@@ -452,3 +452,36 @@ Frontend deploy flow-এ build-এর পর restart mandatory:
 1. `npm run build`
 2. `supervisorctl restart hybrid-stack-frontend`
 3. live smoke check (`/` and `/api/health`)
+
+---
+
+## 20. Ongoing frontend development directives
+
+Future frontend development-এর জন্য নিচের rules follow করতে হবে:
+
+### Page/content rules
+
+- প্রতিটি **নতুন page** বাংলা এবং English—উভয় ভাষায় usable হতে হবে
+- Language switcher support ছাড়া কোনো new public-facing page final ধরা যাবে না
+- Text/content structure এমনভাবে লিখতে হবে যাতে later i18n extraction সহজ হয়
+
+### UI/UX rules
+
+- প্রতিটি নতুন page এবং component **mobile-first** approach-এ build করতে হবে
+- Small screen, tablet, এবং desktop—সব viewport-এ readable ও usable layout নিশ্চিত করতে হবে
+- Dark / Light theme compatibility maintain করতে হবে
+
+### Build and deployment rules
+
+- Frontend-এ নতুন code, UI change, route change, styling change, বা content update করার পর **frontend build mandatory**
+- Required deploy flow:
+	1. `cd /var/www/hybrid-stack/frontend`
+	2. `npm run build`
+	3. `supervisorctl restart hybrid-stack-frontend`
+	4. live smoke check (`/` and `/api/health`)
+
+### Practical expectation
+
+- কোনো নতুন screen implement করলে by default bilingual + responsive + theme-aware হিসেবে build করতে হবে
+- শুধু desktop view target করে page তৈরি করা যাবে না
+- build verification ছাড়া frontend change complete ধরা যাবে না
