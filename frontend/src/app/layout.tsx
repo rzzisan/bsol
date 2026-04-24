@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hybrid Stack Auth",
-  description: "Authentication portal for the Hybrid Stack frontend.",
+  title: "Hybrid Commerce SaaS",
+  description:
+    "Foundation UI for a bilingual, mobile-first F-commerce operations SaaS platform.",
 };
 
 export default function RootLayout({

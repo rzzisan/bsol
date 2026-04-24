@@ -1,6 +1,6 @@
 # Hybrid Stack Server Context
 
-Last updated: 2026-04-23
+Last updated: 2026-04-24
 Domain: `bsol.zyrotechbd.com`
 Server IP: `103.157.253.197`
 
@@ -371,3 +371,84 @@ If development continues, best next steps are:
 - Auto-renewal active করা হয়েছে
 
 এই file-এর উদ্দেশ্য হলো future development-এর সময় context হারিয়ে না ফেলা এবং কোথায় কী আছে তা দ্রুত বুঝে নেওয়া.
+
+---
+
+## 18. SaaS product foundation update (2026-04-24)
+
+Project owner requirement অনুযায়ী frontend-এ এখন একটি **feature-presentation-first foundation shell** তৈরি করা হয়েছে, যা Bangladesh-focused F-commerce SaaS vision দেখানোর জন্য optimized।
+
+### What was implemented now
+
+#### `/var/www/hybrid-stack/frontend/src/app/page.tsx`
+Previous auth-centric UI replace করে একটি modular SaaS foundation page বসানো হয়েছে যেখানে:
+
+- বাংলা / English language switcher
+- Dark / Light theme switcher
+- Mobile-first responsive layout
+- 5টি core module presentation:
+	1. Automated Order + Courier Management
+	2. Fake Order Filtering + Customer Rating
+	3. Landing Page + Single-page Checkout Builder
+	4. Inventory + Ads ROI Tracker
+	5. Messenger CRM + Broadcast
+- MVP roadmap blocks (Phase 1/2/3)
+- API health check CTA (`/api/health`) রাখা হয়েছে যাতে backend connectivity visible থাকে
+
+#### `/var/www/hybrid-stack/frontend/src/app/globals.css`
+Theme token system add করা হয়েছে:
+
+- Shared design tokens: `--background`, `--foreground`, `--surface`, `--surface-soft`, `--border`, `--muted`, `--accent`
+- `html[data-theme="light"]` এর মাধ্যমে light mode override
+- Smooth color transition support
+
+#### `/var/www/hybrid-stack/frontend/src/app/layout.tsx`
+Metadata update করা হয়েছে যেন application purpose reflect করে:
+
+- Title: `Hybrid Commerce SaaS`
+- Description: bilingual mobile-first F-commerce SaaS foundation
+
+### Why this foundation matters
+
+- Product pitch/demo immediately possible
+- Future dashboard modules plug-in করার জন্য section-based skeleton ready
+- UI system এখন থেকেই bilingual + theming-aware হওয়ায় redesign cost কমবে
+- Backend API integration expand করা সহজ হবে (existing Laravel `/api/*` structure compatible)
+
+### Suggested next build steps from this baseline
+
+1. Auth পুনরায় modular form-এ ফিরিয়ে আনা (separate `/auth` route)
+2. Dashboard route groups তৈরি (`/orders`, `/couriers`, `/crm`, `/analytics`)
+3. Shared component library তৈরি (cards, tables, labels, filters, modal)
+4. Courier adapter interface define করা (Pathao/Steadfast/RedX)
+5. Fake-order risk scoring-এর জন্য backend schema draft করা
+
+---
+
+## 19. Deployment incident note (2026-04-24)
+
+### Issue observed
+
+Frontend source + build artifact আপডেট থাকলেও live domain-এ কিছুক্ষণ **পুরনো auth UI** দেখা যাচ্ছিল।
+
+### Root cause
+
+- Next.js production process (`next start`) Supervisor-এর অধীনে চলছিল
+- নতুন `npm run build` হওয়ার পর process restart করা হয়নি
+- ফলে runtime পুরনো build snapshot serve করছিল
+
+### Fix applied
+
+1. `supervisorctl status` দিয়ে process verify
+2. `supervisorctl restart hybrid-stack-frontend` run
+3. domain HTML verify করে নতুন title/content confirm:
+	- `Hybrid Commerce SaaS`
+	- নতুন Bengali/English + theme-aware landing shell
+
+### Operational reminder
+
+Frontend deploy flow-এ build-এর পর restart mandatory:
+
+1. `npm run build`
+2. `supervisorctl restart hybrid-stack-frontend`
+3. live smoke check (`/` and `/api/health`)
