@@ -1,20 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  getStoredLocale,
+  getStoredTheme,
+  getStoredToken,
+  getStoredUser,
+  LOCALE_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  type AuthUser,
+  type Locale,
+  type ThemeMode,
+} from "@/lib/dashboard-client";
 
-type Locale = "bn" | "en";
-type ThemeMode = "dark" | "light";
 type AuthTab = "login" | "register";
-
-const LOCALE_STORAGE_KEY = "preferred_locale";
-const THEME_STORAGE_KEY = "preferred_theme";
-
-interface UserInfo {
-  id: number;
-  name: string;
-  mobile: string | null;
-  email: string;
-}
 
 const API_BASE_URL =
   (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
@@ -81,6 +80,7 @@ const content = {
       loggingIn: "লগইন হচ্ছে...",
       registering: "রেজিস্ট্রেশন হচ্ছে...",
       logoutBtn: "লগআউট",
+      dashboardBtn: "ড্যাশবোর্ডে যান",
       welcomeBack: "স্বাগতম",
       loggedInAs: "আপনি সফলভাবে লগইন করেছেন।",
       mobileDisplay: "মোবাইল",
@@ -147,6 +147,7 @@ const content = {
       loggingIn: "Logging in...",
       registering: "Creating account...",
       logoutBtn: "Logout",
+      dashboardBtn: "Go to dashboard",
       welcomeBack: "Welcome",
       loggedInAs: "You have successfully logged in.",
       mobileDisplay: "Mobile",
@@ -216,36 +217,6 @@ const modules = {
 };
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("auth_token");
-}
-
-function getStoredUser(): UserInfo | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem("auth_user");
-    return raw ? (JSON.parse(raw) as UserInfo) : null;
-  } catch {
-    return null;
-  }
-}
-
-function getStoredLocale(): Locale {
-  if (typeof window === "undefined") return "bn";
-  const value = localStorage.getItem(LOCALE_STORAGE_KEY);
-  return value === "en" ? "en" : "bn";
-}
-
-function getStoredTheme(): ThemeMode {
-  if (typeof window === "undefined") return "dark";
-  const value = localStorage.getItem(THEME_STORAGE_KEY);
-  return value === "light" ? "light" : "dark";
-}
-
-// ---------------------------------------------------------------------------
 // Input component
 // ---------------------------------------------------------------------------
 function FormInput({
@@ -297,7 +268,7 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
   const [tab, setTab] = useState<AuthTab>("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<UserInfo | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -320,10 +291,17 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
     setError(null);
   }
 
-  function persistAuth(token: string, userData: UserInfo) {
+  function persistAuth(token: string, userData: AuthUser) {
+    const normalizedUser: AuthUser = {
+      ...userData,
+      role: userData.role === "admin" ? "admin" : "user",
+    };
     localStorage.setItem("auth_token", token);
-    localStorage.setItem("auth_user", JSON.stringify(userData));
-    setUser(userData);
+    localStorage.setItem("auth_user", JSON.stringify(normalizedUser));
+    setUser(normalizedUser);
+
+    const destination = normalizedUser.role === "admin" ? "/admin" : "/dashboard";
+    window.location.href = destination;
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -343,7 +321,7 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
           : data?.message;
         setError(firstError ?? "Login failed.");
       } else {
-        persistAuth(data.token, data.user as UserInfo);
+        persistAuth(data.token, data.user as AuthUser);
         setLoginEmail("");
         setLoginPassword("");
       }
@@ -387,7 +365,7 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
           : data?.message;
         setError(firstError ?? "Registration failed.");
       } else {
-        persistAuth(data.token, data.user as UserInfo);
+        persistAuth(data.token, data.user as AuthUser);
         setRegName("");
         setRegMobile("");
         setRegEmail("");
@@ -430,13 +408,21 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
           <h2 className="text-base font-semibold text-[var(--foreground)] sm:text-lg">
             {t.welcomeBack}, {user.name}!
           </h2>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-red-400 hover:bg-red-500/10 hover:text-red-400"
-          >
-            {t.logoutBtn}
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={user.role === "admin" ? "/admin" : "/dashboard"}
+              className="shrink-0 rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              {t.dashboardBtn}
+            </a>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-red-400 hover:bg-red-500/10 hover:text-red-400"
+            >
+              {t.logoutBtn}
+            </button>
+          </div>
         </div>
         <p className="text-sm text-[var(--muted)]">{t.loggedInAs}</p>
         <div className="grid gap-2 sm:grid-cols-2">
