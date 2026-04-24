@@ -4,21 +4,32 @@ import { useEffect, useMemo, useState } from "react";
 
 type Locale = "bn" | "en";
 type ThemeMode = "dark" | "light";
+type AuthTab = "login" | "register";
+
+interface UserInfo {
+  id: number;
+  name: string;
+  mobile: string | null;
+  email: string;
+}
 
 const API_BASE_URL =
   (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
 
+// ---------------------------------------------------------------------------
+// Content
+// ---------------------------------------------------------------------------
 const content = {
   bn: {
     badge: "Hybrid Commerce SaaS Foundation",
     title: "বাংলাদেশি F-commerce ব্যবসার জন্য স্মার্ট অপারেশন প্ল্যাটফর্ম",
     subtitle:
-      "অর্ডার, কুরিয়ার, ফেইক অর্ডার রিস্ক, ল্যান্ডিং পেজ, CRM এবং প্রফিট ট্র্যাকিং—সব এক প্ল্যাটফর্মে আনার জন্য বেস স্ট্রাকচার তৈরি করা হয়েছে।",
+      "অর্ডার, কুরিয়ার, ফেইক অর্ডার রিস্ক, ল্যান্ডিং পেজ, CRM এবং প্রফিট ট্র্যাকিং—সব এক প্ল্যাটফর্মে আনার জন্য বেস স্ট্রাকচার তৈরি করা হয়েছে।",
     ctaPrimary: "MVP Roadmap দেখুন",
     ctaSecondary: "API Health Check",
     sectionTitle: "Core Product Modules",
     sectionDescription:
-      "নিচের মডিউলগুলো আপনার দেওয়া requirement অনুযায়ী সাজানো হয়েছে, যাতে ধাপে ধাপে production SaaS বানানো যায়।",
+      "নিচের মডিউলগুলো আপনার দেওয়া requirement অনুযায়ী সাজানো হয়েছে, যাতে ধাপে ধাপে production SaaS বানানো যায়।",
     readyTitle: "Foundation Ready",
     readyItems: [
       "মোবাইল-ফার্স্ট UI কাঠামো",
@@ -45,9 +56,36 @@ const content = {
         detail: "Page builder blocks, custom domain mapping, ad spend sync, net profit and inventory insights.",
       },
     ],
-    footer: "এই স্ক্রিনটি এখন আপনার SaaS vision presentation এবং future dashboard shell হিসেবে কাজ করবে।",
+    footer:
+      "এই স্ক্রিনটি এখন আপনার SaaS vision presentation এবং future dashboard shell হিসেবে কাজ করবে।",
     languageLabel: "ভাষা",
     themeLabel: "থিম",
+    auth: {
+      loginTab: "লগইন",
+      registerTab: "রেজিস্ট্রেশন",
+      nameLabel: "পূর্ণ নাম",
+      namePlaceholder: "আপনার পূর্ণ নাম লিখুন",
+      mobileLabel: "মোবাইল নম্বর",
+      mobilePlaceholder: "01XXXXXXXXX",
+      emailLabel: "ইমেইল অ্যাড্রেস",
+      emailPlaceholder: "example@email.com",
+      passwordLabel: "পাসওয়ার্ড",
+      passwordPlaceholder: "মিনিমাম ৮ অক্ষর",
+      confirmPasswordLabel: "পাসওয়ার্ড নিশ্চিত করুন",
+      confirmPasswordPlaceholder: "পাসওয়ার্ড আবার লিখুন",
+      loginBtn: "লগইন করুন",
+      registerBtn: "অ্যাকাউন্ট তৈরি করুন",
+      loggingIn: "লগইন হচ্ছে...",
+      registering: "রেজিস্ট্রেশন হচ্ছে...",
+      logoutBtn: "লগআউট",
+      welcomeBack: "স্বাগতম",
+      loggedInAs: "আপনি সফলভাবে লগইন করেছেন।",
+      mobileDisplay: "মোবাইল",
+      emailDisplay: "ইমেইল",
+      passwordMismatch: "পাসওয়ার্ড দুটি মিলছে না।",
+      passwordTooShort: "পাসওয়ার্ড কমপক্ষে ৮ অক্ষর হতে হবে।",
+      authSectionTitle: "অ্যাকাউন্ট",
+    },
   },
   en: {
     badge: "Hybrid Commerce SaaS Foundation",
@@ -88,13 +126,39 @@ const content = {
     footer: "This screen now acts as your SaaS vision presenter and future dashboard shell.",
     languageLabel: "Language",
     themeLabel: "Theme",
+    auth: {
+      loginTab: "Login",
+      registerTab: "Register",
+      nameLabel: "Full Name",
+      namePlaceholder: "Enter your full name",
+      mobileLabel: "Mobile Number",
+      mobilePlaceholder: "01XXXXXXXXX",
+      emailLabel: "Email Address",
+      emailPlaceholder: "example@email.com",
+      passwordLabel: "Password",
+      passwordPlaceholder: "Minimum 8 characters",
+      confirmPasswordLabel: "Confirm Password",
+      confirmPasswordPlaceholder: "Re-enter your password",
+      loginBtn: "Login",
+      registerBtn: "Create Account",
+      loggingIn: "Logging in...",
+      registering: "Creating account...",
+      logoutBtn: "Logout",
+      welcomeBack: "Welcome",
+      loggedInAs: "You have successfully logged in.",
+      mobileDisplay: "Mobile",
+      emailDisplay: "Email",
+      passwordMismatch: "Passwords do not match.",
+      passwordTooShort: "Password must be at least 8 characters.",
+      authSectionTitle: "Account",
+    },
   },
 };
 
 const modules = {
   bn: [
     {
-      title: "অটোমেটেড অর্ডার + কুরিয়ার",
+      title: "অটোমেটেড অর্ডার + কুরিয়ার",
       description:
         "একটি single form থেকে Pathao / Steadfast / RedX integration-ready dispatch pipeline।",
     },
@@ -111,7 +175,7 @@ const modules = {
     {
       title: "ইনভেন্টরি + Ads ROI",
       description:
-        "Ad spend, cost of goods, delivery cost, এবং net margin analytics এক জায়গায়।",
+        "Ad spend, cost of goods, delivery cost, এবং net margin analytics এক জায়গায়।",
     },
     {
       title: "মেসেঞ্জার CRM + ব্রডকাস্ট",
@@ -148,6 +212,366 @@ const modules = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("auth_token");
+}
+
+function getStoredUser(): UserInfo | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem("auth_user");
+    return raw ? (JSON.parse(raw) as UserInfo) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Input component
+// ---------------------------------------------------------------------------
+function FormInput({
+  id,
+  label,
+  type,
+  placeholder,
+  value,
+  onChange,
+  required,
+  autoComplete,
+}: {
+  id: string;
+  label: string;
+  type: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  required?: boolean;
+  autoComplete?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label
+        htmlFor={id}
+        className="text-xs font-semibold text-[var(--muted)] sm:text-sm"
+      >
+        {label}
+      </label>
+      <input
+        id={id}
+        name={id}
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        autoComplete={autoComplete}
+        required={required}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2.5 text-sm text-[var(--foreground)] placeholder-[var(--muted)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20"
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Auth Section
+// ---------------------------------------------------------------------------
+function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["auth"] }) {
+  const [tab, setTab] = useState<AuthTab>("login");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
+
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+
+  const [regName, setRegName] = useState("");
+  const [regMobile, setRegMobile] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirm, setRegConfirm] = useState("");
+
+  useEffect(() => {
+    const storedUser = getStoredUser();
+    const storedToken = getStoredToken();
+    if (storedUser && storedToken) {
+      setUser(storedUser);
+    }
+  }, []);
+
+  function clearErrors() {
+    setError(null);
+  }
+
+  function persistAuth(token: string, userData: UserInfo) {
+    localStorage.setItem("auth_token", token);
+    localStorage.setItem("auth_user", JSON.stringify(userData));
+    setUser(userData);
+  }
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    clearErrors();
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const firstError = data?.errors
+          ? Object.values(data.errors as Record<string, string[]>)[0]?.[0]
+          : data?.message;
+        setError(firstError ?? "Login failed.");
+      } else {
+        persistAuth(data.token, data.user as UserInfo);
+        setLoginEmail("");
+        setLoginPassword("");
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault();
+    clearErrors();
+
+    if (regPassword.length < 8) {
+      setError(t.passwordTooShort);
+      return;
+    }
+    if (regPassword !== regConfirm) {
+      setError(t.passwordMismatch);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          name: regName,
+          mobile: regMobile,
+          email: regEmail,
+          password: regPassword,
+          password_confirmation: regConfirm,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const firstError = data?.errors
+          ? Object.values(data.errors as Record<string, string[]>)[0]?.[0]
+          : data?.message;
+        setError(firstError ?? "Registration failed.");
+      } else {
+        persistAuth(data.token, data.user as UserInfo);
+        setRegName("");
+        setRegMobile("");
+        setRegEmail("");
+        setRegPassword("");
+        setRegConfirm("");
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    const token = getStoredToken();
+    if (token) {
+      try {
+        await fetch(`${API_BASE_URL}/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } catch {
+        // ignore network errors on logout
+      }
+    }
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    setUser(null);
+    clearErrors();
+  }
+
+  if (user) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-[var(--foreground)] sm:text-lg">
+            {t.welcomeBack}, {user.name}!
+          </h2>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-red-400 hover:bg-red-500/10 hover:text-red-400"
+          >
+            {t.logoutBtn}
+          </button>
+        </div>
+        <p className="text-sm text-[var(--muted)]">{t.loggedInAs}</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {user.mobile && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                {t.mobileDisplay}
+              </p>
+              <p className="mt-1 text-sm font-medium text-[var(--foreground)]">{user.mobile}</p>
+            </div>
+          )}
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              {t.emailDisplay}
+            </p>
+            <p className="mt-1 text-sm font-medium text-[var(--foreground)]">{user.email}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-1">
+        {(["login", "register"] as AuthTab[]).map((tabKey) => (
+          <button
+            key={tabKey}
+            type="button"
+            onClick={() => { setTab(tabKey); clearErrors(); }}
+            className={`flex-1 rounded-xl py-2 text-sm font-semibold transition ${
+              tab === tabKey
+                ? "bg-[var(--accent)] text-white"
+                : "text-[var(--foreground)] hover:bg-[var(--surface)]"
+            }`}
+          >
+            {tabKey === "login" ? t.loginTab : t.registerTab}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+        >
+          {error}
+        </div>
+      )}
+
+      {tab === "login" && (
+        <form onSubmit={handleLogin} className="flex flex-col gap-4" noValidate>
+          <FormInput
+            id="login_email"
+            label={t.emailLabel}
+            type="email"
+            placeholder={t.emailPlaceholder}
+            value={loginEmail}
+            onChange={setLoginEmail}
+            required
+            autoComplete="email"
+          />
+          <FormInput
+            id="login_password"
+            label={t.passwordLabel}
+            type="password"
+            placeholder={t.passwordPlaceholder}
+            value={loginPassword}
+            onChange={setLoginPassword}
+            required
+            autoComplete="current-password"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? t.loggingIn : t.loginBtn}
+          </button>
+        </form>
+      )}
+
+      {tab === "register" && (
+        <form onSubmit={handleRegister} className="flex flex-col gap-4" noValidate>
+          <FormInput
+            id="reg_name"
+            label={t.nameLabel}
+            type="text"
+            placeholder={t.namePlaceholder}
+            value={regName}
+            onChange={setRegName}
+            required
+            autoComplete="name"
+          />
+          <FormInput
+            id="reg_mobile"
+            label={t.mobileLabel}
+            type="tel"
+            placeholder={t.mobilePlaceholder}
+            value={regMobile}
+            onChange={setRegMobile}
+            required
+            autoComplete="tel"
+          />
+          <FormInput
+            id="reg_email"
+            label={t.emailLabel}
+            type="email"
+            placeholder={t.emailPlaceholder}
+            value={regEmail}
+            onChange={setRegEmail}
+            required
+            autoComplete="email"
+          />
+          <FormInput
+            id="reg_password"
+            label={t.passwordLabel}
+            type="password"
+            placeholder={t.passwordPlaceholder}
+            value={regPassword}
+            onChange={setRegPassword}
+            required
+            autoComplete="new-password"
+          />
+          <FormInput
+            id="reg_confirm"
+            label={t.confirmPasswordLabel}
+            type="password"
+            placeholder={t.confirmPasswordPlaceholder}
+            value={regConfirm}
+            onChange={setRegConfirm}
+            required
+            autoComplete="new-password"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? t.registering : t.registerBtn}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("bn");
   const [theme, setTheme] = useState<ThemeMode>("dark");
@@ -171,11 +595,9 @@ export default function Home() {
             <span className="inline-flex rounded-full border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold tracking-wide text-[var(--muted)] sm:text-sm">
               {text.badge}
             </span>
-
             <h1 className="max-w-3xl text-2xl font-bold tracking-tight text-[var(--foreground)] sm:text-4xl lg:text-5xl">
               {text.title}
             </h1>
-
             <p className="max-w-3xl text-sm leading-6 text-[var(--muted)] sm:text-base sm:leading-7">
               {text.subtitle}
             </p>
@@ -185,10 +607,7 @@ export default function Home() {
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-1">
               <div className="px-2 pb-1 text-xs font-semibold text-[var(--muted)]">{text.languageLabel}</div>
               <div className="flex gap-1">
-                {([
-                  ["bn", "বাংলা"],
-                  ["en", "English"],
-                ] as const).map(([key, label]) => (
+                {([["bn", "বাংলা"], ["en", "English"]] as const).map(([key, label]) => (
                   <button
                     key={key}
                     type="button"
@@ -208,10 +627,7 @@ export default function Home() {
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-1">
               <div className="px-2 pb-1 text-xs font-semibold text-[var(--muted)]">{text.themeLabel}</div>
               <div className="flex gap-1">
-                {([
-                  ["dark", "Dark"],
-                  ["light", "Light"],
-                ] as const).map(([key, label]) => (
+                {([["dark", "Dark"], ["light", "Light"]] as const).map(([key, label]) => (
                   <button
                     key={key}
                     type="button"
@@ -258,43 +674,54 @@ export default function Home() {
         ))}
       </section>
 
-      <section className="mt-6 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+      <section className="mt-6 grid gap-4 lg:grid-cols-2">
+        <article
+          id="auth"
+          className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+        >
+          <h3 className="mb-4 text-lg font-semibold text-[var(--foreground)] sm:text-xl">
+            {text.auth.authSectionTitle}
+          </h3>
+          <AuthSection locale={locale} t={text.auth} />
+        </article>
+
         <article className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
           <h3 className="text-lg font-semibold text-[var(--foreground)] sm:text-xl">{text.readyTitle}</h3>
           <ul className="mt-4 space-y-2 text-sm text-[var(--muted)] sm:text-base">
             {text.readyItems.map((item) => (
               <li key={item} className="flex items-start gap-2">
-                <span className="mt-1 inline-block h-2 w-2 rounded-full bg-[var(--accent)]" />
+                <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--accent)]" />
                 <span>{item}</span>
               </li>
             ))}
           </ul>
         </article>
+      </section>
 
-        <article id="roadmap" className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
-          <h3 className="text-lg font-semibold text-[var(--foreground)] sm:text-xl">{text.roadmapTitle}</h3>
-          <div className="mt-4 space-y-3">
-            {text.roadmap.map((item) => (
-              <div
-                key={item.phase}
-                className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4"
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                  {item.phase}
-                </p>
-                <h4 className="mt-1 text-base font-semibold text-[var(--foreground)]">{item.title}</h4>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.detail}</p>
-              </div>
-            ))}
-          </div>
-        </article>
+      <section
+        id="roadmap"
+        className="mt-6 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6"
+      >
+        <h3 className="text-lg font-semibold text-[var(--foreground)] sm:text-xl">{text.roadmapTitle}</h3>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {text.roadmap.map((item) => (
+            <div
+              key={item.phase}
+              className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                {item.phase}
+              </p>
+              <h4 className="mt-1 text-base font-semibold text-[var(--foreground)]">{item.title}</h4>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.detail}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="mt-6 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:p-6">
         <h3 className="text-lg font-semibold text-[var(--foreground)] sm:text-xl">{text.sectionTitle}</h3>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">
-          {text.sectionDescription}
-        </p>
+        <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">{text.sectionDescription}</p>
         <p className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4 text-sm leading-6 text-[var(--muted)] sm:text-base">
           {text.footer}
         </p>

@@ -485,3 +485,65 @@ Future frontend development-এর জন্য নিচের rules follow ক
 - কোনো নতুন screen implement করলে by default bilingual + responsive + theme-aware হিসেবে build করতে হবে
 - শুধু desktop view target করে page তৈরি করা যাবে না
 - build verification ছাড়া frontend change complete ধরা যাবে না
+
+---
+
+## 21. Homepage auth implementation update (2026-04-24)
+
+Project owner request অনুযায়ী homepage-এ login + registration form fully integrate করা হয়েছে এবং backend API-এর সাথে end-to-end কাজ নিশ্চিত করা হয়েছে।
+
+### Backend changes
+
+#### `/var/www/hybrid-stack/backend/database/migrations/2026_04_24_093035_add_mobile_to_users_table.php`
+- `users` table-এ `mobile` column add করা হয়েছে
+
+#### `/var/www/hybrid-stack/backend/app/Models/User.php`
+- Fillable list update করে `mobile` include করা হয়েছে
+
+#### `/var/www/hybrid-stack/backend/app/Http/Controllers/AuthController.php`
+- Register validation-এ `mobile` field add করা হয়েছে
+- Validation rules:
+	- required
+	- string
+	- max:20
+	- mobile format regex check
+	- unique in users table
+- Password confirmed + minimum length (`8`) rule active আছে
+
+### Frontend changes
+
+#### `/var/www/hybrid-stack/frontend/src/app/page.tsx`
+Homepage-এ bilingual auth section add করা হয়েছে:
+
+- Login tab:
+	- Email
+	- Password
+- Registration tab:
+	- Name
+	- Mobile number
+	- Email address
+	- Password
+	- Confirm password
+- Client-side validation:
+	- password minimum 8 characters
+	- confirm password match check
+- Success flow:
+	- API success হলে token + user data localStorage-এ store হয়
+	- logged-in state UI show করে (name/email/mobile)
+	- logout action included
+- UI compatibility:
+	- বাংলা / English supported
+	- dark / light theme compatible
+	- mobile-first responsive layout maintained
+
+### Deployment steps executed
+
+1. Backend migration run:
+	 - `php artisan migrate --force`
+2. Frontend production build run:
+	 - `npm run build`
+3. Frontend runtime restart:
+	 - `supervisorctl restart hybrid-stack-frontend`
+4. Smoke checks:
+	 - `https://bsol.zyrotechbd.com/api/health` returns `status: ok`
+	 - `https://bsol.zyrotechbd.com/` returns HTTP `200`
