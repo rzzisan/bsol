@@ -6,6 +6,9 @@ type Locale = "bn" | "en";
 type ThemeMode = "dark" | "light";
 type AuthTab = "login" | "register";
 
+const LOCALE_STORAGE_KEY = "preferred_locale";
+const THEME_STORAGE_KEY = "preferred_theme";
+
 interface UserInfo {
   id: number;
   name: string;
@@ -228,6 +231,18 @@ function getStoredUser(): UserInfo | null {
   } catch {
     return null;
   }
+}
+
+function getStoredLocale(): Locale {
+  if (typeof window === "undefined") return "bn";
+  const value = localStorage.getItem(LOCALE_STORAGE_KEY);
+  return value === "en" ? "en" : "bn";
+}
+
+function getStoredTheme(): ThemeMode {
+  if (typeof window === "undefined") return "dark";
+  const value = localStorage.getItem(THEME_STORAGE_KEY);
+  return value === "light" ? "light" : "dark";
 }
 
 // ---------------------------------------------------------------------------
@@ -573,15 +588,17 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
 // Page
 // ---------------------------------------------------------------------------
 export default function Home() {
-  const [locale, setLocale] = useState<Locale>("bn");
-  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
+    localStorage.setItem(LOCALE_STORAGE_KEY, locale);
   }, [locale]);
 
   const text = useMemo(() => content[locale], [locale]);
