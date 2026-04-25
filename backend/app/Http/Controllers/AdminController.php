@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SubscriptionPackage;
+use App\Models\SmsGateway;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,9 +25,9 @@ class AdminController extends Controller
 
     public function listUsers(): JsonResponse
     {
-        $users = User::with('subscriptionPackage:id,name,slug')
+        $users = User::with(['subscriptionPackage:id,name,slug', 'assignedGateway:id,name,provider'])
             ->latest()
-            ->get(['id', 'name', 'mobile', 'email', 'role', 'subscription_package_id', 'created_at']);
+            ->get(['id', 'name', 'mobile', 'email', 'role', 'subscription_package_id', 'sms_gateway_id', 'created_at']);
 
         return response()->json([
             'users' => $users,
@@ -42,13 +43,14 @@ class AdminController extends Controller
             'password' => ['required', 'string', 'min:8'],
             'role' => ['required', Rule::in(['admin', 'user'])],
             'subscription_package_id' => ['nullable', 'integer', 'exists:subscription_packages,id'],
+            'sms_gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
         ]);
 
         $user = User::create($validated);
 
         return response()->json([
             'message' => 'User created successfully.',
-            'user' => $user,
+            'user' => $user->load('assignedGateway:id,name,provider'),
         ], 201);
     }
 
@@ -61,13 +63,14 @@ class AdminController extends Controller
             'password' => ['sometimes', 'required', 'string', 'min:8'],
             'role' => ['sometimes', 'required', Rule::in(['admin', 'user'])],
             'subscription_package_id' => ['nullable', 'integer', 'exists:subscription_packages,id'],
+            'sms_gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
         ]);
 
         $user->update($validated);
 
         return response()->json([
             'message' => 'User updated successfully.',
-            'user' => $user,
+            'user' => $user->load('assignedGateway:id,name,provider'),
         ]);
     }
 
