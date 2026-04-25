@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SmsGateway;
 use App\Models\SmsHistory;
+use App\Services\SmsCreditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class AdminSmsGatewayController extends Controller
 {
+    public function __construct(private readonly SmsCreditService $creditService) {}
+
     public function index(): JsonResponse
     {
         $this->ensureDefaultKhudebartaGateway();
@@ -132,11 +135,43 @@ class AdminSmsGatewayController extends Controller
             'message' => ['required', 'string', 'max:2000'],
         ]);
 
-        $actorId = $request->user()?->id;
+        $actor = $request->user();
+        $actorId = $actor?->id;
+        $isAdmin = (bool) $actor?->isAdmin();
 
-        $gateway = isset($validated['gateway_id'])
-            ? SmsGateway::find($validated['gateway_id'])
-            : SmsGateway::where('is_active', true)->first();
+        if (! $isAdmin && $actor?->sms_gateway_id) {
+            $gateway = SmsGateway::find($actor->sms_gateway_id);
+        } else {
+            $gateway = isset($validated['gateway_id'])
+                ? SmsGateway::find($validated['gateway_id'])
+                : SmsGateway::where('is_active', true)->first();
+        }
+
+        $creditsRequired = $this->creditService->calculateCreditsRequired($validated['message']);
+
+        if (! $isAdmin && $actorId) {
+            $balance = $this->creditService->getBalance($actorId);
+
+            if ($balance < $creditsRequired) {
+                $this->createHistoryRecord(
+                    gateway: $gateway,
+                    userId: $actorId,
+                    phoneNumber: $validated['phone_number'],
+                    message: $validated['message'],
+                    status: 'failed',
+                    httpStatusCode: null,
+                    responseBody: null,
+                    errorMessage: "Insufficient SMS credits. Required {$creditsRequired}, available {$balance}.",
+                    sentAt: null,
+                );
+
+                return response()->json([
+                    'message' => 'Insufficient SMS credits.',
+                    'credits_required' => $creditsRequired,
+                    'available_credits' => $balance,
+                ], 402);
+            }
+        }
 
         if (! $gateway) {
             $this->createHistoryRecord(
@@ -271,11 +306,20 @@ class AdminSmsGatewayController extends Controller
             ], 502);
         }
 
+        if (! $isAdmin && $actorId) {
+            $this->creditService->deduct(
+                userId: $actorId,
+                credits: $creditsRequired,
+                note: "SMS sent to {$phone} via {$gateway->name}",
+            );
+        }
+
         return response()->json([
             'message' => 'SMS sent successfully.',
             'gateway' => $gateway->name,
             'provider' => $gateway->provider,
             'phone_number' => $phone,
+            'credits_used' => $creditsRequired,
             'status_code' => $response->status(),
             'response_body' => mb_substr($body, 0, 1000),
         ]);

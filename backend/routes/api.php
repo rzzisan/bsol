@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminSmsCreditController;
 use App\Http\Controllers\AdminSmsGatewayController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
@@ -41,5 +42,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/sms/gateways/{smsGateway}', [AdminSmsGatewayController::class, 'destroy']);
         Route::get('/sms/history', [AdminSmsGatewayController::class, 'history']);
         Route::post('/sms/send', [AdminSmsGatewayController::class, 'send']);
+
+        Route::get('/sms/credit/settings', [AdminSmsCreditController::class, 'getSettings']);
+        Route::put('/sms/credit/settings', [AdminSmsCreditController::class, 'updateSettings']);
+        Route::get('/sms/credit/users', [AdminSmsCreditController::class, 'listUserCredits']);
+        Route::post('/sms/credit/recharge', [AdminSmsCreditController::class, 'recharge']);
+        Route::get('/sms/credit/history', [AdminSmsCreditController::class, 'creditHistory']);
     });
 });
