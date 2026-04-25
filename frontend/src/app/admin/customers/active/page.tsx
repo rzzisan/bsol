@@ -42,6 +42,7 @@ const text = {
     menuSms: "এসএমএস",
     menuSmsGateway: "এসএমএস গেটওয়ে",
     menuSmsSend: "এসএমএস সেন্ড",
+    menuSmsHistory: "এসএমএস হিস্টোরি",
     menuPackages: "প্যাকেজ",
     loading: "ডাটা লোড হচ্ছে...",
     empty: "কোনো ইউজার পাওয়া যায়নি।",
@@ -71,6 +72,7 @@ const text = {
     menuSms: "SMS",
     menuSmsGateway: "SMS Gateway",
     menuSmsSend: "Send SMS",
+    menuSmsHistory: "SMS History",
     menuPackages: "Packages",
     loading: "Loading data...",
     empty: "No users found.",
@@ -179,6 +181,7 @@ export default function ActiveCustomersPage() {
         children: [
           { key: "sms-gateway", label: t.menuSmsGateway, href: "/admin/sms/gateways" },
           { key: "sms-send", label: t.menuSmsSend, href: "/admin/sms/send" },
+          { key: "sms-history", label: t.menuSmsHistory, href: "/admin/sms/history" },
         ],
       },
       { key: "packages", label: t.menuPackages, icon: "📦" },

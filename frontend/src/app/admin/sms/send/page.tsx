@@ -38,6 +38,7 @@ const text = {
     menuSms: "এসএমএস",
     menuSmsGateway: "এসএমএস গেটওয়ে",
     menuSmsSend: "এসএমএস সেন্ড",
+    menuSmsHistory: "এসএমএস হিস্টোরি",
     menuPackages: "প্যাকেজ",
     languageLabel: "ভাষা",
     themeLabel: "থিম",
@@ -67,6 +68,7 @@ const text = {
     menuSms: "SMS",
     menuSmsGateway: "SMS Gateway",
     menuSmsSend: "Send SMS",
+    menuSmsHistory: "SMS History",
     menuPackages: "Packages",
     languageLabel: "Language",
     themeLabel: "Theme",
@@ -191,6 +193,7 @@ export default function AdminSmsSendPage() {
         children: [
           { key: "sms-gateway", label: t.menuSmsGateway, href: "/admin/sms/gateways" },
           { key: "sms-send", label: t.menuSmsSend, href: "/admin/sms/send" },
+          { key: "sms-history", label: t.menuSmsHistory, href: "/admin/sms/history" },
         ],
       },
       { key: "packages", label: t.menuPackages, icon: "📦" },

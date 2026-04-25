@@ -39,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/sms/gateways', [AdminSmsGatewayController::class, 'store']);
         Route::put('/sms/gateways/{smsGateway}', [AdminSmsGatewayController::class, 'update']);
         Route::delete('/sms/gateways/{smsGateway}', [AdminSmsGatewayController::class, 'destroy']);
+        Route::get('/sms/history', [AdminSmsGatewayController::class, 'history']);
         Route::post('/sms/send', [AdminSmsGatewayController::class, 'send']);
     });
 });

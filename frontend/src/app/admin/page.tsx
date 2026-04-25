@@ -33,6 +33,7 @@ const text = {
       sms: "এসএমএস",
       smsGateway: "এসএমএস গেটওয়ে",
       smsSend: "এসএমএস সেন্ড",
+      smsHistory: "এসএমএস হিস্টোরি",
       packages: "প্যাকেজ",
       billing: "বিলিং",
       reports: "রিপোর্ট",
@@ -75,6 +76,7 @@ const text = {
       sms: "SMS",
       smsGateway: "SMS Gateway",
       smsSend: "Send SMS",
+      smsHistory: "SMS History",
       packages: "Packages",
       billing: "Billing",
       reports: "Reports",
@@ -156,6 +158,7 @@ export default function AdminDashboardPage() {
         children: [
           { key: "sms-gateway", label: t.menu.smsGateway, href: "/admin/sms/gateways" },
           { key: "sms-send", label: t.menu.smsSend, href: "/admin/sms/send" },
+          { key: "sms-history", label: t.menu.smsHistory, href: "/admin/sms/history" },
         ],
       },
       { key: "packages", label: t.menu.packages, icon: "📦" },

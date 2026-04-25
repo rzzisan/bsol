@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SmsGateway;
+use App\Models\SmsHistory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -131,17 +132,43 @@ class AdminSmsGatewayController extends Controller
             'message' => ['required', 'string', 'max:2000'],
         ]);
 
+        $actorId = $request->user()?->id;
+
         $gateway = isset($validated['gateway_id'])
             ? SmsGateway::find($validated['gateway_id'])
             : SmsGateway::where('is_active', true)->first();
 
         if (! $gateway) {
+            $this->createHistoryRecord(
+                gateway: null,
+                userId: $actorId,
+                phoneNumber: $validated['phone_number'],
+                message: $validated['message'],
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'No gateway selected or active gateway found.',
+                sentAt: null,
+            );
+
             return response()->json([
                 'message' => 'No SMS gateway selected or active gateway found.',
             ], 422);
         }
 
         if (! $gateway->is_enabled) {
+            $this->createHistoryRecord(
+                gateway: $gateway,
+                userId: $actorId,
+                phoneNumber: $validated['phone_number'],
+                message: $validated['message'],
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'Selected SMS gateway is disabled.',
+                sentAt: null,
+            );
+
             return response()->json([
                 'message' => 'Selected SMS gateway is disabled.',
             ], 422);
@@ -150,6 +177,18 @@ class AdminSmsGatewayController extends Controller
         $phone = $this->formatBdPhoneNumber($validated['phone_number']);
 
         if (! $phone) {
+            $this->createHistoryRecord(
+                gateway: $gateway,
+                userId: $actorId,
+                phoneNumber: $validated['phone_number'],
+                message: $validated['message'],
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'Invalid phone number format.',
+                sentAt: null,
+            );
+
             return response()->json([
                 'message' => 'Invalid phone number format. Use a valid BD mobile number.',
             ], 422);
@@ -161,12 +200,36 @@ class AdminSmsGatewayController extends Controller
             || blank($gateway->secret_key)
             || blank($gateway->sender_id)
         ) {
+            $this->createHistoryRecord(
+                gateway: $gateway,
+                userId: $actorId,
+                phoneNumber: $phone,
+                message: $validated['message'],
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'Gateway credentials are incomplete.',
+                sentAt: null,
+            );
+
             return response()->json([
                 'message' => 'Gateway credentials are incomplete. Please update endpoint/API key/secret/sender ID.',
             ], 422);
         }
 
         if ($gateway->provider !== 'khudebarta') {
+            $this->createHistoryRecord(
+                gateway: $gateway,
+                userId: $actorId,
+                phoneNumber: $phone,
+                message: $validated['message'],
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'Provider is not supported yet.',
+                sentAt: null,
+            );
+
             return response()->json([
                 'message' => 'Selected gateway provider is not supported yet.',
             ], 422);
@@ -186,6 +249,18 @@ class AdminSmsGatewayController extends Controller
         $looksFailed = preg_match('/(error|failed|invalid|unauthorized)/i', $body) === 1;
         $ok = $response->successful() && ! $looksFailed;
 
+        $this->createHistoryRecord(
+            gateway: $gateway,
+            userId: $actorId,
+            phoneNumber: $phone,
+            message: $validated['message'],
+            status: $ok ? 'sent' : 'failed',
+            httpStatusCode: $response->status(),
+            responseBody: mb_substr($body, 0, 4000),
+            errorMessage: $ok ? null : 'Gateway responded with failure signal.',
+            sentAt: $ok ? now() : null,
+        );
+
         if (! $ok) {
             return response()->json([
                 'message' => 'Failed to send SMS through gateway.',
@@ -203,6 +278,63 @@ class AdminSmsGatewayController extends Controller
             'phone_number' => $phone,
             'status_code' => $response->status(),
             'response_body' => mb_substr($body, 0, 1000),
+        ]);
+    }
+
+    public function history(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'status' => ['nullable', Rule::in(['sent', 'failed'])],
+            'gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+        ]);
+
+        $perPage = (int) ($validated['per_page'] ?? 50);
+
+        $query = SmsHistory::query()->latest('id');
+
+        if (! empty($validated['search'])) {
+            $search = $validated['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('phone_number', 'like', "%{$search}%")
+                    ->orWhere('message', 'like', "%{$search}%")
+                    ->orWhere('gateway_name', 'like', "%{$search}%")
+                    ->orWhere('provider', 'like', "%{$search}%");
+            });
+        }
+
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
+        if (! empty($validated['gateway_id'])) {
+            $query->where('gateway_id', $validated['gateway_id']);
+        }
+
+        $histories = $query->paginate($perPage);
+
+        return response()->json([
+            'histories' => collect($histories->items())->map(fn (SmsHistory $history) => [
+                'id' => $history->id,
+                'gateway_id' => $history->gateway_id,
+                'gateway_name' => $history->gateway_name,
+                'provider' => $history->provider,
+                'phone_number' => $history->phone_number,
+                'message' => $history->message,
+                'status' => $history->status,
+                'http_status_code' => $history->http_status_code,
+                'response_body' => $history->response_body,
+                'error_message' => $history->error_message,
+                'sent_at' => optional($history->sent_at)?->toIso8601String(),
+                'created_at' => optional($history->created_at)?->toIso8601String(),
+            ]),
+            'meta' => [
+                'current_page' => $histories->currentPage(),
+                'last_page' => $histories->lastPage(),
+                'per_page' => $histories->perPage(),
+                'total' => $histories->total(),
+            ],
         ]);
     }
 
@@ -281,5 +413,31 @@ class AdminSmsGatewayController extends Controller
         }
 
         return preg_match('/^8801[0-9]{9}$/', $number) === 1 ? $number : null;
+    }
+
+    private function createHistoryRecord(
+        ?SmsGateway $gateway,
+        ?int $userId,
+        string $phoneNumber,
+        string $message,
+        string $status,
+        ?int $httpStatusCode,
+        ?string $responseBody,
+        ?string $errorMessage,
+        $sentAt,
+    ): void {
+        SmsHistory::create([
+            'gateway_id' => $gateway?->id,
+            'user_id' => $userId,
+            'gateway_name' => $gateway?->name,
+            'provider' => $gateway?->provider,
+            'phone_number' => $phoneNumber,
+            'message' => $message,
+            'status' => $status,
+            'http_status_code' => $httpStatusCode,
+            'response_body' => $responseBody,
+            'error_message' => $errorMessage,
+            'sent_at' => $sentAt,
+        ]);
     }
 }
