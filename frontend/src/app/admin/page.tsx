@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import CatvShell, { type ShellMenuItem } from "@/components/catv-shell";
 import {
   getStoredLocale,
   getStoredTheme,
@@ -95,20 +96,10 @@ const text = {
   },
 };
 
-type MenuItem = {
-  key: string;
-  label: string;
-  icon: string;
-  children?: Array<{ key: string; label: string }>;
-};
-
 export default function AdminDashboardPage() {
   const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [expandedMenu, setExpandedMenu] = useState<string | null>("customers");
-  const [activeItem, setActiveItem] = useState("dashboard");
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
   useEffect(() => {
@@ -140,15 +131,15 @@ export default function AdminDashboardPage() {
   }, []);
 
   const t = useMemo(() => text[locale], [locale]);
-  const menus = useMemo<MenuItem[]>(
+  const menus = useMemo<ShellMenuItem[]>(
     () => [
-      { key: "dashboard", label: t.menu.dashboard, icon: "🏠" },
+      { key: "dashboard", label: t.menu.dashboard, icon: "🏠", href: "/admin" },
       {
         key: "customers",
         label: t.menu.customers,
         icon: "👥",
         children: [
-          { key: "customers-active", label: t.menu.activeCustomers },
+          { key: "customers-active", label: t.menu.activeCustomers, href: "/admin/customers/active" },
           { key: "customers-pending", label: t.menu.pendingCustomers },
         ],
       },
@@ -159,14 +150,6 @@ export default function AdminDashboardPage() {
     ],
     [t],
   );
-
-  function onMenuClick(menu: MenuItem) {
-    if (menu.children?.length) {
-      setExpandedMenu((prev) => (prev === menu.key ? null : menu.key));
-      return;
-    }
-    setActiveItem(menu.key);
-  }
 
   if (state !== "ready") {
     return (
@@ -188,170 +171,90 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <div className="flex min-h-screen">
-        <aside
-          className={`border-r border-[var(--border)] bg-[var(--surface)] transition-all duration-300 ${
-            isSidebarCollapsed ? "w-20" : "w-72"
-          }`}
-        >
-          <div className="flex h-16 items-center justify-between border-b border-[var(--border)] px-4">
-            {!isSidebarCollapsed && (
-              <h2 className="truncate text-sm font-bold uppercase tracking-wide text-[var(--muted)]">
-                {t.sidebarTitle}
-              </h2>
-            )}
-            <button
-              type="button"
-              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-              className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs font-semibold"
-            >
-              {isSidebarCollapsed ? t.expand : t.collapse}
-            </button>
+    <CatvShell
+      title={t.title}
+      subtitle={t.subtitle}
+      locale={locale}
+      theme={theme}
+      localeLabel={t.languageLabel}
+      themeLabel={t.themeLabel}
+      sidebarTitle={t.sidebarTitle}
+      searchPlaceholder={t.searchPlaceholder}
+      userName={user?.name}
+      userMeta={user?.email}
+      menu={menus}
+      activeKey="dashboard"
+      defaultExpandedKey="customers"
+      onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
+      onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+    >
+      <section className="catv-panel p-4 sm:p-5">
+        <h2 className="text-xl font-bold sm:text-2xl">
+          {t.welcome}, {user?.name}
+        </h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">{t.subtitle}</p>
+      </section>
+
+      <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {t.stats.map((stat, idx) => (
+          <article
+            key={stat.label}
+            className={`rounded-xl p-4 text-white shadow-md ${
+              idx % 4 === 0
+                ? "bg-[#2f7ec1]"
+                : idx % 4 === 1
+                  ? "bg-[#0f7c7b]"
+                  : idx % 4 === 2
+                    ? "bg-[#4c8bd6]"
+                    : "bg-[#ff7a59]"
+            }`}
+          >
+            <p className="text-sm font-semibold">{stat.label}</p>
+            <p className="mt-1 text-3xl font-bold">{stat.value}</p>
+            <p className="mt-2 text-xs text-white/85">{stat.hint}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-12">
+        <article className="catv-panel p-4 lg:col-span-4">
+          <h3 className="text-base font-semibold">{t.sectionA}</h3>
+          <div className="mt-4 flex h-52 items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-soft)] text-sm text-[var(--muted)]">
+            Pie chart placeholder
           </div>
+        </article>
 
-          <nav className="space-y-1 p-3">
-            {menus.map((menu) => {
-              const isExpanded = expandedMenu === menu.key;
-              const hasChildren = Boolean(menu.children?.length);
+        <article className="catv-panel p-4 lg:col-span-4">
+          <h3 className="text-base font-semibold">{t.sectionB}</h3>
+          <div className="mt-4 flex h-52 items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-soft)] text-sm text-[var(--muted)]">
+            Donut chart placeholder
+          </div>
+        </article>
 
-              return (
-                <div key={menu.key}>
-                  <button
-                    type="button"
-                    onClick={() => onMenuClick(menu)}
-                    className={`flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
-                      activeItem === menu.key || isExpanded
-                        ? "bg-[var(--accent)] text-white"
-                        : "text-[var(--foreground)] hover:bg-[var(--surface-soft)]"
-                    }`}
-                  >
-                    <span className="mr-3 text-base">{menu.icon}</span>
-                    {!isSidebarCollapsed && <span className="flex-1 text-left">{menu.label}</span>}
-                    {!isSidebarCollapsed && hasChildren && <span className="text-xs">{isExpanded ? "▾" : "▸"}</span>}
-                  </button>
+        <article className="space-y-2 lg:col-span-4">
+          {t.quickRows.map((row) => (
+            <div key={row.label} className={`rounded-xl p-3 text-white shadow ${row.tone}`}>
+              <p className="text-sm font-semibold">{row.label}</p>
+              <p className="text-2xl font-bold">{row.value}</p>
+            </div>
+          ))}
+        </article>
+      </section>
 
-                  {!isSidebarCollapsed && hasChildren && isExpanded && (
-                    <div className="mt-1 space-y-1 pl-10">
-                      {menu.children?.map((child) => (
-                        <button
-                          key={child.key}
-                          type="button"
-                          onClick={() => setActiveItem(child.key)}
-                          className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition ${
-                            activeItem === child.key
-                              ? "bg-[var(--accent)]/20 text-[var(--foreground)]"
-                              : "text-[var(--muted)] hover:bg-[var(--surface-soft)]"
-                          }`}
-                        >
-                          {child.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <section className="flex-1">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[#1f4565] px-4 py-3 text-white sm:px-6">
-            <div className="flex w-full items-center gap-3 sm:w-auto">
-              <span className="text-sm font-semibold">{t.title}</span>
-              <input
-                placeholder={t.searchPlaceholder}
-                className="h-9 w-full rounded-full border border-white/30 bg-white/10 px-4 text-sm text-white placeholder-white/70 outline-none sm:w-72"
+      <section className="catv-panel mt-4 p-4">
+        <h3 className="text-base font-semibold">{t.sectionC}</h3>
+        <div className="mt-4 flex h-56 items-end gap-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-soft)] p-4">
+          {[53, 57, 59, 56].map((n, idx) => (
+            <div key={n} className="flex flex-1 flex-col items-center gap-2">
+              <div
+                className={`w-full rounded-t ${idx % 2 === 0 ? "bg-[#2f7ec1]" : "bg-[#ff7a59]"}`}
+                style={{ height: `${n * 2}px` }}
               />
+              <span className="text-xs text-[var(--muted)]">{n}</span>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setLocale(locale === "bn" ? "en" : "bn")}
-                className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold"
-              >
-                {t.languageLabel}: {locale === "bn" ? "বাংলা" : "English"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold"
-              >
-                {t.themeLabel}: {theme === "dark" ? "Dark" : "Light"}
-              </button>
-            </div>
-          </header>
-
-          <div className="p-4 sm:p-6">
-            <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
-              <h1 className="text-xl font-bold sm:text-2xl">{t.welcome}, {user?.name}</h1>
-              <p className="mt-1 text-sm text-[var(--muted)]">{t.subtitle}</p>
-            </div>
-
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {t.stats.map((stat, idx) => (
-                <article
-                  key={stat.label}
-                  className={`rounded-xl p-4 text-white ${
-                    idx % 4 === 0
-                      ? "bg-sky-600"
-                      : idx % 4 === 1
-                        ? "bg-cyan-600"
-                        : idx % 4 === 2
-                          ? "bg-indigo-500"
-                          : "bg-slate-600"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{stat.label}</p>
-                  <p className="mt-1 text-3xl font-bold">{stat.value}</p>
-                  <p className="mt-2 text-xs text-white/85">{stat.hint}</p>
-                </article>
-              ))}
-            </section>
-
-            <section className="mt-4 grid gap-4 lg:grid-cols-12">
-              <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 lg:col-span-4">
-                <h3 className="text-base font-semibold">{t.sectionA}</h3>
-                <div className="mt-4 flex h-52 items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-soft)] text-sm text-[var(--muted)]">
-                  Pie chart placeholder
-                </div>
-              </article>
-
-              <article className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 lg:col-span-4">
-                <h3 className="text-base font-semibold">{t.sectionB}</h3>
-                <div className="mt-4 flex h-52 items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-soft)] text-sm text-[var(--muted)]">
-                  Donut chart placeholder
-                </div>
-              </article>
-
-              <article className="space-y-2 lg:col-span-4">
-                {t.quickRows.map((row) => (
-                  <div key={row.label} className={`rounded-xl p-3 text-white ${row.tone}`}>
-                    <p className="text-sm font-semibold">{row.label}</p>
-                    <p className="text-2xl font-bold">{row.value}</p>
-                  </div>
-                ))}
-              </article>
-            </section>
-
-            <section className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
-              <h3 className="text-base font-semibold">{t.sectionC}</h3>
-              <div className="mt-4 flex h-56 items-end gap-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-soft)] p-4">
-                {[53, 57, 59, 56].map((n, idx) => (
-                  <div key={n} className="flex flex-1 flex-col items-center gap-2">
-                    <div
-                      className={`w-full rounded-t ${idx % 2 === 0 ? "bg-sky-500" : "bg-orange-500"}`}
-                      style={{ height: `${n * 2}px` }}
-                    />
-                    <span className="text-xs text-[var(--muted)]">{n}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        </section>
-      </div>
-    </main>
+          ))}
+        </div>
+      </section>
+    </CatvShell>
   );
 }

@@ -1,6 +1,8 @@
+⚠️ বাধ্যতামূলক নির্দেশনা: এই `CONTEXT.md` ফাইলটি শুরু থেকে শেষ পর্যন্ত সম্পূর্ণ পড়া শেষ না করে কোনো development কাজ শুরু করা যাবে না।
+আংশিক পড়ে কাজ শুরু করা হলে সেটি invalid execution হিসেবে গণ্য হবে।
 # Hybrid Stack Server Context
 
-Last updated: 2026-04-24
+Last updated: 2026-04-25
 Domain: `bsol.zyrotechbd.com`
 Server IP: `103.157.253.197`
 
@@ -547,3 +549,205 @@ Homepage-এ bilingual auth section add করা হয়েছে:
 4. Smoke checks:
 	 - `https://bsol.zyrotechbd.com/api/health` returns `status: ok`
 	 - `https://bsol.zyrotechbd.com/` returns HTTP `200`
+
+---
+
+## 22. Mandatory design & layout consistency policy (2026-04-24)
+
+Project owner feedback অনুযায়ী notice করা হয়েছে যে admin-related নতুন page-গুলোর মধ্যে design ধারাবাহিকতা ভেঙে গিয়েছিল। তাই এখন থেকে নিচের policy **mandatory**:
+
+### Core principle
+
+- পুরো application-এ একটি unified design language maintain করতে হবে
+- নতুন page বা module implement করার সময় existing dashboard design থেকে বিচ্যুতি করা যাবে না, unless explicitly approved
+- “Function works” যথেষ্ট না — “visual consistency” equally required
+
+### Design system source of truth
+
+Frontend styling-এর primary source:
+
+- `/var/www/hybrid-stack/frontend/src/app/globals.css`
+
+Theme token rules:
+
+- নতুন UI-তে hardcoded random color ব্যবহার করা যাবে না যদি token equivalent থাকে
+- Primary token family reuse করতে হবে:
+	- `--background`
+	- `--foreground`
+	- `--surface`
+	- `--surface-soft`
+	- `--border`
+	- `--muted`
+	- `--accent`
+- Dark এবং Light mode-এ contrast/readability preserve করতে হবে
+
+### Admin dashboard layout continuity rules
+
+Admin route group-এর সব পেজে নিচের structure maintain করতে হবে:
+
+1. Top header bar (consistent height, spacing, action alignment)
+2. Left sidebar navigation (same width behavior + collapse/expand pattern)
+3. Same sidebar color family and active-state pattern
+4. Same content container spacing/grid rhythm
+5. Same card/table border radius, shadow depth, and border treatment
+
+### Sidebar and menu behavior rules
+
+- Sidebar collapse/expand interaction সব admin sub-page-এ identical হতে হবে
+- Menu hierarchy maintain করতে হবে:
+	- Main menu click → submenu expand/collapse (if children exist)
+- Active route highlight সবসময় visible থাকতে হবে
+- Submenu item spacing, typography, এবং indicator style consistent হতে হবে
+
+### Table UI consistency rules (for customer/package/billing lists)
+
+- Table header background, text color, এবং row border style shared হতে হবে
+- Zebra/hover behavior consistent হতে হবে
+- Cell padding এবং typography scale fixed রাখতে হবে
+- Status badge style (active/pending/paid/due) reusable pattern হিসেবে define ও reuse করতে হবে
+- একই ধরনের data table-এ একই column alignment convention follow করতে হবে
+
+### Component reuse expectation
+
+যেসব UI pattern বারবার আসবে সেগুলো reusable component হিসেবে centralize করতে হবে (gradually):
+
+- Sidebar shell
+- Top header bar
+- Stats card
+- Data table wrapper
+- Status badges
+
+### Delivery and review checklist (must pass before marking complete)
+
+প্রতি frontend UI task complete বলার আগে verify করতে হবে:
+
+1. Existing admin/user design language-এর সাথে visual match আছে কিনা
+2. Mobile/tablet/desktop-এ layout break করছে কিনা
+3. Dark/light theme-এ color mismatch আছে কিনা
+4. বাংলা/English text length change-এ alignment ভাঙছে কিনা
+5. Build run হয়েছে কিনা (`npm run build`)
+6. Supervisor restart + smoke check হয়েছে কিনা
+
+### Operational enforcement
+
+- Future context update-এর সময় যদি নতুন কোনো design exception নেওয়া হয়, এখানে explicitly লিখতে হবে
+- Design inconsistency report হলে next task-এ bug-priority হিসেবে fix করতে হবে
+- এই policy ignore করে করা UI change “final” হিসেবে গ্রহণযোগ্য হবে না
+
+---
+
+## 23. External reference projects: `catv` এবং `zyro` (2026-04-25)
+
+বর্তমান `hybrid-stack` project-এ future development acceleration-এর জন্য root-level দুইটি আলাদা project reference হিসেবে ব্যবহার করা হবে:
+
+- `/var/www/hybrid-stack/catv`
+- `/var/www/hybrid-stack/zyro`
+
+এগুলো **runtime dependency** নয়; এগুলো primarily **implementation reference / code example source** হিসেবে ব্যবহার হবে।
+
+### 23.1 `catv` project সম্পর্কে সংক্ষিপ্ত ধারণা
+
+`catv` একটি Bengali-first CATV billing product codebase, যেখানে:
+
+- Frontend: React + Vite + React Router
+- Backend: Node.js + Express
+- Database: MariaDB via Prisma
+- Auth: JWT + phone/password ভিত্তিক flow
+
+Observed reusable patterns:
+
+- Layout shell pattern (`AppLayout`, Sidebar, Topbar, responsive collapse/off-canvas)
+- Modular page segmentation (Areas/Managers/Collectors/Billing/Reports)
+- Frontend থেকে `/api/*` consume করার clean structure
+- Express route grouping + health endpoint style
+
+### 23.2 `zyro` project সম্পর্কে সংক্ষিপ্ত ধারণা
+
+`zyro` একটি large-scale PHP SaaS platform, যেখানে API-first এবং multi-website/multi-tenant pattern heavily ব্যবহৃত:
+
+- Core stack: Native PHP (MVC-style structure), MySQL/MariaDB, Tailwind-based UI
+- Strong service separation: Controllers / Models / Services / Core
+- API security pattern: API key + domain binding (`core/api_auth_guard.php`)
+- Operational modules: Fraud check, landing template system, automation jobs, marketing/courier/CAPI integrations
+
+Observed reusable patterns:
+
+- Thin-client integration mindset (plugin/client side minimal logic)
+- Queue-first async processing guideline (jobs table + cron workers)
+- Reusable response/validation/service abstraction approach
+- Changelog-driven iterative delivery discipline
+
+### 23.3 `hybrid-stack`-এ এই দুই project কীভাবে ব্যবহার হবে
+
+`backend` (Laravel) এবং `frontend` (Next.js)-এ feature implement করার সময়:
+
+1. `catv` থেকে primarily UI shell, navigation behavior, module breakdown, এবং API consumption style reference নেওয়া হবে
+2. `zyro` থেকে primarily API security, multi-tenant isolation, service-layer ভাবনা, async job processing, এবং product workflow reference নেওয়া হবে
+3. Copy-paste নয়; **concept adaptation** করতে হবে যেন Laravel 13 + Next.js 16 architecture-এর সাথে fully compatible থাকে
+
+### 23.4 Reference ব্যবহার করার mandatory guardrails
+
+- কোনো secret, token, password, বা hardcoded domain reference project থেকে copy করা যাবে না
+- `catv/CONTEXT-production.md`-এ conflict marker থাকলে সেটা source-of-truth হিসেবে use করা যাবে না; stable guidance হিসেবে `catv/CONTEXT.md` এবং actual code structure verify করতে হবে
+- `zyro`-র PHP example সরাসরি `hybrid-stack/frontend`-এ ব্যবহার করা যাবে না; pattern translate করে implement করতে হবে
+- `hybrid-stack`-এর established policies (bilingual, mobile-first, dark/light theme, design consistency) সবসময় final authority হবে
+
+### 23.5 Practical expectation for future tasks
+
+- নতুন feature implement করার আগে engineer/agent প্রথমে `CONTEXT.md` + relevant reference section পড়ে scope confirm করবে
+- Required হলে `catv`/`zyro` থেকে only minimal relevant snippet inspect করা হবে
+- Final implementation সবসময় `hybrid-stack` coding standard, deployment flow, এবং architecture boundary follow করবে
+
+---
+
+## 24. Frontend build হলেও নতুন design live না হওয়ার incident note (2026-04-25)
+
+### Issue summary
+
+Frontend-এ নতুন code + `npm run build` successful হলেও live domain-এ page plain/unstyled দেখাচ্ছিল এবং login form submit করলে URL-এ query string (`?login_email=...&login_password=...`) যোগ হচ্ছিল।
+
+### Verified root cause
+
+এটা backend restart issue ছিল না।
+
+মূল সমস্যা ছিল **stale Next.js runtime process + chunk mismatch**:
+
+1. Running process পুরনো build reference ধরে ছিল
+2. নতুন build overwrite হওয়ার পরে পুরনো CSS chunk file আর filesystem-এ ছিল না
+3. HTML old CSS chunk path serve করছিল (`/_next/static/chunks/...css`), কিন্তু asset request `500` দিচ্ছিল
+4. CSS/JS load না হওয়ায় page plain দেখাচ্ছিল এবং client-side form handler attach না হয়ে browser default GET submit করছিল
+
+### Fix applied
+
+1. Frontend process restart করা হয়েছে (`supervisorctl restart hybrid-stack-frontend`)
+2. নতুন runtime PID confirm করা হয়েছে
+3. live HTML থেকে বর্তমান CSS chunk path verify করা হয়েছে
+4. CSS chunk response `200 OK` confirm করা হয়েছে
+
+### How to detect this problem quickly (future)
+
+Symptoms দেখলে বুঝবে frontend runtime stale:
+
+- UI suddenly plain (Tailwind/style apply হচ্ছে না)
+- login/register submit করলে URL-এ raw query params চলে আসে
+- Browser devtools-এ `/_next/static/chunks/*.css` বা `*.js` request fail (often 404/500)
+
+### Mandatory safe deploy flow (frontend)
+
+Frontend deploy-এর পরে নিচের flow strictভাবে follow করতে হবে:
+
+1. `cd /var/www/hybrid-stack/frontend`
+2. `npm run build`
+3. `supervisorctl restart hybrid-stack-frontend`
+4. `supervisorctl status hybrid-stack-frontend` (must be `RUNNING`)
+5. live smoke check:
+	- `https://bsol.zyrotechbd.com/`
+	- `https://bsol.zyrotechbd.com/api/health`
+6. asset check (recommended): homepage HTML থেকে current CSS chunk path নিয়ে ensure `200 OK`
+
+### Operational guardrail
+
+- **Never** treat frontend deployment complete after build only
+- Build success + process restart + asset health check — তিনটি pass না করলে deployment incomplete ধরা হবে
+- যদি restart মাঝপথে interrupted হয়, সঙ্গে সঙ্গে `status` check করে process আবার start/restart করতে হবে
+
