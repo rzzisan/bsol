@@ -66,18 +66,24 @@ class AdminSmsGatewayController extends Controller
     {
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:2000'],
+            'phone_numbers' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $actor = $request->user();
         $actorId = $actor?->id;
-        $creditsRequired = $this->creditService->calculateCreditsRequired($validated['message']);
+        $creditsPerSms = $this->creditService->calculateCreditsRequired($validated['message']);
+        $recipientCount = max(1, count($this->extractRecipients($validated['phone_numbers'] ?? null)));
+        $totalCreditsRequired = $creditsPerSms * $recipientCount;
 
         $available = $actorId ? $this->creditService->getBalance($actorId) : 0;
 
         return response()->json([
-            'credits_required' => $creditsRequired,
+            'credits_required' => $totalCreditsRequired,
+            'credits_per_sms' => $creditsPerSms,
+            'recipients_count' => $recipientCount,
+            'total_credits_required' => $totalCreditsRequired,
             'available_credits' => $available,
-            'can_send' => $available >= $creditsRequired,
+            'can_send' => $available >= $totalCreditsRequired,
         ]);
     }
 
@@ -261,9 +267,17 @@ class AdminSmsGatewayController extends Controller
     {
         $validated = $request->validate([
             'gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
-            'phone_number' => ['required', 'string', 'max:30'],
+            'phone_number' => ['required', 'string', 'max:5000'],
             'message' => ['required', 'string', 'max:2000'],
         ]);
+
+        $rawRecipients = $this->extractRecipients($validated['phone_number']);
+
+        if (count($rawRecipients) === 0) {
+            return response()->json([
+                'message' => 'No valid recipient found. Use comma, semicolon, pipe, or new line as separators.',
+            ], 422);
+        }
 
         $actor = $request->user();
         $actorId = $actor?->id;
@@ -295,44 +309,20 @@ class AdminSmsGatewayController extends Controller
                 : SmsGateway::where('is_active', true)->first();
         }
 
-        $creditsRequired = $this->creditService->calculateCreditsRequired($validated['message']);
-
-        if (! $isAdmin && $actorId) {
-            $balance = $this->creditService->getBalance($actorId);
-
-            if ($balance < $creditsRequired) {
+        if (! $gateway) {
+            foreach ($rawRecipients as $rawRecipient) {
                 $this->createHistoryRecord(
-                    gateway: $gateway,
+                    gateway: null,
                     userId: $actorId,
-                    phoneNumber: $validated['phone_number'],
+                    phoneNumber: $rawRecipient,
                     message: $validated['message'],
                     status: 'failed',
                     httpStatusCode: null,
                     responseBody: null,
-                    errorMessage: "Insufficient SMS credits. Required {$creditsRequired}, available {$balance}.",
+                    errorMessage: 'No gateway selected or active gateway found.',
                     sentAt: null,
                 );
-
-                return response()->json([
-                    'message' => 'Insufficient SMS credits.',
-                    'credits_required' => $creditsRequired,
-                    'available_credits' => $balance,
-                ], 402);
             }
-        }
-
-        if (! $gateway) {
-            $this->createHistoryRecord(
-                gateway: null,
-                userId: $actorId,
-                phoneNumber: $validated['phone_number'],
-                message: $validated['message'],
-                status: 'failed',
-                httpStatusCode: null,
-                responseBody: null,
-                errorMessage: 'No gateway selected or active gateway found.',
-                sentAt: null,
-            );
 
             return response()->json([
                 'message' => 'No SMS gateway selected or active gateway found.',
@@ -340,40 +330,22 @@ class AdminSmsGatewayController extends Controller
         }
 
         if (! $gateway->is_enabled) {
-            $this->createHistoryRecord(
-                gateway: $gateway,
-                userId: $actorId,
-                phoneNumber: $validated['phone_number'],
-                message: $validated['message'],
-                status: 'failed',
-                httpStatusCode: null,
-                responseBody: null,
-                errorMessage: 'Selected SMS gateway is disabled.',
-                sentAt: null,
-            );
+            foreach ($rawRecipients as $rawRecipient) {
+                $this->createHistoryRecord(
+                    gateway: $gateway,
+                    userId: $actorId,
+                    phoneNumber: $rawRecipient,
+                    message: $validated['message'],
+                    status: 'failed',
+                    httpStatusCode: null,
+                    responseBody: null,
+                    errorMessage: 'Selected SMS gateway is disabled.',
+                    sentAt: null,
+                );
+            }
 
             return response()->json([
                 'message' => 'Selected SMS gateway is disabled.',
-            ], 422);
-        }
-
-        $phone = $this->formatBdPhoneNumber($validated['phone_number']);
-
-        if (! $phone) {
-            $this->createHistoryRecord(
-                gateway: $gateway,
-                userId: $actorId,
-                phoneNumber: $validated['phone_number'],
-                message: $validated['message'],
-                status: 'failed',
-                httpStatusCode: null,
-                responseBody: null,
-                errorMessage: 'Invalid phone number format.',
-                sentAt: null,
-            );
-
-            return response()->json([
-                'message' => 'Invalid phone number format. Use a valid BD mobile number.',
             ], 422);
         }
 
@@ -383,17 +355,19 @@ class AdminSmsGatewayController extends Controller
             || blank($gateway->secret_key)
             || blank($gateway->sender_id)
         ) {
-            $this->createHistoryRecord(
-                gateway: $gateway,
-                userId: $actorId,
-                phoneNumber: $phone,
-                message: $validated['message'],
-                status: 'failed',
-                httpStatusCode: null,
-                responseBody: null,
-                errorMessage: 'Gateway credentials are incomplete.',
-                sentAt: null,
-            );
+            foreach ($rawRecipients as $rawRecipient) {
+                $this->createHistoryRecord(
+                    gateway: $gateway,
+                    userId: $actorId,
+                    phoneNumber: $rawRecipient,
+                    message: $validated['message'],
+                    status: 'failed',
+                    httpStatusCode: null,
+                    responseBody: null,
+                    errorMessage: 'Gateway credentials are incomplete.',
+                    sentAt: null,
+                );
+            }
 
             return response()->json([
                 'message' => 'Gateway credentials are incomplete. Please update endpoint/API key/secret/sender ID.',
@@ -401,76 +375,176 @@ class AdminSmsGatewayController extends Controller
         }
 
         if ($gateway->provider !== 'khudebarta') {
-            $this->createHistoryRecord(
-                gateway: $gateway,
-                userId: $actorId,
-                phoneNumber: $phone,
-                message: $validated['message'],
-                status: 'failed',
-                httpStatusCode: null,
-                responseBody: null,
-                errorMessage: 'Provider is not supported yet.',
-                sentAt: null,
-            );
+            foreach ($rawRecipients as $rawRecipient) {
+                $this->createHistoryRecord(
+                    gateway: $gateway,
+                    userId: $actorId,
+                    phoneNumber: $rawRecipient,
+                    message: $validated['message'],
+                    status: 'failed',
+                    httpStatusCode: null,
+                    responseBody: null,
+                    errorMessage: 'Provider is not supported yet.',
+                    sentAt: null,
+                );
+            }
 
             return response()->json([
                 'message' => 'Selected gateway provider is not supported yet.',
             ], 422);
         }
 
-        $response = Http::asForm()
-            ->timeout(20)
-            ->post($gateway->endpoint_url, [
-                'apikey' => $gateway->api_key,
-                'secretkey' => $gateway->secret_key,
-                'callerID' => $gateway->sender_id,
-                'toUser' => $phone,
-                'messageContent' => $validated['message'],
-            ]);
+        $creditsPerSms = $this->creditService->calculateCreditsRequired($validated['message']);
+        $normalizedRecipients = [];
+        $invalidRecipients = [];
 
-        $body = (string) $response->body();
-        $looksFailed = preg_match('/(error|failed|invalid|unauthorized)/i', $body) === 1;
-        $ok = $response->successful() && ! $looksFailed;
+        foreach ($rawRecipients as $rawRecipient) {
+            $normalized = $this->formatBdPhoneNumber($rawRecipient);
+            if ($normalized) {
+                $normalizedRecipients[] = $normalized;
+            } else {
+                $invalidRecipients[] = $rawRecipient;
+                $this->createHistoryRecord(
+                    gateway: $gateway,
+                    userId: $actorId,
+                    phoneNumber: $rawRecipient,
+                    message: $validated['message'],
+                    status: 'failed',
+                    httpStatusCode: null,
+                    responseBody: null,
+                    errorMessage: 'Invalid phone number format.',
+                    sentAt: null,
+                );
+            }
+        }
 
-        $this->createHistoryRecord(
-            gateway: $gateway,
-            userId: $actorId,
-            phoneNumber: $phone,
-            message: $validated['message'],
-            status: $ok ? 'sent' : 'failed',
-            httpStatusCode: $response->status(),
-            responseBody: mb_substr($body, 0, 4000),
-            errorMessage: $ok ? null : 'Gateway responded with failure signal.',
-            sentAt: $ok ? now() : null,
-        );
+        $normalizedRecipients = array_values(array_unique($normalizedRecipients));
 
-        if (! $ok) {
+        if (count($normalizedRecipients) === 0) {
+            return response()->json([
+                'message' => 'No valid phone number found. Use valid BD numbers.',
+                'invalid_numbers' => $invalidRecipients,
+            ], 422);
+        }
+
+        $totalCreditsRequired = $creditsPerSms * count($normalizedRecipients);
+
+        if (! $isAdmin && $actorId) {
+            $balance = $this->creditService->getBalance($actorId);
+
+            if ($balance < $totalCreditsRequired) {
+                foreach ($normalizedRecipients as $recipient) {
+                    $this->createHistoryRecord(
+                        gateway: $gateway,
+                        userId: $actorId,
+                        phoneNumber: $recipient,
+                        message: $validated['message'],
+                        status: 'failed',
+                        httpStatusCode: null,
+                        responseBody: null,
+                        errorMessage: "Insufficient SMS credits. Required {$totalCreditsRequired}, available {$balance}.",
+                        sentAt: null,
+                    );
+                }
+
+                return response()->json([
+                    'message' => 'Insufficient SMS credits.',
+                    'recipients_count' => count($normalizedRecipients),
+                    'credits_per_sms' => $creditsPerSms,
+                    'credits_required' => $totalCreditsRequired,
+                    'available_credits' => $balance,
+                ], 402);
+            }
+        }
+
+        $results = [];
+        $successCount = 0;
+        $failedCount = count($invalidRecipients);
+
+        foreach ($normalizedRecipients as $recipient) {
+            $response = Http::asForm()
+                ->timeout(20)
+                ->post($gateway->endpoint_url, [
+                    'apikey' => $gateway->api_key,
+                    'secretkey' => $gateway->secret_key,
+                    'callerID' => $gateway->sender_id,
+                    'toUser' => $recipient,
+                    'messageContent' => $validated['message'],
+                ]);
+
+            $body = (string) $response->body();
+            $looksFailed = preg_match('/(error|failed|invalid|unauthorized)/i', $body) === 1;
+            $ok = $response->successful() && ! $looksFailed;
+
+            $this->createHistoryRecord(
+                gateway: $gateway,
+                userId: $actorId,
+                phoneNumber: $recipient,
+                message: $validated['message'],
+                status: $ok ? 'sent' : 'failed',
+                httpStatusCode: $response->status(),
+                responseBody: mb_substr($body, 0, 4000),
+                errorMessage: $ok ? null : 'Gateway responded with failure signal.',
+                sentAt: $ok ? now() : null,
+            );
+
+            if ($ok) {
+                $successCount++;
+
+                if (! $isAdmin && $actorId) {
+                    $this->creditService->deduct(
+                        userId: $actorId,
+                        credits: $creditsPerSms,
+                        note: "SMS sent to {$recipient} via {$gateway->name}",
+                    );
+                }
+            } else {
+                $failedCount++;
+            }
+
+            $results[] = [
+                'phone_number' => $recipient,
+                'status' => $ok ? 'sent' : 'failed',
+                'status_code' => $response->status(),
+                'response_body' => mb_substr($body, 0, 1000),
+            ];
+        }
+
+        $creditsUsed = $successCount * $creditsPerSms;
+        $totalRequested = count($normalizedRecipients) + count($invalidRecipients);
+
+        if ($successCount === 0) {
             return response()->json([
                 'message' => 'Failed to send SMS through gateway.',
                 'gateway' => $gateway->name,
                 'provider' => $gateway->provider,
-                'status_code' => $response->status(),
-                'response_body' => mb_substr($body, 0, 1000),
+                'requested_count' => $totalRequested,
+                'success_count' => $successCount,
+                'failed_count' => $failedCount,
+                'credits_per_sms' => $creditsPerSms,
+                'credits_used' => $creditsUsed,
+                'invalid_numbers' => $invalidRecipients,
+                'results' => $results,
             ], 502);
         }
 
-        if (! $isAdmin && $actorId) {
-            $this->creditService->deduct(
-                userId: $actorId,
-                credits: $creditsRequired,
-                note: "SMS sent to {$phone} via {$gateway->name}",
-            );
-        }
+        $statusCode = $failedCount > 0 ? 207 : 200;
 
         return response()->json([
-            'message' => 'SMS sent successfully.',
+            'message' => $failedCount > 0
+                ? "SMS sent to {$successCount} of {$totalRequested} recipients."
+                : 'SMS sent successfully.',
             'gateway' => $gateway->name,
             'provider' => $gateway->provider,
-            'phone_number' => $phone,
-            'credits_used' => $creditsRequired,
-            'status_code' => $response->status(),
-            'response_body' => mb_substr($body, 0, 1000),
-        ]);
+            'requested_count' => $totalRequested,
+            'success_count' => $successCount,
+            'failed_count' => $failedCount,
+            'recipients_count' => count($normalizedRecipients),
+            'credits_per_sms' => $creditsPerSms,
+            'credits_used' => $creditsUsed,
+            'invalid_numbers' => $invalidRecipients,
+            'results' => $results,
+        ], $statusCode);
     }
 
     public function history(Request $request): JsonResponse
@@ -605,6 +679,19 @@ class AdminSmsGatewayController extends Controller
         }
 
         return preg_match('/^8801[0-9]{9}$/', $number) === 1 ? $number : null;
+    }
+
+    private function extractRecipients(?string $raw): array
+    {
+        if (blank($raw)) {
+            return [];
+        }
+
+        $parts = preg_split('/[\n,;|]+/', (string) $raw) ?: [];
+        $parts = array_map(fn ($part) => trim((string) $part), $parts);
+        $parts = array_filter($parts, fn ($part) => $part !== '');
+
+        return array_values(array_unique($parts));
     }
 
     private function createHistoryRecord(

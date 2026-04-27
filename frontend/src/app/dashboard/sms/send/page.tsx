@@ -48,14 +48,22 @@ const text = {
     noGateways: "আপনার জন্য কোনো SMS গেটওয়ে অ্যাসাইন করা নেই।",
     form: {
       gateway: "অ্যাসাইন করা গেটওয়ে",
-      phone: "ফোন নম্বর",
+      phone: "ফোন নম্বরসমূহ",
       message: "মেসেজ",
+      liveCounter: "লাইভ কাউন্টার",
+      chars: "ক্যারেক্টার",
+      smsCount: "SMS কাউন্ট",
+      mode: "মোড",
+      unicode: "বাংলা/Unicode",
+      gsm: "English/GSM",
       send: "SMS পাঠান",
       sending: "পাঠানো হচ্ছে...",
-      phoneHint: "বাংলাদেশি নম্বর দিন (যেমন: 017..., +88017..., 88017...)",
+      phoneHint: "comma, semicolon, pipe, বা নতুন লাইনে একাধিক নম্বর দিন।",
       messageHint: "English 160 / Bangla 70 char = 1 credit segment",
     },
     previewTitle: "Credit Preview",
+    previewRecipients: "গ্রহীতা",
+    previewPerSms: "প্রতি SMS",
     previewRequired: "প্রয়োজন",
     previewAvailable: "আপনার ব্যালেন্স",
     previewCanSend: "পাঠানো যাবে",
@@ -83,14 +91,22 @@ const text = {
     noGateways: "No SMS gateway assigned to your account.",
     form: {
       gateway: "Assigned Gateway",
-      phone: "Phone Number",
+      phone: "Phone Number(s)",
       message: "Message",
+      liveCounter: "Live Counter",
+      chars: "Characters",
+      smsCount: "SMS Count",
+      mode: "Mode",
+      unicode: "Bangla/Unicode",
+      gsm: "English/GSM",
       send: "Send SMS",
       sending: "Sending...",
-      phoneHint: "Use a valid Bangladesh number (017..., +88017..., 88017...)",
+      phoneHint: "Use comma, semicolon, pipe, or new line for multiple recipients.",
       messageHint: "English 160 / Bangla 70 chars = 1 credit segment",
     },
     previewTitle: "Credit Preview",
+    previewRecipients: "Recipients",
+    previewPerSms: "Per SMS",
     previewRequired: "Required",
     previewAvailable: "Your Balance",
     previewCanSend: "Can send",
@@ -107,17 +123,24 @@ export default function UserSmsSendPage() {
 
   const [gateways, setGateways] = useState<SmsGatewayOption[]>([]);
   const [loadingGateways, setLoadingGateways] = useState(true);
-  const [phone, setPhone] = useState("");
+  const [phoneNumbers, setPhoneNumbers] = useState("");
   const [messageBody, setMessageBody] = useState("");
   const [sending, setSending] = useState(false);
 
   const [requiredCredits, setRequiredCredits] = useState(1);
+  const [creditsPerSms, setCreditsPerSms] = useState(1);
+  const [recipientCount, setRecipientCount] = useState(1);
   const [availableCredits, setAvailableCredits] = useState(0);
   const [canSend, setCanSend] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [responseBody, setResponseBody] = useState<string | null>(null);
+
+  const charCount = useMemo(() => Array.from(messageBody).length, [messageBody]);
+  const isUnicode = useMemo(() => /[^\u0000-\u007f]/.test(messageBody), [messageBody]);
+  const segmentLimit = isUnicode ? 70 : 160;
+  const smsCount = Math.max(1, Math.ceil(Math.max(charCount, 1) / segmentLimit));
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -202,6 +225,7 @@ export default function UserSmsSendPage() {
           },
           body: JSON.stringify({
             message: messageBody || "a",
+            phone_numbers: phoneNumbers,
           }),
         });
 
@@ -209,6 +233,8 @@ export default function UserSmsSendPage() {
         if (!res.ok) return;
 
         setRequiredCredits(data?.credits_required ?? 1);
+        setCreditsPerSms(data?.credits_per_sms ?? 1);
+        setRecipientCount(data?.recipients_count ?? 1);
         setAvailableCredits(data?.available_credits ?? 0);
         setCanSend(Boolean(data?.can_send));
       } catch {
@@ -217,7 +243,7 @@ export default function UserSmsSendPage() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [messageBody, state]);
+  }, [messageBody, phoneNumbers, state]);
 
   const menu = useMemo<ShellMenuItem[]>(
     () => [
@@ -259,7 +285,7 @@ export default function UserSmsSendPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          phone_number: phone,
+          phone_number: phoneNumbers,
           message: messageBody,
         }),
       });
@@ -276,6 +302,7 @@ export default function UserSmsSendPage() {
       setResponseBody(JSON.stringify(data, null, 2));
 
       setAvailableCredits((prev) => Math.max(0, prev - (data?.credits_used ?? 0)));
+      setRecipientCount(data?.requested_count ?? recipientCount);
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -337,7 +364,15 @@ export default function UserSmsSendPage() {
 
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
             <p className="text-xs font-semibold text-[var(--muted)]">{t.previewTitle}</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="rounded-lg bg-[var(--surface)] px-3 py-2 text-sm">
+                <span className="text-[var(--muted)]">{t.previewRecipients}: </span>
+                <strong>{recipientCount}</strong>
+              </div>
+              <div className="rounded-lg bg-[var(--surface)] px-3 py-2 text-sm">
+                <span className="text-[var(--muted)]">{t.previewPerSms}: </span>
+                <strong>{creditsPerSms}</strong>
+              </div>
               <div className="rounded-lg bg-[var(--surface)] px-3 py-2 text-sm">
                 <span className="text-[var(--muted)]">{t.previewRequired}: </span>
                 <strong>{requiredCredits}</strong>
@@ -357,12 +392,13 @@ export default function UserSmsSendPage() {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">{t.form.phone}</label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+            <textarea
+              value={phoneNumbers}
+              onChange={(e) => setPhoneNumbers(e.target.value)}
               required
+              rows={3}
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none"
-              placeholder="017XXXXXXXX"
+              placeholder="017XXXXXXXX, 018XXXXXXXX"
             />
             <p className="mt-1 text-xs text-[var(--muted)]">{t.form.phoneHint}</p>
           </div>
@@ -377,6 +413,21 @@ export default function UserSmsSendPage() {
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none"
             />
             <p className="mt-1 text-xs text-[var(--muted)]">{t.form.messageHint}</p>
+            <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">{t.form.liveCounter}</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs">
+                <span className="text-[var(--muted)]">{t.form.chars}: </span>
+                <strong>{charCount}</strong>
+              </div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs">
+                <span className="text-[var(--muted)]">{t.form.smsCount}: </span>
+                <strong>{smsCount}</strong>
+              </div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs">
+                <span className="text-[var(--muted)]">{t.form.mode}: </span>
+                <strong>{isUnicode ? t.form.unicode : t.form.gsm}</strong>
+              </div>
+            </div>
           </div>
 
           <button

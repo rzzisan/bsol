@@ -47,11 +47,17 @@ const text = {
     noGateways: "কোনো গেটওয়ে নেই। আগে SMS Gateway পেজে credential যোগ করুন।",
     form: {
       gateway: "গেটওয়ে",
-      phone: "ফোন নম্বর",
+      phone: "ফোন নম্বরসমূহ",
       message: "মেসেজ",
+      liveCounter: "লাইভ কাউন্টার",
+      chars: "ক্যারেক্টার",
+      smsCount: "SMS কাউন্ট",
+      mode: "মোড",
+      unicode: "বাংলা/Unicode",
+      gsm: "English/GSM",
       send: "SMS পাঠান",
       sending: "পাঠানো হচ্ছে...",
-      phoneHint: "বাংলাদেশি নম্বর দিন (যেমন: 017..., +88017..., 88017...)",
+      phoneHint: "একাধিক নম্বর দিতে comma, semicolon, pipe, বা নতুন লাইন ব্যবহার করুন।",
       messageHint: "Unicode/GSM অনুযায়ী segment count backend-এ গণনা করা হবে।",
     },
     response: "Gateway Response",
@@ -78,11 +84,17 @@ const text = {
     noGateways: "No gateways available. Add credentials from SMS Gateway page first.",
     form: {
       gateway: "Gateway",
-      phone: "Phone Number",
+      phone: "Phone Number(s)",
       message: "Message",
+      liveCounter: "Live Counter",
+      chars: "Characters",
+      smsCount: "SMS Count",
+      mode: "Mode",
+      unicode: "Bangla/Unicode",
+      gsm: "English/GSM",
       send: "Send SMS",
       sending: "Sending...",
-      phoneHint: "Use a valid Bangladesh number (017..., +88017..., 88017...)",
+      phoneHint: "Use comma, semicolon, pipe, or new line to send to multiple numbers.",
       messageHint: "Backend will process Unicode/GSM segment behavior.",
     },
     response: "Gateway Response",
@@ -97,13 +109,18 @@ export default function AdminSmsSendPage() {
   const [gateways, setGateways] = useState<SmsGatewayOption[]>([]);
   const [loadingGateways, setLoadingGateways] = useState(true);
   const [gatewayId, setGatewayId] = useState<string>("");
-  const [phone, setPhone] = useState("");
+  const [phoneNumbers, setPhoneNumbers] = useState("");
   const [messageBody, setMessageBody] = useState("");
   const [sending, setSending] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [responseBody, setResponseBody] = useState<string | null>(null);
+
+  const charCount = useMemo(() => Array.from(messageBody).length, [messageBody]);
+  const isUnicode = useMemo(() => /[^\u0000-\u007f]/.test(messageBody), [messageBody]);
+  const segmentLimit = isUnicode ? 70 : 160;
+  const smsCount = Math.max(1, Math.ceil(Math.max(charCount, 1) / segmentLimit));
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -225,7 +242,7 @@ export default function AdminSmsSendPage() {
         },
         body: JSON.stringify({
           gateway_id: gatewayId ? Number(gatewayId) : null,
-          phone_number: phone,
+          phone_number: phoneNumbers,
           message: messageBody,
         }),
       });
@@ -303,12 +320,13 @@ export default function AdminSmsSendPage() {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">{t.form.phone}</label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+            <textarea
+              value={phoneNumbers}
+              onChange={(e) => setPhoneNumbers(e.target.value)}
               required
+              rows={3}
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none"
-              placeholder="017XXXXXXXX"
+              placeholder={locale === "bn" ? "017XXXXXXXX, 018XXXXXXXX" : "017XXXXXXXX, 018XXXXXXXX"}
             />
             <p className="mt-1 text-xs text-[var(--muted)]">{t.form.phoneHint}</p>
           </div>
@@ -323,6 +341,21 @@ export default function AdminSmsSendPage() {
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none"
             />
             <p className="mt-1 text-xs text-[var(--muted)]">{t.form.messageHint}</p>
+            <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">{t.form.liveCounter}</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs">
+                <span className="text-[var(--muted)]">{t.form.chars}: </span>
+                <strong>{charCount}</strong>
+              </div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs">
+                <span className="text-[var(--muted)]">{t.form.smsCount}: </span>
+                <strong>{smsCount}</strong>
+              </div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs">
+                <span className="text-[var(--muted)]">{t.form.mode}: </span>
+                <strong>{isUnicode ? t.form.unicode : t.form.gsm}</strong>
+              </div>
+            </div>
           </div>
 
           <button
