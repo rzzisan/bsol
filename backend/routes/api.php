@@ -23,6 +23,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    Route::get('/sms/gateways', [AdminSmsGatewayController::class, 'myGateways']);
+    Route::post('/sms/preview', [AdminSmsGatewayController::class, 'preview']);
+    Route::post('/sms/send', [AdminSmsGatewayController::class, 'send']);
+
     Route::middleware('is_admin')->prefix('admin')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);
 

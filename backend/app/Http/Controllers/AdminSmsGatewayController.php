@@ -14,6 +14,73 @@ class AdminSmsGatewayController extends Controller
 {
     public function __construct(private readonly SmsCreditService $creditService) {}
 
+    public function myGateways(Request $request): JsonResponse
+    {
+        $actor = $request->user();
+
+        if (! $actor) {
+            return response()->json([
+                'message' => 'Unauthenticated.',
+                'gateways' => [],
+            ], 401);
+        }
+
+        if ($actor->isAdmin()) {
+            $gateways = SmsGateway::query()
+                ->where('is_enabled', true)
+                ->orderByDesc('is_active')
+                ->orderBy('id')
+                ->get()
+                ->map(fn (SmsGateway $gateway) => $this->transformGateway($gateway));
+
+            return response()->json([
+                'gateways' => $gateways,
+            ]);
+        }
+
+        if (! $actor->sms_gateway_id) {
+            return response()->json([
+                'message' => 'No SMS gateway assigned to this user.',
+                'gateways' => [],
+            ]);
+        }
+
+        $gateway = SmsGateway::query()
+            ->where('id', $actor->sms_gateway_id)
+            ->where('is_enabled', true)
+            ->first();
+
+        if (! $gateway) {
+            return response()->json([
+                'message' => 'Assigned SMS gateway is unavailable or disabled.',
+                'gateways' => [],
+            ]);
+        }
+
+        return response()->json([
+            'gateways' => [$this->transformGateway($gateway)],
+        ]);
+    }
+
+    public function preview(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'message' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $actor = $request->user();
+        $actorId = $actor?->id;
+        $creditsRequired = $this->creditService->calculateCreditsRequired($validated['message']);
+
+        $available = $actorId ? $this->creditService->getBalance($actorId) : 0;
+
+        return response()->json([
+            'credits_required' => $creditsRequired,
+            'available_credits' => $available,
+            'can_send' => $available >= $creditsRequired,
+        ]);
+    }
+
     public function index(): JsonResponse
     {
         $this->ensureDefaultKhudebartaGateway();
@@ -139,7 +206,25 @@ class AdminSmsGatewayController extends Controller
         $actorId = $actor?->id;
         $isAdmin = (bool) $actor?->isAdmin();
 
-        if (! $isAdmin && $actor?->sms_gateway_id) {
+        if (! $isAdmin) {
+            if (! $actor?->sms_gateway_id) {
+                $this->createHistoryRecord(
+                    gateway: null,
+                    userId: $actorId,
+                    phoneNumber: $validated['phone_number'],
+                    message: $validated['message'],
+                    status: 'failed',
+                    httpStatusCode: null,
+                    responseBody: null,
+                    errorMessage: 'No SMS gateway assigned to this user.',
+                    sentAt: null,
+                );
+
+                return response()->json([
+                    'message' => 'No SMS gateway assigned. Please contact admin.',
+                ], 422);
+            }
+
             $gateway = SmsGateway::find($actor->sms_gateway_id);
         } else {
             $gateway = isset($validated['gateway_id'])

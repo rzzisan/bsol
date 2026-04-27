@@ -23,6 +23,13 @@ const text = {
     accessDenied: "এই পেজটি সাধারণ ইউজারদের জন্য।",
     goHome: "হোমে যান",
     quickActions: "Quick Actions",
+    menuDashboard: "ড্যাশবোর্ড",
+    menuOrders: "My Orders",
+    menuCourier: "Courier Tracking",
+    menuBilling: "Billing & Subscription",
+    menuProfile: "Profile Settings",
+    menuSms: "এসএমএস",
+    menuSmsSend: "SMS পাঠান",
     cards: [
       { label: "চলমান অর্ডার", value: "0", hint: "আজকের active order" },
       { label: "ডেলিভার্ড", value: "0", hint: "এ মাসে complete" },
@@ -44,6 +51,13 @@ const text = {
     accessDenied: "This page is available for regular users only.",
     goHome: "Go Home",
     quickActions: "Quick Actions",
+    menuDashboard: "Dashboard",
+    menuOrders: "My Orders",
+    menuCourier: "Courier Tracking",
+    menuBilling: "Billing & Subscription",
+    menuProfile: "Profile Settings",
+    menuSms: "SMS",
+    menuSmsSend: "Send SMS",
     cards: [
       { label: "Active Orders", value: "0", hint: "today's active orders" },
       { label: "Delivered", value: "0", hint: "completed this month" },
@@ -98,11 +112,17 @@ export default function UserDashboardPage() {
 
   const menu = useMemo<ShellMenuItem[]>(
     () => [
-      { key: "dashboard", label: t.title, href: "/dashboard", icon: "🏠" },
-      { key: "orders", label: t.modules[0], icon: "📦" },
-      { key: "courier", label: t.modules[1], icon: "🚚" },
-      { key: "billing", label: t.modules[2], icon: "💳" },
-      { key: "profile", label: t.modules[3], icon: "⚙️" },
+      { key: "dashboard", label: t.menuDashboard, href: "/dashboard", icon: "🏠" },
+      { key: "orders", label: t.menuOrders, icon: "📦" },
+      { key: "courier", label: t.menuCourier, icon: "🚚" },
+      { key: "billing", label: t.menuBilling, icon: "💳" },
+      {
+        key: "sms",
+        label: t.menuSms,
+        icon: "✉️",
+        children: [{ key: "sms-send", label: t.menuSmsSend, href: "/dashboard/sms/send" }],
+      },
+      { key: "profile", label: t.menuProfile, icon: "⚙️" },
     ],
     [t],
   );

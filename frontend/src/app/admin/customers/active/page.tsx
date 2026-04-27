@@ -28,6 +28,7 @@ interface AdminUserRow {
   role: "admin" | "user";
   subscription_package_id: number | null;
   sms_gateway_id: number | null;
+  sms_balance?: number;
   assigned_gateway?: { id: number; name: string; provider: string } | null;
   created_at: string;
 }
@@ -69,7 +70,7 @@ const text = {
     menuSmsGateway: "এসএমএস গেটওয়ে",
     menuSmsSend: "এসএমএস সেন্ড",
     menuSmsHistory: "এসএমএস হিস্টোরি",
-      menuSmsCredit: "এসএমএস ক্রেডিট",
+    menuSmsCredit: "এসএমএস ক্রেডিট",
     menuPackages: "প্যাকেজ",
     loading: "ডাটা লোড হচ্ছে...",
     empty: "কোনো ইউজার পাওয়া যায়নি।",
@@ -81,6 +82,7 @@ const text = {
       mobile: "মোবাইল",
       role: "রোল",
       gateway: "এসএমএস গেটওয়ে",
+      credit: "SMS ক্রেডিট",
       date: "রেজিস্টার্ড তারিখ",
       actions: "অ্যাকশন",
     },
@@ -138,6 +140,7 @@ const text = {
       mobile: "Mobile",
       role: "Role",
       gateway: "SMS Gateway",
+      credit: "SMS Credit",
       date: "Registered Date",
       actions: "Actions",
     },
@@ -677,6 +680,9 @@ export default function ActiveCustomersPage() {
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
                   {t.table.gateway}
                 </th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">
+                  {t.table.credit}
+                </th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
                   {t.table.date}
                 </th>
@@ -689,7 +695,7 @@ export default function ActiveCustomersPage() {
               {loadingRows && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]"
                   >
                     {t.loading}
@@ -699,7 +705,7 @@ export default function ActiveCustomersPage() {
               {!loadingRows && error && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="border border-[#e5ebf5] px-4 py-6 text-center text-red-600"
                   >
                     {error}
@@ -709,7 +715,7 @@ export default function ActiveCustomersPage() {
               {!loadingRows && !error && rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]"
                   >
                     {t.empty}
@@ -756,6 +762,11 @@ export default function ActiveCustomersPage() {
                           {t.noGateway}
                         </span>
                       )}
+                    </td>
+                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                      <span className="rounded bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700">
+                        {(row.sms_balance ?? 0).toLocaleString()}
+                      </span>
                     </td>
                     <td className="border border-[#e5ebf5] px-3 py-2">
                       {new Date(row.created_at).toLocaleDateString()}

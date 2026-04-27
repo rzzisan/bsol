@@ -10,6 +10,7 @@ import {
   LOCALE_STORAGE_KEY,
   normalizeRole,
   THEME_STORAGE_KEY,
+  type AuthUser,
   type Locale,
   type ThemeMode,
 } from "@/lib/dashboard-client";
@@ -22,84 +23,95 @@ interface SmsGatewayOption {
   is_enabled: boolean;
 }
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
 
 const text = {
   bn: {
-    title: "এসএমএস সেন্ড",
-    subtitle: "সিলেক্টেড গেটওয়ে ব্যবহার করে টেস্ট বা রিয়েল SMS পাঠান।",
-    loginRequired: "এই পেজ দেখতে হলে অ্যাডমিন হিসেবে লগইন করুন।",
-    accessDenied: "শুধুমাত্র অ্যাডমিন এই পেজ দেখতে পারবেন।",
+    title: "ইউজার ড্যাশবোর্ড",
+    subtitle: "অ্যাসাইন করা গেটওয়ে ও নিজের SMS credit ব্যবহার করে SMS পাঠান।",
+    loginRequired: "ড্যাশবোর্ড দেখতে হলে আগে লগইন করুন।",
+    accessDenied: "এই পেজটি সাধারণ ইউজারদের জন্য।",
     goHome: "হোমে যান",
+    quickActions: "Quick Actions",
     menuDashboard: "ড্যাশবোর্ড",
-    menuCustomers: "গ্রাহক",
-    menuActive: "অ্যাকটিভ গ্রাহক",
-    menuPending: "পেন্ডিং গ্রাহক",
+    menuOrders: "My Orders",
+    menuCourier: "Courier Tracking",
+    menuBilling: "Billing & Subscription",
+    menuProfile: "Profile Settings",
     menuSms: "এসএমএস",
-    menuSmsGateway: "এসএমএস গেটওয়ে",
-    menuSmsSend: "এসএমএস সেন্ড",
-    menuSmsHistory: "এসএমএস হিস্টোরি",
-    menuSmsCredit: "এসএমএস ক্রেডিট",
-    menuPackages: "প্যাকেজ",
+    menuSmsSend: "SMS পাঠান",
     languageLabel: "ভাষা",
     themeLabel: "থিম",
     loadingGateways: "গেটওয়ে লোড হচ্ছে...",
-    noGateways: "কোনো গেটওয়ে নেই। আগে SMS Gateway পেজে credential যোগ করুন।",
+    noGateways: "আপনার জন্য কোনো SMS গেটওয়ে অ্যাসাইন করা নেই।",
     form: {
-      gateway: "গেটওয়ে",
+      gateway: "অ্যাসাইন করা গেটওয়ে",
       phone: "ফোন নম্বর",
       message: "মেসেজ",
       send: "SMS পাঠান",
       sending: "পাঠানো হচ্ছে...",
       phoneHint: "বাংলাদেশি নম্বর দিন (যেমন: 017..., +88017..., 88017...)",
-      messageHint: "Unicode/GSM অনুযায়ী segment count backend-এ গণনা করা হবে।",
+      messageHint: "English 160 / Bangla 70 char = 1 credit segment",
     },
-    response: "Gateway Response",
+    previewTitle: "Credit Preview",
+    previewRequired: "প্রয়োজন",
+    previewAvailable: "আপনার ব্যালেন্স",
+    previewCanSend: "পাঠানো যাবে",
+    previewCannotSend: "ক্রেডিট কম আছে",
+    response: "API Response",
   },
   en: {
-    title: "Send SMS",
-    subtitle: "Send test or real SMS using a selected gateway.",
-    loginRequired: "Please login as admin to access this page.",
-    accessDenied: "Only admin users can view this page.",
+    title: "User Dashboard",
+    subtitle: "Send SMS with assigned gateway and your own SMS credits.",
+    loginRequired: "Please login first to access the dashboard.",
+    accessDenied: "This page is available for regular users only.",
     goHome: "Go Home",
+    quickActions: "Quick Actions",
     menuDashboard: "Dashboard",
-    menuCustomers: "Customers",
-    menuActive: "Active Customers",
-    menuPending: "Pending Customers",
+    menuOrders: "My Orders",
+    menuCourier: "Courier Tracking",
+    menuBilling: "Billing & Subscription",
+    menuProfile: "Profile Settings",
     menuSms: "SMS",
-    menuSmsGateway: "SMS Gateway",
     menuSmsSend: "Send SMS",
-    menuSmsHistory: "SMS History",
-    menuSmsCredit: "SMS Credit",
-    menuPackages: "Packages",
     languageLabel: "Language",
     themeLabel: "Theme",
-    loadingGateways: "Loading gateways...",
-    noGateways: "No gateways available. Add credentials from SMS Gateway page first.",
+    loadingGateways: "Loading gateway...",
+    noGateways: "No SMS gateway assigned to your account.",
     form: {
-      gateway: "Gateway",
+      gateway: "Assigned Gateway",
       phone: "Phone Number",
       message: "Message",
       send: "Send SMS",
       sending: "Sending...",
       phoneHint: "Use a valid Bangladesh number (017..., +88017..., 88017...)",
-      messageHint: "Backend will process Unicode/GSM segment behavior.",
+      messageHint: "English 160 / Bangla 70 chars = 1 credit segment",
     },
-    response: "Gateway Response",
+    previewTitle: "Credit Preview",
+    previewRequired: "Required",
+    previewAvailable: "Your Balance",
+    previewCanSend: "Can send",
+    previewCannotSend: "Insufficient credit",
+    response: "API Response",
   },
 };
 
-export default function AdminSmsSendPage() {
+export default function UserSmsSendPage() {
   const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
   const [gateways, setGateways] = useState<SmsGatewayOption[]>([]);
   const [loadingGateways, setLoadingGateways] = useState(true);
-  const [gatewayId, setGatewayId] = useState<string>("");
   const [phone, setPhone] = useState("");
   const [messageBody, setMessageBody] = useState("");
   const [sending, setSending] = useState(false);
+
+  const [requiredCredits, setRequiredCredits] = useState(1);
+  const [availableCredits, setAvailableCredits] = useState(0);
+  const [canSend, setCanSend] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -124,11 +136,12 @@ export default function AdminSmsSendPage() {
       return;
     }
 
-    if (normalizeRole(storedUser) !== "admin") {
+    if (normalizeRole(storedUser) !== "user") {
       setState("forbidden");
       return;
     }
 
+    setUser(storedUser);
     setState("ready");
   }, []);
 
@@ -145,7 +158,7 @@ export default function AdminSmsSendPage() {
       setError(null);
 
       try {
-        const res = await fetch(`${API_BASE_URL}/admin/sms/gateways`, {
+        const res = await fetch(`${API_BASE_URL}/sms/gateways`, {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${token}`,
@@ -155,17 +168,11 @@ export default function AdminSmsSendPage() {
         const data = await res.json();
 
         if (!res.ok) {
-          setError(data?.message ?? "Failed to load gateways.");
+          setError(data?.message ?? "Failed to load gateway.");
           return;
         }
 
-        const list = ((data?.gateways ?? []) as SmsGatewayOption[]).filter((gateway) => gateway.is_enabled);
-        setGateways(list);
-
-        if (list.length > 0) {
-          const active = list.find((gateway) => gateway.is_active) ?? list[0];
-          setGatewayId(String(active.id));
-        }
+        setGateways((data?.gateways ?? []) as SmsGatewayOption[]);
       } catch {
         setError("Network error. Please try again.");
       } finally {
@@ -176,30 +183,53 @@ export default function AdminSmsSendPage() {
     void loadGateways();
   }, [state]);
 
+  useEffect(() => {
+    if (state !== "ready") return;
+
+    const token = getStoredToken();
+    if (!token) return;
+
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/sms/preview`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            message: messageBody || "a",
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) return;
+
+        setRequiredCredits(data?.credits_required ?? 1);
+        setAvailableCredits(data?.available_credits ?? 0);
+        setCanSend(Boolean(data?.can_send));
+      } catch {
+        // ignore preview errors
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [messageBody, state]);
+
   const menu = useMemo<ShellMenuItem[]>(
     () => [
-      { key: "dashboard", label: t.menuDashboard, href: "/admin", icon: "🏠" },
-      {
-        key: "customers",
-        label: t.menuCustomers,
-        icon: "👥",
-        children: [
-          { key: "customers-active", label: t.menuActive, href: "/admin/customers/active" },
-          { key: "customers-pending", label: t.menuPending },
-        ],
-      },
+      { key: "dashboard", label: t.menuDashboard, href: "/dashboard", icon: "🏠" },
+      { key: "orders", label: t.menuOrders, icon: "📦" },
+      { key: "courier", label: t.menuCourier, icon: "🚚" },
+      { key: "billing", label: t.menuBilling, icon: "💳" },
       {
         key: "sms",
         label: t.menuSms,
         icon: "✉️",
-        children: [
-          { key: "sms-gateway", label: t.menuSmsGateway, href: "/admin/sms/gateways" },
-          { key: "sms-send", label: t.menuSmsSend, href: "/admin/sms/send" },
-          { key: "sms-history", label: t.menuSmsHistory, href: "/admin/sms/history" },
-          { key: "sms-credit", label: t.menuSmsCredit, href: "/admin/sms/credit" },
-        ],
+        children: [{ key: "sms-send", label: t.menuSmsSend, href: "/dashboard/sms/send" }],
       },
-      { key: "packages", label: t.menuPackages, icon: "📦" },
+      { key: "profile", label: t.menuProfile, icon: "⚙️" },
     ],
     [t],
   );
@@ -216,7 +246,7 @@ export default function AdminSmsSendPage() {
     setResponseBody(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/sms/send`, {
+      const res = await fetch(`${API_BASE_URL}/sms/send`, {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -224,7 +254,6 @@ export default function AdminSmsSendPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          gateway_id: gatewayId ? Number(gatewayId) : null,
           phone_number: phone,
           message: messageBody,
         }),
@@ -240,6 +269,8 @@ export default function AdminSmsSendPage() {
 
       setSuccess(data?.message ?? "SMS sent successfully.");
       setResponseBody(JSON.stringify(data, null, 2));
+
+      setAvailableCredits((prev) => Math.max(0, prev - (data?.credits_used ?? 0)));
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -271,9 +302,9 @@ export default function AdminSmsSendPage() {
       theme={theme}
       localeLabel={t.languageLabel}
       themeLabel={t.themeLabel}
-      sidebarTitle="Admin Panel"
-      userName={t.menuSms}
-      userMeta={t.menuSmsSend}
+      sidebarTitle={t.title}
+      userName={user?.name}
+      userMeta={user?.email}
       menu={menu}
       activeKey="sms-send"
       defaultExpandedKey="sms"
@@ -286,19 +317,37 @@ export default function AdminSmsSendPage() {
             <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">{t.form.gateway}</label>
             <select
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none"
-              value={gatewayId}
-              onChange={(e) => setGatewayId(e.target.value)}
-              disabled={loadingGateways || gateways.length === 0}
+              value={gateways[0]?.id ?? ""}
+              disabled
             >
               {loadingGateways ? <option value="">{t.loadingGateways}</option> : null}
               {!loadingGateways && gateways.length === 0 ? <option value="">{t.noGateways}</option> : null}
-              {!loadingGateways &&
-                gateways.map((gateway) => (
-                  <option key={gateway.id} value={gateway.id}>
-                    {gateway.name} ({gateway.provider}){gateway.is_active ? " • Active" : ""}
-                  </option>
-                ))}
+              {!loadingGateways && gateways.length > 0 ? (
+                <option value={gateways[0].id}>
+                  {gateways[0].name} ({gateways[0].provider})
+                </option>
+              ) : null}
             </select>
+          </div>
+
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
+            <p className="text-xs font-semibold text-[var(--muted)]">{t.previewTitle}</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg bg-[var(--surface)] px-3 py-2 text-sm">
+                <span className="text-[var(--muted)]">{t.previewRequired}: </span>
+                <strong>{requiredCredits}</strong>
+              </div>
+              <div className="rounded-lg bg-[var(--surface)] px-3 py-2 text-sm">
+                <span className="text-[var(--muted)]">{t.previewAvailable}: </span>
+                <strong>{availableCredits}</strong>
+              </div>
+              <div className="rounded-lg bg-[var(--surface)] px-3 py-2 text-sm">
+                <span className="text-[var(--muted)]">Status: </span>
+                <strong className={canSend ? "text-emerald-600" : "text-red-600"}>
+                  {canSend ? t.previewCanSend : t.previewCannotSend}
+                </strong>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -327,7 +376,7 @@ export default function AdminSmsSendPage() {
 
           <button
             type="submit"
-            disabled={sending || loadingGateways || gateways.length === 0}
+            disabled={sending || loadingGateways || gateways.length === 0 || !canSend}
             className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-70"
           >
             {sending ? t.form.sending : t.form.send}

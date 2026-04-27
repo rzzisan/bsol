@@ -25,9 +25,21 @@ class AdminController extends Controller
 
     public function listUsers(): JsonResponse
     {
-        $users = User::with(['subscriptionPackage:id,name,slug', 'assignedGateway:id,name,provider'])
+        $users = User::query()
+            ->with(['subscriptionPackage:id,name,slug', 'assignedGateway:id,name,provider'])
+            ->leftJoin('sms_credits', 'users.id', '=', 'sms_credits.user_id')
             ->latest()
-            ->get(['id', 'name', 'mobile', 'email', 'role', 'subscription_package_id', 'sms_gateway_id', 'created_at']);
+            ->get([
+                'users.id',
+                'users.name',
+                'users.mobile',
+                'users.email',
+                'users.role',
+                'users.subscription_package_id',
+                'users.sms_gateway_id',
+                'users.created_at',
+                \DB::raw('COALESCE(sms_credits.balance, 0) as sms_balance'),
+            ]);
 
         return response()->json([
             'users' => $users,
