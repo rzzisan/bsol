@@ -81,6 +81,69 @@ class AdminSmsGatewayController extends Controller
         ]);
     }
 
+    public function myHistory(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'status' => ['nullable', Rule::in(['sent', 'failed'])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+        ]);
+
+        $actor = $request->user();
+        $actorId = $actor?->id;
+
+        if (! $actorId) {
+            return response()->json([
+                'message' => 'Unauthenticated.',
+                'histories' => [],
+            ], 401);
+        }
+
+        $perPage = (int) ($validated['per_page'] ?? 20);
+
+        $query = SmsHistory::query()
+            ->where('user_id', $actorId)
+            ->latest('id');
+
+        if (! empty($validated['search'])) {
+            $search = $validated['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('phone_number', 'like', "%{$search}%")
+                    ->orWhere('message', 'like', "%{$search}%")
+                    ->orWhere('gateway_name', 'like', "%{$search}%")
+                    ->orWhere('provider', 'like', "%{$search}%");
+            });
+        }
+
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
+        $histories = $query->paginate($perPage);
+
+        return response()->json([
+            'histories' => collect($histories->items())->map(fn (SmsHistory $history) => [
+                'id' => $history->id,
+                'gateway_name' => $history->gateway_name,
+                'provider' => $history->provider,
+                'phone_number' => $history->phone_number,
+                'message' => $history->message,
+                'status' => $history->status,
+                'http_status_code' => $history->http_status_code,
+                'response_body' => $history->response_body,
+                'error_message' => $history->error_message,
+                'sent_at' => optional($history->sent_at)?->toIso8601String(),
+                'created_at' => optional($history->created_at)?->toIso8601String(),
+            ]),
+            'meta' => [
+                'current_page' => $histories->currentPage(),
+                'last_page' => $histories->lastPage(),
+                'per_page' => $histories->perPage(),
+                'total' => $histories->total(),
+            ],
+        ]);
+    }
+
     public function index(): JsonResponse
     {
         $this->ensureDefaultKhudebartaGateway();

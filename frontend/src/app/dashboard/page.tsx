@@ -30,6 +30,7 @@ const text = {
     menuProfile: "Profile Settings",
     menuSms: "এসএমএস",
     menuSmsSend: "SMS পাঠান",
+    menuSmsHistory: "SMS হিস্টোরি",
     cards: [
       { label: "চলমান অর্ডার", value: "0", hint: "আজকের active order" },
       { label: "ডেলিভার্ড", value: "0", hint: "এ মাসে complete" },
@@ -58,6 +59,7 @@ const text = {
     menuProfile: "Profile Settings",
     menuSms: "SMS",
     menuSmsSend: "Send SMS",
+    menuSmsHistory: "SMS History",
     cards: [
       { label: "Active Orders", value: "0", hint: "today's active orders" },
       { label: "Delivered", value: "0", hint: "completed this month" },
@@ -120,7 +122,10 @@ export default function UserDashboardPage() {
         key: "sms",
         label: t.menuSms,
         icon: "✉️",
-        children: [{ key: "sms-send", label: t.menuSmsSend, href: "/dashboard/sms/send" }],
+        children: [
+          { key: "sms-send", label: t.menuSmsSend, href: "/dashboard/sms/send" },
+          { key: "sms-history", label: t.menuSmsHistory, href: "/dashboard/sms/history" },
+        ],
       },
       { key: "profile", label: t.menuProfile, icon: "⚙️" },
     ],

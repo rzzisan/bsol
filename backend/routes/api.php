@@ -26,6 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sms/gateways', [AdminSmsGatewayController::class, 'myGateways']);
     Route::post('/sms/preview', [AdminSmsGatewayController::class, 'preview']);
     Route::post('/sms/send', [AdminSmsGatewayController::class, 'send']);
+    Route::get('/sms/history', [AdminSmsGatewayController::class, 'myHistory']);
 
     Route::middleware('is_admin')->prefix('admin')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);
