@@ -39,6 +39,7 @@ const text = {
       billing: "বিলিং",
       reports: "রিপোর্ট",
       settings: "সেটিংস",
+      emailSettings: "ইমেইল সেটিংস",
     },
     stats: [
       { label: "মোট গ্রাহক", value: "5584", hint: "বর্তমান সক্রিয় + নিষ্ক্রিয় গ্রাহক" },
@@ -83,6 +84,7 @@ const text = {
       billing: "Billing",
       reports: "Reports",
       settings: "Settings",
+      emailSettings: "Email Settings",
     },
     stats: [
       { label: "Total Clients", value: "5584", hint: "Current active + inactive clients" },
@@ -167,7 +169,14 @@ export default function AdminDashboardPage() {
       { key: "packages", label: t.menu.packages, icon: "📦" },
       { key: "billing", label: t.menu.billing, icon: "💳" },
       { key: "reports", label: t.menu.reports, icon: "📊" },
-      { key: "settings", label: t.menu.settings, icon: "⚙️" },
+      {
+        key: "settings",
+        label: t.menu.settings,
+        icon: "⚙️",
+        children: [
+          { key: "settings-email", label: t.menu.emailSettings, href: "/admin/settings/email" },
+        ],
+      },
     ],
     [t],
   );

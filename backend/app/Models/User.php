@@ -43,6 +43,11 @@ class User extends Authenticatable
         return $this->belongsTo(SmsGateway::class, 'sms_gateway_id');
     }
 
+    public function emailConfigurations()
+    {
+        return $this->hasMany(EmailConfiguration::class);
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';

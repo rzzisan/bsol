@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminSmsCreditController;
 use App\Http\Controllers\AdminSmsGatewayController;
+use App\Http\Controllers\Api\EmailConfigurationController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -53,5 +54,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/sms/credit/users', [AdminSmsCreditController::class, 'listUserCredits']);
         Route::post('/sms/credit/recharge', [AdminSmsCreditController::class, 'recharge']);
         Route::get('/sms/credit/history', [AdminSmsCreditController::class, 'creditHistory']);
+
+        // Email Configuration Routes
+        Route::get('/email-configurations', [EmailConfigurationController::class, 'index']);
+        Route::post('/email-configurations', [EmailConfigurationController::class, 'store']);
+        Route::post('/email-configurations/test-connection', [EmailConfigurationController::class, 'testConnection']);
+        Route::get('/email-configurations/{id}', [EmailConfigurationController::class, 'show']);
+        Route::put('/email-configurations/{id}', [EmailConfigurationController::class, 'update']);
+        Route::delete('/email-configurations/{id}', [EmailConfigurationController::class, 'destroy']);
     });
 });
