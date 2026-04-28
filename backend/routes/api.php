@@ -4,6 +4,9 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminSmsCreditController;
 use App\Http\Controllers\AdminSmsGatewayController;
 use App\Http\Controllers\Api\EmailConfigurationController;
+use App\Http\Controllers\Api\NotificationDispatchController;
+use App\Http\Controllers\Api\NotificationTemplateController;
+use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -62,5 +65,24 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/email-configurations/{id}', [EmailConfigurationController::class, 'show']);
         Route::put('/email-configurations/{id}', [EmailConfigurationController::class, 'update']);
         Route::delete('/email-configurations/{id}', [EmailConfigurationController::class, 'destroy']);
+
+        // Notification Template Routes
+        Route::get('/notification-templates', [NotificationTemplateController::class, 'index']);
+        Route::post('/notification-templates', [NotificationTemplateController::class, 'store']);
+        Route::post('/notification-templates/preview', [NotificationTemplateController::class, 'preview']);
+        Route::get('/notification-templates/{id}', [NotificationTemplateController::class, 'show']);
+        Route::put('/notification-templates/{id}', [NotificationTemplateController::class, 'update']);
+        Route::delete('/notification-templates/{id}', [NotificationTemplateController::class, 'destroy']);
+
+        // Notification Use-Case Mapping Routes
+        Route::get('/notification-use-case-bindings', [NotificationUseCaseBindingController::class, 'index']);
+        Route::post('/notification-use-case-bindings', [NotificationUseCaseBindingController::class, 'store']);
+        Route::get('/notification-use-case-bindings/{id}', [NotificationUseCaseBindingController::class, 'show']);
+        Route::put('/notification-use-case-bindings/{id}', [NotificationUseCaseBindingController::class, 'update']);
+        Route::delete('/notification-use-case-bindings/{id}', [NotificationUseCaseBindingController::class, 'destroy']);
+
+        // Notification Dispatch Routes
+        Route::post('/notification-dispatch', [NotificationDispatchController::class, 'dispatch']);
+        Route::get('/notification-dispatch/logs', [NotificationDispatchController::class, 'logs']);
     });
 });

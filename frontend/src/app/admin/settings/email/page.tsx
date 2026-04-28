@@ -108,6 +108,8 @@ const text = {
       reports: "রিপোর্ট",
       settings: "সেটিংস",
       emailSettings: "ইমেইল সেটিংস",
+      notificationTemplates: "নোটিফিকেশন টেমপ্লেট",
+      notificationUseCases: "ইউজকেস ম্যাপিং",
     },
   },
   en: {
@@ -166,6 +168,8 @@ const text = {
       reports: "Reports",
       settings: "Settings",
       emailSettings: "Email Settings",
+      notificationTemplates: "Notification Templates",
+      notificationUseCases: "Use-case Mapping",
     },
   },
 };
@@ -460,6 +464,8 @@ export default function EmailSettingsPage() {
         reports: t.menu.reports,
         settings: t.menu.settings,
         emailSettings: t.menu.emailSettings,
+        notificationTemplates: t.menu.notificationTemplates,
+        notificationUseCases: t.menu.notificationUseCases,
       }),
     [t],
   );

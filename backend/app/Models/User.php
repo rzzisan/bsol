@@ -4,6 +4,9 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use App\Models\NotificationDispatchLog;
+use App\Models\NotificationTemplate;
+use App\Models\NotificationUseCaseBinding;
 use App\Models\SubscriptionPackage;
 use App\Models\SmsGateway;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -46,6 +49,21 @@ class User extends Authenticatable
     public function emailConfigurations()
     {
         return $this->hasMany(EmailConfiguration::class);
+    }
+
+    public function notificationTemplates()
+    {
+        return $this->hasMany(NotificationTemplate::class);
+    }
+
+    public function notificationUseCaseBindings()
+    {
+        return $this->hasMany(NotificationUseCaseBinding::class);
+    }
+
+    public function notificationDispatchLogs()
+    {
+        return $this->hasMany(NotificationDispatchLog::class);
     }
 
     public function isAdmin(): bool
