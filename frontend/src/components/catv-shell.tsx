@@ -91,6 +91,14 @@ export default function CatvShell({
   }
 
   function handleGroupClick(key: string) {
+    const isMobile = window.matchMedia("(max-width: 980px)").matches;
+
+    if (collapsed && !isMobile) {
+      setCollapsed(false);
+      setExpanded(key);
+      return;
+    }
+
     setExpanded((prev) => (prev === key ? null : key));
   }
 
