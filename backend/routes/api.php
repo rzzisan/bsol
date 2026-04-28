@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\NotificationDispatchController;
 use App\Http\Controllers\Api\NotificationTemplateController;
 use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\OtpController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -21,6 +22,11 @@ Route::get('/health', function () {
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// Phone OTP for registration
+Route::post('/otp/register', [OtpController::class, 'sendRegistrationOtp']);
+Route::post('/otp/verify-registration', [OtpController::class, 'verifyRegistrationOtp']);
+Route::post('/otp/resend', [OtpController::class, 'resendOtp']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);

@@ -16,7 +16,7 @@ import {
 } from "@/lib/dashboard-client";
 
 interface SmsHistoryRow {
-  id: number;
+  id: string;
   gateway_id: number | null;
   gateway_name: string | null;
   provider: string | null;
@@ -28,6 +28,8 @@ interface SmsHistoryRow {
   error_message: string | null;
   sent_at: string | null;
   created_at: string | null;
+  source?: string;
+  event_type?: string;
 }
 
 interface PaginationMeta {
@@ -81,6 +83,7 @@ const text = {
     },
     table: {
       id: "ID",
+      type: "Type",
       date: "তারিখ",
       gateway: "গেটওয়ে",
       phone: "ফোন",
@@ -131,6 +134,7 @@ const text = {
     },
     table: {
       id: "ID",
+      type: "Type",
       date: "Date",
       gateway: "Gateway",
       phone: "Phone",
@@ -341,6 +345,7 @@ export default function AdminSmsHistoryPage() {
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.id}</th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.type}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.date}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.gateway}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.phone}</th>
@@ -353,7 +358,7 @@ export default function AdminSmsHistoryPage() {
             <tbody>
               {loadingRows && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
@@ -361,7 +366,7 @@ export default function AdminSmsHistoryPage() {
 
               {!loadingRows && error && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-red-600">
+                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-red-600">
                     {error}
                   </td>
                 </tr>
@@ -369,7 +374,7 @@ export default function AdminSmsHistoryPage() {
 
               {!loadingRows && !error && rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
@@ -378,6 +383,11 @@ export default function AdminSmsHistoryPage() {
               {!loadingRows && !error && rows.map((row) => (
                 <tr key={row.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]">
                   <td className="border border-[#e5ebf5] px-3 py-2">{row.id}</td>
+                  <td className="border border-[#e5ebf5] px-3 py-2">
+                    <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                      {row.event_type ?? "sms_send"}
+                    </span>
+                  </td>
                   <td className="border border-[#e5ebf5] px-3 py-2 whitespace-nowrap">
                     {new Date(row.created_at ?? row.sent_at ?? Date.now()).toLocaleString()}
                   </td>

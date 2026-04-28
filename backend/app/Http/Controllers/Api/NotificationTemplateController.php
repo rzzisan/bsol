@@ -213,16 +213,14 @@ class NotificationTemplateController extends Controller
      */
     private function validatePayload(Request $request, bool $partial = false): array
     {
-        $prefix = $partial ? 'sometimes|' : '';
-
         return $request->validate([
-            'name' => [$prefix.'required', 'string', 'max:160'],
-            'channel' => [$prefix.'required', Rule::in(['sms', 'email'])],
-            'language' => [$prefix.'required', Rule::in(['bn', 'en'])],
+            'name' => [$partial ? 'sometimes' : 'required', 'string', 'max:160'],
+            'channel' => [$partial ? 'sometimes' : 'required', Rule::in(['sms', 'email'])],
+            'language' => [$partial ? 'sometimes' : 'required', Rule::in(['bn', 'en'])],
             'sms_gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
             'email_configuration_id' => ['nullable', 'integer', 'exists:email_configurations,id'],
             'subject' => ['nullable', 'string', 'max:255'],
-            'body' => [$prefix.'required', 'string', 'max:5000'],
+            'body' => [$partial ? 'sometimes' : 'required', 'string', 'max:5000'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
     }

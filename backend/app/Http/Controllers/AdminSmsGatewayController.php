@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PhoneOtpActivityLog;
 use App\Models\SmsGateway;
 use App\Models\SmsHistory;
 use App\Services\SmsCreditService;
@@ -554,15 +555,17 @@ class AdminSmsGatewayController extends Controller
             'status' => ['nullable', Rule::in(['sent', 'failed'])],
             'gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $perPage = (int) ($validated['per_page'] ?? 50);
+        $page = (int) ($validated['page'] ?? 1);
 
-        $query = SmsHistory::query()->latest('id');
+        $smsQuery = SmsHistory::query()->latest('id');
 
         if (! empty($validated['search'])) {
             $search = $validated['search'];
-            $query->where(function ($q) use ($search) {
+            $smsQuery->where(function ($q) use ($search) {
                 $q->where('phone_number', 'like', "%{$search}%")
                     ->orWhere('message', 'like', "%{$search}%")
                     ->orWhere('gateway_name', 'like', "%{$search}%")
@@ -571,35 +574,82 @@ class AdminSmsGatewayController extends Controller
         }
 
         if (! empty($validated['status'])) {
-            $query->where('status', $validated['status']);
+            $smsQuery->where('status', $validated['status']);
         }
 
         if (! empty($validated['gateway_id'])) {
-            $query->where('gateway_id', $validated['gateway_id']);
+            $smsQuery->where('gateway_id', $validated['gateway_id']);
         }
 
-        $histories = $query->paginate($perPage);
+        $smsRows = $smsQuery->get()->map(fn (SmsHistory $history) => [
+            'id' => 'sms-'.$history->id,
+            'gateway_id' => $history->gateway_id,
+            'gateway_name' => $history->gateway_name,
+            'provider' => $history->provider,
+            'phone_number' => $history->phone_number,
+            'message' => $history->message,
+            'status' => $history->status,
+            'http_status_code' => $history->http_status_code,
+            'response_body' => $history->response_body,
+            'error_message' => $history->error_message,
+            'sent_at' => optional($history->sent_at)?->toIso8601String(),
+            'created_at' => optional($history->created_at)?->toIso8601String(),
+            'source' => 'sms_history',
+            'event_type' => 'sms_send',
+        ]);
+
+        $otpQuery = PhoneOtpActivityLog::query()->latest('id');
+
+        if (! empty($validated['search'])) {
+            $search = $validated['search'];
+            $otpQuery->where(function ($q) use ($search) {
+                $q->where('mobile', 'like', "%{$search}%")
+                    ->orWhere('message', 'like', "%{$search}%")
+                    ->orWhere('error_message', 'like', "%{$search}%")
+                    ->orWhere('event_type', 'like', "%{$search}%");
+            });
+        }
+
+        if (! empty($validated['status'])) {
+            $otpQuery->where('status', $validated['status']);
+        }
+
+        $otpRows = $otpQuery->get()->map(fn (PhoneOtpActivityLog $log) => [
+            'id' => 'otp-'.$log->id,
+            'gateway_id' => null,
+            'gateway_name' => 'OTP Verification',
+            'provider' => $log->provider,
+            'phone_number' => $log->mobile,
+            'message' => $log->message,
+            'status' => $log->status,
+            'http_status_code' => null,
+            'response_body' => null,
+            'error_message' => $log->error_message,
+            'sent_at' => $log->status === 'sent' ? optional($log->created_at)?->toIso8601String() : null,
+            'created_at' => optional($log->created_at)?->toIso8601String(),
+            'source' => 'otp_registration',
+            'event_type' => $log->event_type,
+        ]);
+
+        $merged = $smsRows
+            ->concat($otpRows)
+            ->sortByDesc(fn (array $row) => (string) ($row['created_at'] ?? $row['sent_at'] ?? ''))
+            ->values();
+
+        $total = $merged->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $currentPage = min($page, $lastPage);
+        $offset = ($currentPage - 1) * $perPage;
+
+        $items = $merged->slice($offset, $perPage)->values();
 
         return response()->json([
-            'histories' => collect($histories->items())->map(fn (SmsHistory $history) => [
-                'id' => $history->id,
-                'gateway_id' => $history->gateway_id,
-                'gateway_name' => $history->gateway_name,
-                'provider' => $history->provider,
-                'phone_number' => $history->phone_number,
-                'message' => $history->message,
-                'status' => $history->status,
-                'http_status_code' => $history->http_status_code,
-                'response_body' => $history->response_body,
-                'error_message' => $history->error_message,
-                'sent_at' => optional($history->sent_at)?->toIso8601String(),
-                'created_at' => optional($history->created_at)?->toIso8601String(),
-            ]),
+            'histories' => $items,
             'meta' => [
-                'current_page' => $histories->currentPage(),
-                'last_page' => $histories->lastPage(),
-                'per_page' => $histories->perPage(),
-                'total' => $histories->total(),
+                'current_page' => $currentPage,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
             ],
         ]);
     }

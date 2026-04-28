@@ -347,7 +347,7 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/register`, {
+      const res = await fetch(`${API_BASE_URL}/otp/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
@@ -365,12 +365,10 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
           : data?.message;
         setError(firstError ?? "Registration failed.");
       } else {
-        persistAuth(data.token, data.user as AuthUser);
-        setRegName("");
-        setRegMobile("");
-        setRegEmail("");
-        setRegPassword("");
-        setRegConfirm("");
+        // Store verification session and redirect to OTP page
+        sessionStorage.setItem("otp_token", data.token as string);
+        sessionStorage.setItem("otp_mobile", data.mobile as string);
+        window.location.href = "/verify-phone";
       }
     } catch {
       setError("Network error. Please try again.");
