@@ -77,6 +77,7 @@ a {
   position: relative;
   z-index: 20;
   transition: transform 0.2s ease;
+  overflow-x: hidden;
 }
 
 .catv-sidebar-brand {
@@ -102,6 +103,7 @@ a {
 
 .catv-brand-copy {
   min-width: 0;
+  transition: opacity 0.18s ease;
 }
 
 .catv-brand-title {
@@ -169,6 +171,7 @@ a {
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.18s ease;
+  overflow: hidden;
 }
 
 .catv-nav-link:hover {
@@ -196,6 +199,40 @@ a {
 .catv-nav-sublink {
   font-size: 0.84rem;
   padding-left: 0.75rem;
+}
+
+.catv-shell.is-collapsed .catv-sidebar {
+  padding-inline: 0.7rem;
+}
+
+.catv-shell.is-collapsed .catv-sidebar-brand {
+  justify-content: center;
+}
+
+.catv-shell.is-collapsed .catv-brand-copy,
+.catv-shell.is-collapsed .catv-nav-label,
+.catv-shell.is-collapsed .catv-nav-caret,
+.catv-shell.is-collapsed .catv-subnav {
+  display: none;
+}
+
+.catv-shell.is-collapsed .catv-nav,
+.catv-shell.is-collapsed .catv-nav-group {
+  justify-items: center;
+}
+
+.catv-shell.is-collapsed .catv-nav-link {
+  display: flex;
+  width: 48px;
+  min-width: 48px;
+  justify-content: center;
+  padding-inline: 0;
+  gap: 0;
+  pointer-events: auto;
+}
+
+.catv-shell.is-collapsed .catv-nav-icon {
+  width: 20px;
 }
 
 .catv-sidebar-overlay {

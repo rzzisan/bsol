@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import CatvShell, { type ShellMenuItem } from "@/components/catv-shell";
+import CatvShell from "@/components/catv-shell";
+import { buildAdminMenu } from "@/lib/admin-menu";
 import {
   getStoredLocale,
   getStoredTheme,
@@ -109,10 +110,15 @@ const text = {
 };
 
 export default function AdminDashboardPage() {
-  const [locale, setLocale] = useState<Locale>(getStoredLocale);
-  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
+  const [locale, setLocale] = useState<Locale>("en");
+  const [theme, setTheme] = useState<ThemeMode>("light");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
+
+  useEffect(() => {
+    setLocale(getStoredLocale());
+    setTheme(getStoredTheme());
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -143,41 +149,24 @@ export default function AdminDashboardPage() {
   }, []);
 
   const t = useMemo(() => text[locale], [locale]);
-  const menus = useMemo<ShellMenuItem[]>(
-    () => [
-      { key: "dashboard", label: t.menu.dashboard, icon: "🏠", href: "/admin" },
-      {
-        key: "customers",
-        label: t.menu.customers,
-        icon: "👥",
-        children: [
-          { key: "customers-active", label: t.menu.activeCustomers, href: "/admin/customers/active" },
-          { key: "customers-pending", label: t.menu.pendingCustomers },
-        ],
-      },
-      {
-        key: "sms",
-        label: t.menu.sms,
-        icon: "✉️",
-        children: [
-          { key: "sms-gateway", label: t.menu.smsGateway, href: "/admin/sms/gateways" },
-          { key: "sms-send", label: t.menu.smsSend, href: "/admin/sms/send" },
-          { key: "sms-history", label: t.menu.smsHistory, href: "/admin/sms/history" },
-                  { key: "sms-credit", label: t.menu.smsCredit, href: "/admin/sms/credit" },
-        ],
-      },
-      { key: "packages", label: t.menu.packages, icon: "📦" },
-      { key: "billing", label: t.menu.billing, icon: "💳" },
-      { key: "reports", label: t.menu.reports, icon: "📊" },
-      {
-        key: "settings",
-        label: t.menu.settings,
-        icon: "⚙️",
-        children: [
-          { key: "settings-email", label: t.menu.emailSettings, href: "/admin/settings/email" },
-        ],
-      },
-    ],
+  const menus = useMemo(
+    () =>
+      buildAdminMenu({
+        dashboard: t.menu.dashboard,
+        customers: t.menu.customers,
+        activeCustomers: t.menu.activeCustomers,
+        pendingCustomers: t.menu.pendingCustomers,
+        sms: t.menu.sms,
+        smsGateway: t.menu.smsGateway,
+        smsSend: t.menu.smsSend,
+        smsHistory: t.menu.smsHistory,
+        smsCredit: t.menu.smsCredit,
+        packages: t.menu.packages,
+        billing: t.menu.billing,
+        reports: t.menu.reports,
+        settings: t.menu.settings,
+        emailSettings: t.menu.emailSettings,
+      }),
     [t],
   );
 

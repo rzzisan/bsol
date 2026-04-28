@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import CatvShell, { type ShellMenuItem } from "@/components/catv-shell";
+import CatvShell from "@/components/catv-shell";
+import { buildAdminMenu } from "@/lib/admin-menu";
 import {
   getStoredLocale,
   getStoredTheme,
@@ -55,6 +56,10 @@ const text = {
     menuSmsHistory: "এসএমএস হিস্টোরি",
       menuSmsCredit: "এসএমএস ক্রেডিট",
     menuPackages: "প্যাকেজ",
+    menuBilling: "বিলিং",
+    menuReports: "রিপোর্ট",
+    menuSettings: "সেটিংস",
+    menuEmailSettings: "ইমেইল সেটিংস",
     languageLabel: "ভাষা",
     themeLabel: "থিম",
     filters: {
@@ -101,6 +106,10 @@ const text = {
     menuSmsHistory: "SMS History",
       menuSmsCredit: "SMS Credit",
     menuPackages: "Packages",
+    menuBilling: "Billing",
+    menuReports: "Reports",
+    menuSettings: "Settings",
+    menuEmailSettings: "Email Settings",
     languageLabel: "Language",
     themeLabel: "Theme",
     filters: {
@@ -134,8 +143,8 @@ const text = {
 };
 
 export default function AdminSmsHistoryPage() {
-  const [locale, setLocale] = useState<Locale>(getStoredLocale);
-  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
+  const [locale, setLocale] = useState<Locale>("en");
+  const [theme, setTheme] = useState<ThemeMode>("light");
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
   const [rows, setRows] = useState<SmsHistoryRow[]>([]);
@@ -146,6 +155,11 @@ export default function AdminSmsHistoryPage() {
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "failed">("all");
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setLocale(getStoredLocale());
+    setTheme(getStoredTheme());
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -219,31 +233,24 @@ export default function AdminSmsHistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, page]);
 
-  const menu = useMemo<ShellMenuItem[]>(
-    () => [
-      { key: "dashboard", label: t.menuDashboard, href: "/admin", icon: "🏠" },
-      {
-        key: "customers",
-        label: t.menuCustomers,
-        icon: "👥",
-        children: [
-          { key: "customers-active", label: t.menuActive, href: "/admin/customers/active" },
-          { key: "customers-pending", label: t.menuPending },
-        ],
-      },
-      {
-        key: "sms",
-        label: t.menuSms,
-        icon: "✉️",
-        children: [
-          { key: "sms-gateway", label: t.menuSmsGateway, href: "/admin/sms/gateways" },
-          { key: "sms-send", label: t.menuSmsSend, href: "/admin/sms/send" },
-          { key: "sms-history", label: t.menuSmsHistory, href: "/admin/sms/history" },
-          { key: "sms-credit", label: t.menuSmsCredit, href: "/admin/sms/credit" },
-        ],
-      },
-      { key: "packages", label: t.menuPackages, icon: "📦" },
-    ],
+  const menu = useMemo(
+    () =>
+      buildAdminMenu({
+        dashboard: t.menuDashboard,
+        customers: t.menuCustomers,
+        activeCustomers: t.menuActive,
+        pendingCustomers: t.menuPending,
+        sms: t.menuSms,
+        smsGateway: t.menuSmsGateway,
+        smsSend: t.menuSmsSend,
+        smsHistory: t.menuSmsHistory,
+        smsCredit: t.menuSmsCredit,
+        packages: t.menuPackages,
+        billing: t.menuBilling,
+        reports: t.menuReports,
+        settings: t.menuSettings,
+        emailSettings: t.menuEmailSettings,
+      }),
     [t],
   );
 

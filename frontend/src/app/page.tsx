@@ -574,8 +574,13 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
 // Page
 // ---------------------------------------------------------------------------
 export default function Home() {
-  const [locale, setLocale] = useState<Locale>(getStoredLocale);
-  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
+  const [locale, setLocale] = useState<Locale>("en");
+  const [theme, setTheme] = useState<ThemeMode>("light");
+
+  useEffect(() => {
+    setLocale(getStoredLocale());
+    setTheme(getStoredTheme());
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

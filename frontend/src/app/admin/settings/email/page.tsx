@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import CatvShell from "@/components/catv-shell";
+import { buildAdminMenu } from "@/lib/admin-menu";
 import {
   getStoredLocale,
   getStoredTheme,
@@ -94,6 +95,17 @@ const text = {
     createSuccess: "কনফিগারেশন তৈরি হয়েছে",
     menu: {
       dashboard: "ড্যাশবোর্ড",
+      customers: "গ্রাহক",
+      activeCustomers: "অ্যাকটিভ গ্রাহক",
+      pendingCustomers: "পেন্ডিং গ্রাহক",
+      sms: "এসএমএস",
+      smsGateway: "এসএমএস গেটওয়ে",
+      smsSend: "এসএমএস সেন্ড",
+      smsHistory: "এসএমএস হিস্টোরি",
+      smsCredit: "এসএমএস ক্রেডিট",
+      packages: "প্যাকেজ",
+      billing: "বিলিং",
+      reports: "রিপোর্ট",
       settings: "সেটিংস",
       emailSettings: "ইমেইল সেটিংস",
     },
@@ -141,6 +153,17 @@ const text = {
     createSuccess: "Configuration created",
     menu: {
       dashboard: "Dashboard",
+      customers: "Customers",
+      activeCustomers: "Active Customers",
+      pendingCustomers: "Pending Customers",
+      sms: "SMS",
+      smsGateway: "SMS Gateway",
+      smsSend: "Send SMS",
+      smsHistory: "SMS History",
+      smsCredit: "SMS Credit",
+      packages: "Packages",
+      billing: "Billing",
+      reports: "Reports",
       settings: "Settings",
       emailSettings: "Email Settings",
     },
@@ -421,15 +444,23 @@ export default function EmailSettingsPage() {
   };
 
   const menus = useMemo(
-    () => [
-      { key: "dashboard", label: t.menu.dashboard, icon: "🏠", href: "/admin" },
-      {
-        key: "settings",
-        label: t.menu.settings,
-        icon: "⚙️",
-        children: [{ key: "settings-email", label: t.menu.emailSettings, href: "/admin/settings/email" }],
-      },
-    ],
+    () =>
+      buildAdminMenu({
+        dashboard: t.menu.dashboard,
+        customers: t.menu.customers,
+        activeCustomers: t.menu.activeCustomers,
+        pendingCustomers: t.menu.pendingCustomers,
+        sms: t.menu.sms,
+        smsGateway: t.menu.smsGateway,
+        smsSend: t.menu.smsSend,
+        smsHistory: t.menu.smsHistory,
+        smsCredit: t.menu.smsCredit,
+        packages: t.menu.packages,
+        billing: t.menu.billing,
+        reports: t.menu.reports,
+        settings: t.menu.settings,
+        emailSettings: t.menu.emailSettings,
+      }),
     [t],
   );
 
