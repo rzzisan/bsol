@@ -368,6 +368,9 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
         // Store verification session and redirect to OTP page
         sessionStorage.setItem("otp_token", data.token as string);
         sessionStorage.setItem("otp_mobile", data.mobile as string);
+        if (data?.next_resend_after_seconds !== undefined) {
+          sessionStorage.setItem("otp_resend_cooldown", String(data.next_resend_after_seconds));
+        }
         window.location.href = "/verify-phone";
       }
     } catch {

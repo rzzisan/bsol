@@ -11,6 +11,7 @@ export default function VerifyPhonePage() {
   const [maskedMobile, setMaskedMobile] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
@@ -18,6 +19,7 @@ export default function VerifyPhonePage() {
   useEffect(() => {
     const storedToken = sessionStorage.getItem("otp_token");
     const storedMobile = sessionStorage.getItem("otp_mobile");
+    const storedCooldown = Number(sessionStorage.getItem("otp_resend_cooldown") ?? "0");
     if (!storedToken) {
       // No session – redirect to home
       window.location.href = "/";
@@ -25,7 +27,30 @@ export default function VerifyPhonePage() {
     }
     setToken(storedToken);
     setMaskedMobile(storedMobile ?? "");
+    if (Number.isFinite(storedCooldown) && storedCooldown > 0) {
+      setResendCooldown(Math.ceil(storedCooldown));
+    }
   }, []);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      sessionStorage.removeItem("otp_resend_cooldown");
+      return;
+    }
+
+    sessionStorage.setItem("otp_resend_cooldown", String(resendCooldown));
+    const timer = window.setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
+
+  function formatCountdown(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  }
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
@@ -50,6 +75,7 @@ export default function VerifyPhonePage() {
         setSuccess(true);
         sessionStorage.removeItem("otp_token");
         sessionStorage.removeItem("otp_mobile");
+        sessionStorage.removeItem("otp_resend_cooldown");
 
         // Persist auth and redirect
         localStorage.setItem("auth_token", data.token as string);
@@ -81,10 +107,14 @@ export default function VerifyPhonePage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data?.message ?? "Could not resend OTP.");
+        if (data?.retry_after_seconds !== undefined) {
+          setResendCooldown(Math.max(0, Math.ceil(Number(data.retry_after_seconds) || 0)));
+        }
       } else {
         setOtp("");
         setRemainingAttempts(null);
         setError(null);
+        setResendCooldown(Math.max(0, Math.ceil(Number(data?.next_resend_after_seconds) || 0)));
       }
     } catch {
       setError("Network error. Please try again.");
@@ -183,10 +213,14 @@ export default function VerifyPhonePage() {
               <button
                 type="button"
                 onClick={handleResend}
-                disabled={resending}
+                disabled={resending || resendCooldown > 0}
                 className="text-xs text-[var(--accent)] hover:underline disabled:opacity-50 transition"
               >
-                {resending ? "পাঠানো হচ্ছে…" : "OTP আবার পাঠান"}
+                {resending
+                  ? "পাঠানো হচ্ছে…"
+                  : resendCooldown > 0
+                    ? `OTP আবার পাঠান (${formatCountdown(resendCooldown)})`
+                    : "OTP আবার পাঠান"}
               </button>
             </div>
           </form>

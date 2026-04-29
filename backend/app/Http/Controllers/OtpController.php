@@ -106,6 +106,7 @@ class OtpController extends Controller
             'message' => 'OTP sent to your mobile number.',
             'token'   => $token,
             'mobile'  => $masked,
+            'next_resend_after_seconds' => 60,
         ]);
     }
 
