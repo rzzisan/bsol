@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmailConfiguration;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use PHPMailer\PHPMailer\PHPMailer;
@@ -16,7 +17,7 @@ class EmailConfigurationController extends Controller
      */
     public function index()
     {
-        $configurations = EmailConfiguration::where('user_id', auth()->id())
+        $configurations = EmailConfiguration::whereIn('user_id', $this->adminScopeUserIds())
             ->select(['id', 'name', 'host', 'port', 'username', 'encryption', 'from_email', 'from_name', 'is_active', 'created_at'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -43,8 +44,8 @@ class EmailConfigurationController extends Controller
             'from_name' => 'nullable|string|max:255',
         ]);
 
-        // Check if name already exists for this user
-        $exists = EmailConfiguration::where('user_id', auth()->id())
+        // Check if name already exists across all admin configs
+        $exists = EmailConfiguration::whereIn('user_id', $this->adminScopeUserIds())
             ->where('name', $validated['name'])
             ->exists();
 
@@ -73,7 +74,7 @@ class EmailConfigurationController extends Controller
     public function show(string $id)
     {
         $configuration = EmailConfiguration::where('id', $id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->first();
 
         if (!$configuration) {
@@ -95,7 +96,7 @@ class EmailConfigurationController extends Controller
     public function update(Request $request, string $id)
     {
         $configuration = EmailConfiguration::where('id', $id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->first();
 
         if (!$configuration) {
@@ -117,9 +118,9 @@ class EmailConfigurationController extends Controller
             'is_active' => 'sometimes|boolean',
         ]);
 
-        // Check if name already exists for this user (excluding current record)
+        // Check if name already exists across all admin configs (excluding current record)
         if (isset($validated['name']) && $validated['name'] !== $configuration->name) {
-            $exists = EmailConfiguration::where('user_id', auth()->id())
+            $exists = EmailConfiguration::whereIn('user_id', $this->adminScopeUserIds())
                 ->where('name', $validated['name'])
                 ->where('id', '!=', $id)
                 ->exists();
@@ -147,7 +148,7 @@ class EmailConfigurationController extends Controller
     public function destroy(string $id)
     {
         $configuration = EmailConfiguration::where('id', $id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->first();
 
         if (!$configuration) {
@@ -163,6 +164,18 @@ class EmailConfigurationController extends Controller
             'status' => 'success',
             'message' => 'Email configuration deleted successfully.',
         ]);
+    }
+
+    /**
+     * @return array<int>
+     */
+    private function adminScopeUserIds(): array
+    {
+        if (auth()->user()->isAdmin()) {
+            return User::where('role', 'admin')->pluck('id')->toArray();
+        }
+
+        return [auth()->id()];
     }
 
     /**

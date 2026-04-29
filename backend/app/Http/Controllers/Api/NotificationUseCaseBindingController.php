@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\NotificationTemplate;
 use App\Models\NotificationUseCaseBinding;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -13,7 +14,7 @@ class NotificationUseCaseBindingController extends Controller
     public function index()
     {
         $rows = NotificationUseCaseBinding::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->with([
                 'smsTemplate:id,name,channel,language',
                 'emailTemplate:id,name,channel,language',
@@ -32,18 +33,26 @@ class NotificationUseCaseBindingController extends Controller
         $validated = $this->validatePayload($request);
         $this->validateTemplatesOwnership($validated);
 
-        $binding = NotificationUseCaseBinding::updateOrCreate(
-            [
+        $binding = NotificationUseCaseBinding::whereIn('user_id', $this->adminScopeUserIds())
+            ->where('use_case_key', $validated['use_case_key'])
+            ->first();
+
+        $attributes = [
+            'sms_template_id' => $validated['sms_template_id'] ?? null,
+            'email_template_id' => $validated['email_template_id'] ?? null,
+            'priority_channel' => $validated['priority_channel'],
+            'is_active' => (bool) ($validated['is_active'] ?? true),
+        ];
+
+        if ($binding) {
+            $binding->update($attributes);
+        } else {
+            $binding = NotificationUseCaseBinding::create([
                 'user_id' => auth()->id(),
                 'use_case_key' => $validated['use_case_key'],
-            ],
-            [
-                'sms_template_id' => $validated['sms_template_id'] ?? null,
-                'email_template_id' => $validated['email_template_id'] ?? null,
-                'priority_channel' => $validated['priority_channel'],
-                'is_active' => (bool) ($validated['is_active'] ?? true),
-            ]
-        );
+                ...$attributes,
+            ]);
+        }
 
         return response()->json([
             'status' => 'success',
@@ -56,7 +65,7 @@ class NotificationUseCaseBindingController extends Controller
     {
         $binding = NotificationUseCaseBinding::query()
             ->where('id', $id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->with([
                 'smsTemplate:id,name,channel,language',
                 'emailTemplate:id,name,channel,language',
@@ -80,7 +89,7 @@ class NotificationUseCaseBindingController extends Controller
     {
         $binding = NotificationUseCaseBinding::query()
             ->where('id', $id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->first();
 
         if (! $binding) {
@@ -114,7 +123,7 @@ class NotificationUseCaseBindingController extends Controller
     {
         $binding = NotificationUseCaseBinding::query()
             ->where('id', $id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->first();
 
         if (! $binding) {
@@ -154,6 +163,18 @@ class NotificationUseCaseBindingController extends Controller
     }
 
     /**
+     * @return array<int>
+     */
+    private function adminScopeUserIds(): array
+    {
+        if (auth()->user()->isAdmin()) {
+            return User::where('role', 'admin')->pluck('id')->toArray();
+        }
+
+        return [auth()->id()];
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     private function validateTemplatesOwnership(array $payload): void
@@ -168,7 +189,7 @@ class NotificationUseCaseBindingController extends Controller
         if (! empty($payload['sms_template_id'])) {
             $smsTemplate = NotificationTemplate::query()
                 ->where('id', $payload['sms_template_id'])
-                ->where('user_id', auth()->id())
+                ->whereIn('user_id', $this->adminScopeUserIds())
                 ->where('channel', 'sms')
                 ->first();
 
@@ -183,7 +204,7 @@ class NotificationUseCaseBindingController extends Controller
         if (! empty($payload['email_template_id'])) {
             $emailTemplate = NotificationTemplate::query()
                 ->where('id', $payload['email_template_id'])
-                ->where('user_id', auth()->id())
+                ->whereIn('user_id', $this->adminScopeUserIds())
                 ->where('channel', 'email')
                 ->first();
 

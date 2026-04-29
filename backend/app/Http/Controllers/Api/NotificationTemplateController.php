@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EmailConfiguration;
 use App\Models\NotificationTemplate;
 use App\Models\SmsGateway;
+use App\Models\User;
 use App\Services\NotificationTemplateRenderer;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,7 @@ class NotificationTemplateController extends Controller
         ]);
 
         $query = NotificationTemplate::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->with(['smsGateway:id,name,provider', 'emailConfiguration:id,name,host,from_email'])
             ->latest('id');
 
@@ -41,7 +42,7 @@ class NotificationTemplateController extends Controller
         $this->validateChannelDependencies($validated);
 
         $exists = NotificationTemplate::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->where('channel', $validated['channel'])
             ->where('name', $validated['name'])
             ->exists();
@@ -70,7 +71,7 @@ class NotificationTemplateController extends Controller
     {
         $template = NotificationTemplate::query()
             ->where('id', $id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->with(['smsGateway:id,name,provider', 'emailConfiguration:id,name,host,from_email'])
             ->first();
 
@@ -91,7 +92,7 @@ class NotificationTemplateController extends Controller
     {
         $template = NotificationTemplate::query()
             ->where('id', $id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->first();
 
         if (! $template) {
@@ -114,7 +115,7 @@ class NotificationTemplateController extends Controller
 
         if (isset($validated['name']) && $validated['name'] !== $template->name) {
             $exists = NotificationTemplate::query()
-                ->where('user_id', auth()->id())
+                ->whereIn('user_id', $this->adminScopeUserIds())
                 ->where('channel', $merged['channel'])
                 ->where('name', $validated['name'])
                 ->where('id', '!=', $template->id)
@@ -147,7 +148,7 @@ class NotificationTemplateController extends Controller
     {
         $template = NotificationTemplate::query()
             ->where('id', $id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->first();
 
         if (! $template) {
@@ -174,7 +175,7 @@ class NotificationTemplateController extends Controller
 
         $template = NotificationTemplate::query()
             ->where('id', $validated['template_id'])
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->first();
 
         if (! $template) {
@@ -206,6 +207,18 @@ class NotificationTemplateController extends Controller
                 ])),
             ],
         ]);
+    }
+
+    /**
+     * @return array<int>
+     */
+    private function adminScopeUserIds(): array
+    {
+        if (auth()->user()->isAdmin()) {
+            return User::where('role', 'admin')->pluck('id')->toArray();
+        }
+
+        return [auth()->id()];
     }
 
     /**
