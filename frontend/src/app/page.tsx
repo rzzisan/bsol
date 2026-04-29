@@ -88,6 +88,7 @@ const content = {
       passwordMismatch: "পাসওয়ার্ড দুটি মিলছে না।",
       passwordTooShort: "পাসওয়ার্ড কমপক্ষে ৮ অক্ষর হতে হবে।",
       authSectionTitle: "অ্যাকাউন্ট",
+      forgotPassword: "পাসওয়ার্ড ভুলে গেছেন?",
     },
   },
   en: {
@@ -155,6 +156,7 @@ const content = {
       passwordMismatch: "Passwords do not match.",
       passwordTooShort: "Password must be at least 8 characters.",
       authSectionTitle: "Account",
+      forgotPassword: "Forgot password?",
     },
   },
 };
@@ -503,6 +505,14 @@ function AuthSection({ locale, t }: { locale: Locale; t: typeof content["bn"]["a
           >
             {loading ? t.loggingIn : t.loginBtn}
           </button>
+          <div className="text-center">
+            <a
+              href={`/forgot-password?lang=${locale}`}
+              className="text-sm text-[var(--accent)] hover:underline"
+            >
+              {t.forgotPassword}
+            </a>
+          </div>
         </form>
       )}
 

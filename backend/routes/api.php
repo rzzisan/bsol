@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EmailOtpController;
 use App\Http\Controllers\OtpController;
+use App\Http\Controllers\PasswordResetController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -31,6 +32,13 @@ Route::post('/otp/resend', [OtpController::class, 'resendOtp']);
 
 // Email verification link (public access)
 Route::get('/email/verify-link', [EmailOtpController::class, 'verifyEmailLink'])->name('email.verify-link');
+
+// Password reset (public, no auth required)
+Route::post('/password/find-account', [PasswordResetController::class, 'findAccount']);
+Route::post('/password/send-otp',     [PasswordResetController::class, 'sendOtp']);
+Route::post('/password/resend-otp',   [PasswordResetController::class, 'resendOtp']);
+Route::post('/password/verify-otp',   [PasswordResetController::class, 'verifyOtp']);
+Route::post('/password/reset',        [PasswordResetController::class, 'resetPassword']);
 
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
