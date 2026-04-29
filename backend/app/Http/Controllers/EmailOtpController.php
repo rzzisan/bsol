@@ -395,7 +395,7 @@ class EmailOtpController extends Controller
         $frontendUrl = config('app.frontend_url', env('FRONTEND_URL', 'https://bsol.zyrotechbd.com'));
         $verificationLink = $frontendUrl . '/verify-email?token=' . urlencode($verificationToken);
 
-        $result = $dispatcher->dispatch($adminUser, 'email_verification', $email, null, [
+        $result = $dispatcher->dispatch($adminUser, 'email_verification', null, $email, [
             'otp' => $otp,
             'name' => $user->name,
             'email' => $email,
