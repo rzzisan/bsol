@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\NotificationDispatchController;
 use App\Http\Controllers\Api\NotificationTemplateController;
 use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\EmailOtpController;
 use App\Http\Controllers\OtpController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,7 +29,14 @@ Route::post('/otp/register', [OtpController::class, 'sendRegistrationOtp']);
 Route::post('/otp/verify-registration', [OtpController::class, 'verifyRegistrationOtp']);
 Route::post('/otp/resend', [OtpController::class, 'resendOtp']);
 
+// Email verification link (public access)
+Route::get('/email/verify-link', [EmailOtpController::class, 'verifyEmailLink'])->name('email.verify-link');
+
 Route::middleware('auth:sanctum')->group(function () {
+    // Email OTP for verification (authenticated)
+    Route::post('/email/send-verification', [EmailOtpController::class, 'sendVerificationEmail']);
+    Route::post('/email/verify', [EmailOtpController::class, 'verifyEmailOtp']);
+    Route::post('/email/resend', [EmailOtpController::class, 'resendVerificationEmail']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);

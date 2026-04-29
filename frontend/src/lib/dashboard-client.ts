@@ -9,6 +9,8 @@ export interface AuthUser {
   name: string;
   email: string;
   mobile: string | null;
+  mobile_verified_at?: string | null;
+  email_verified_at?: string | null;
   role?: "admin" | "user";
 }
 

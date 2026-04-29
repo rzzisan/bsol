@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import CatvShell, { type ShellMenuItem } from "@/components/catv-shell";
+import EmailVerificationBanner from "@/components/email-verification-banner";
 import {
   getStoredLocale,
   getStoredTheme,
@@ -77,6 +79,7 @@ const text = {
 };
 
 export default function UserDashboardPage() {
+  const router = useRouter();
   const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -132,6 +135,42 @@ export default function UserDashboardPage() {
     [t],
   );
 
+  const handleInitiateEmailVerification = async () => {
+    if (!user) return;
+
+    const token = getStoredToken();
+    if (!token) {
+      router.push("/");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/email/send-verification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.token) {
+          // Store the verification token and redirect to verify-email page
+          sessionStorage.setItem("email_verification_token", data.token);
+          sessionStorage.setItem("email_verification_email", data.email);
+          router.push("/verify-email");
+        }
+      } else {
+        const error = await response.json();
+        alert(error.message || "Failed to send verification email");
+      }
+    } catch (error) {
+      console.error("Error sending verification email:", error);
+      alert("An error occurred while sending the verification email");
+    }
+  };
+
   if (state !== "ready") {
     return (
       <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-8">
@@ -167,6 +206,16 @@ export default function UserDashboardPage() {
       onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
     >
+      {!user?.email_verified_at && (
+        <div className="p-4 sm:p-5">
+          <EmailVerificationBanner
+            userEmail={user?.email || ""}
+            onInitiateVerification={handleInitiateEmailVerification}
+            locale={locale}
+          />
+        </div>
+      )}
+
       <section className="catv-panel p-4 sm:p-5">
         <h2 className="text-lg font-bold sm:text-xl">{t.quickActions}</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">{user?.name} • {user?.email}</p>
