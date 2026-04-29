@@ -7,6 +7,7 @@ use App\Models\NotificationDispatchLog;
 use App\Models\NotificationTemplate;
 use App\Models\NotificationUseCaseBinding;
 use App\Models\SmsGateway;
+use App\Models\SmsHistory;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use PHPMailer\PHPMailer\Exception;
@@ -69,6 +70,18 @@ class NotificationDispatchService
     private function sendSms(User $user, NotificationUseCaseBinding $binding, ?NotificationTemplate $template, string $recipientPhone, string $useCaseKey, array $variables): array
     {
         if (! $template || $template->channel !== 'sms') {
+            $this->createSmsHistoryRecord(
+                gateway: null,
+                userId: $user->id,
+                phoneNumber: $recipientPhone,
+                message: '',
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'SMS template not found or invalid.',
+                sentAt: null,
+            );
+
             return [
                 'channel' => 'sms',
                 'status' => 'failed',
@@ -78,21 +91,69 @@ class NotificationDispatchService
 
         $gateway = $template->smsGateway;
         if (! $gateway || ! $gateway->is_enabled) {
+            $this->createSmsHistoryRecord(
+                gateway: $gateway,
+                userId: $user->id,
+                phoneNumber: $recipientPhone,
+                message: '',
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'Gateway missing or disabled.',
+                sentAt: null,
+            );
+
             return $this->storeFailedLog($user, $binding, $template, $useCaseKey, 'sms', $recipientPhone, 'Gateway missing or disabled.', 'sms');
         }
 
         if (blank($gateway->endpoint_url) || blank($gateway->api_key) || blank($gateway->secret_key) || blank($gateway->sender_id)) {
+            $this->createSmsHistoryRecord(
+                gateway: $gateway,
+                userId: $user->id,
+                phoneNumber: $recipientPhone,
+                message: '',
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'Gateway credentials are incomplete.',
+                sentAt: null,
+            );
+
             return $this->storeFailedLog($user, $binding, $template, $useCaseKey, 'sms', $recipientPhone, 'Gateway credentials are incomplete.', 'sms');
         }
 
         $normalized = $this->formatBdPhoneNumber($recipientPhone);
         if (! $normalized) {
+            $this->createSmsHistoryRecord(
+                gateway: $gateway,
+                userId: $user->id,
+                phoneNumber: $recipientPhone,
+                message: '',
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'Invalid phone number format.',
+                sentAt: null,
+            );
+
             return $this->storeFailedLog($user, $binding, $template, $useCaseKey, 'sms', $recipientPhone, 'Invalid phone number format.', 'sms');
         }
 
         $render = $this->renderer->render($template->body, $variables);
 
         if (count($render['missing']) > 0) {
+            $this->createSmsHistoryRecord(
+                gateway: $gateway,
+                userId: $user->id,
+                phoneNumber: $normalized,
+                message: $render['rendered'],
+                status: 'failed',
+                httpStatusCode: null,
+                responseBody: null,
+                errorMessage: 'Missing placeholders: '.implode(', ', $render['missing']),
+                sentAt: null,
+            );
+
             return $this->storeFailedLog(
                 $user,
                 $binding,
@@ -122,6 +183,18 @@ class NotificationDispatchService
         $body = (string) $response->body();
         $looksFailed = preg_match('/(error|failed|invalid|unauthorized)/i', $body) === 1;
         $ok = $response->successful() && ! $looksFailed;
+
+        $this->createSmsHistoryRecord(
+            gateway: $gateway,
+            userId: $user->id,
+            phoneNumber: $normalized,
+            message: $render['rendered'],
+            status: $ok ? 'sent' : 'failed',
+            httpStatusCode: $response->status(),
+            responseBody: mb_substr($body, 0, 4000),
+            errorMessage: $ok ? null : 'Gateway responded with failure signal.',
+            sentAt: $ok ? now() : null,
+        );
 
         $log = NotificationDispatchLog::create([
             'user_id' => $user->id,
@@ -299,6 +372,32 @@ class NotificationDispatchService
             'message' => $error,
             'log_id' => $log->id,
         ];
+    }
+
+    private function createSmsHistoryRecord(
+        ?SmsGateway $gateway,
+        ?int $userId,
+        string $phoneNumber,
+        string $message,
+        string $status,
+        ?int $httpStatusCode,
+        ?string $responseBody,
+        ?string $errorMessage,
+        mixed $sentAt,
+    ): void {
+        SmsHistory::create([
+            'gateway_id' => $gateway?->id,
+            'user_id' => $userId,
+            'gateway_name' => $gateway?->name,
+            'provider' => $gateway?->provider,
+            'phone_number' => $phoneNumber,
+            'message' => $message,
+            'status' => $status,
+            'http_status_code' => $httpStatusCode,
+            'response_body' => $responseBody,
+            'error_message' => $errorMessage,
+            'sent_at' => $sentAt,
+        ]);
     }
 
     private function formatBdPhoneNumber(string $phone): ?string
