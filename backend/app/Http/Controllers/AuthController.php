@@ -2,34 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
     public function register(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'mobile'   => ['required', 'string', 'max:20', 'regex:/^[0-9+\-\s]{7,20}$/', 'unique:users,mobile'],
-            'email'    => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'confirmed', Password::min(8)],
-        ]);
-
-        $validated['role'] = 'user';
-
-        $user = User::create($validated);
-        $token = $user->createToken('frontend')->plainTextToken;
-
         return response()->json([
-            'message' => 'Registration successful.',
-            'token' => $token,
-            'user' => $user,
-        ], 201);
+            'message' => 'Direct registration is disabled. Use /api/otp/register and complete phone verification before account creation.',
+            'requires_phone_verification' => true,
+            'registration_endpoint' => '/api/otp/register',
+        ], 410);
     }
 
     public function login(Request $request): JsonResponse
