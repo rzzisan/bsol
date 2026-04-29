@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\DispatchNotificationJob;
 use App\Models\NotificationDispatchLog;
+use App\Models\User;
 use App\Services\NotificationDispatchService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -95,7 +96,7 @@ class NotificationDispatchController extends Controller
         ]);
 
         $query = NotificationDispatchLog::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', $this->adminScopeUserIds())
             ->latest('id');
 
         if (! empty($validated['use_case_key'])) {
@@ -123,5 +124,17 @@ class NotificationDispatchController extends Controller
                 'total' => $logs->total(),
             ],
         ]);
+    }
+
+    /**
+     * @return array<int>
+     */
+    private function adminScopeUserIds(): array
+    {
+        if (auth()->user()->isAdmin()) {
+            return User::where('role', 'admin')->pluck('id')->toArray();
+        }
+
+        return [auth()->id()];
     }
 }

@@ -2,7 +2,7 @@
 আংশিক পড়ে কাজ শুরু করা হলে সেটি invalid execution হিসেবে গণ্য হবে।
 # Hybrid Stack Server Context
 
-Last updated: 2026-04-25
+Last updated: 2026-04-29
 Domain: `bsol.zyrotechbd.com`
 Server IP: `103.157.253.197`
 
@@ -751,3 +751,135 @@ Frontend deploy-এর পরে নিচের flow strictভাবে follow 
 - Build success + process restart + asset health check — তিনটি pass না করলে deployment incomplete ধরা হবে
 - যদি restart মাঝপথে interrupted হয়, সঙ্গে সঙ্গে `status` check করে process আবার start/restart করতে হবে
 
+
+---
+
+## 25. Admin data isolation policy — `adminScopeUserIds()` pattern (2026-04-29)
+
+### Background
+
+সব admin user যেন একই shared pool-এর resources দেখতে পায় — এই requirement থেকে একটি standard data scoping pattern confirm করা হয়েছে।
+
+### Route access এবং role security — বর্তমান অবস্থা
+
+Backend route structure দুই স্তরে protected:
+
+```
+Route::middleware('auth:sanctum')->group(function () {
+    // User + Admin উভয়ই access করতে পারে এমন routes (যেমন /sms/gateways, /me)
+
+    Route::middleware('is_admin')->prefix('admin')->group(function () {
+        // শুধুমাত্র admin role-এর user access করতে পারবে
+        // EnsureUserIsAdmin middleware: role !== 'admin' হলে 403 Forbidden
+    });
+});
+```
+
+**Regular `user` role-এর user কি admin data দেখতে পারে?**
+
+না। `EnsureUserIsAdmin` middleware (`app/Http/Middleware/EnsureUserIsAdmin.php`) সকল `/api/admin/*` route-এ enforce করা আছে। `role !== 'admin'` হলে HTTP 403 return করে, controller পর্যন্ত request পৌঁছায় না।
+
+**SMS Gateways (`/api/sms/gateways`) সম্পর্কে বিশেষ নোট:**
+
+এই route `is_admin` middleware ছাড়া — কিন্তু `AdminSmsGatewayController::myGateways()` controller-এ নিজেই role-check করা আছে:
+- Admin হলে → সব enabled gateway দেখায়
+- Regular user হলে → শুধু তার assigned gateway দেখায়
+
+এটি **intentional design** — user নিজের gateway দিয়ে SMS পাঠাতে পারে।
+
+### `adminScopeUserIds()` pattern — কীভাবে কাজ করে
+
+Admin-shared resources-এর জন্য প্রতিটি relevant controller-এ এই private helper method রাখা হয়:
+
+```php
+private function adminScopeUserIds(): array
+{
+    if (auth()->user()->isAdmin()) {
+        return User::where('role', 'admin')->pluck('id')->toArray();
+    }
+
+    return [auth()->id()];
+}
+```
+
+Query-তে ব্যবহার:
+```php
+->whereIn('user_id', $this->adminScopeUserIds())
+```
+
+**Effect:**
+- Admin1 login করলে → Admin1 + Admin2 + ... সব admin-এর records দেখা যায়
+- Regular user login করলে → শুধু নিজের records দেখা যায়
+
+**`store()` / `create()` তে:**
+- সবসময় `'user_id' => auth()->id()` — audit trail-এর জন্য কে create করেছে সেটা track থাকে
+
+### কোন controllers-এ এই pattern প্রযোজ্য হয়েছে (2026-04-29 পর্যন্ত)
+
+| Controller | File | Applied |
+|---|---|---|
+| NotificationTemplateController | `Api/NotificationTemplateController.php` | ✅ |
+| NotificationUseCaseBindingController | `Api/NotificationUseCaseBindingController.php` | ✅ |
+| EmailConfigurationController | `Api/EmailConfigurationController.php` | ✅ |
+| NotificationDispatchController (logs) | `Api/NotificationDispatchController.php` | ✅ |
+
+**এই pattern প্রযোজ্য নয়:**
+- `AdminSmsGatewayController::myHistory()` — SMS send history per-user হওয়া correct (নিজের send করা history)
+- `AdminSmsCreditController` — credit management per-user intentional
+- `OtpController`, `EmailOtpController` — verification flow per-user স্বাভাবিক
+
+### ভবিষ্যৎ নতুন feature implement করার mandatory rule
+
+নতুন backend feature implement করার সময় **প্রতিটি resource table-এ** নিচের প্রশ্নের উত্তর দিতে হবে:
+
+> **"এই resource কি সব admin-এর কাছে shared হওয়া উচিত, নাকি per-user isolated?"**
+
+**Shared হওয়া উচিত (adminScopeUserIds pattern apply করতে হবে):**
+- System configuration (email config, SMS config, template, binding, rule)
+- Platform-level reports বা logs যা admin team দেখে
+- Shared notification/communication assets
+
+**Per-user থাকা উচিত (adminScopeUserIds প্রয়োজন নেই):**
+- Personal SMS/email send history
+- Per-user credit/billing records
+- Customer-facing data (order, invoice, subscription) — future multi-tenant-এ এগুলো customer-scoped হবে
+
+### নতুন controller তৈরির checklist
+
+নতুন controller তৈরি করলে এই checklist follow করতে হবে:
+
+1. **Route placement ঠিক করা:**
+   - Admin-only → `is_admin` middleware গ্রুপের ভেতরে `/admin/` prefix-সহ
+   - User+Admin → `auth:sanctum` গ্রুপে, controller-এ নিজেই role-check করো
+
+2. **Data scope নির্ধারণ:**
+   - Shared admin resource → `adminScopeUserIds()` helper যোগ করো
+   - Per-user resource → `where('user_id', auth()->id())` রাখো
+
+3. **`adminScopeUserIds()` যোগ করার নিয়ম:**
+   - Controller-এ `use App\Models\User;` import করো
+   - Private helper method add করো (copy from existing controllers)
+   - `index()`, `show()`, `update()`, `destroy()` — সব query-তে `whereIn` দিয়ে replace করো
+   - `store()` / `create()` — `user_id` = `auth()->id()` রাখো (audit trail)
+
+4. **Security verification:**
+   - Regular user কি admin route access করতে পারছে কিনা test করো
+   - `php artisan route:list` দিয়ে middleware assignment verify করো
+
+### Anti-pattern — এগুলো করা যাবে না
+
+```php
+// ❌ Admin controller-এ hardcoded per-user filter
+->where('user_id', auth()->id())  // Admin2 Admin1-এর data দেখতে পাবে না
+
+// ❌ Middleware ছাড়া admin data expose করা
+Route::get('/admin/configs', ...)  // is_admin middleware ছাড়া
+
+// ❌ adminScopeUserIds ছাড়া shared resource query
+NotificationTemplate::all()  // সব user-এর data leak হবে
+```
+
+### Production commit reference
+
+- `38c3967` — Initial adminScopeUserIds implementation (3 controllers)
+- `NotificationDispatchController` logs fix — same session (2026-04-29)
