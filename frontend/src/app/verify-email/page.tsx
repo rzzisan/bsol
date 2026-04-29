@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getStoredUser, setStoredUser } from "@/lib/dashboard-client";
+import { getStoredToken, getStoredUser, setStoredUser, type AuthUser } from "@/lib/dashboard-client";
 
 const text = {
   bn: {
@@ -48,6 +48,51 @@ const text = {
     remainingAttempts: "Remaining attempts:",
   },
 };
+
+function parseApiPayload(raw: string): Record<string, unknown> {
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { message: raw };
+  }
+}
+
+function syncStoredUserFromApi(userPayload: unknown): void {
+  if (!userPayload || typeof userPayload !== "object") return;
+
+  const apiUser = userPayload as Record<string, unknown>;
+  const currentUser = getStoredUser();
+
+  const fallback: AuthUser = currentUser ?? {
+    id: Number(apiUser.id ?? 0),
+    name: String(apiUser.name ?? ""),
+    email: String(apiUser.email ?? ""),
+    mobile: (apiUser.mobile as string | null | undefined) ?? null,
+    role: apiUser.role === "admin" ? "admin" : "user",
+    email_verified_at: (apiUser.email_verified_at as string | null | undefined) ?? null,
+    mobile_verified_at: (apiUser.mobile_verified_at as string | null | undefined) ?? null,
+  };
+
+  const nextUser: AuthUser = {
+    ...fallback,
+    ...apiUser,
+    id: Number(apiUser.id ?? fallback.id),
+    name: String(apiUser.name ?? fallback.name),
+    email: String(apiUser.email ?? fallback.email),
+    mobile: (apiUser.mobile as string | null | undefined) ?? fallback.mobile ?? null,
+    role: (apiUser.role as "admin" | "user" | undefined) ?? fallback.role ?? "user",
+  };
+
+  setStoredUser(nextUser);
+}
+
+function getErrorMessage(data: Record<string, unknown>, fallback: string): string {
+  return typeof data.message === "string" && data.message.trim().length > 0
+    ? data.message
+    : fallback;
+}
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -125,22 +170,23 @@ function VerifyEmailContent() {
     setError(null);
 
     try {
+      const authToken = getStoredToken();
+
       const response = await fetch("/api/email/verify", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({token, otp}),
       });
 
-      const data = await response.json();
+      const raw = await response.text();
+      const data = parseApiPayload(raw);
 
       if (response.ok) {
         if (data.user) {
-          const currentUser = getStoredUser();
-          setStoredUser({
-            ...currentUser,
-            ...data.user,
-            role: data.user.role ?? currentUser?.role ?? "user",
-          });
+          syncStoredUserFromApi(data.user);
         }
         sessionStorage.removeItem("email_verification_token");
         sessionStorage.removeItem("email_verification_email");
@@ -148,8 +194,8 @@ function VerifyEmailContent() {
         setSuccess(true);
         setTimeout(() => router.push("/dashboard"), 2000);
       } else {
-        setError(data.message || t.error);
-        if (data.remaining_attempts !== undefined) {
+        setError(getErrorMessage(data, t.error));
+        if (typeof data.remaining_attempts === "number") {
           setRemainingAttempts(data.remaining_attempts);
         }
       }
@@ -173,12 +219,7 @@ function VerifyEmailContent() {
 
       if (response.ok) {
         if (data.user) {
-          const currentUser = getStoredUser();
-          setStoredUser({
-            ...currentUser,
-            ...data.user,
-            role: data.user.role ?? currentUser?.role ?? "user",
-          });
+          syncStoredUserFromApi(data.user);
         }
         sessionStorage.removeItem("email_verification_token");
         sessionStorage.removeItem("email_verification_email");
@@ -202,24 +243,33 @@ function VerifyEmailContent() {
     setError(null);
 
     try {
+      const authToken = getStoredToken();
+
       const response = await fetch("/api/email/resend", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({token}),
       });
 
-      const data = await response.json();
+      const raw = await response.text();
+      const data = parseApiPayload(raw);
 
       if (response.ok) {
-        setResendCooldown(data.next_resend_after_seconds || 120);
+        const nextResendSeconds =
+          typeof data.next_resend_after_seconds === "number" ? data.next_resend_after_seconds : 120;
+
+        setResendCooldown(nextResendSeconds);
         sessionStorage.setItem(
           "email_resend_cooldown_end",
-          (Date.now() + (data.next_resend_after_seconds || 120) * 1000).toString()
+          (Date.now() + nextResendSeconds * 1000).toString()
         );
         setOtp("");
       } else {
-        setError(data.message || t.error);
-        if (data.retry_after_seconds) {
+        setError(getErrorMessage(data, t.error));
+        if (typeof data.retry_after_seconds === "number") {
           setResendCooldown(data.retry_after_seconds);
         }
       }
