@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\EmailOtpVerification;
 use App\Models\SubscriptionPackage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -103,6 +104,47 @@ class AdminApiTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => 'managed@example.com',
             'subscription_package_id' => $package->id,
+        ]);
+    }
+
+    public function test_updating_user_email_resets_email_verification_and_clears_pending_email_otps(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $user = User::factory()->create([
+            'email' => 'old@example.com',
+            'email_verified_at' => now(),
+        ]);
+
+        EmailOtpVerification::create([
+            'token' => str_repeat('a', 64),
+            'email' => 'old@example.com',
+            'otp_code' => '123456',
+            'verification_token' => str_repeat('b', 64),
+            'purpose' => 'registration',
+            'pending_data' => ['user_id' => $user->id, 'name' => $user->name],
+            'resend_count' => 0,
+            'expires_at' => now()->addMinutes(30),
+        ]);
+
+        $token = $admin->createToken('test-suite')->plainTextToken;
+
+        $this->putJson('/api/admin/users/'.$user->id, [
+            'email' => 'new@example.com',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('user.email', 'new@example.com');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'email' => 'new@example.com',
+            'email_verified_at' => null,
+        ]);
+
+        $this->assertDatabaseMissing('email_otp_verifications', [
+            'email' => 'old@example.com',
+            'verified_at' => null,
         ]);
     }
 }

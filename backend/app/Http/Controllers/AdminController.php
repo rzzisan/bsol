@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EmailOtpVerification;
 use App\Models\SubscriptionPackage;
 use App\Models\SmsGateway;
 use App\Models\User;
@@ -78,7 +79,21 @@ class AdminController extends Controller
             'sms_gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
         ]);
 
+        $originalEmail = $user->email;
+        $emailChanged = array_key_exists('email', $validated) && $validated['email'] !== $originalEmail;
+
+        if ($emailChanged) {
+            $validated['email_verified_at'] = null;
+        }
+
         $user->update($validated);
+
+        if ($emailChanged) {
+            EmailOtpVerification::query()
+                ->whereNull('verified_at')
+                ->whereIn('email', array_values(array_unique([$originalEmail, $user->email])))
+                ->delete();
+        }
 
         return response()->json([
             'message' => 'User updated successfully.',
