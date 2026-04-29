@@ -39,6 +39,17 @@ export function getStoredUser(): AuthUser | null {
   }
 }
 
+export function setStoredUser(user: AuthUser | null): void {
+  if (typeof window === "undefined") return;
+
+  if (!user) {
+    localStorage.removeItem("auth_user");
+    return;
+  }
+
+  localStorage.setItem("auth_user", JSON.stringify(user));
+}
+
 export function normalizeRole(user: AuthUser | null): "admin" | "user" | null {
   if (!user) return null;
   return user.role === "admin" ? "admin" : "user";

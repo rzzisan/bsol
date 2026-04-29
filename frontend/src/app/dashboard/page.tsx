@@ -11,6 +11,7 @@ import {
   getStoredUser,
   LOCALE_STORAGE_KEY,
   normalizeRole,
+  setStoredUser,
   THEME_STORAGE_KEY,
   type AuthUser,
   type Locale,
@@ -113,6 +114,39 @@ export default function UserDashboardPage() {
     setState("ready");
   }, []);
 
+  useEffect(() => {
+    const token = getStoredToken();
+
+    if (!token) return;
+
+    const syncUser = async () => {
+      try {
+        const response = await fetch("/api/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!data.user) return;
+
+        const normalizedUser: AuthUser = {
+          ...data.user,
+          role: data.user.role ?? "user",
+        };
+
+        setStoredUser(normalizedUser);
+        setUser(normalizedUser);
+      } catch (error) {
+        console.error("Failed to sync user profile:", error);
+      }
+    };
+
+    void syncUser();
+  }, []);
+
   const t = useMemo(() => text[locale], [locale]);
 
   const menu = useMemo<ShellMenuItem[]>(
@@ -160,6 +194,19 @@ export default function UserDashboardPage() {
           sessionStorage.setItem("email_verification_token", data.token);
           sessionStorage.setItem("email_verification_email", data.email);
           router.push("/verify-email");
+        } else if (data.message === "Your email is already verified.") {
+          const updatedUser: AuthUser = {
+            ...(user ?? getStoredUser()),
+            email_verified_at: new Date().toISOString(),
+            role: user?.role ?? getStoredUser()?.role ?? "user",
+            id: user?.id ?? getStoredUser()?.id ?? 0,
+            name: user?.name ?? getStoredUser()?.name ?? "",
+            email: user?.email ?? getStoredUser()?.email ?? "",
+            mobile: user?.mobile ?? getStoredUser()?.mobile ?? null,
+          };
+
+          setStoredUser(updatedUser);
+          setUser(updatedUser);
         }
       } else {
         const error = await response.json();

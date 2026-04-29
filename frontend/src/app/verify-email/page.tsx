@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getStoredUser, setStoredUser } from "@/lib/dashboard-client";
 
 const text = {
   bn: {
@@ -133,8 +134,17 @@ function VerifyEmailContent() {
       const data = await response.json();
 
       if (response.ok) {
+        if (data.user) {
+          const currentUser = getStoredUser();
+          setStoredUser({
+            ...currentUser,
+            ...data.user,
+            role: data.user.role ?? currentUser?.role ?? "user",
+          });
+        }
         sessionStorage.removeItem("email_verification_token");
         sessionStorage.removeItem("email_verification_email");
+        sessionStorage.removeItem("email_resend_cooldown_end");
         setSuccess(true);
         setTimeout(() => router.push("/dashboard"), 2000);
       } else {
@@ -162,6 +172,17 @@ function VerifyEmailContent() {
       const data = await response.json();
 
       if (response.ok) {
+        if (data.user) {
+          const currentUser = getStoredUser();
+          setStoredUser({
+            ...currentUser,
+            ...data.user,
+            role: data.user.role ?? currentUser?.role ?? "user",
+          });
+        }
+        sessionStorage.removeItem("email_verification_token");
+        sessionStorage.removeItem("email_verification_email");
+        sessionStorage.removeItem("email_resend_cooldown_end");
         setSuccess(true);
         setTimeout(() => router.push("/dashboard"), 2000);
       } else {
