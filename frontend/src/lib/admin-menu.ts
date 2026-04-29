@@ -21,25 +21,22 @@ export type AdminMenuLabels = {
 };
 
 export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
+  const notificationTemplatesLabel = labels.notificationTemplates ?? "Notification Templates";
+  const notificationUseCasesLabel = labels.notificationUseCases ?? "Use-case Mapping";
+
   const settingsChildren: Array<{ key: string; label: string; href?: string }> = [
     { key: "settings-email", label: labels.emailSettings, href: "/admin/settings/email" },
-  ];
-
-  if (labels.notificationTemplates) {
-    settingsChildren.push({
+    {
       key: "settings-notification-templates",
-      label: labels.notificationTemplates,
+      label: notificationTemplatesLabel,
       href: "/admin/settings/notification-templates",
-    });
-  }
-
-  if (labels.notificationUseCases) {
-    settingsChildren.push({
+    },
+    {
       key: "settings-notification-use-cases",
-      label: labels.notificationUseCases,
+      label: notificationUseCasesLabel,
       href: "/admin/settings/notification-use-cases",
-    });
-  }
+    },
+  ];
 
   if (labels.notificationLogs) {
     settingsChildren.push({

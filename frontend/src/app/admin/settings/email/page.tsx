@@ -175,8 +175,8 @@ const text = {
 };
 
 export default function EmailSettingsPage() {
-  const [locale, setLocale] = useState<Locale>("en");
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
@@ -202,9 +202,6 @@ export default function EmailSettingsPage() {
   }, [locale]);
 
   useEffect(() => {
-    setLocale(getStoredLocale());
-    setTheme(getStoredTheme());
-
     const token = getStoredToken();
     const storedUser = getStoredUser();
 

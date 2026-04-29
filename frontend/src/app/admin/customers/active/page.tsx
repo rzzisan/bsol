@@ -189,8 +189,8 @@ const labelCls =
   "mb-1 block text-xs font-semibold text-[var(--muted)] uppercase tracking-wide";
 
 export default function ActiveCustomersPage() {
-  const [locale, setLocale] = useState<Locale>("en");
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [state, setState] = useState<
     "loading" | "unauthenticated" | "forbidden" | "ready"
   >("loading");
@@ -207,11 +207,6 @@ export default function ActiveCustomersPage() {
   const [form, setForm] = useState<UserForm>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    setLocale(getStoredLocale());
-    setTheme(getStoredTheme());
-  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

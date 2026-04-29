@@ -197,8 +197,8 @@ const text = {
 };
 
 export default function NotificationTemplatesPage() {
-  const [locale, setLocale] = useState<Locale>("bn");
-  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
@@ -212,11 +212,6 @@ export default function NotificationTemplatesPage() {
   const [preview, setPreview] = useState<{ subject?: string | null; body?: string; missing_placeholders?: string[] } | null>(null);
   const [previewVariables, setPreviewVariables] = useState('{"otp":"123456","verification_link":"https://example.com/verify"}');
   const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  useEffect(() => {
-    setLocale(getStoredLocale());
-    setTheme(getStoredTheme());
-  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

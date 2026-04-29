@@ -147,8 +147,8 @@ const text = {
 };
 
 export default function AdminSmsHistoryPage() {
-  const [locale, setLocale] = useState<Locale>("en");
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
   const [rows, setRows] = useState<SmsHistoryRow[]>([]);
@@ -159,11 +159,6 @@ export default function AdminSmsHistoryPage() {
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "failed">("all");
   const [page, setPage] = useState(1);
-
-  useEffect(() => {
-    setLocale(getStoredLocale());
-    setTheme(getStoredTheme());
-  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

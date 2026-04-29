@@ -110,15 +110,10 @@ const text = {
 };
 
 export default function AdminDashboardPage() {
-  const [locale, setLocale] = useState<Locale>("en");
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
-
-  useEffect(() => {
-    setLocale(getStoredLocale());
-    setTheme(getStoredTheme());
-  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

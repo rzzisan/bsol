@@ -145,8 +145,8 @@ const text = {
 };
 
 export default function NotificationUseCasesPage() {
-  const [locale, setLocale] = useState<Locale>("bn");
-  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
   const [smsTemplates, setSmsTemplates] = useState<NotificationTemplateOption[]>([]);
@@ -170,11 +170,6 @@ export default function NotificationUseCasesPage() {
     recipient_email: "",
     variables: '{"otp":"654321","verification_link":"https://example.com/verify"}',
   });
-
-  useEffect(() => {
-    setLocale(getStoredLocale());
-    setTheme(getStoredTheme());
-  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
