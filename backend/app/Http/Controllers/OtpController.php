@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PhoneOtpActivityLog;
 use App\Models\PhoneOtpVerification;
+use App\Models\RegistrationSetting;
 use App\Models\User;
 use App\Services\NotificationDispatchService;
 use Illuminate\Http\JsonResponse;
@@ -185,12 +186,16 @@ class OtpController extends Controller
             return response()->json(['message' => 'This email is already registered.'], 422);
         }
 
+        $registrationDefaults = RegistrationSetting::getSetting();
+
         $user = User::create([
             'name'               => $pendingData['name'],
             'mobile'             => $rawMobile,
             'email'              => $pendingData['email'],
             'password'           => $pendingData['password'],
             'role'               => 'user',
+            'user_status'        => $registrationDefaults->default_user_status,
+            'subscription_package_id' => $registrationDefaults->default_subscription_package_id,
             'mobile_verified_at' => now(),
         ]);
 

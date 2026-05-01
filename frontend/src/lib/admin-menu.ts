@@ -68,7 +68,7 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
         { key: "sms-credit", label: labels.smsCredit, href: "/admin/sms/credit" },
       ],
     },
-    { key: "packages", label: labels.packages, icon: "📦" },
+    { key: "packages", label: labels.packages, icon: "📦", href: "/admin/packages" },
     { key: "billing", label: labels.billing, icon: "💳" },
     { key: "reports", label: labels.reports, icon: "📊" },
     {

@@ -67,6 +67,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/packages/{package}', [AdminController::class, 'updatePackage']);
         Route::delete('/packages/{package}', [AdminController::class, 'deletePackage']);
 
+        Route::get('/registration-defaults', [AdminController::class, 'getRegistrationDefaults']);
+        Route::put('/registration-defaults', [AdminController::class, 'updateRegistrationDefaults']);
+
         Route::get('/sms/gateways', [AdminSmsGatewayController::class, 'index']);
         Route::post('/sms/gateways', [AdminSmsGatewayController::class, 'store']);
         Route::put('/sms/gateways/{smsGateway}', [AdminSmsGatewayController::class, 'update']);

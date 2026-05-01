@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\EmailOtpVerification;
+use App\Models\RegistrationSetting;
 use App\Models\SubscriptionPackage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -146,5 +147,50 @@ class AdminApiTest extends TestCase
             'email' => 'old@example.com',
             'verified_at' => null,
         ]);
+    }
+
+    public function test_admin_can_update_registration_defaults(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $token = $admin->createToken('test-suite')->plainTextToken;
+
+        $package = SubscriptionPackage::create([
+            'name' => 'Starter',
+            'slug' => 'starter',
+            'price' => 399,
+            'duration_days' => 30,
+        ]);
+
+        $this->putJson('/api/admin/registration-defaults', [
+            'default_user_status' => 'active',
+            'default_subscription_package_id' => $package->id,
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('defaults.default_user_status', 'active')
+            ->assertJsonPath('defaults.default_subscription_package_id', $package->id);
+
+        $this->getJson('/api/admin/registration-defaults', [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('defaults.default_user_status', 'active')
+            ->assertJsonPath('defaults.default_subscription_package_id', $package->id)
+            ->assertJsonPath('defaults.default_package.name', 'Starter');
+
+        $this->assertDatabaseHas('registration_settings', [
+            'default_user_status' => 'active',
+            'default_subscription_package_id' => $package->id,
+        ]);
+
+        RegistrationSetting::query()->delete();
+
+        $this->getJson('/api/admin/registration-defaults', [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('defaults.default_user_status', 'pending')
+            ->assertJsonPath('defaults.default_subscription_package_id', null);
     }
 }

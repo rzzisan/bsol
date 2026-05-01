@@ -3,15 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\EmailOtpVerification;
+use App\Models\RegistrationSetting;
 use App\Models\SubscriptionPackage;
 use App\Models\SmsGateway;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
+    private const USER_STATUSES = ['pending', 'active', 'inactive', 'expired', 'left'];
+
     public function dashboardSummary(): JsonResponse
     {
         return response()->json([
@@ -36,6 +40,7 @@ class AdminController extends Controller
                 'users.mobile',
                 'users.email',
                 'users.role',
+                'users.user_status',
                 'users.subscription_package_id',
                 'users.sms_gateway_id',
                 'users.created_at',
@@ -55,6 +60,7 @@ class AdminController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8'],
             'role' => ['required', Rule::in(['admin', 'user'])],
+            'user_status' => ['sometimes', 'required', Rule::in(self::USER_STATUSES)],
             'subscription_package_id' => ['nullable', 'integer', 'exists:subscription_packages,id'],
             'sms_gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
         ]);
@@ -75,6 +81,7 @@ class AdminController extends Controller
             'email' => ['sometimes', 'required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['sometimes', 'required', 'string', 'min:8'],
             'role' => ['sometimes', 'required', Rule::in(['admin', 'user'])],
+            'user_status' => ['sometimes', 'required', Rule::in(self::USER_STATUSES)],
             'subscription_package_id' => ['nullable', 'integer', 'exists:subscription_packages,id'],
             'sms_gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
         ]);
@@ -121,13 +128,17 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'unique:subscription_packages,slug'],
+            'slug' => ['nullable', 'string', 'max:255', 'unique:subscription_packages,slug'],
             'price' => ['required', 'numeric', 'min:0'],
             'duration_days' => ['required', 'integer', 'min:1'],
             'max_orders' => ['nullable', 'integer', 'min:0'],
             'features' => ['nullable', 'array'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
+
+        if (empty($validated['slug'])) {
+            $validated['slug'] = $this->generateUniquePackageSlug($validated['name']);
+        }
 
         $package = SubscriptionPackage::create($validated);
 
@@ -159,10 +170,68 @@ class AdminController extends Controller
 
     public function deletePackage(SubscriptionPackage $package): JsonResponse
     {
+        // If this package is the current registration default, clear it
+        $regSetting = RegistrationSetting::getSetting();
+        if ($regSetting->default_subscription_package_id === $package->id) {
+            $regSetting->update(['default_subscription_package_id' => null]);
+        }
+
         $package->delete();
 
         return response()->json([
             'message' => 'Package deleted successfully.',
         ]);
+    }
+
+    public function getRegistrationDefaults(): JsonResponse
+    {
+        $setting = RegistrationSetting::getSetting()->load('defaultPackage:id,name,slug');
+
+        return response()->json([
+            'defaults' => [
+                'default_user_status' => $setting->default_user_status,
+                'default_subscription_package_id' => $setting->default_subscription_package_id,
+                'default_package' => $setting->defaultPackage,
+            ],
+        ]);
+    }
+
+    public function updateRegistrationDefaults(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'default_user_status' => ['required', Rule::in(self::USER_STATUSES)],
+            'default_subscription_package_id' => ['nullable', 'integer', 'exists:subscription_packages,id'],
+        ]);
+
+        $setting = RegistrationSetting::getSetting();
+        $setting->update($validated);
+        $setting->load('defaultPackage:id,name,slug');
+
+        return response()->json([
+            'message' => 'Registration defaults updated successfully.',
+            'defaults' => [
+                'default_user_status' => $setting->default_user_status,
+                'default_subscription_package_id' => $setting->default_subscription_package_id,
+                'default_package' => $setting->defaultPackage,
+            ],
+        ]);
+    }
+
+    private function generateUniquePackageSlug(string $name): string
+    {
+        $base = Str::slug($name);
+        if ($base === '') {
+            $base = 'package';
+        }
+
+        $slug = $base;
+        $counter = 2;
+
+        while (SubscriptionPackage::where('slug', $slug)->exists()) {
+            $slug = $base.'-'.$counter;
+            $counter++;
+        }
+
+        return $slug;
     }
 }
