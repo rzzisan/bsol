@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\NotificationTemplateController;
 use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -87,6 +88,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/booked', [CourierController::class, 'booked']);
         Route::post('/book/{order}', [CourierController::class, 'book']);
         Route::get('/track/{order}', [CourierController::class, 'trackOrder']);
+    });
+
+    // ── Fraud Check ───────────────────────────────────────────────────────────
+    Route::prefix('fraud')->group(function () {
+        Route::post('/check-phone', [FraudController::class, 'checkPhone']);
+        Route::post('/bulk-check', [FraudController::class, 'bulkCheck']);
+        Route::get('/blacklist', [FraudController::class, 'blacklist']);
+        Route::post('/blacklist', [FraudController::class, 'addBlacklist']);
+        Route::delete('/blacklist/{id}', [FraudController::class, 'removeBlacklist']);
     });
 
     Route::middleware('is_admin')->prefix('admin')->group(function () {

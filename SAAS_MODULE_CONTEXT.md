@@ -1,7 +1,7 @@
 # F-Commerce SaaS — Module Context
 
-Last updated: 2026-05-02
-Status: Phase 1 — 4/6 modules complete. Fraud Check + Blacklist remaining.
+Last updated: 2026-05-03
+Status: **Phase 1 COMPLETE ✅** — All 6 modules implemented and deployed.
 
 ---
 
@@ -148,7 +148,7 @@ GET    /api/orders/stats
 ---
 
 #### 4.2 Fake Order / Fraud Detection
-**Status:** Shell ready at `/dashboard/orders/fraud-check`
+**Status:** ✅ COMPLETE — FraudController, fraud scoring, blacklist all live
 
 **Fraud score algorithm (adapted from zyro FraudScoreService):**
 ```
@@ -477,73 +477,22 @@ backend/app/
 | Order Management | ✅ OrderController (CRUD, status, bulk, stats) | ✅ /orders, /orders/create, /orders/[id] | `7a16e3c` → `0020557` |
 | Customer CRM | ✅ CustomerController (6 routes, syncFromOrder) | ✅ /customers, /customers/[id], /customers/vip, /customers/risky | `669d310` |
 | Courier Integration | ✅ CourierController, SteadfastService, courier_settings migration | ✅ /courier, /courier/track, /settings/courier | `b69eebc` |
+| Fraud Check + Blacklist | ✅ FraudController (5 routes), customer_fraud_profiles + customer_blacklist tables | ✅ /orders/fraud-check, /orders/blacklist | current |
+| Dashboard Home | — | ✅ /dashboard — live stat cards + recent orders + shortcuts | current |
 
 ---
 
-### 🔲 বাকি (Remaining in Phase 1)
-
-#### P1-A: Fake Order / Fraud Detection
-
-**Backend কাজ:**
-- [ ] Migration: `customer_fraud_profiles` table
-  ```
-  id, user_id, phone, total_orders, delivered_count, cancelled_count,
-  return_count, fraud_score (0-100), risk_level, last_updated
-  ```
-- [ ] Migration: `customer_blacklist` table
-  ```
-  id, user_id, phone, reason, blocked_at
-  ```
-- [ ] `FraudController.php` — routes:
-  ```
-  POST /api/fraud/check-phone      ← score একটি ফোন নম্বর
-  GET  /api/fraud/blacklist         ← ব্লাকলিস্ট
-  POST /api/fraud/blacklist         ← ব্লাকলিস্টে যোগ করুন
-  DELETE /api/fraud/blacklist/{id}  ← সরান
-  ```
-- [ ] Fraud score algorithm (order history থেকে computed):
-  ```
-  +30  ফোনে 3+ অর্ডার এবং return rate > 40%
-  +20  cancel rate > 40%
-  +15  2+ বার same phone অন্য user-এর কাছেও returned
-  -20  সফল delivery (trust signal)
-  Score 0–30 → low, 31–60 → medium, 61+ → high
-  ```
-- [ ] Auto-fraud-score on order create (OrderController::store() এ hook)
-
-**Frontend কাজ:**
-- [ ] `/dashboard/orders/fraud-check/page.tsx` — phone search + fraud score card
-  - Phone input → API call → স্কোর + risk badge + order history
-  - Bulk check (paste multiple phones)
-  - "Blacklist" বাটন
-- [ ] `/dashboard/orders/blacklist/page.tsx` — blacklisted phones list
-  - Table: phone, reason, date, remove button
-  - Add to blacklist modal
-
----
-
-#### P1-B: Dashboard Home (stat cards)
-
-**Frontend কাজ:**
-- [ ] `/dashboard/page.tsx` — এখনো placeholder
-  - Today's orders, revenue, pending count, high-risk count
-  - Quick actions: Create Order, Book Parcel
-  - Recent orders mini-list
-
----
-
-### Phase 1 সম্পন্ন হলে MVP হবে:
+### ✅ Phase 1 সম্পূর্ণ MVP:
 - ✅ পণ্য যোগ করা যাবে
 - ✅ অর্ডার নেওয়া যাবে (manual + create wizard)
 - ✅ কাস্টমার অটো-ট্র্যাক হবে
 - ✅ Steadfast কুরিয়ার বুক করা যাবে
-- 🔲 ফেক অর্ডার ধরা যাবে (Fraud Check)
-- 🔲 ড্যাশবোর্ড হোম (stats overview)
+- ✅ ফেক অর্ডার ধরা যাবে (Fraud Check + Blacklist)
+- ✅ ড্যাশবোর্ড হোম (live stats overview)
 
 ---
 
-### পরবর্তী কাজের অর্ডার (Recommended)
-
-1. **Fraud Check** — `FraudController` + `/fraud-check` + `/blacklist` pages
-2. **Dashboard Home** — stat cards + shortcuts
-3. **Phase 2** শুরু → SMS Automation, Accounting
+### পরবর্তী কাজ — Phase 2
+1. **SMS Automation** — template engine, scheduled sends, event triggers
+2. **Accounting** — expense tracking, daily P&L, invoice generation
+3. **Analytics** — sales funnel, product performance, customer cohorts
