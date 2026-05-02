@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -94,5 +95,68 @@ class AuthApiTest extends TestCase
             ->assertJsonPath('message', 'Logout successful.');
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_authenticated_user_can_update_own_profile(): void
+    {
+        $user = User::factory()->create([
+            'name' => 'Old Name',
+            'email' => 'old@example.com',
+            'mobile' => '01711111111',
+            'email_verified_at' => Carbon::now(),
+            'password' => Hash::make('old-password'),
+        ]);
+
+        $token = $user->createToken('test-suite')->plainTextToken;
+
+        $response = $this->putJson('/api/me', [
+            'name' => 'Updated Name',
+            'mobile' => '01722222222',
+            'email' => 'updated@example.com',
+            'current_password' => 'old-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('message', 'Profile updated successfully.')
+            ->assertJsonPath('user.name', 'Updated Name')
+            ->assertJsonPath('user.mobile', '01722222222')
+            ->assertJsonPath('user.email', 'updated@example.com');
+
+        $user->refresh();
+
+        $this->assertSame('Updated Name', $user->name);
+        $this->assertSame('01722222222', $user->mobile);
+        $this->assertSame('updated@example.com', $user->email);
+        $this->assertNull($user->email_verified_at);
+        $this->assertTrue(Hash::check('new-password', $user->password));
+    }
+
+    public function test_profile_password_update_requires_valid_current_password(): void
+    {
+        $user = User::factory()->create([
+            'password' => Hash::make('old-password'),
+        ]);
+
+        $token = $user->createToken('test-suite')->plainTextToken;
+
+        $response = $this->putJson('/api/me', [
+            'current_password' => 'wrong-current-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('current_password');
+
+        $user->refresh();
+        $this->assertTrue(Hash::check('old-password', $user->password));
     }
 }

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EmailOtpVerification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -47,6 +49,49 @@ class AuthController extends Controller
     {
         return response()->json([
             'user' => $request->user(),
+        ]);
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'mobile' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s]{7,20}$/', Rule::unique('users', 'mobile')->ignore($user->id)],
+            'email' => ['sometimes', 'required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'current_password' => ['required_with:password', 'string'],
+            'password' => ['sometimes', 'required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if (array_key_exists('password', $validated) && ! Hash::check((string) $validated['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Current password is incorrect.'],
+            ]);
+        }
+
+        unset($validated['current_password']);
+
+        $originalEmail = $user->email;
+        $emailChanged = array_key_exists('email', $validated) && $validated['email'] !== $originalEmail;
+
+        if ($emailChanged) {
+            $validated['email_verified_at'] = null;
+        }
+
+        $user->update($validated);
+
+        if ($emailChanged) {
+            EmailOtpVerification::query()
+                ->whereNull('verified_at')
+                ->whereIn('email', array_values(array_unique([$originalEmail, $user->email])))
+                ->delete();
+        }
+
+        return response()->json([
+            'message' => 'Profile updated successfully.',
+            'user' => $user,
         ]);
     }
 

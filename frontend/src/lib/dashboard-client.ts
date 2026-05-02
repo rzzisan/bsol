@@ -29,6 +29,17 @@ export function getStoredToken(): string | null {
   return localStorage.getItem("auth_token");
 }
 
+export function setStoredToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+
+  if (!token) {
+    localStorage.removeItem("auth_token");
+    return;
+  }
+
+  localStorage.setItem("auth_token", token);
+}
+
 export function getStoredUser(): AuthUser | null {
   if (typeof window === "undefined") return null;
   try {
@@ -48,6 +59,12 @@ export function setStoredUser(user: AuthUser | null): void {
   }
 
   localStorage.setItem("auth_user", JSON.stringify(user));
+}
+
+export function clearStoredAuth(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("auth_user");
 }
 
 export function normalizeRole(user: AuthUser | null): "admin" | "user" | null {
