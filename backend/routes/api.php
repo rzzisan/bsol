@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\EmailConfigurationController;
 use App\Http\Controllers\Api\NotificationDispatchController;
 use App\Http\Controllers\Api\NotificationTemplateController;
 use App\Http\Controllers\Api\NotificationUseCaseBindingController;
+use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
@@ -76,6 +77,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/customers/sync-all', [CustomerController::class, 'syncAll']);
     Route::post('/customers/{customer}/toggle-block', [CustomerController::class, 'toggleBlock']);
     Route::apiResource('/customers', CustomerController::class)->only(['index', 'show', 'update']);
+
+    // ── Courier Integration ───────────────────────────────────────────────────
+    Route::prefix('courier')->group(function () {
+        Route::get('/settings', [CourierController::class, 'getSettings']);
+        Route::put('/settings', [CourierController::class, 'saveSettings']);
+        Route::post('/settings/test', [CourierController::class, 'testConnection']);
+        Route::get('/ready', [CourierController::class, 'readyToBook']);
+        Route::get('/booked', [CourierController::class, 'booked']);
+        Route::post('/book/{order}', [CourierController::class, 'book']);
+        Route::get('/track/{order}', [CourierController::class, 'trackOrder']);
+    });
 
     Route::middleware('is_admin')->prefix('admin')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);
