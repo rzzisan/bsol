@@ -180,6 +180,9 @@ class OrderController extends Controller
 
             $order->load(['items', 'statusLogs']);
 
+            // Upsert customer aggregate
+            \App\Models\Customer::syncFromOrder($order);
+
             return response()->json(['success' => true, 'data' => $order], 201);
         });
     }

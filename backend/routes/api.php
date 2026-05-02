@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\EmailConfigurationController;
 use App\Http\Controllers\Api\NotificationDispatchController;
 use App\Http\Controllers\Api\NotificationTemplateController;
 use App\Http\Controllers\Api\NotificationUseCaseBindingController;
+use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -69,6 +70,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
     Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
     Route::apiResource('/orders', OrderController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+
+    // ── Customer Management ───────────────────────────────────────────────────
+    Route::get('/customers/stats', [CustomerController::class, 'stats']);
+    Route::post('/customers/sync-all', [CustomerController::class, 'syncAll']);
+    Route::post('/customers/{customer}/toggle-block', [CustomerController::class, 'toggleBlock']);
+    Route::apiResource('/customers', CustomerController::class)->only(['index', 'show', 'update']);
 
     Route::middleware('is_admin')->prefix('admin')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);
