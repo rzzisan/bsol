@@ -7,6 +7,9 @@ use App\Http\Controllers\Api\EmailConfigurationController;
 use App\Http\Controllers\Api\NotificationDispatchController;
 use App\Http\Controllers\Api\NotificationTemplateController;
 use App\Http\Controllers\Api\NotificationUseCaseBindingController;
+use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\ProductCategoryController;
+use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EmailOtpController;
 use App\Http\Controllers\OtpController;
@@ -54,6 +57,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/sms/preview', [AdminSmsGatewayController::class, 'preview']);
     Route::post('/sms/send', [AdminSmsGatewayController::class, 'send']);
     Route::get('/sms/history', [AdminSmsGatewayController::class, 'myHistory']);
+
+    // ── Product Management ────────────────────────────────────────────────────
+    Route::get('/products/stats', [ProductController::class, 'stats']);
+    Route::post('/products/{product}/adjust-stock', [ProductController::class, 'adjustStock']);
+    Route::apiResource('/products', ProductController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+    Route::apiResource('/categories', ProductCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
+
+    // ── Order Management ──────────────────────────────────────────────────────
+    Route::get('/orders/stats', [OrderController::class, 'stats']);
+    Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
+    Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
+    Route::apiResource('/orders', OrderController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
 
     Route::middleware('is_admin')->prefix('admin')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);
