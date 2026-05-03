@@ -10,6 +10,8 @@ class CourierSetting extends Model
         'user_id', 'default_courier',
         'steadfast_api_key', 'steadfast_secret_key',
         'pathao_client_id', 'pathao_client_secret', 'pathao_store_id',
+        'pathao_username', 'pathao_password',
+        'pathao_access_token', 'pathao_refresh_token', 'pathao_token_expires_at',
         'redx_api_key',
     ];
 
@@ -22,7 +24,7 @@ class CourierSetting extends Model
     public function masked(): array
     {
         $data = $this->toArray();
-        foreach (['steadfast_api_key','steadfast_secret_key','pathao_client_secret','redx_api_key'] as $field) {
+        foreach (['steadfast_api_key','steadfast_secret_key','pathao_client_secret','pathao_password','pathao_access_token','pathao_refresh_token','redx_api_key'] as $field) {
             if (!empty($data[$field])) {
                 $data[$field] = substr($data[$field], 0, 4) . str_repeat('*', max(0, strlen($data[$field]) - 4));
             }

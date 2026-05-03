@@ -16,23 +16,40 @@ const t = {
     customer: "গ্রাহক",
     address: "ঠিকানা",
     total: "মোট",
-    courier: "কুরিয়ার",
     book: "বুক করুন",
     booking: "বুকিং হচ্ছে...",
     booked: "বুকড ✓",
     codAmount: "COD পরিমাণ (৳)",
-    note: "নোট",
+    note: "নোট / বিশেষ নির্দেশনা",
     trackingId: "ট্র্যাকিং আইডি",
     cancel: "বাতিল",
     confirm: "নিশ্চিত করুন",
     confirming: "হচ্ছে...",
     modalTitle: "পার্সেল বুক করুন",
-    manualTracking: "ম্যানুয়াল ট্র্যাকিং",
     steadfast: "Steadfast",
+    pathao: "Pathao",
     manual: "ম্যানুয়াল",
-    noCredentials: "Steadfast API Key সেট করা নেই। Settings → Courier-এ যান।",
+    courier: "কুরিয়ার সার্ভিস",
+    store: "পার্সেল পিকআপ স্টোর",
+    selectStore: "স্টোর নির্বাচন করুন",
+    loadingStores: "স্টোর লোড হচ্ছে...",
+    deliveryType: "ডেলিভারি ধরন",
+    normalDelivery: "Normal Delivery",
+    onDemandDelivery: "On Demand",
+    itemType: "আইটেম ধরন",
+    document: "ডকুমেন্ট",
+    parcel: "পার্সেল",
+    itemWeight: "ওজন (KG)",
+    itemDescription: "আইটেম বিবরণ (ঐচ্ছিক)",
+    calcPrice: "ডেলিভারি চার্জ হিসাব",
+    calculating: "হিসাব হচ্ছে...",
+    deliveryFee: "ডেলিভারি ফি",
     successMsg: (id: string) => `বুকড! Consignment: ${id}`,
     errorMsg: "বুকিং ব্যর্থ হয়েছে।",
+    noStoreWarning: "Pathao Store পাওয়া যায়নি। Settings → Courier-এ credentials সেট করুন।",
+    prev: "আগে",
+    next: "পরে",
+    ordersReady: "টি অর্ডার রেডি",
   },
   en: {
     pageTitle: "Book Parcel",
@@ -43,34 +60,64 @@ const t = {
     customer: "Customer",
     address: "Address",
     total: "Total",
-    courier: "Courier",
     book: "Book",
     booking: "Booking...",
     booked: "Booked ✓",
     codAmount: "COD Amount (৳)",
-    note: "Note",
+    note: "Note / Special Instruction",
     trackingId: "Tracking ID",
     cancel: "Cancel",
     confirm: "Confirm",
     confirming: "Processing...",
     modalTitle: "Book Parcel",
-    manualTracking: "Manual Tracking",
     steadfast: "Steadfast",
+    pathao: "Pathao",
     manual: "Manual",
-    noCredentials: "Steadfast API Key not configured. Go to Settings → Courier.",
+    courier: "Courier Service",
+    store: "Pickup Store",
+    selectStore: "Select store",
+    loadingStores: "Loading stores...",
+    deliveryType: "Delivery Type",
+    normalDelivery: "Normal Delivery",
+    onDemandDelivery: "On Demand",
+    itemType: "Item Type",
+    document: "Document",
+    parcel: "Parcel",
+    itemWeight: "Weight (KG)",
+    itemDescription: "Item Description (optional)",
+    calcPrice: "Calculate Delivery Charge",
+    calculating: "Calculating...",
+    deliveryFee: "Delivery Fee",
     successMsg: (id: string) => `Booked! Consignment: ${id}`,
     errorMsg: "Booking failed.",
+    noStoreWarning: "No Pathao store found. Configure credentials in Settings → Courier.",
+    prev: "Prev",
+    next: "Next",
+    ordersReady: "orders ready",
   },
 };
 
 type Order = {
   id: number; order_number: string; customer_name: string | null;
   customer_phone: string; customer_address: string | null;
-  customer_district: string | null; customer_thana: string | null;
+  customer_district: string | null; customer_thana: string | null; customer_area: string | null;
+  pathao_city_id: number | null; pathao_zone_id: number | null; pathao_area_id: number | null;
   total: string; status: string;
 };
 
-type BookForm = { courier: "steadfast" | "manual"; cod_amount: string; note: string; tracking_id: string };
+type PathaoStore = { store_id: number; store_name: string; store_address: string; is_active: number };
+
+type BookForm = {
+  courier: "steadfast" | "pathao" | "manual";
+  cod_amount: string;
+  note: string;
+  tracking_id: string;
+  store_id: string;
+  delivery_type: "48" | "12";
+  item_type: "1" | "2";
+  item_weight: string;
+  item_description: string;
+};
 
 export default function BookParcelPage() {
   const [locale] = useState<Locale>(getStoredLocale);
@@ -85,10 +132,19 @@ export default function BookParcelPage() {
   const [total, setTotal] = useState(0);
 
   const [modal, setModal] = useState<Order | null>(null);
-  const [form, setForm] = useState<BookForm>({ courier: "steadfast", cod_amount: "", note: "", tracking_id: "" });
+  const [form, setForm] = useState<BookForm>({
+    courier: "pathao", cod_amount: "", note: "", tracking_id: "",
+    store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "",
+  });
   const [booking, setBooking] = useState(false);
   const [bookResult, setBookResult] = useState<{ success: boolean; msg: string } | null>(null);
   const [bookedIds, setBookedIds] = useState<Set<number>>(new Set());
+
+  const [pathaoStores, setPathaoStores] = useState<PathaoStore[]>([]);
+  const [loadingStores, setLoadingStores] = useState(false);
+  const [storesFetched, setStoresFetched] = useState(false);
+  const [priceResult, setPriceResult] = useState<{ fee: number; final: number } | null>(null);
+  const [calculatingPrice, setCalculatingPrice] = useState(false);
 
   const fetchReady = useCallback(async () => {
     setLoading(true);
@@ -110,10 +166,62 @@ export default function BookParcelPage() {
   useEffect(() => { void fetchReady(); }, [fetchReady]);
   useEffect(() => { setPage(1); }, [search]);
 
+  const fetchPathaoStores = useCallback(async () => {
+    if (storesFetched) return;
+    setLoadingStores(true);
+    try {
+      const res = await fetch(`${API}/courier/pathao/stores`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        const active = (d.data ?? []).filter((s: PathaoStore) => s.is_active);
+        setPathaoStores(active);
+        if (active.length > 0) {
+          setForm(f => ({ ...f, store_id: String(active[0].store_id) }));
+        }
+      }
+    } finally {
+      setLoadingStores(false);
+      setStoresFetched(true);
+    }
+  }, [storesFetched, token]);
+
   const openModal = (o: Order) => {
     setModal(o);
-    setForm({ courier: "steadfast", cod_amount: String(Math.round(Number(o.total))), note: "", tracking_id: "" });
+    setForm({
+      courier: "pathao", cod_amount: String(Math.round(Number(o.total))), note: "", tracking_id: "",
+      store_id: pathaoStores.length > 0 ? String(pathaoStores[0].store_id) : "",
+      delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "",
+    });
     setBookResult(null);
+    setPriceResult(null);
+    void fetchPathaoStores();
+  };
+
+  const calculatePathaoPrice = async () => {
+    if (!modal || !form.store_id) return;
+    if (!modal.pathao_city_id || !modal.pathao_zone_id) return;
+    setCalculatingPrice(true);
+    setPriceResult(null);
+    try {
+      const res = await fetch(`${API}/courier/pathao/price`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          store_id: Number(form.store_id),
+          item_type: Number(form.item_type),
+          delivery_type: Number(form.delivery_type),
+          item_weight: Number(form.item_weight),
+          recipient_city: modal.pathao_city_id,
+          recipient_zone: modal.pathao_zone_id,
+        }),
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setPriceResult({ fee: d.data.price, final: d.data.final_price });
+      }
+    } finally {
+      setCalculatingPrice(false);
+    }
   };
 
   const handleBook = async () => {
@@ -126,7 +234,17 @@ export default function BookParcelPage() {
         cod_amount: Number(form.cod_amount),
         note: form.note,
       };
-      if (form.courier === "manual") body.tracking_id = form.tracking_id;
+
+      if (form.courier === "manual") {
+        body.tracking_id = form.tracking_id;
+      } else if (form.courier === "pathao") {
+        if (form.store_id) body.store_id = Number(form.store_id);
+        body.delivery_type = Number(form.delivery_type);
+        body.item_type = Number(form.item_type);
+        body.item_weight = Number(form.item_weight);
+        if (form.item_description) body.item_description = form.item_description;
+        if (form.note) body.special_instruction = form.note;
+      }
 
       const res = await fetch(`${API}/courier/book/${modal.id}`, {
         method: "POST",
@@ -136,11 +254,15 @@ export default function BookParcelPage() {
       const data = await res.json();
       if (res.ok) {
         const id = data.consignment_id ? String(data.consignment_id) : (form.tracking_id || "saved");
-        setBookResult({ success: true, msg: txt.successMsg(id) });
+        const feeMsg = data.delivery_fee ? ` | Fee: ৳${data.delivery_fee}` : "";
+        setBookResult({ success: true, msg: txt.successMsg(id) + feeMsg });
         setBookedIds(prev => new Set([...prev, modal.id]));
-        setTimeout(() => { setModal(null); void fetchReady(); }, 1500);
+        setTimeout(() => { setModal(null); void fetchReady(); }, 2000);
       } else {
-        setBookResult({ success: false, msg: data.message ?? txt.errorMsg });
+        const errMsg = data.errors
+          ? Object.values(data.errors as Record<string, string[]>).flat().join(", ")
+          : (data.message ?? txt.errorMsg);
+        setBookResult({ success: false, msg: errMsg });
       }
     } finally {
       setBooking(false);
@@ -151,12 +273,11 @@ export default function BookParcelPage() {
     <UserShell activeKey="book-parcel" defaultExpandedKey="courier"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
-      {/* Toolbar */}
       <div className="catv-panel mb-4 flex flex-wrap items-center gap-3 p-3">
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
           placeholder={txt.search}
           className="flex-1 min-w-[180px] rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
-        <p className="text-xs text-[var(--muted)]">{total} {locale === "bn" ? "টি অর্ডার রেডি" : "orders ready"}</p>
+        <p className="text-xs text-[var(--muted)]">{total} {txt.ordersReady}</p>
       </div>
 
       <div className="catv-panel overflow-x-auto">
@@ -183,7 +304,7 @@ export default function BookParcelPage() {
                   <p className="text-xs text-[var(--muted)]">{o.customer_phone}</p>
                 </td>
                 <td className="px-4 py-3 hidden md:table-cell text-xs text-[var(--muted)]">
-                  {[o.customer_address, o.customer_district, o.customer_thana].filter(Boolean).join(", ") || "—"}
+                  {[o.customer_address, o.customer_district, o.customer_thana, o.customer_area].filter(Boolean).join(", ") || "—"}
                 </td>
                 <td className="px-4 py-3 text-right font-semibold">৳{Number(o.total).toLocaleString()}</td>
                 <td className="px-4 py-3 text-right">
@@ -200,28 +321,21 @@ export default function BookParcelPage() {
             ))}
           </tbody>
         </table>
-
         {lastPage > 1 && (
-          <div className="flex items-center justify-between border-t border-[var(--border)] px-4 py-3">
-            <div className="flex gap-2">
-              <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
-                className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs disabled:opacity-40">
-                {locale === "bn" ? "আগে" : "Prev"}
-              </button>
-              <span className="text-xs self-center">{page}/{lastPage}</span>
-              <button disabled={page === lastPage} onClick={() => setPage(p => p + 1)}
-                className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs disabled:opacity-40">
-                {locale === "bn" ? "পরে" : "Next"}
-              </button>
-            </div>
+          <div className="flex items-center gap-2 border-t border-[var(--border)] px-4 py-3">
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+              className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs disabled:opacity-40">{txt.prev}</button>
+            <span className="text-xs">{page}/{lastPage}</span>
+            <button disabled={page === lastPage} onClick={() => setPage(p => p + 1)}
+              className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs disabled:opacity-40">{txt.next}</button>
           </div>
         )}
       </div>
 
-      {/* Book modal */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && setModal(null)}>
-          <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={e => e.target === e.currentTarget && setModal(null)}>
+          <div className="w-full max-w-lg rounded-2xl bg-[var(--surface)] p-6 shadow-xl overflow-y-auto max-h-[90vh]">
             <h3 className="mb-1 text-base font-bold">{txt.modalTitle}</h3>
             <p className="mb-4 text-xs text-[var(--muted)]">{modal.order_number} — {modal.customer_name ?? modal.customer_phone}</p>
 
@@ -234,26 +348,93 @@ export default function BookParcelPage() {
             <div className="grid gap-3">
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.courier}</span>
-                <select value={form.courier} onChange={e => setForm(f => ({ ...f, courier: e.target.value as "steadfast"|"manual" }))}
+                <select value={form.courier}
+                  onChange={e => { setForm(f => ({ ...f, courier: e.target.value as BookForm["courier"] })); setPriceResult(null); if (e.target.value === "pathao") void fetchPathaoStores(); }}
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                  <option value="pathao">{txt.pathao}</option>
                   <option value="steadfast">{txt.steadfast}</option>
                   <option value="manual">{txt.manual}</option>
                 </select>
               </label>
 
-              {form.courier === "manual" ? (
+              {form.courier === "manual" && (
                 <label>
                   <span className="mb-1 block text-xs text-[var(--muted)]">{txt.trackingId}</span>
                   <input value={form.tracking_id} onChange={e => setForm(f => ({ ...f, tracking_id: e.target.value }))}
                     className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
                 </label>
-              ) : (
-                <label>
-                  <span className="mb-1 block text-xs text-[var(--muted)]">{txt.codAmount}</span>
-                  <input type="number" value={form.cod_amount} onChange={e => setForm(f => ({ ...f, cod_amount: e.target.value }))}
-                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
-                </label>
               )}
+
+              {form.courier === "pathao" && (
+                <>
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.store}</span>
+                    <select value={form.store_id} onChange={e => setForm(f => ({ ...f, store_id: e.target.value }))}
+                      disabled={loadingStores}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                      <option value="">{loadingStores ? txt.loadingStores : txt.selectStore}</option>
+                      {pathaoStores.map(s => (
+                        <option key={s.store_id} value={s.store_id}>{s.store_name}</option>
+                      ))}
+                    </select>
+                    {storesFetched && !loadingStores && pathaoStores.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-400">{txt.noStoreWarning}</p>
+                    )}
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.deliveryType}</span>
+                      <select value={form.delivery_type} onChange={e => setForm(f => ({ ...f, delivery_type: e.target.value as "48"|"12" }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                        <option value="48">{txt.normalDelivery}</option>
+                        <option value="12">{txt.onDemandDelivery}</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.itemType}</span>
+                      <select value={form.item_type} onChange={e => setForm(f => ({ ...f, item_type: e.target.value as "1"|"2" }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                        <option value="2">{txt.parcel}</option>
+                        <option value="1">{txt.document}</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.itemWeight} (0.5–10 KG)</span>
+                    <input type="number" step="0.5" min="0.5" max="10" value={form.item_weight}
+                      onChange={e => setForm(f => ({ ...f, item_weight: e.target.value }))}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                  </label>
+
+                  {modal.pathao_city_id && modal.pathao_zone_id && form.store_id && (
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={() => void calculatePathaoPrice()} disabled={calculatingPrice}
+                        className="rounded-xl border border-[var(--accent)] px-3 py-1.5 text-xs text-[var(--accent)] hover:bg-[var(--accent)]/10 disabled:opacity-60">
+                        {calculatingPrice ? txt.calculating : txt.calcPrice}
+                      </button>
+                      {priceResult && (
+                        <span className="text-sm font-semibold text-emerald-400">
+                          {txt.deliveryFee}: ৳{priceResult.final}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.itemDescription}</span>
+                    <input value={form.item_description} onChange={e => setForm(f => ({ ...f, item_description: e.target.value }))}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                  </label>
+                </>
+              )}
+
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.codAmount}</span>
+                <input type="number" value={form.cod_amount} onChange={e => setForm(f => ({ ...f, cod_amount: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
 
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.note}</span>
@@ -263,8 +444,11 @@ export default function BookParcelPage() {
             </div>
 
             <div className="mt-5 flex justify-end gap-3">
-              <button onClick={() => setModal(null)} className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm hover:bg-[var(--surface-soft)]">{txt.cancel}</button>
-              <button onClick={handleBook} disabled={booking}
+              <button onClick={() => setModal(null)}
+                className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm hover:bg-[var(--surface-soft)]">
+                {txt.cancel}
+              </button>
+              <button onClick={() => void handleBook()} disabled={booking}
                 className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {booking ? txt.confirming : txt.confirm}
               </button>

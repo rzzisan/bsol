@@ -22,6 +22,12 @@ const t = {
     pathaoClientId: "Client ID",
     pathaoClientSecret: "Client Secret",
     pathaoStoreId: "Store ID",
+    pathaoUsername: "লগইন ইমেইল (Pathao Merchant)",
+    pathaoPassword: "লগইন পাসওয়ার্ড (Pathao Merchant)",
+    testPathao: "Pathao টেস্ট",
+    testingPathao: "চেক হচ্ছে...",
+    testPathaoSuccess: "Pathao কানেকশন সফল।",
+    testPathaoError: "Pathao কানেকশন ব্যর্থ।",
     redxTitle: "RedX API",
     redxApiKey: "API Key",
     saveSuccess: "সেটিং সেভ হয়েছে!",
@@ -45,6 +51,12 @@ const t = {
     pathaoClientId: "Client ID",
     pathaoClientSecret: "Client Secret",
     pathaoStoreId: "Store ID",
+    pathaoUsername: "Login Email (Pathao Merchant)",
+    pathaoPassword: "Login Password (Pathao Merchant)",
+    testPathao: "Test Pathao",
+    testingPathao: "Testing...",
+    testPathaoSuccess: "Pathao connection successful.",
+    testPathaoError: "Pathao connection failed.",
     redxTitle: "RedX API",
     redxApiKey: "API Key",
     saveSuccess: "Settings saved!",
@@ -59,12 +71,14 @@ type Form = {
   default_courier: string;
   steadfast_api_key: string; steadfast_secret_key: string;
   pathao_client_id: string; pathao_client_secret: string; pathao_store_id: string;
+  pathao_username: string; pathao_password: string;
   redx_api_key: string;
 };
 
 const EMPTY_FORM: Form = {
   default_courier: "", steadfast_api_key: "", steadfast_secret_key: "",
-  pathao_client_id: "", pathao_client_secret: "", pathao_store_id: "", redx_api_key: "",
+  pathao_client_id: "", pathao_client_secret: "", pathao_store_id: "",
+  pathao_username: "", pathao_password: "", redx_api_key: "",
 };
 
 export default function CourierSettingsPage() {
@@ -76,6 +90,7 @@ export default function CourierSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [testingPathao, setTestingPathao] = useState(false);
   const [message, setMessage] = useState<{ type: "success"|"error"; text: string } | null>(null);
 
   const set = (field: keyof Form, value: string) => setForm(f => ({ ...f, [field]: value }));
@@ -131,6 +146,25 @@ export default function CourierSettingsPage() {
       }
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleTestPathao = async () => {
+    setTestingPathao(true); setMessage(null);
+    try {
+      const res = await fetch(`${API}/courier/settings/test-pathao`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        const storeInfo = d.data?.store_count !== undefined ? ` (${d.data.store_count} store(s) found)` : "";
+        setMessage({ type: "success", text: txt.testPathaoSuccess + storeInfo });
+      } else {
+        setMessage({ type: "error", text: d.message ?? txt.testPathaoError });
+      }
+    } finally {
+      setTestingPathao(false);
     }
   };
 
@@ -195,6 +229,18 @@ export default function CourierSettingsPage() {
                     className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-mono outline-none focus:border-[var(--accent)]" />
                 </label>
               ))}
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.pathaoUsername}</span>
+                <input value={form.pathao_username} onChange={e => set("pathao_username", e.target.value)}
+                  type="email" placeholder="merchant@email.com"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.pathaoPassword}</span>
+                <input value={form.pathao_password} onChange={e => set("pathao_password", e.target.value)}
+                  type="password"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
             </div>
           </div>
 
@@ -217,6 +263,10 @@ export default function CourierSettingsPage() {
             <button onClick={() => void handleTest()} disabled={testing}
               className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm hover:bg-[var(--surface-soft)] disabled:opacity-60">
               {testing ? txt.testing : txt.test}
+            </button>
+            <button onClick={() => void handleTestPathao()} disabled={testingPathao}
+              className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm hover:bg-[var(--surface-soft)] disabled:opacity-60">
+              {testingPathao ? txt.testingPathao : txt.testPathao}
             </button>
           </div>
 

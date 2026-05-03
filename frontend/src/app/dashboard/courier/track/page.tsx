@@ -94,7 +94,7 @@ export default function TrackPage() {
       const res = await fetch(`${API}/courier/track/${orderId}`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const d = await res.json();
-        const newStatus = d.data?.delivery_status ?? d.data?.status;
+        const newStatus = d.data?.order_status_slug ?? d.data?.delivery_status ?? d.data?.status;
         if (newStatus) {
           setOrders(prev => prev.map(o => o.id === orderId ? { ...o, courier_status: newStatus } : o));
         }
@@ -150,7 +150,7 @@ export default function TrackPage() {
                   ) : "—"}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {o.courier_name === "steadfast" ? (
+                  {(o.courier_name === "steadfast" || o.courier_name === "pathao") ? (
                     <button onClick={() => void refreshOrder(o.id)} disabled={refreshing === o.id}
                       className="rounded-xl border border-[var(--border)] px-3 py-1 text-xs hover:bg-[var(--surface-soft)] disabled:opacity-50">
                       {refreshing === o.id ? txt.refreshing : txt.refresh}

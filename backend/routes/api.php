@@ -85,6 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/settings', [CourierController::class, 'getSettings']);
         Route::put('/settings', [CourierController::class, 'saveSettings']);
         Route::post('/settings/test', [CourierController::class, 'testConnection']);
+        Route::post('/settings/test-pathao', [CourierController::class, 'testPathaoConnection']);
         Route::get('/ready', [CourierController::class, 'readyToBook']);
         Route::get('/booked', [CourierController::class, 'booked']);
         Route::post('/book/{order}', [CourierController::class, 'book']);
@@ -93,6 +94,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/locations/cities', [CourierController::class, 'cities']);
         Route::get('/locations/zones/{cityId}', [CourierController::class, 'zones']);
         Route::get('/locations/areas/{zoneId}', [CourierController::class, 'areas']);
+        // Pathao stores & price
+        Route::get('/pathao/stores', [CourierController::class, 'pathaoStores']);
+        Route::post('/pathao/stores', [CourierController::class, 'createPathaoStore']);
+        Route::post('/pathao/price', [CourierController::class, 'pathaoPrice']);
     });
 
     // ── Fraud Check ───────────────────────────────────────────────────────────
