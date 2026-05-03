@@ -74,6 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('/orders', OrderController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
 
     // ── Customer Management ───────────────────────────────────────────────────
+    Route::get('/customers/lookup-by-phone', [CustomerController::class, 'lookupByPhone']);
     Route::get('/customers/stats', [CustomerController::class, 'stats']);
     Route::post('/customers/sync-all', [CustomerController::class, 'syncAll']);
     Route::post('/customers/{customer}/toggle-block', [CustomerController::class, 'toggleBlock']);

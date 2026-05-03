@@ -51,6 +51,8 @@ const t = {
     enterPhone: "একটি ফোন নম্বর দিয়ে চেক শুরু করুন",
     bulkResults: "বাল্ক ফলাফল",
     phone: "ফোন",
+    sharedSellers: "শেয়ার্ড বিক্রেতা",
+    sharedBlacklist: "গ্লোবাল ব্ল্যাকলিস্ট",
   },
   en: {
     pageTitle: "Fraud Check",
@@ -80,12 +82,15 @@ const t = {
     enterPhone: "Enter a phone number to start checking",
     bulkResults: "Bulk Results",
     phone: "Phone",
+    sharedSellers: "Shared Sellers",
+    sharedBlacklist: "Global Blacklists",
   },
 };
 
 type FraudResult = {
   phone: string; fraud_score: number; risk_level: string; is_blacklisted: boolean;
   stats: { total: number; delivered: number; cancelled: number; returned: number };
+  shared?: { seller_count: number; global_blacklisted_count: number };
   orders: { id: number; order_number: string; status: string; total: string; created_at: string }[];
 };
 
@@ -245,6 +250,19 @@ export default function FraudCheckPage() {
                     </div>
                   ))}
                 </div>
+
+                {result.shared && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-xl bg-white/5 px-3 py-2">
+                      <p className="opacity-80">{txt.sharedSellers}</p>
+                      <p className="text-base font-bold">{result.shared.seller_count}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/5 px-3 py-2">
+                      <p className="opacity-80">{txt.sharedBlacklist}</p>
+                      <p className="text-base font-bold">{result.shared.global_blacklisted_count}</p>
+                    </div>
+                  </div>
+                )}
 
                 {!result.is_blacklisted && (
                   <div className="mt-4">

@@ -52,6 +52,9 @@ const t = {
     landing_page: "ল্যান্ডিং পেজ",
     required: "এই মাঠটি আবশ্যক।",
     itemRequired: "কমপক্ষে একটি পণ্য যোগ করুন।",
+    sharedLookupLoading: "ফোন থেকে গ্রাহক তথ্য খোঁজা হচ্ছে...",
+    sharedLookupFound: "শেয়ারড নেটওয়ার্ক থেকে তথ্য পাওয়া গেছে — অটো-ফিল করা হয়েছে।",
+    sharedLookupMeta: "মোট অর্ডার: {orders}, বিক্রেতা: {sellers}",
   },
   en: {
     pageTitle: "New Order",
@@ -94,11 +97,35 @@ const t = {
     landing_page: "Landing Page",
     required: "This field is required.",
     itemRequired: "Add at least one product.",
+    sharedLookupLoading: "Looking up customer by phone...",
+    sharedLookupFound: "Shared network data found — fields auto-filled.",
+    sharedLookupMeta: "Total orders: {orders}, sellers: {sellers}",
   },
 };
 
 type ProductSearchResult = { id: number; name: string; sku: string | null; selling_price: string; unit: string };
 type OrderItem = { product_id: number | null; product_name: string; sku: string; quantity: number; unit_price: number };
+type SharedLookupResponse = {
+  found: boolean;
+  profile: {
+    name: string | null;
+    address: string | null;
+    district: string | null;
+    thana: string | null;
+  } | null;
+  shared: {
+    total_orders: number;
+    seller_count: number;
+  };
+};
+
+const normalizePhone = (value: string): string => {
+  const digits = value.replace(/\D/g, "");
+  if (digits.startsWith("880") && digits.length >= 13) {
+    return `0${digits.slice(-10)}`;
+  }
+  return digits.slice(-11);
+};
 
 export default function CreateOrderPage() {
   const [locale] = useState<Locale>(getStoredLocale);
@@ -117,6 +144,8 @@ export default function CreateOrderPage() {
   const [district, setDistrict] = useState("");
   const [thana, setThana] = useState("");
   const [source, setSource] = useState<"manual" | "facebook_inbox" | "landing_page">("manual");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupInfo, setLookupInfo] = useState<SharedLookupResponse | null>(null);
 
   // Step 2
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -150,10 +179,55 @@ export default function CreateOrderPage() {
     }
   }, [token]);
 
+  const lookupCustomerByPhone = useCallback(async (rawPhone: string) => {
+    const p = normalizePhone(rawPhone);
+    if (p.length < 10) {
+      setLookupInfo(null);
+      return;
+    }
+
+    setLookupLoading(true);
+    try {
+      const res = await fetch(`${API}/customers/lookup-by-phone?phone=${encodeURIComponent(p)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const info: SharedLookupResponse | undefined = data?.data;
+      if (!info) return;
+
+      setLookupInfo(info);
+
+      if (info.found && info.profile) {
+        setName(info.profile.name ?? "");
+        setAddress(info.profile.address ?? "");
+        setDistrict(info.profile.district ?? "");
+        setThana(info.profile.thana ?? "");
+      }
+    } finally {
+      setLookupLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     const t = setTimeout(() => void searchProducts(productSearch), 300);
     return () => clearTimeout(t);
   }, [productSearch, searchProducts]);
+
+  useEffect(() => {
+    const t = setTimeout(() => void lookupCustomerByPhone(phone), 250);
+    return () => clearTimeout(t);
+  }, [phone, lookupCustomerByPhone]);
+
+  const lookupMeta = useMemo(() => {
+    if (!lookupInfo?.shared) return "";
+    const template = txt.sharedLookupMeta;
+    return template
+      .replace("{orders}", String(lookupInfo.shared.total_orders ?? 0))
+      .replace("{sellers}", String(lookupInfo.shared.seller_count ?? 0));
+  }, [lookupInfo, txt.sharedLookupMeta]);
 
   const addProduct = (p: ProductSearchResult) => {
     setItems(prev => {
@@ -251,6 +325,15 @@ export default function CreateOrderPage() {
               <span className="mb-1 block text-xs text-[var(--muted)]">{txt.customerPhone}</span>
               <input value={phone} onChange={e => setPhone(e.target.value)} type="tel"
                 className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              {lookupLoading && (
+                <p className="mt-1 text-[11px] text-[var(--muted)]">{txt.sharedLookupLoading}</p>
+              )}
+              {!lookupLoading && lookupInfo?.found && (
+                <div className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5">
+                  <p className="text-[11px] font-medium text-emerald-400">{txt.sharedLookupFound}</p>
+                  <p className="text-[11px] text-emerald-300/90">{lookupMeta}</p>
+                </div>
+              )}
             </label>
             <label>
               <span className="mb-1 block text-xs text-[var(--muted)]">{txt.customerName}</span>

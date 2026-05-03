@@ -10,6 +10,17 @@ use Illuminate\Support\Facades\DB;
 
 class FraudController extends Controller
 {
+    private function normalizePhone(string $phone): string
+    {
+        $digits = preg_replace('/\D/', '', $phone) ?? '';
+
+        if (str_starts_with($digits, '880') && strlen($digits) >= 13) {
+            $digits = '0' . substr($digits, -10);
+        }
+
+        return substr($digits, -11);
+    }
+
     // ── Compute fraud score for a phone number ────────────────────────────────
 
     public function checkPhone(Request $request): JsonResponse
@@ -121,17 +132,38 @@ class FraudController extends Controller
 
     public function computeScore(int $userId, string $phone): array
     {
-        $phone = preg_replace('/\D/', '', $phone);
+        $phone   = $this->normalizePhone($phone);
+        $match10 = substr($phone, -10);
 
-        // Get all orders for this phone by this user
-        $orders = Order::where('user_id', $userId)
-            ->where('customer_phone', 'like', '%' . substr($phone, -10))
-            ->get(['id', 'status', 'risk_level', 'fraud_score', 'created_at', 'order_number', 'total']);
+        // Shared signal pool from all users (privacy-safe aggregation)
+        $sharedOrders = Order::query()
+            ->whereRaw("right(regexp_replace(customer_phone, '\\D', '', 'g'), 10) = ?", [$match10])
+            ->get(['id', 'user_id', 'status', 'risk_level', 'fraud_score', 'created_at', 'order_number', 'total']);
 
-        $total     = $orders->count();
-        $delivered = $orders->where('status', 'delivered')->count();
-        $cancelled = $orders->where('status', 'cancelled')->count();
-        $returned  = $orders->where('status', 'returned')->count();
+        // Only this user's order details are returned in list view
+        $orders = $sharedOrders
+            ->where('user_id', $userId)
+            ->values()
+            ->map(fn ($o) => [
+                'id'           => $o->id,
+                'status'       => $o->status,
+                'risk_level'   => $o->risk_level,
+                'fraud_score'  => $o->fraud_score,
+                'created_at'   => $o->created_at,
+                'order_number' => $o->order_number,
+                'total'        => $o->total,
+            ]);
+
+        $total     = $sharedOrders->count();
+        $delivered = $sharedOrders->where('status', 'delivered')->count();
+        $cancelled = $sharedOrders->where('status', 'cancelled')->count();
+        $returned  = $sharedOrders->where('status', 'returned')->count();
+        $sellerCount = $sharedOrders->pluck('user_id')->unique()->count();
+
+        $myTotal     = $orders->count();
+        $myDelivered = $orders->where('status', 'delivered')->count();
+        $myCancelled = $orders->where('status', 'cancelled')->count();
+        $myReturned  = $orders->where('status', 'returned')->count();
 
         $score = 0;
 
@@ -140,14 +172,33 @@ class FraudController extends Controller
             $cancelRate  = $total > 0 ? ($cancelled / $total) : 0;
             $deliverRate = $total > 0 ? ($delivered / $total) : 0;
 
-            if ($returnRate > 0.40)  $score += 30;
-            if ($cancelRate > 0.40)  $score += 20;
-            if ($returned >= 2)      $score += 15;
-            if ($deliverRate >= 0.7) $score -= 20;
+            if ($returnRate > 0.40) {
+                $score += 30;
+            }
+            if ($cancelRate > 0.40) {
+                $score += 20;
+            }
+            if ($returned >= 2) {
+                $score += 15;
+            }
+            if ($deliverRate >= 0.7) {
+                $score -= 20;
+            }
         } elseif ($total >= 1) {
-            if ($returned >= 1)  $score += 15;
-            if ($cancelled >= 1) $score += 10;
-            if ($delivered >= 1) $score -= 10;
+            if ($returned >= 1) {
+                $score += 15;
+            }
+            if ($cancelled >= 1) {
+                $score += 10;
+            }
+            if ($delivered >= 1) {
+                $score -= 10;
+            }
+        }
+
+        // Cross-user reuse pattern can indicate risky phone behavior.
+        if ($sellerCount >= 3) {
+            $score += 10;
         }
 
         // Phone format check
@@ -155,13 +206,21 @@ class FraudController extends Controller
             $score += 5;
         }
 
-        // Blacklisted?
+        // My blacklist status (used by UI actions)
         $isBlacklisted = DB::table('customer_blacklist')
             ->where('user_id', $userId)
-            ->where('phone', 'like', '%' . substr($phone, -10))
+            ->whereRaw("right(regexp_replace(phone, '\\D', '', 'g'), 10) = ?", [$match10])
             ->exists();
 
-        if ($isBlacklisted) $score += 40;
+        // Shared blacklist signal across all users
+        $globalBlacklistCount = DB::table('customer_blacklist')
+            ->whereRaw("right(regexp_replace(phone, '\\D', '', 'g'), 10) = ?", [$match10])
+            ->distinct('user_id')
+            ->count('user_id');
+
+        if ($globalBlacklistCount > 0) {
+            $score += 40;
+        }
 
         $score = max(0, min(100, $score));
 
@@ -192,6 +251,14 @@ class FraudController extends Controller
             'risk_level'     => $riskLevel,
             'is_blacklisted' => $isBlacklisted,
             'stats'          => compact('total', 'delivered', 'cancelled', 'returned'),
+            'shared'         => [
+                'seller_count'             => $sellerCount,
+                'global_blacklisted_count' => $globalBlacklistCount,
+                'my_total'                 => $myTotal,
+                'my_delivered'             => $myDelivered,
+                'my_cancelled'             => $myCancelled,
+                'my_returned'              => $myReturned,
+            ],
             'orders'         => $orders->values(),
         ];
     }
