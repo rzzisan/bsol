@@ -15,6 +15,13 @@ const t = {
     testing: "চেক হচ্ছে...",
     loading: "লোড হচ্ছে...",
     defaultCourier: "ডিফল্ট কুরিয়ার",
+    tabsLabel: "কুরিয়ার সেটিং ট্যাব",
+    tabSteadfast: "Steadfast",
+    tabPathao: "Pathao",
+    tabRedx: "RedX",
+    tabManual: "Manual",
+    manualTitle: "Manual Courier",
+    manualDesc: "ম্যানুয়াল কুরিয়ারের জন্য আলাদা API credentials প্রয়োজন নেই। অর্ডার বুক করার সময় Tracking ID দিয়ে ম্যানুয়ালি এন্ট্রি করা যাবে।",
     steadfastTitle: "Steadfast API",
     steadfastApiKey: "API Key",
     steadfastSecretKey: "Secret Key",
@@ -63,6 +70,13 @@ const t = {
     testing: "Testing...",
     loading: "Loading...",
     defaultCourier: "Default Courier",
+    tabsLabel: "Courier settings tabs",
+    tabSteadfast: "Steadfast",
+    tabPathao: "Pathao",
+    tabRedx: "RedX",
+    tabManual: "Manual",
+    manualTitle: "Manual Courier",
+    manualDesc: "Manual courier does not require API credentials. You can provide tracking IDs manually while booking.",
     steadfastTitle: "Steadfast API",
     steadfastApiKey: "API Key",
     steadfastSecretKey: "Secret Key",
@@ -147,6 +161,7 @@ export default function CourierSettingsPage() {
   const token = getStoredToken();
 
   const [form, setForm] = useState<Form>(EMPTY_FORM);
+  const [activeTab, setActiveTab] = useState<"steadfast" | "pathao" | "redx" | "manual">("steadfast");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -369,8 +384,35 @@ export default function CourierSettingsPage() {
             </select>
           </div>
 
+          {/* Tabs */}
+          <div className="catv-panel p-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="tablist" aria-label={txt.tabsLabel}>
+              {([
+                { key: "steadfast", label: txt.tabSteadfast },
+                { key: "pathao", label: txt.tabPathao },
+                { key: "redx", label: txt.tabRedx },
+                { key: "manual", label: txt.tabManual },
+              ] as const).map(tab => (
+                <button
+                  key={tab.key}
+                  role="tab"
+                  aria-selected={activeTab === tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                    activeTab === tab.key
+                      ? "bg-[var(--accent)] text-white"
+                      : "border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-soft)]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Steadfast */}
-          <div className="catv-panel p-4">
+          {activeTab === "steadfast" && (
+          <div className="catv-panel p-4" role="tabpanel">
             <h3 className="mb-3 text-sm font-semibold">{txt.steadfastTitle}</h3>
             <div className="grid gap-3">
               <label>
@@ -387,9 +429,12 @@ export default function CourierSettingsPage() {
               </label>
             </div>
           </div>
+          )}
 
           {/* Pathao */}
-          <div className="catv-panel p-4">
+          {activeTab === "pathao" && (
+          <>
+          <div className="catv-panel p-4" role="tabpanel">
             <h3 className="mb-3 text-sm font-semibold">{txt.pathaoTitle}</h3>
             <div className="grid gap-3">
               {(["pathao_client_id", "pathao_client_secret", "pathao_store_id"] as const).map((field) => (
@@ -418,7 +463,7 @@ export default function CourierSettingsPage() {
           </div>
 
           {/* Create Pathao Store */}
-          <div className="catv-panel p-4">
+          <div className="catv-panel p-4" role="tabpanel">
             <h3 className="mb-3 text-sm font-semibold">{txt.createStoreTitle}</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <label>
@@ -523,9 +568,12 @@ export default function CourierSettingsPage() {
               )}
             </div>
           </div>
+          </>
+          )}
 
           {/* RedX */}
-          <div className="catv-panel p-4">
+          {activeTab === "redx" && (
+          <div className="catv-panel p-4" role="tabpanel">
             <h3 className="mb-3 text-sm font-semibold">{txt.redxTitle}</h3>
             <label>
               <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxApiKey}</span>
@@ -533,6 +581,15 @@ export default function CourierSettingsPage() {
                 className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-mono outline-none focus:border-[var(--accent)]" />
             </label>
           </div>
+          )}
+
+          {/* Manual */}
+          {activeTab === "manual" && (
+          <div className="catv-panel p-4" role="tabpanel">
+            <h3 className="mb-2 text-sm font-semibold">{txt.manualTitle}</h3>
+            <p className="text-sm text-[var(--muted)]">{txt.manualDesc}</p>
+          </div>
+          )}
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
@@ -540,14 +597,18 @@ export default function CourierSettingsPage() {
               className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
               {saving ? txt.saving : txt.save}
             </button>
-            <button onClick={() => void handleTest()} disabled={testing}
-              className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm hover:bg-[var(--surface-soft)] disabled:opacity-60">
-              {testing ? txt.testing : txt.test}
-            </button>
-            <button onClick={() => void handleTestPathao()} disabled={testingPathao}
-              className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm hover:bg-[var(--surface-soft)] disabled:opacity-60">
-              {testingPathao ? txt.testingPathao : txt.testPathao}
-            </button>
+            {activeTab === "steadfast" && (
+              <button onClick={() => void handleTest()} disabled={testing}
+                className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm hover:bg-[var(--surface-soft)] disabled:opacity-60">
+                {testing ? txt.testing : txt.test}
+              </button>
+            )}
+            {activeTab === "pathao" && (
+              <button onClick={() => void handleTestPathao()} disabled={testingPathao}
+                className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm hover:bg-[var(--surface-soft)] disabled:opacity-60">
+                {testingPathao ? txt.testingPathao : txt.testPathao}
+              </button>
+            )}
           </div>
 
         </div>
