@@ -5,12 +5,36 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CourierSetting;
 use App\Models\Order;
+use App\Services\PathaoLocationService;
 use App\Services\SteadfastService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CourierController extends Controller
 {
+    // ── Pathao Location Dropdowns ─────────────────────────────────────────────
+
+    public function cities(): JsonResponse
+    {
+        $svc   = new PathaoLocationService();
+        $cities = $svc->getCities(auth()->id());
+        return response()->json(['success' => true, 'data' => $cities, 'has_credentials' => $svc->hasCredentials(auth()->id())]);
+    }
+
+    public function zones(int $cityId): JsonResponse
+    {
+        $svc   = new PathaoLocationService();
+        $zones = $svc->getZones($cityId, auth()->id());
+        return response()->json(['success' => true, 'data' => $zones]);
+    }
+
+    public function areas(int $zoneId): JsonResponse
+    {
+        $svc   = new PathaoLocationService();
+        $areas = $svc->getAreas($zoneId, auth()->id());
+        return response()->json(['success' => true, 'data' => $areas]);
+    }
+
     // ── Courier Settings ──────────────────────────────────────────────────────
 
     public function getSettings(): JsonResponse

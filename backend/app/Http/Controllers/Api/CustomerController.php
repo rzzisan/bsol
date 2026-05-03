@@ -50,8 +50,8 @@ class CustomerController extends Controller
                         ->orWhereNotNull('district')
                         ->orWhereNotNull('thana');
                 })
-                ->selectRaw("NULLIF(TRIM(name), '') as name, NULLIF(TRIM(address), '') as address, NULLIF(TRIM(district), '') as district, NULLIF(TRIM(thana), '') as thana, COUNT(*) as freq, MAX(last_order_at) as last_seen")
-                ->groupBy(DB::raw("NULLIF(TRIM(name), '')"), DB::raw("NULLIF(TRIM(address), '')"), DB::raw("NULLIF(TRIM(district), '')"), DB::raw("NULLIF(TRIM(thana), '')"))
+                ->selectRaw("NULLIF(TRIM(name), '') as name, NULLIF(TRIM(address), '') as address, NULLIF(TRIM(district), '') as district, NULLIF(TRIM(thana), '') as thana, area, pathao_city_id, pathao_zone_id, pathao_area_id, COUNT(*) as freq, MAX(last_order_at) as last_seen")
+                ->groupBy(DB::raw("NULLIF(TRIM(name), '')"), DB::raw("NULLIF(TRIM(address), '')"), DB::raw("NULLIF(TRIM(district), '')"), DB::raw("NULLIF(TRIM(thana), '')"), 'area', 'pathao_city_id', 'pathao_zone_id', 'pathao_area_id')
                 ->orderByDesc('freq')
                 ->orderByDesc('last_seen')
                 ->first();
@@ -71,10 +71,14 @@ class CustomerController extends Controller
                 ->first();
 
             $profile = [
-                'name'     => $fromCustomers?->name ?? $fromOrders?->name,
-                'address'  => $fromCustomers?->address ?? $fromOrders?->address,
-                'district' => $fromCustomers?->district ?? $fromOrders?->district,
-                'thana'    => $fromCustomers?->thana ?? $fromOrders?->thana,
+                'name'            => $fromCustomers?->name ?? $fromOrders?->name,
+                'address'         => $fromCustomers?->address ?? $fromOrders?->address,
+                'district'        => $fromCustomers?->district ?? $fromOrders?->district,
+                'thana'           => $fromCustomers?->thana ?? $fromOrders?->thana,
+                'area'            => $fromCustomers?->area ?? null,
+                'pathao_city_id'  => $fromCustomers?->pathao_city_id ?? null,
+                'pathao_zone_id'  => $fromCustomers?->pathao_zone_id ?? null,
+                'pathao_area_id'  => $fromCustomers?->pathao_area_id ?? null,
             ];
 
             $found = collect($profile)->filter(fn ($v) => filled($v))->isNotEmpty();
@@ -181,9 +185,13 @@ class CustomerController extends Controller
             'name'       => 'nullable|string|max:150',
             'email'      => 'nullable|email|max:150',
             'address'    => 'nullable|string',
-            'district'   => 'nullable|string|max:100',
-            'thana'      => 'nullable|string|max:100',
-            'notes'      => 'nullable|string',
+            'district'        => 'nullable|string|max:100',
+            'thana'           => 'nullable|string|max:100',
+            'area'            => 'nullable|string|max:120',
+            'pathao_city_id'  => 'nullable|integer',
+            'pathao_zone_id'  => 'nullable|integer',
+            'pathao_area_id'  => 'nullable|integer',
+            'notes'           => 'nullable|string',
             'tags'       => 'nullable|array',
             'tags.*'     => 'string|max:50',
             'risk_level' => 'nullable|in:low,medium,high',

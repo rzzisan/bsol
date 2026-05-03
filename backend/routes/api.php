@@ -89,6 +89,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/booked', [CourierController::class, 'booked']);
         Route::post('/book/{order}', [CourierController::class, 'book']);
         Route::get('/track/{order}', [CourierController::class, 'trackOrder']);
+        // Pathao location dropdowns
+        Route::get('/locations/cities', [CourierController::class, 'cities']);
+        Route::get('/locations/zones/{cityId}', [CourierController::class, 'zones']);
+        Route::get('/locations/areas/{zoneId}', [CourierController::class, 'areas']);
     });
 
     // ── Fraud Check ───────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
+import { useLocationDropdowns } from "@/lib/use-location-dropdowns";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -32,6 +33,12 @@ const t = {
     phone: "ফোন",
     email: "ইমেইল",
     address: "ঠিকানা",
+    district: "জেলা",
+    thana: "থানা / উপজেলা",
+    area: "এলাকা",
+    selectCity: "-- জেলা সিলেক্ট করুন --",
+    selectZone: "-- উপজেলা সিলেক্ট করুন --",
+    selectArea: "-- এলাকা সিলেক্ট করুন --",
     notes: "নোট",
     totalOrders: "মোট অর্ডার",
     totalSpent: "মোট ক্রয়",
@@ -65,6 +72,12 @@ const t = {
     phone: "Phone",
     email: "Email",
     address: "Address",
+    district: "District",
+    thana: "Thana / Upazila",
+    area: "Area",
+    selectCity: "-- Select District --",
+    selectZone: "-- Select Upazila --",
+    selectArea: "-- Select Area --",
     notes: "Notes",
     totalOrders: "Total Orders",
     totalSpent: "Total Spent",
@@ -99,7 +112,8 @@ type Order = {
 };
 type Customer = {
   id: number; name: string | null; phone: string; email: string | null;
-  address: string | null; district: string | null; thana: string | null;
+  address: string | null; district: string | null; thana: string | null; area: string | null;
+  pathao_city_id: number | null; pathao_zone_id: number | null; pathao_area_id: number | null;
   notes: string | null; tags: string[]; risk_level: string; is_blocked: boolean;
   fraud_score: number; total_orders: number; total_spent: number;
   last_order_at: string | null; orders: Order[];
@@ -116,6 +130,7 @@ export default function CustomerDetailPage() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Partial<Customer>>({});
   const [saving, setSaving] = useState(false);
+  const loc = useLocationDropdowns();
 
   const fetchCustomer = useCallback(async () => {
     setLoading(true);
@@ -135,8 +150,11 @@ export default function CustomerDetailPage() {
   const openEdit = () => {
     if (!customer) return;
     setForm({ name: customer.name ?? "", email: customer.email ?? "", address: customer.address ?? "",
-      district: customer.district ?? "", thana: customer.thana ?? "", notes: customer.notes ?? "",
-      risk_level: customer.risk_level });
+      notes: customer.notes ?? "", risk_level: customer.risk_level });
+    // Preload location dropdowns from saved customer data
+    if (customer.pathao_city_id) {
+      void loc.preload(customer.pathao_city_id, customer.pathao_zone_id, customer.pathao_area_id, customer.area);
+    }
     setModal(true);
   };
 
@@ -145,7 +163,15 @@ export default function CustomerDetailPage() {
     await fetch(`${API}/customers/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        district: loc.cityName || form.district || null,
+        thana: loc.zoneName || form.thana || null,
+        area: loc.areaName || null,
+        pathao_city_id: loc.cityId || null,
+        pathao_zone_id: loc.zoneId || null,
+        pathao_area_id: loc.areaId || null,
+      }),
     });
     setSaving(false);
     setModal(false);
@@ -309,7 +335,7 @@ export default function CustomerDetailPage() {
           <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
             <h3 className="mb-4 text-base font-bold">{txt.editTitle}</h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              {(["name","email","address","district","thana","notes"] as const).map(field => (
+              {(["name","email","address","notes"] as const).map(field => (
                 <label key={field} className={field === "address" || field === "notes" ? "sm:col-span-2" : ""}>
                   <span className="mb-1 block text-xs capitalize text-[var(--muted)]">{txt[field as keyof typeof txt]}</span>
                   {field === "notes" || field === "address" ? (
@@ -323,6 +349,37 @@ export default function CustomerDetailPage() {
                   )}
                 </label>
               ))}
+              {/* City / Zone / Area dropdowns */}
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.district}</span>
+                <select value={loc.cityId}
+                  onChange={e => loc.setCity(e.target.value ? Number(e.target.value) : "")}
+                  disabled={loc.loadingCities || loc.cities.length === 0}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                  <option value="">{loc.loadingCities ? "লোড হচ্ছে..." : txt.selectCity}</option>
+                  {loc.cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.thana}</span>
+                <select value={loc.zoneId}
+                  onChange={e => loc.setZone(e.target.value ? Number(e.target.value) : "")}
+                  disabled={!loc.cityId || loc.loadingZones}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                  <option value="">{loc.loadingZones ? "লোড হচ্ছে..." : txt.selectZone}</option>
+                  {loc.zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.area}</span>
+                <select value={loc.areaId}
+                  onChange={e => loc.setArea(e.target.value ? Number(e.target.value) : "")}
+                  disabled={!loc.zoneId || loc.loadingAreas}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                  <option value="">{loc.loadingAreas ? "লোড হচ্ছে..." : txt.selectArea}</option>
+                  {loc.areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </label>
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.riskLevel}</span>
                 <select value={form.risk_level ?? "low"} onChange={e => setForm(f => ({ ...f, risk_level: e.target.value }))}

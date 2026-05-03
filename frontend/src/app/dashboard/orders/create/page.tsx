@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
+import { useLocationDropdowns } from "@/lib/use-location-dropdowns";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -23,6 +24,10 @@ const t = {
     customerAddress: "ঠিকানা",
     customerDistrict: "জেলা",
     customerThana: "থানা / উপজেলা",
+    customerArea: "এলাকা",
+    selectCity: "-- জেলা সিলেক্ট করুন --",
+    selectZone: "-- উপজেলা সিলেক্ট করুন --",
+    selectArea: "-- এলাকা সিলেক্ট করুন --",
     source: "উৎস",
     // step 2
     searchProduct: "পণ্য খুঁজুন...",
@@ -70,6 +75,10 @@ const t = {
     customerAddress: "Address",
     customerDistrict: "District",
     customerThana: "Thana / Upazila",
+    customerArea: "Area",
+    selectCity: "-- Select District --",
+    selectZone: "-- Select Upazila --",
+    selectArea: "-- Select Area --",
     source: "Source",
     searchProduct: "Search product...",
     addItem: "Add",
@@ -112,6 +121,10 @@ type SharedLookupResponse = {
     address: string | null;
     district: string | null;
     thana: string | null;
+    area: string | null;
+    pathao_city_id: number | null;
+    pathao_zone_id: number | null;
+    pathao_area_id: number | null;
   } | null;
   shared: {
     total_orders: number;
@@ -141,8 +154,7 @@ export default function CreateOrderPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
-  const [district, setDistrict] = useState("");
-  const [thana, setThana] = useState("");
+  const loc = useLocationDropdowns();
   const [source, setSource] = useState<"manual" | "facebook_inbox" | "landing_page">("manual");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupInfo, setLookupInfo] = useState<SharedLookupResponse | null>(null);
@@ -203,8 +215,15 @@ export default function CreateOrderPage() {
       if (info.found && info.profile) {
         setName(info.profile.name ?? "");
         setAddress(info.profile.address ?? "");
-        setDistrict(info.profile.district ?? "");
-        setThana(info.profile.thana ?? "");
+        // Preload city/zone/area dropdowns if pathao IDs available
+        if (info.profile.pathao_city_id) {
+          void loc.preload(
+            info.profile.pathao_city_id,
+            info.profile.pathao_zone_id,
+            info.profile.pathao_area_id,
+            info.profile.area,
+          );
+        }
       }
     } finally {
       setLookupLoading(false);
@@ -267,8 +286,12 @@ export default function CreateOrderPage() {
           customer_phone: phone,
           customer_name: name || null,
           customer_address: address || null,
-          customer_district: district || null,
-          customer_thana: thana || null,
+          customer_district: loc.cityName || null,
+          customer_thana: loc.zoneName || null,
+          customer_area: loc.areaName || null,
+          pathao_city_id: loc.cityId || null,
+          pathao_zone_id: loc.zoneId || null,
+          pathao_area_id: loc.areaId || null,
           source,
           payment_method: paymentMethod,
           payment_status: paymentStatus,
@@ -347,13 +370,36 @@ export default function CreateOrderPage() {
             </label>
             <label>
               <span className="mb-1 block text-xs text-[var(--muted)]">{txt.customerDistrict}</span>
-              <input value={district} onChange={e => setDistrict(e.target.value)}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              <select
+                value={loc.cityId}
+                onChange={e => loc.setCity(e.target.value ? Number(e.target.value) : "")}
+                disabled={loc.loadingCities || loc.cities.length === 0}
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                <option value="">{loc.loadingCities ? "লোড হচ্ছে..." : txt.selectCity}</option>
+                {loc.cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </label>
             <label>
               <span className="mb-1 block text-xs text-[var(--muted)]">{txt.customerThana}</span>
-              <input value={thana} onChange={e => setThana(e.target.value)}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              <select
+                value={loc.zoneId}
+                onChange={e => loc.setZone(e.target.value ? Number(e.target.value) : "")}
+                disabled={!loc.cityId || loc.loadingZones}
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                <option value="">{loc.loadingZones ? "লোড হচ্ছে..." : txt.selectZone}</option>
+                {loc.zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{txt.customerArea}</span>
+              <select
+                value={loc.areaId}
+                onChange={e => loc.setArea(e.target.value ? Number(e.target.value) : "")}
+                disabled={!loc.zoneId || loc.loadingAreas}
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                <option value="">{loc.loadingAreas ? "লোড হচ্ছে..." : txt.selectArea}</option>
+                {loc.areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
             </label>
             <label>
               <span className="mb-1 block text-xs text-[var(--muted)]">{txt.source}</span>

@@ -8,7 +8,8 @@ class Customer extends Model
 {
     protected $fillable = [
         'user_id', 'phone', 'name', 'email', 'address',
-        'district', 'thana', 'notes', 'tags',
+        'district', 'thana', 'area', 'notes', 'tags',
+        'pathao_city_id', 'pathao_zone_id', 'pathao_area_id',
         'risk_level', 'fraud_score', 'is_blocked',
         'total_orders', 'total_spent', 'last_order_at',
     ];
@@ -44,11 +45,15 @@ class Customer extends Model
         ]);
 
         if (! $customer->exists) {
-            $customer->name     = $order->customer_name;
-            $customer->address  = $order->customer_address;
-            $customer->district = $order->customer_district;
-            $customer->thana    = $order->customer_thana;
-            $customer->tags     = [];
+            $customer->name           = $order->customer_name;
+            $customer->address        = $order->customer_address;
+            $customer->district       = $order->customer_district;
+            $customer->thana          = $order->customer_thana;
+            $customer->area           = $order->customer_area;
+            $customer->pathao_city_id = $order->pathao_city_id;
+            $customer->pathao_zone_id = $order->pathao_zone_id;
+            $customer->pathao_area_id = $order->pathao_area_id;
+            $customer->tags           = [];
         } else {
             if (empty($customer->name) && $order->customer_name)
                 $customer->name = $order->customer_name;
