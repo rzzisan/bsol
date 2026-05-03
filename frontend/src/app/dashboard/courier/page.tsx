@@ -48,10 +48,12 @@ const t = {
     bulkBook: "বাল্ক বুক",
     bulkTitle: "বাল্ক পার্সেল বুকিং",
     selectedCount: "টি সিলেক্টেড",
-    bulkHint: "সিলেক্টেড অর্ডারগুলো Pathao-তে বুক হবে। প্রতিটি অর্ডারের নিজস্ব COD amount (order total) ব্যবহার হবে।",
+    bulkHint: "সিলেক্টেড অর্ডারগুলো নির্বাচিত কুরিয়ারে বুক হবে। প্রতিটি অর্ডারের নিজস্ব COD amount (order total) ব্যবহার হবে।",
     bulkConfirm: "একসাথে বুক করুন",
     bulkSuccess: (s: number, f: number) => `বাল্ক বুকিং শেষ। সফল: ${s}, ব্যর্থ: ${f}`,
     minTwoOrders: "বাল্ক বুকিং এর জন্য অন্তত ২টি অর্ডার নির্বাচন করুন।",
+    bulkCourier: "বাল্ক কুরিয়ার",
+    onlyPathaoNeedsStore: "শুধু Pathao bulk booking-এর জন্য store প্রয়োজন।",
     successMsg: (id: string) => `বুকড! Consignment: ${id}`,
     errorMsg: "বুকিং ব্যর্থ হয়েছে।",
     noStoreWarning: "Pathao Store পাওয়া যায়নি। Settings → Courier-এ credentials সেট করুন।",
@@ -100,10 +102,12 @@ const t = {
     bulkBook: "Bulk Book",
     bulkTitle: "Bulk Parcel Booking",
     selectedCount: "selected",
-    bulkHint: "Selected orders will be booked in Pathao. Each order will keep its own COD amount (order total).",
+    bulkHint: "Selected orders will be booked in the chosen courier. Each order will keep its own COD amount (order total).",
     bulkConfirm: "Book All",
     bulkSuccess: (s: number, f: number) => `Bulk booking completed. Success: ${s}, Failed: ${f}`,
     minTwoOrders: "Select at least 2 orders for bulk booking.",
+    bulkCourier: "Bulk Courier",
+    onlyPathaoNeedsStore: "Only Pathao bulk booking requires a pickup store.",
     successMsg: (id: string) => `Booked! Consignment: ${id}`,
     errorMsg: "Booking failed.",
     noStoreWarning: "No Pathao store found. Configure credentials in Settings → Courier.",
@@ -136,6 +140,7 @@ type BookForm = {
 };
 
 type BulkForm = {
+  courier: "pathao" | "steadfast";
   store_id: string;
   delivery_type: "48" | "12";
   item_type: "1" | "2";
@@ -175,7 +180,7 @@ export default function BookParcelPage() {
   const [priceResult, setPriceResult] = useState<{ fee: number; final: number } | null>(null);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
   const [bulkForm, setBulkForm] = useState<BulkForm>({
-    store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "", note: "",
+    courier: "pathao", store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "", note: "",
   });
 
   const fetchReady = useCallback(async () => {
@@ -255,6 +260,7 @@ export default function BookParcelPage() {
     }
     setBulkResult(null);
     setBulkForm({
+      courier: "pathao",
       store_id: pathaoStores.length > 0 ? String(pathaoStores[0].store_id) : "",
       delivery_type: "48",
       item_type: "2",
@@ -275,9 +281,9 @@ export default function BookParcelPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          courier: "pathao",
+          courier: bulkForm.courier,
           order_ids: Array.from(selectedIds),
-          store_id: bulkForm.store_id ? Number(bulkForm.store_id) : undefined,
+          store_id: bulkForm.courier === "pathao" && bulkForm.store_id ? Number(bulkForm.store_id) : undefined,
           delivery_type: Number(bulkForm.delivery_type),
           item_type: Number(bulkForm.item_type),
           item_weight: Number(bulkForm.item_weight),
@@ -604,6 +610,24 @@ export default function BookParcelPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="sm:col-span-2">
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.bulkCourier}</span>
+                <select value={bulkForm.courier} onChange={e => {
+                  const courier = e.target.value as BulkForm["courier"];
+                  setBulkForm(f => ({
+                    ...f,
+                    courier,
+                    store_id: courier === "pathao" ? (f.store_id || (pathaoStores[0] ? String(pathaoStores[0].store_id) : "")) : "",
+                  }));
+                  if (courier === "pathao") void fetchPathaoStores();
+                }}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                  <option value="pathao">{txt.pathao}</option>
+                  <option value="steadfast">{txt.steadfast}</option>
+                </select>
+              </label>
+
+              {bulkForm.courier === "pathao" && (
+              <label className="sm:col-span-2">
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.store}</span>
                 <select value={bulkForm.store_id} onChange={e => setBulkForm(f => ({ ...f, store_id: e.target.value }))}
                   disabled={loadingStores}
@@ -612,6 +636,11 @@ export default function BookParcelPage() {
                   {pathaoStores.map(s => <option key={s.store_id} value={s.store_id}>{s.store_name}</option>)}
                 </select>
               </label>
+              )}
+
+              {bulkForm.courier !== "pathao" && (
+                <p className="sm:col-span-2 text-xs text-[var(--muted)]">{txt.onlyPathaoNeedsStore}</p>
+              )}
 
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.deliveryType}</span>
@@ -659,7 +688,7 @@ export default function BookParcelPage() {
                 className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm hover:bg-[var(--surface-soft)]">
                 {txt.cancel}
               </button>
-              <button onClick={() => void handleBulkBook()} disabled={bulkBooking || !bulkForm.store_id}
+              <button onClick={() => void handleBulkBook()} disabled={bulkBooking || (bulkForm.courier === "pathao" && !bulkForm.store_id)}
                 className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {bulkBooking ? txt.confirming : txt.bulkConfirm}
               </button>

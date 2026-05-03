@@ -13,6 +13,17 @@ use Illuminate\Http\Request;
 
 class CourierController extends Controller
 {
+    private function getSteadfastSettings(): ?CourierSetting
+    {
+        $settings = CourierSetting::where('user_id', auth()->id())->first();
+
+        if (! $settings || ! $settings->steadfast_api_key) {
+            return null;
+        }
+
+        return $settings;
+    }
+
     // ── Pathao Location Dropdowns ─────────────────────────────────────────────
 
     public function cities(): JsonResponse
@@ -78,8 +89,8 @@ class CourierController extends Controller
 
     public function testConnection(Request $request): JsonResponse
     {
-        $settings = CourierSetting::where('user_id', auth()->id())->first();
-        if (! $settings || ! $settings->steadfast_api_key) {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
             return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
         }
 
@@ -92,6 +103,152 @@ class CourierController extends Controller
             'data'    => $result,
             'message' => $ok ? 'Connection successful.' : ($result['message'] ?? 'Connection failed.'),
         ]);
+    }
+
+    // ── Steadfast Utilities ───────────────────────────────────────────────────
+
+    public function steadfastBalance(): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        $service = new SteadfastService();
+        $result = $service->getBalance($settings->steadfast_api_key, $settings->steadfast_secret_key);
+
+        return response()->json([
+            'success' => isset($result['status']) ? (int) $result['status'] === 200 : ! empty($result),
+            'data'    => $result,
+        ]);
+    }
+
+    public function steadfastStatusByConsignment(string $id): JsonResponse
+    {
+        return $this->steadfastStatusLookup('consignment', $id);
+    }
+
+    public function steadfastStatusByInvoice(string $invoice): JsonResponse
+    {
+        return $this->steadfastStatusLookup('invoice', $invoice);
+    }
+
+    public function steadfastStatusByTracking(string $trackingCode): JsonResponse
+    {
+        return $this->steadfastStatusLookup('tracking', $trackingCode);
+    }
+
+    private function steadfastStatusLookup(string $type, string $value): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        $service = new SteadfastService();
+        $result = match ($type) {
+            'invoice'     => $service->getStatusByInvoice($settings->steadfast_api_key, $settings->steadfast_secret_key, $value),
+            'tracking'    => $service->getStatusByTrackingCode($settings->steadfast_api_key, $settings->steadfast_secret_key, $value),
+            default       => $service->getStatus($settings->steadfast_api_key, $settings->steadfast_secret_key, $value),
+        };
+
+        return response()->json([
+            'success' => isset($result['status']) ? (int) $result['status'] === 200 : ! empty($result),
+            'data'    => $result,
+        ], isset($result['status']) && (int) $result['status'] !== 200 ? 422 : 200);
+    }
+
+    public function steadfastReturnRequests(): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        $service = new SteadfastService();
+        $result = $service->getReturnRequests($settings->steadfast_api_key, $settings->steadfast_secret_key);
+
+        return response()->json(['success' => true, 'data' => $result]);
+    }
+
+    public function steadfastReturnRequest(int|string $id): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        $service = new SteadfastService();
+        $result = $service->getReturnRequest($settings->steadfast_api_key, $settings->steadfast_secret_key, $id);
+
+        return response()->json(['success' => true, 'data' => $result]);
+    }
+
+    public function createSteadfastReturnRequest(Request $request): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        $data = $request->validate([
+            'consignment_id' => 'nullable|string|max:100',
+            'invoice'        => 'nullable|string|max:100',
+            'tracking_code'  => 'nullable|string|max:100',
+            'reason'         => 'nullable|string|max:300',
+        ]);
+
+        if (empty($data['consignment_id']) && empty($data['invoice']) && empty($data['tracking_code'])) {
+            return response()->json(['success' => false, 'message' => 'Provide consignment ID, invoice, or tracking code.'], 422);
+        }
+
+        $service = new SteadfastService();
+        $result = $service->createReturnRequest($settings->steadfast_api_key, $settings->steadfast_secret_key, $data);
+
+        return response()->json([
+            'success' => ! empty($result),
+            'data'    => $result,
+            'message' => $result['message'] ?? 'Return request submitted.',
+        ], isset($result['status']) && (int) $result['status'] !== 200 ? 422 : 200);
+    }
+
+    public function steadfastPayments(): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        $service = new SteadfastService();
+        $result = $service->getPayments($settings->steadfast_api_key, $settings->steadfast_secret_key);
+
+        return response()->json(['success' => true, 'data' => $result]);
+    }
+
+    public function steadfastPayment(int|string $paymentId): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        $service = new SteadfastService();
+        $result = $service->getPayment($settings->steadfast_api_key, $settings->steadfast_secret_key, $paymentId);
+
+        return response()->json(['success' => true, 'data' => $result]);
+    }
+
+    public function steadfastPoliceStations(): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        $service = new SteadfastService();
+        $result = $service->getPoliceStations($settings->steadfast_api_key, $settings->steadfast_secret_key);
+
+        return response()->json(['success' => true, 'data' => $result]);
     }
 
     public function testPathaoConnection(): JsonResponse
@@ -202,7 +359,7 @@ class CourierController extends Controller
     public function bookBulk(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'courier'            => 'required|in:pathao',
+            'courier'            => 'required|in:pathao,steadfast',
             'order_ids'          => 'required|array|min:2|max:200',
             'order_ids.*'        => 'integer',
             'store_id'           => 'nullable|integer',
@@ -222,6 +379,10 @@ class CourierController extends Controller
 
         if ($orders->isEmpty()) {
             return response()->json(['success' => false, 'message' => 'No eligible orders found for bulk booking.'], 422);
+        }
+
+        if ($data['courier'] === 'steadfast') {
+            return $this->bookSteadfastBulk($orders->all(), $data);
         }
 
         $results = [];
@@ -257,6 +418,74 @@ class CourierController extends Controller
         ], $successCount > 0 ? 200 : 422);
     }
 
+    private function bookSteadfastBulk(array $orders, array $data): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        $service = new SteadfastService();
+        $items = array_map(function (Order $order) use ($data, $service) {
+            return $service->formatBulkItem([
+                'invoice'           => $order->order_number,
+                'recipient_name'    => $order->customer_name ?? $order->customer_phone,
+                'recipient_phone'   => $order->customer_phone,
+                'recipient_address' => $order->customer_address ?? trim(implode(', ', array_filter([$order->customer_district, $order->customer_thana, $order->customer_area]))),
+                'cod_amount'        => $order->total,
+                'note'              => $data['note'] ?? $order->notes ?? '',
+            ]);
+        }, $orders);
+
+        $result = $service->createBulkOrder($settings->steadfast_api_key, $settings->steadfast_secret_key, $items);
+
+        $successCount = 0;
+        $failedCount = 0;
+        $results = [];
+
+        $resultItems = $result['data'] ?? $result['result'] ?? $result;
+        $resultItems = is_array($resultItems) ? array_values(array_filter($resultItems, fn ($item) => is_array($item))) : [];
+
+        foreach ($orders as $index => $order) {
+            $item = $resultItems[$index] ?? [];
+            $consignmentId = $service->extractSteadfastConsignment($item);
+            $message = $item['message'] ?? $item['status'] ?? null;
+            $success = $consignmentId !== null || (isset($item['status']) && (string) $item['status'] === 'success');
+
+            if ($success && $consignmentId !== null) {
+                $order->update([
+                    'courier_name'        => 'steadfast',
+                    'courier_tracking_id' => $consignmentId,
+                    'courier_status'      => 'booked',
+                    'status'              => 'processing',
+                ]);
+                $successCount++;
+            } else {
+                $failedCount++;
+            }
+
+            $results[] = [
+                'order_id'       => $order->id,
+                'order_number'   => $order->order_number,
+                'success'        => $success,
+                'consignment_id' => $consignmentId,
+                'message'        => $message,
+            ];
+        }
+
+        return response()->json([
+            'success' => $successCount > 0,
+            'message' => "Bulk booking completed. Success: {$successCount}, Failed: {$failedCount}",
+            'data'    => [
+                'total'   => count($orders),
+                'success' => $successCount,
+                'failed'  => $failedCount,
+                'results' => $results,
+                'raw'     => $result,
+            ],
+        ], $successCount > 0 ? 200 : 422);
+    }
+
     private function bookSteadfast(Order $order, array $data): JsonResponse
     {
         $settings = CourierSetting::where('user_id', auth()->id())->first();
@@ -275,13 +504,13 @@ class CourierController extends Controller
         ]);
 
         // Steadfast returns consignment_id on success
-        if (isset($result['consignment']['consignment_id'])) {
-            $consignmentId = $result['consignment']['consignment_id'];
+        $consignmentId = $service->extractSteadfastConsignment($result);
+        if ($consignmentId) {
             $order->update([
                 'courier_name'        => 'steadfast',
                 'courier_tracking_id' => (string) $consignmentId,
                 'courier_status'      => 'booked',
-                'courier_charge'      => $result['consignment']['current_status'] ?? null,
+                'courier_charge'      => data_get($result, 'consignment.current_status') ?? null,
                 'status'              => 'processing',
             ]);
             return response()->json(['success' => true, 'data' => $order, 'consignment_id' => $consignmentId]);

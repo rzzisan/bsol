@@ -86,6 +86,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/settings', [CourierController::class, 'saveSettings']);
         Route::post('/settings/test', [CourierController::class, 'testConnection']);
         Route::post('/settings/test-pathao', [CourierController::class, 'testPathaoConnection']);
+        Route::get('/steadfast/balance', [CourierController::class, 'steadfastBalance']);
+        Route::get('/steadfast/status/consignment/{id}', [CourierController::class, 'steadfastStatusByConsignment']);
+        Route::get('/steadfast/status/invoice/{invoice}', [CourierController::class, 'steadfastStatusByInvoice']);
+        Route::get('/steadfast/status/tracking/{trackingCode}', [CourierController::class, 'steadfastStatusByTracking']);
+        Route::get('/steadfast/return-requests', [CourierController::class, 'steadfastReturnRequests']);
+        Route::get('/steadfast/return-requests/{id}', [CourierController::class, 'steadfastReturnRequest']);
+        Route::post('/steadfast/return-requests', [CourierController::class, 'createSteadfastReturnRequest']);
+        Route::get('/steadfast/payments', [CourierController::class, 'steadfastPayments']);
+        Route::get('/steadfast/payments/{paymentId}', [CourierController::class, 'steadfastPayment']);
+        Route::get('/steadfast/police-stations', [CourierController::class, 'steadfastPoliceStations']);
         Route::get('/ready', [CourierController::class, 'readyToBook']);
         Route::get('/booked', [CourierController::class, 'booked']);
         Route::post('/book/bulk', [CourierController::class, 'bookBulk']);
