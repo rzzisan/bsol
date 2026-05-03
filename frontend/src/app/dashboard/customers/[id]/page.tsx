@@ -149,7 +149,7 @@ export default function CustomerDetailPage() {
 
   const openEdit = () => {
     if (!customer) return;
-    setForm({ name: customer.name ?? "", email: customer.email ?? "", address: customer.address ?? "",
+    setForm({ name: customer.name ?? "", phone: customer.phone ?? "", email: customer.email ?? "", address: customer.address ?? "",
       notes: customer.notes ?? "", risk_level: customer.risk_level });
     // Preload location dropdowns from saved customer data
     if (customer.pathao_city_id) {
@@ -335,7 +335,7 @@ export default function CustomerDetailPage() {
           <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
             <h3 className="mb-4 text-base font-bold">{txt.editTitle}</h3>
             <div className="grid gap-3 sm:grid-cols-2">
-              {(["name","email","address","notes"] as const).map(field => (
+              {(["name","phone","email","address","notes"] as const).map(field => (
                 <label key={field} className={field === "address" || field === "notes" ? "sm:col-span-2" : ""}>
                   <span className="mb-1 block text-xs capitalize text-[var(--muted)]">{txt[field as keyof typeof txt]}</span>
                   {field === "notes" || field === "address" ? (
