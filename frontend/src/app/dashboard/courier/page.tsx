@@ -44,6 +44,14 @@ const t = {
     calcPrice: "ডেলিভারি চার্জ হিসাব",
     calculating: "হিসাব হচ্ছে...",
     deliveryFee: "ডেলিভারি ফি",
+    selectAll: "সব নির্বাচন",
+    bulkBook: "বাল্ক বুক",
+    bulkTitle: "বাল্ক পার্সেল বুকিং",
+    selectedCount: "টি সিলেক্টেড",
+    bulkHint: "সিলেক্টেড অর্ডারগুলো Pathao-তে বুক হবে। প্রতিটি অর্ডারের নিজস্ব COD amount (order total) ব্যবহার হবে।",
+    bulkConfirm: "একসাথে বুক করুন",
+    bulkSuccess: (s: number, f: number) => `বাল্ক বুকিং শেষ। সফল: ${s}, ব্যর্থ: ${f}`,
+    minTwoOrders: "বাল্ক বুকিং এর জন্য অন্তত ২টি অর্ডার নির্বাচন করুন।",
     successMsg: (id: string) => `বুকড! Consignment: ${id}`,
     errorMsg: "বুকিং ব্যর্থ হয়েছে।",
     noStoreWarning: "Pathao Store পাওয়া যায়নি। Settings → Courier-এ credentials সেট করুন।",
@@ -88,6 +96,14 @@ const t = {
     calcPrice: "Calculate Delivery Charge",
     calculating: "Calculating...",
     deliveryFee: "Delivery Fee",
+    selectAll: "Select all",
+    bulkBook: "Bulk Book",
+    bulkTitle: "Bulk Parcel Booking",
+    selectedCount: "selected",
+    bulkHint: "Selected orders will be booked in Pathao. Each order will keep its own COD amount (order total).",
+    bulkConfirm: "Book All",
+    bulkSuccess: (s: number, f: number) => `Bulk booking completed. Success: ${s}, Failed: ${f}`,
+    minTwoOrders: "Select at least 2 orders for bulk booking.",
     successMsg: (id: string) => `Booked! Consignment: ${id}`,
     errorMsg: "Booking failed.",
     noStoreWarning: "No Pathao store found. Configure credentials in Settings → Courier.",
@@ -119,6 +135,15 @@ type BookForm = {
   item_description: string;
 };
 
+type BulkForm = {
+  store_id: string;
+  delivery_type: "48" | "12";
+  item_type: "1" | "2";
+  item_weight: string;
+  item_description: string;
+  note: string;
+};
+
 export default function BookParcelPage() {
   const [locale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
@@ -139,12 +164,19 @@ export default function BookParcelPage() {
   const [booking, setBooking] = useState(false);
   const [bookResult, setBookResult] = useState<{ success: boolean; msg: string } | null>(null);
   const [bookedIds, setBookedIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkModal, setBulkModal] = useState(false);
+  const [bulkBooking, setBulkBooking] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ success: boolean; msg: string } | null>(null);
 
   const [pathaoStores, setPathaoStores] = useState<PathaoStore[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
   const [storesFetched, setStoresFetched] = useState(false);
   const [priceResult, setPriceResult] = useState<{ fee: number; final: number } | null>(null);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
+  const [bulkForm, setBulkForm] = useState<BulkForm>({
+    store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "", note: "",
+  });
 
   const fetchReady = useCallback(async () => {
     setLoading(true);
@@ -157,6 +189,8 @@ export default function BookParcelPage() {
         setOrders(d.data ?? []);
         setTotal(d.meta?.total ?? 0);
         setLastPage(d.meta?.last_page ?? 1);
+        const visibleIds = new Set<number>((d.data ?? []).map((o: Order) => o.id));
+        setSelectedIds(prev => new Set([...prev].filter(id => visibleIds.has(id))));
       }
     } finally {
       setLoading(false);
@@ -195,6 +229,79 @@ export default function BookParcelPage() {
     setBookResult(null);
     setPriceResult(null);
     void fetchPathaoStores();
+  };
+
+  const toggleSelect = (orderId: number, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(orderId); else next.delete(orderId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = (checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      const visible = orders.filter(o => !bookedIds.has(o.id)).map(o => o.id);
+      visible.forEach(id => checked ? next.add(id) : next.delete(id));
+      return next;
+    });
+  };
+
+  const openBulkModal = () => {
+    if (selectedIds.size < 2) {
+      setBulkResult({ success: false, msg: txt.minTwoOrders });
+      return;
+    }
+    setBulkResult(null);
+    setBulkForm({
+      store_id: pathaoStores.length > 0 ? String(pathaoStores[0].store_id) : "",
+      delivery_type: "48",
+      item_type: "2",
+      item_weight: "0.5",
+      item_description: "",
+      note: "",
+    });
+    setBulkModal(true);
+    void fetchPathaoStores();
+  };
+
+  const handleBulkBook = async () => {
+    if (selectedIds.size < 2) return;
+    setBulkBooking(true);
+    setBulkResult(null);
+    try {
+      const res = await fetch(`${API}/courier/book/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          courier: "pathao",
+          order_ids: Array.from(selectedIds),
+          store_id: bulkForm.store_id ? Number(bulkForm.store_id) : undefined,
+          delivery_type: Number(bulkForm.delivery_type),
+          item_type: Number(bulkForm.item_type),
+          item_weight: Number(bulkForm.item_weight),
+          item_description: bulkForm.item_description || undefined,
+          note: bulkForm.note || undefined,
+        }),
+      });
+      const d = await res.json();
+      if (res.ok && d.data) {
+        const successIds = (d.data.results ?? []).filter((r: { success: boolean; order_id: number }) => r.success).map((r: { success: boolean; order_id: number }) => r.order_id);
+        setBookedIds(prev => new Set([...prev, ...successIds]));
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          successIds.forEach((id: number) => next.delete(id));
+          return next;
+        });
+        setBulkResult({ success: true, msg: txt.bulkSuccess(d.data.success ?? 0, d.data.failed ?? 0) });
+        setTimeout(() => { setBulkModal(false); void fetchReady(); }, 1800);
+      } else {
+        setBulkResult({ success: false, msg: d.message ?? txt.errorMsg });
+      }
+    } finally {
+      setBulkBooking(false);
+    }
   };
 
   const calculatePathaoPrice = async () => {
@@ -277,6 +384,11 @@ export default function BookParcelPage() {
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
           placeholder={txt.search}
           className="flex-1 min-w-[180px] rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+        <button onClick={() => openBulkModal()}
+          disabled={selectedIds.size < 2}
+          className="rounded-xl border border-[var(--accent)] px-3 py-2 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/10 disabled:opacity-40 disabled:cursor-not-allowed">
+          {txt.bulkBook} ({selectedIds.size})
+        </button>
         <p className="text-xs text-[var(--muted)]">{total} {txt.ordersReady}</p>
       </div>
 
@@ -284,6 +396,15 @@ export default function BookParcelPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--muted)] uppercase">
+              <th className="px-4 py-3 w-10">
+                <input
+                  type="checkbox"
+                  aria-label={txt.selectAll}
+                  checked={orders.length > 0 && orders.filter(o => !bookedIds.has(o.id)).every(o => selectedIds.has(o.id))}
+                  onChange={e => toggleSelectAllVisible(e.target.checked)}
+                  className="h-4 w-4"
+                />
+              </th>
               <th className="px-4 py-3">{txt.orderNo}</th>
               <th className="px-4 py-3">{txt.customer}</th>
               <th className="px-4 py-3 hidden md:table-cell">{txt.address}</th>
@@ -293,11 +414,21 @@ export default function BookParcelPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-[var(--muted)] text-xs">{txt.noOrders}</td></tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--muted)] text-xs">{txt.noOrders}</td></tr>
             ) : orders.map(o => (
               <tr key={o.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-soft)]">
+                <td className="px-4 py-3">
+                  {!bookedIds.has(o.id) && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(o.id)}
+                      onChange={e => toggleSelect(o.id, e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                  )}
+                </td>
                 <td className="px-4 py-3 font-mono text-xs text-[var(--accent)]">{o.order_number}</td>
                 <td className="px-4 py-3">
                   <p className="font-medium">{o.customer_name ?? "—"}</p>
@@ -451,6 +582,86 @@ export default function BookParcelPage() {
               <button onClick={() => void handleBook()} disabled={booking}
                 className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {booking ? txt.confirming : txt.confirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={e => e.target === e.currentTarget && setBulkModal(false)}>
+          <div className="w-full max-w-xl rounded-2xl bg-[var(--surface)] p-6 shadow-xl overflow-y-auto max-h-[90vh]">
+            <h3 className="mb-1 text-base font-bold">{txt.bulkTitle}</h3>
+            <p className="mb-3 text-xs text-[var(--muted)]">{selectedIds.size} {txt.selectedCount}</p>
+            <p className="mb-4 text-xs text-[var(--muted)]">{txt.bulkHint}</p>
+
+            {bulkResult && (
+              <div className={`mb-4 rounded-xl px-3 py-2 text-sm ${bulkResult.success ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+                {bulkResult.msg}
+              </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.store}</span>
+                <select value={bulkForm.store_id} onChange={e => setBulkForm(f => ({ ...f, store_id: e.target.value }))}
+                  disabled={loadingStores}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                  <option value="">{loadingStores ? txt.loadingStores : txt.selectStore}</option>
+                  {pathaoStores.map(s => <option key={s.store_id} value={s.store_id}>{s.store_name}</option>)}
+                </select>
+              </label>
+
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.deliveryType}</span>
+                <select value={bulkForm.delivery_type} onChange={e => setBulkForm(f => ({ ...f, delivery_type: e.target.value as "48"|"12" }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                  <option value="48">{txt.normalDelivery}</option>
+                  <option value="12">{txt.onDemandDelivery}</option>
+                </select>
+              </label>
+
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.itemType}</span>
+                <select value={bulkForm.item_type} onChange={e => setBulkForm(f => ({ ...f, item_type: e.target.value as "1"|"2" }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                  <option value="2">{txt.parcel}</option>
+                  <option value="1">{txt.document}</option>
+                </select>
+              </label>
+
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.itemWeight}</span>
+                <input type="number" min="0.5" max="10" step="0.5"
+                  value={bulkForm.item_weight}
+                  onChange={e => setBulkForm(f => ({ ...f, item_weight: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+              </label>
+
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.itemDescription}</span>
+                <input value={bulkForm.item_description}
+                  onChange={e => setBulkForm(f => ({ ...f, item_description: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+              </label>
+
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.note}</span>
+                <input value={bulkForm.note}
+                  onChange={e => setBulkForm(f => ({ ...f, note: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+              </label>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button onClick={() => setBulkModal(false)}
+                className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm hover:bg-[var(--surface-soft)]">
+                {txt.cancel}
+              </button>
+              <button onClick={() => void handleBulkBook()} disabled={bulkBooking || !bulkForm.store_id}
+                className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                {bulkBooking ? txt.confirming : txt.bulkConfirm}
               </button>
             </div>
           </div>

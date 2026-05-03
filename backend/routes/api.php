@@ -88,6 +88,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/settings/test-pathao', [CourierController::class, 'testPathaoConnection']);
         Route::get('/ready', [CourierController::class, 'readyToBook']);
         Route::get('/booked', [CourierController::class, 'booked']);
+        Route::post('/book/bulk', [CourierController::class, 'bookBulk']);
         Route::post('/book/{order}', [CourierController::class, 'book']);
         Route::get('/track/{order}', [CourierController::class, 'trackOrder']);
         // Pathao location dropdowns

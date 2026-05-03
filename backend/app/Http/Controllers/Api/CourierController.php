@@ -199,6 +199,64 @@ class CourierController extends Controller
         return response()->json(['success' => false, 'message' => 'Courier not supported yet.'], 422);
     }
 
+    public function bookBulk(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'courier'            => 'required|in:pathao',
+            'order_ids'          => 'required|array|min:2|max:200',
+            'order_ids.*'        => 'integer',
+            'store_id'           => 'nullable|integer',
+            'delivery_type'      => 'nullable|integer|in:48,12',
+            'item_type'          => 'nullable|integer|in:1,2',
+            'item_weight'        => 'nullable|numeric|min:0.5|max:10',
+            'item_description'   => 'nullable|string|max:250',
+            'special_instruction'=> 'nullable|string|max:300',
+            'note'               => 'nullable|string|max:300',
+        ]);
+
+        $orders = Order::where('user_id', auth()->id())
+            ->whereIn('id', $data['order_ids'])
+            ->whereIn('status', ['confirmed', 'processing'])
+            ->whereNull('courier_tracking_id')
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No eligible orders found for bulk booking.'], 422);
+        }
+
+        $results = [];
+        $successCount = 0;
+        $failedCount  = 0;
+
+        foreach ($orders as $order) {
+            $result = $this->bookPathaoAndPersist($order, $data);
+            $results[] = [
+                'order_id'       => $order->id,
+                'order_number'   => $order->order_number,
+                'success'        => $result['success'],
+                'consignment_id' => $result['consignment_id'] ?? null,
+                'message'        => $result['message'] ?? null,
+            ];
+
+            if ($result['success']) {
+                $successCount++;
+            } else {
+                $failedCount++;
+            }
+        }
+
+        return response()->json([
+            'success' => $successCount > 0,
+            'message' => "Bulk booking completed. Success: {$successCount}, Failed: {$failedCount}",
+            'data'    => [
+                'total'    => $orders->count(),
+                'success'  => $successCount,
+                'failed'   => $failedCount,
+                'results'  => $results,
+            ],
+        ], $successCount > 0 ? 200 : 422);
+    }
+
     private function bookSteadfast(Order $order, array $data): JsonResponse
     {
         $settings = CourierSetting::where('user_id', auth()->id())->first();
@@ -238,22 +296,71 @@ class CourierController extends Controller
 
     private function bookPathao(Order $order, array $data): JsonResponse
     {
+        $result = $this->bookPathaoAndPersist($order, $data);
+
+        if ($result['success']) {
+            return response()->json([
+                'success'        => true,
+                'data'           => $order->fresh(),
+                'consignment_id' => $result['consignment_id'],
+                'delivery_fee'   => $result['delivery_fee'] ?? null,
+                'message'        => $result['message'] ?? 'Pathao order booked.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $result['message'] ?? 'Pathao booking failed.',
+            'errors'  => $result['errors'] ?? null,
+            'raw'     => $result['raw'] ?? null,
+        ], 422);
+    }
+
+    private function bookPathaoAndPersist(Order $order, array $data): array
+    {
         $svc      = new PathaoService();
+        $payload  = $this->buildPathaoPayload($order, $data);
+
+        if (! $payload['success']) {
+            return $payload;
+        }
+
+        $result = $svc->createOrder(auth()->id(), $payload['payload']);
+
+        if ($result['success']) {
+            $order->update([
+                'courier_name'        => 'pathao',
+                'courier_tracking_id' => $result['consignment_id'],
+                'courier_status'      => strtolower($result['order_status'] ?? 'booked'),
+                'courier_charge'      => $result['delivery_fee'] ?? null,
+                'status'              => 'processing',
+            ]);
+            return $result;
+        }
+
+        return [
+            'success' => false,
+            'message' => $result['message'] ?? 'Pathao booking failed.',
+            'errors'  => $result['errors'] ?? null,
+            'raw'     => $result['raw'] ?? null,
+        ];
+    }
+
+    private function buildPathaoPayload(Order $order, array $data): array
+    {
         $settings = CourierSetting::where('user_id', auth()->id())->first();
 
         $storeId = $data['store_id'] ?? ($settings->pathao_store_id ?? null);
         if (! $storeId) {
-            return response()->json(['success' => false, 'message' => 'Pathao store_id is required. Configure it in Settings → Courier.'], 422);
+            return ['success' => false, 'message' => 'Pathao store_id is required. Configure it in Settings → Courier.'];
         }
 
-        // Build address from available fields
         $address = $order->customer_address ?? '';
         if ($order->customer_district) $address .= ', ' . $order->customer_district;
         if ($order->customer_thana)    $address .= ', ' . $order->customer_thana;
         if ($order->customer_area)     $address .= ', ' . $order->customer_area;
         $address = trim($address, ', ');
 
-        // Pathao requires address 10–220 characters
         if (strlen($address) < 10) {
             $address = ($address ?: ($order->customer_district ?? 'Bangladesh')) . ', Bangladesh';
         }
@@ -271,40 +378,15 @@ class CourierController extends Controller
             'amount_to_collect'    => (int) ($data['cod_amount'] ?? $order->total),
         ];
 
-        // Optional location IDs (from order's Pathao fields)
         if ($order->pathao_city_id) $payload['recipient_city'] = $order->pathao_city_id;
         if ($order->pathao_zone_id) $payload['recipient_zone'] = $order->pathao_zone_id;
         if ($order->pathao_area_id) $payload['recipient_area'] = $order->pathao_area_id;
 
         if (! empty($data['special_instruction'])) $payload['special_instruction'] = $data['special_instruction'];
-        if (! empty($data['item_description']))     $payload['item_description']    = $data['item_description'];
-        if (! empty($data['note']))                 $payload['special_instruction'] = $data['note'];
+        if (! empty($data['item_description']))    $payload['item_description']    = $data['item_description'];
+        if (! empty($data['note']))                $payload['special_instruction'] = $data['note'];
 
-        $result = $svc->createOrder(auth()->id(), $payload);
-
-        if ($result['success']) {
-            $order->update([
-                'courier_name'        => 'pathao',
-                'courier_tracking_id' => $result['consignment_id'],
-                'courier_status'      => strtolower($result['order_status'] ?? 'booked'),
-                'courier_charge'      => $result['delivery_fee'] ?? null,
-                'status'              => 'processing',
-            ]);
-            return response()->json([
-                'success'        => true,
-                'data'           => $order->fresh(),
-                'consignment_id' => $result['consignment_id'],
-                'delivery_fee'   => $result['delivery_fee'] ?? null,
-                'message'        => $result['message'] ?? 'Pathao order booked.',
-            ]);
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => $result['message'] ?? 'Pathao booking failed.',
-            'errors'  => $result['errors'] ?? null,
-            'raw'     => $result['raw'] ?? null,
-        ], 422);
+        return ['success' => true, 'payload' => $payload];
     }
 
     // ── Track ─────────────────────────────────────────────────────────────────
