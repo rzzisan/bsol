@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderStatusLog;
+use App\Support\PhoneIntelCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -182,6 +183,7 @@ class OrderController extends Controller
 
             // Upsert customer aggregate
             \App\Models\Customer::syncFromOrder($order);
+            PhoneIntelCache::bump($order->customer_phone);
 
             return response()->json(['success' => true, 'data' => $order], 201);
         });
@@ -203,6 +205,7 @@ class OrderController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $order = Order::where('user_id', auth()->id())->findOrFail($id);
+        $oldPhone = $order->customer_phone;
 
         $data = $request->validate([
             'customer_name'       => 'nullable|string|max:150',
@@ -230,6 +233,9 @@ class OrderController extends Controller
 
         $order->update($data);
 
+        PhoneIntelCache::bump($oldPhone);
+        PhoneIntelCache::bump($order->customer_phone);
+
         return response()->json(['success' => true, 'data' => $order]);
     }
 
@@ -246,6 +252,7 @@ class OrderController extends Controller
 
         $oldStatus = $order->status;
         $order->update(['status' => $data['status']]);
+        PhoneIntelCache::bump($order->customer_phone);
 
         OrderStatusLog::create([
             'order_id'   => $order->id,
@@ -276,6 +283,7 @@ class OrderController extends Controller
         foreach ($orders as $order) {
             $old = $order->status;
             $order->update(['status' => $data['status']]);
+            PhoneIntelCache::bump($order->customer_phone);
             OrderStatusLog::create([
                 'order_id'   => $order->id,
                 'old_status' => $old,
@@ -296,7 +304,9 @@ class OrderController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $order = Order::where('user_id', auth()->id())->findOrFail($id);
+        $phone = $order->customer_phone;
         $order->delete();
+        PhoneIntelCache::bump($phone);
 
         return response()->json(['success' => true, 'message' => 'Order deleted.']);
     }

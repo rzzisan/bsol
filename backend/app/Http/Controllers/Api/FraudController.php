@@ -4,22 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Support\PhoneIntelCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class FraudController extends Controller
 {
-    private function normalizePhone(string $phone): string
-    {
-        $digits = preg_replace('/\D/', '', $phone) ?? '';
-
-        if (str_starts_with($digits, '880') && strlen($digits) >= 13) {
-            $digits = '0' . substr($digits, -10);
-        }
-
-        return substr($digits, -11);
-    }
 
     // ── Compute fraud score for a phone number ────────────────────────────────
 
@@ -108,6 +99,8 @@ class FraudController extends Controller
             'updated_at' => now(),
         ]);
 
+        PhoneIntelCache::bump($data['phone']);
+
         return response()->json([
             'success' => true,
             'data'    => DB::table('customer_blacklist')->find($id),
@@ -116,14 +109,21 @@ class FraudController extends Controller
 
     public function removeBlacklist(int $id): JsonResponse
     {
-        $deleted = DB::table('customer_blacklist')
+        $row = DB::table('customer_blacklist')
+            ->where('user_id', auth()->id())
+            ->where('id', $id)
+            ->first();
+
+        if (! $row) {
+            return response()->json(['success' => false, 'message' => 'Not found.'], 404);
+        }
+
+        DB::table('customer_blacklist')
             ->where('user_id', auth()->id())
             ->where('id', $id)
             ->delete();
 
-        if (! $deleted) {
-            return response()->json(['success' => false, 'message' => 'Not found.'], 404);
-        }
+        PhoneIntelCache::bump($row->phone);
 
         return response()->json(['success' => true, 'message' => 'Removed from blacklist.']);
     }
@@ -132,17 +132,36 @@ class FraudController extends Controller
 
     public function computeScore(int $userId, string $phone): array
     {
-        $phone   = $this->normalizePhone($phone);
-        $match10 = substr($phone, -10);
+        $phone   = PhoneIntelCache::normalizePhone($phone);
+        $match10 = PhoneIntelCache::phone10($phone);
 
-        // Shared signal pool from all users (privacy-safe aggregation)
-        $sharedOrders = Order::query()
-            ->whereRaw("right(regexp_replace(customer_phone, '\\D', '', 'g'), 10) = ?", [$match10])
-            ->get(['id', 'user_id', 'status', 'risk_level', 'fraud_score', 'created_at', 'order_number', 'total']);
+        $sharedStats = PhoneIntelCache::remember('fraud-shared-stats', $match10, 180, function () use ($match10) {
+            return Order::query()
+                ->whereRaw("right(regexp_replace(customer_phone, '\\D', '', 'g'), 10) = ?", [$match10])
+                ->selectRaw("COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'delivered') as delivered,
+                    COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+                    COUNT(*) FILTER (WHERE status = 'returned') as returned,
+                    COUNT(DISTINCT user_id) as seller_count")
+                ->first();
+        });
+
+        $globalBlacklistCount = (int) PhoneIntelCache::remember('fraud-global-blacklist', $match10, 180, function () use ($match10) {
+            return DB::table('customer_blacklist')
+                ->whereRaw("right(regexp_replace(phone, '\\D', '', 'g'), 10) = ?", [$match10])
+                ->distinct('user_id')
+                ->count('user_id');
+        });
+
+        $userOrders = PhoneIntelCache::remember('fraud-user-orders', $match10, 120, function () use ($match10, $userId) {
+            return Order::query()
+                ->where('user_id', $userId)
+                ->whereRaw("right(regexp_replace(customer_phone, '\\D', '', 'g'), 10) = ?", [$match10])
+                ->get(['id', 'status', 'risk_level', 'fraud_score', 'created_at', 'order_number', 'total']);
+        }, $userId);
 
         // Only this user's order details are returned in list view
-        $orders = $sharedOrders
-            ->where('user_id', $userId)
+        $orders = collect($userOrders)
             ->values()
             ->map(fn ($o) => [
                 'id'           => $o->id,
@@ -154,11 +173,11 @@ class FraudController extends Controller
                 'total'        => $o->total,
             ]);
 
-        $total     = $sharedOrders->count();
-        $delivered = $sharedOrders->where('status', 'delivered')->count();
-        $cancelled = $sharedOrders->where('status', 'cancelled')->count();
-        $returned  = $sharedOrders->where('status', 'returned')->count();
-        $sellerCount = $sharedOrders->pluck('user_id')->unique()->count();
+        $total       = (int) ($sharedStats->total ?? 0);
+        $delivered   = (int) ($sharedStats->delivered ?? 0);
+        $cancelled   = (int) ($sharedStats->cancelled ?? 0);
+        $returned    = (int) ($sharedStats->returned ?? 0);
+        $sellerCount = (int) ($sharedStats->seller_count ?? 0);
 
         $myTotal     = $orders->count();
         $myDelivered = $orders->where('status', 'delivered')->count();
@@ -213,11 +232,6 @@ class FraudController extends Controller
             ->exists();
 
         // Shared blacklist signal across all users
-        $globalBlacklistCount = DB::table('customer_blacklist')
-            ->whereRaw("right(regexp_replace(phone, '\\D', '', 'g'), 10) = ?", [$match10])
-            ->distinct('user_id')
-            ->count('user_id');
-
         if ($globalBlacklistCount > 0) {
             $score += 40;
         }
