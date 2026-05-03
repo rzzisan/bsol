@@ -60,7 +60,8 @@ type StatusLog = {
 type Order = {
   id: number; order_number: string; status: OrderStatus;
   customer_name: string | null; customer_phone: string;
-  customer_address: string | null; customer_district: string | null; customer_thana: string | null;
+  customer_address: string | null; customer_district: string | null; customer_thana: string | null; customer_area: string | null;
+  pathao_city_id: number | null; pathao_zone_id: number | null; pathao_area_id: number | null;
   source: string | null; source_ref: string | null;
   payment_method: string | null; payment_status: string;
   subtotal: string; shipping_charge: string; discount: string; total: string;
@@ -101,6 +102,7 @@ const t = {
     address: "ঠিকানা",
     district: "জেলা",
     thana: "থানা",
+    area: "এলাকা",
     product: "পণ্য",
     qty: "পরিমাণ",
     unitPrice: "একক মূল্য",
@@ -160,6 +162,7 @@ const t = {
     address: "Address",
     district: "District",
     thana: "Thana",
+    area: "Area",
     product: "Product",
     qty: "Qty",
     unitPrice: "Unit Price",
@@ -216,7 +219,7 @@ export default function OrderDetailPage() {
   // edit form
   const [editForm, setEditForm] = useState({
     customer_name: "", customer_phone: "", customer_address: "",
-    customer_district: "", customer_thana: "",
+    customer_district: "", customer_thana: "", customer_area: "",
     payment_method: "", payment_status: "",
     shipping_charge: "", discount: "", notes: "",
   });
@@ -259,6 +262,7 @@ export default function OrderDetailPage() {
       customer_address: order.customer_address ?? "",
       customer_district: order.customer_district ?? "",
       customer_thana: order.customer_thana ?? "",
+      customer_area: order.customer_area ?? "",
       payment_method: order.payment_method ?? "",
       payment_status: order.payment_status,
       shipping_charge: order.shipping_charge,
@@ -463,6 +467,13 @@ export default function OrderDetailPage() {
 
             <dt className="text-[var(--muted)]">{txt.thana}</dt>
             <dd>{order.customer_thana ?? "—"}</dd>
+
+            {order.customer_area && (
+              <>
+                <dt className="text-[var(--muted)]">{txt.area}</dt>
+                <dd>{order.customer_area}</dd>
+              </>
+            )}
           </dl>
         </div>
 
@@ -613,6 +624,7 @@ export default function OrderDetailPage() {
                 ["customer_address", txt.address],
                 ["customer_district",txt.district],
                 ["customer_thana",   txt.thana],
+                ["customer_area",    txt.area],
               ] as [keyof typeof editForm, string][]).map(([field, label]) => (
                 <label key={field} className={field === "customer_address" ? "col-span-2" : ""}>
                   <span className="mb-1 block text-xs text-[var(--muted)]">{label}</span>
