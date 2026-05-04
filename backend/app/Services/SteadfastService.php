@@ -15,24 +15,71 @@ class SteadfastService
             'Api-Key'    => $apiKey,
             'Secret-Key' => $secretKey,
             'Content-Type' => 'application/json',
-        ])->timeout(20);
+        ])->acceptJson()->timeout(25);
     }
 
     private function jsonResponse($response, array $fallback = []): array
     {
-        return $response->json() ?? ($fallback ?: ['status' => 0, 'message' => 'Invalid response']);
+        $json = $response->json();
+        if (is_array($json)) {
+            return $json;
+        }
+
+        $body = trim((string) $response->body());
+        if ($body !== '') {
+            $decoded = json_decode($body, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        if (! empty($fallback)) {
+            return $fallback;
+        }
+
+        if ($response->successful()) {
+            return [
+                'status' => $response->status(),
+                'message' => 'Request succeeded but response was not valid JSON.',
+                'raw' => $body !== '' ? substr(strip_tags($body), 0, 500) : null,
+            ];
+        }
+
+        return [
+            'status' => $response->status(),
+            'message' => $body !== '' ? substr(strip_tags($body), 0, 500) : 'Request failed',
+            'raw' => $body !== '' ? substr(strip_tags($body), 0, 1000) : null,
+        ];
     }
 
     public function createOrder(string $apiKey, string $secretKey, array $data): array
     {
-        $response = $this->client($apiKey, $secretKey)->post(self::BASE . '/create_order', [
-            'invoice'           => $data['invoice'],
-            'recipient_name'    => $data['recipient_name'],
-            'recipient_phone'   => $this->formatPhone($data['recipient_phone']),
-            'recipient_address' => $data['recipient_address'],
+        $payload = [
+            'invoice'           => (string) $data['invoice'],
+            'recipient_name'    => Str::limit((string) $data['recipient_name'], 100, ''),
+            'recipient_phone'   => $this->formatPhone((string) $data['recipient_phone']),
+            'recipient_address' => Str::limit((string) $data['recipient_address'], 250, ''),
             'cod_amount'        => (float) $data['cod_amount'],
-            'note'              => $data['note'] ?? '',
-        ]);
+            'note'              => (string) ($data['note'] ?? ''),
+        ];
+
+        if (! empty($data['alternative_phone'])) {
+            $payload['alternative_phone'] = $this->formatPhone((string) $data['alternative_phone']);
+        }
+        if (! empty($data['recipient_email'])) {
+            $payload['recipient_email'] = (string) $data['recipient_email'];
+        }
+        if (! empty($data['item_description'])) {
+            $payload['item_description'] = (string) $data['item_description'];
+        }
+        if (isset($data['total_lot']) && $data['total_lot'] !== '') {
+            $payload['total_lot'] = (float) $data['total_lot'];
+        }
+        if (isset($data['delivery_type']) && $data['delivery_type'] !== '') {
+            $payload['delivery_type'] = (int) $data['delivery_type'];
+        }
+
+        $response = $this->client($apiKey, $secretKey)->post(self::BASE . '/create_order', $payload);
 
         return $this->jsonResponse($response);
     }
@@ -150,23 +197,43 @@ class SteadfastService
 
     public function formatBulkItem(array $data): array
     {
-        return [
-            'invoice'           => $data['invoice'],
+        $item = [
+            'invoice'           => (string) $data['invoice'],
             'recipient_name'    => Str::limit((string) $data['recipient_name'], 100, ''),
             'recipient_phone'   => $this->formatPhone((string) $data['recipient_phone']),
-            'recipient_address' => $data['recipient_address'],
+            'recipient_address' => Str::limit((string) $data['recipient_address'], 250, ''),
             'cod_amount'        => (float) $data['cod_amount'],
-            'note'              => $data['note'] ?? '',
+            'note'              => (string) ($data['note'] ?? ''),
         ];
 
+        if (! empty($data['item_description'])) {
+            $item['item_description'] = (string) $data['item_description'];
+        }
+        if (isset($data['delivery_type']) && $data['delivery_type'] !== '') {
+            $item['delivery_type'] = (int) $data['delivery_type'];
+        }
+
+        return $item;
     }
 
     private function formatPhone(string $phone): string
     {
         $phone = preg_replace('/[^0-9]/', '', $phone);
+
+        // 8801XXXXXXXXX => 01XXXXXXXXX
+        if (str_starts_with($phone, '880') && strlen($phone) >= 13) {
+            $phone = '0' . substr($phone, 3);
+        }
+
+        // 1XXXXXXXXX => 01XXXXXXXXX
+        if (strlen($phone) === 10 && str_starts_with($phone, '1')) {
+            $phone = '0' . $phone;
+        }
+
         if (strlen($phone) > 11) {
             $phone = substr($phone, -11);
         }
+
         return $phone;
     }
 }

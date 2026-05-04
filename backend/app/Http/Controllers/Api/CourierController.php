@@ -323,12 +323,16 @@ class CourierController extends Controller
             'cod_amount'    => 'nullable|numeric|min:0',
             'note'          => 'nullable|string|max:300',
             'tracking_id'   => 'nullable|string|max:100', // for manual entry
+            // Steadfast optional fields
+            'delivery_type'       => 'nullable|integer|in:0,1,12,48',
+            'item_description'    => 'nullable|string|max:250',
+            'alternative_phone'   => 'nullable|string|max:20',
+            'recipient_email'     => 'nullable|email|max:150',
+            'total_lot'           => 'nullable|numeric|min:0',
             // Pathao-specific
             'store_id'             => 'nullable|integer',
-            'delivery_type'        => 'nullable|integer|in:48,12',
             'item_type'            => 'nullable|integer|in:1,2',
             'item_weight'          => 'nullable|numeric|min:0.5|max:10',
-            'item_description'     => 'nullable|string|max:250',
             'special_instruction'  => 'nullable|string|max:300',
         ]);
 
@@ -427,13 +431,22 @@ class CourierController extends Controller
 
         $service = new SteadfastService();
         $items = array_map(function (Order $order) use ($data, $service) {
+            $address = trim(implode(', ', array_filter([
+                $order->customer_address,
+                $order->customer_area,
+                $order->customer_thana,
+                $order->customer_district,
+            ])));
+
             return $service->formatBulkItem([
                 'invoice'           => $order->order_number,
                 'recipient_name'    => $order->customer_name ?? $order->customer_phone,
                 'recipient_phone'   => $order->customer_phone,
-                'recipient_address' => $order->customer_address ?? trim(implode(', ', array_filter([$order->customer_district, $order->customer_thana, $order->customer_area]))),
+                'recipient_address' => $address !== '' ? $address : 'Address not provided',
                 'cod_amount'        => $order->total,
                 'note'              => $data['note'] ?? $order->notes ?? '',
+                'item_description'  => $data['item_description'] ?? null,
+                'delivery_type'     => isset($data['delivery_type']) ? (int) $data['delivery_type'] : null,
             ]);
         }, $orders);
 
@@ -493,14 +506,32 @@ class CourierController extends Controller
             return response()->json(['success' => false, 'message' => 'Steadfast API credentials not configured. Go to Settings → Courier.'], 422);
         }
 
+        $address = trim(implode(', ', array_filter([
+            $order->customer_address,
+            $order->customer_area,
+            $order->customer_thana,
+            $order->customer_district,
+        ])));
+
+        if ($address === '') {
+            return response()->json(['success' => false, 'message' => 'Customer address is required for Steadfast booking.'], 422);
+        }
+
         $service = new SteadfastService();
         $result  = $service->createOrder($settings->steadfast_api_key, $settings->steadfast_secret_key, [
             'invoice'           => $order->order_number,
             'recipient_name'    => $order->customer_name ?? $order->customer_phone,
             'recipient_phone'   => $order->customer_phone,
-            'recipient_address' => $order->customer_address ?? ($order->customer_district . ', ' . $order->customer_thana),
+            'recipient_address' => $address,
             'cod_amount'        => $data['cod_amount'] ?? $order->total,
             'note'              => $data['note'] ?? $order->notes ?? '',
+            'delivery_type'     => isset($data['delivery_type']) && in_array((int) $data['delivery_type'], [0, 1], true)
+                ? (int) $data['delivery_type']
+                : null,
+            'item_description'  => $data['item_description'] ?? null,
+            'alternative_phone' => $data['alternative_phone'] ?? null,
+            'recipient_email'   => $data['recipient_email'] ?? null,
+            'total_lot'         => $data['total_lot'] ?? null,
         ]);
 
         // Steadfast returns consignment_id on success
@@ -646,7 +677,10 @@ class CourierController extends Controller
         }
 
         $service = new SteadfastService();
-        $result  = $service->getStatus($settings->steadfast_api_key, $settings->steadfast_secret_key, $order->courier_tracking_id);
+        $trackingId = (string) $order->courier_tracking_id;
+        $result  = ctype_digit($trackingId)
+            ? $service->getStatus($settings->steadfast_api_key, $settings->steadfast_secret_key, $trackingId)
+            : $service->getStatusByTrackingCode($settings->steadfast_api_key, $settings->steadfast_secret_key, $trackingId);
 
         if (isset($result['delivery_status'])) {
             $order->update(['courier_status' => $result['delivery_status']]);
