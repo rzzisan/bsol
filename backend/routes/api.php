@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SmsAutomationController;
+use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EmailOtpController;
 use App\Http\Controllers\OtpController;
@@ -78,6 +79,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
     Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
     Route::apiResource('/orders', OrderController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+
+    // ── Accounting ───────────────────────────────────────────────────────────
+    Route::get('/accounting/summary', [TransactionController::class, 'summary']);
+    Route::get('/accounting/transactions', [TransactionController::class, 'index']);
+    Route::post('/accounting/transactions', [TransactionController::class, 'store']);
+    Route::put('/accounting/transactions/{id}', [TransactionController::class, 'update']);
+    Route::delete('/accounting/transactions/{id}', [TransactionController::class, 'destroy']);
 
     // ── Customer Management ───────────────────────────────────────────────────
     Route::get('/customers/lookup-by-phone', [CustomerController::class, 'lookupByPhone']);

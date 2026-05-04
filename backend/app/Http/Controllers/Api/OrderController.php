@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderStatusLog;
+use App\Services\AccountingService;
 use App\Services\SmsAutomationService;
 use App\Support\PhoneIntelCache;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function __construct(private readonly SmsAutomationService $smsAutomationService) {}
+    public function __construct(
+        private readonly SmsAutomationService $smsAutomationService,
+        private readonly AccountingService $accountingService,
+    ) {}
 
     private const VALID_STATUSES = [
         'pending', 'confirmed', 'processing', 'shipped',
@@ -196,6 +200,9 @@ class OrderController extends Controller
             \App\Models\Customer::syncFromOrder($order);
             PhoneIntelCache::bump($order->customer_phone);
 
+            $this->accountingService->onOrderCreated($order);
+            $this->accountingService->onCourierChargeUpdated($order);
+
             return response()->json(['success' => true, 'data' => $order], 201);
         });
     }
@@ -251,6 +258,10 @@ class OrderController extends Controller
         PhoneIntelCache::bump($oldPhone);
         PhoneIntelCache::bump($order->customer_phone);
 
+        if (array_key_exists('courier_charge', $data)) {
+            $this->accountingService->onCourierChargeUpdated($order);
+        }
+
         return response()->json(['success' => true, 'data' => $order]);
     }
 
@@ -278,6 +289,14 @@ class OrderController extends Controller
         ]);
 
         $this->smsAutomationService->handleOrderStatusChanged($order, $oldStatus, $data['status']);
+
+        if ($data['status'] === 'delivered') {
+            $this->accountingService->onOrderDelivered($order);
+        }
+
+        if (in_array($data['status'], ['cancelled', 'returned'], true)) {
+            $this->accountingService->onOrderCancelledOrReturned($order);
+        }
 
         return response()->json(['success' => true, 'data' => $order]);
     }
@@ -310,6 +329,14 @@ class OrderController extends Controller
             ]);
 
             $this->smsAutomationService->handleOrderStatusChanged($order, $old, $data['status']);
+
+            if ($data['status'] === 'delivered') {
+                $this->accountingService->onOrderDelivered($order);
+            }
+
+            if (in_array($data['status'], ['cancelled', 'returned'], true)) {
+                $this->accountingService->onOrderCancelledOrReturned($order);
+            }
         }
 
         return response()->json([
