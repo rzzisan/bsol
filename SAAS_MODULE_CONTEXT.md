@@ -511,9 +511,15 @@ backend/app/
 - [ ] Production booking smoke test from `/dashboard/courier` (single + bulk)
 - [ ] Hotfix commit/tag + deploy note update
 
+### Frontend Production Stability (2026-05-04)
+- [x] Incident reproduced: `/dashboard` UI unstyled + `/dashboard/accounting/expenses` load failure
+- [x] Root cause fixed: `frontend/.next` ownership/permissions mismatch (`www-data`) causing `_next/static/*.css` 500
+- [x] Recovery actions: `chown -R www-data:www-data frontend/.next` + supervisor frontend restart
+- [x] Validation: dashboard/accounting routes and current CSS/JS chunks serving `200`
+
 ### Phase 2 Readiness
 - [x] SMS Automation DB schema + API শুরু
-- [ ] Accounting transactions module scaffold
+- [x] Accounting transactions module scaffold
 - [ ] Analytics data aggregation plan finalize
 
 ---
@@ -550,19 +556,19 @@ backend/app/
 - [x] Frontend UI: `/dashboard/sms/automation` rule builder
 
 ### 14.3 Accounting
-- [ ] Migration: `transactions`
-- [ ] Auto-ledger rules: order created (pending income)
-- [ ] Auto-ledger rules: order delivered (confirmed income)
-- [ ] Auto-ledger rules: courier charge (expense)
-- [ ] Manual expense CRUD API
-- [ ] API: `GET /api/accounting/summary`
-- [ ] API: `GET /api/accounting/transactions`
-- [ ] API: `POST /api/accounting/transactions`
-- [ ] API: `PUT /api/accounting/transactions/{id}`
-- [ ] API: `DELETE /api/accounting/transactions/{id}`
-- [ ] Frontend: `/dashboard/accounting`
-- [ ] Frontend: `/dashboard/accounting/expenses`
-- [ ] Frontend: `/dashboard/accounting/profit`
+- [x] Migration: `transactions`
+- [x] Auto-ledger rules: order created (pending income)
+- [x] Auto-ledger rules: order delivered (confirmed income)
+- [x] Auto-ledger rules: courier charge (expense)
+- [x] Manual expense CRUD API
+- [x] API: `GET /api/accounting/summary`
+- [x] API: `GET /api/accounting/transactions`
+- [x] API: `POST /api/accounting/transactions`
+- [x] API: `PUT /api/accounting/transactions/{id}`
+- [x] API: `DELETE /api/accounting/transactions/{id}`
+- [x] Frontend: `/dashboard/accounting`
+- [x] Frontend: `/dashboard/accounting/expenses`
+- [x] Frontend: `/dashboard/accounting/profit`
 
 ### 14.4 Analytics
 - [ ] Sales funnel API (pending → confirmed → shipped → delivered)
@@ -584,6 +590,6 @@ backend/app/
 
 ### 14.6 Suggested Implementation Order
 1. [ ] SMS Automation
-2. [ ] Accounting
+2. [x] Accounting
 3. [ ] Analytics
 4. [ ] Courier hardening + RedX completion (parallel track)
