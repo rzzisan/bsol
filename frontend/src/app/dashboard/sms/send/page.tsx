@@ -1,18 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import CatvShell, { type ShellMenuItem } from "@/components/catv-shell";
+import UserShell from "@/components/user-shell";
 import {
   getStoredLocale,
-  getStoredTheme,
   getStoredToken,
-  getStoredUser,
-  LOCALE_STORAGE_KEY,
-  normalizeRole,
-  THEME_STORAGE_KEY,
-  type AuthUser,
   type Locale,
-  type ThemeMode,
 } from "@/lib/dashboard-client";
 
 interface SmsGatewayOption {
@@ -116,10 +109,7 @@ const text = {
 };
 
 export default function UserSmsSendPage() {
-  const [locale, setLocale] = useState<Locale>(getStoredLocale);
-  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
+  const [locale] = useState<Locale>(getStoredLocale);
 
   const [gateways, setGateways] = useState<SmsGatewayOption[]>([]);
   const [loadingGateways, setLoadingGateways] = useState(true);
@@ -142,42 +132,15 @@ export default function UserSmsSendPage() {
   const segmentLimit = isUnicode ? 70 : 160;
   const smsCount = Math.max(1, Math.ceil(Math.max(charCount, 1) / segmentLimit));
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
-
-  useEffect(() => {
-    document.documentElement.lang = locale;
-    localStorage.setItem(LOCALE_STORAGE_KEY, locale);
-  }, [locale]);
-
-  useEffect(() => {
-    const token = getStoredToken();
-    const storedUser = getStoredUser();
-
-    if (!token || !storedUser) {
-      setState("unauthenticated");
-      return;
-    }
-
-    if (normalizeRole(storedUser) !== "user") {
-      setState("forbidden");
-      return;
-    }
-
-    setUser(storedUser);
-    setState("ready");
-  }, []);
-
   const t = useMemo(() => text[locale], [locale]);
 
   useEffect(() => {
-    if (state !== "ready") return;
-
     async function loadGateways() {
       const token = getStoredToken();
-      if (!token) return;
+      if (!token) {
+        setLoadingGateways(false);
+        return;
+      }
 
       setLoadingGateways(true);
       setError(null);
@@ -206,11 +169,9 @@ export default function UserSmsSendPage() {
     }
 
     void loadGateways();
-  }, [state]);
+  }, []);
 
   useEffect(() => {
-    if (state !== "ready") return;
-
     const token = getStoredToken();
     if (!token) return;
 
@@ -243,27 +204,7 @@ export default function UserSmsSendPage() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [messageBody, phoneNumbers, state]);
-
-  const menu = useMemo<ShellMenuItem[]>(
-    () => [
-      { key: "dashboard", label: t.menuDashboard, href: "/dashboard", icon: "🏠" },
-      { key: "orders", label: t.menuOrders, icon: "📦" },
-      { key: "courier", label: t.menuCourier, icon: "🚚" },
-      { key: "billing", label: t.menuBilling, icon: "💳" },
-      {
-        key: "sms",
-        label: t.menuSms,
-        icon: "✉️",
-        children: [
-          { key: "sms-send", label: t.menuSmsSend, href: "/dashboard/sms/send" },
-          { key: "sms-history", label: t.menuSmsHistory, href: "/dashboard/sms/history" },
-        ],
-      },
-      { key: "profile", label: t.menuProfile, icon: "⚙️" },
-    ],
-    [t],
-  );
+  }, [messageBody, phoneNumbers]);
 
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -310,38 +251,12 @@ export default function UserSmsSendPage() {
     }
   }
 
-  if (state !== "ready") {
-    return (
-      <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-8">
-        <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
-          <h1 className="text-xl font-semibold text-[var(--foreground)] sm:text-2xl">{t.title}</h1>
-          <p className="mt-3 text-sm text-[var(--muted)] sm:text-base">
-            {state === "forbidden" ? t.accessDenied : t.loginRequired}
-          </p>
-          <a href="/" className="mt-5 inline-flex rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">
-            {t.goHome}
-          </a>
-        </section>
-      </main>
-    );
-  }
-
   return (
-    <CatvShell
-      title={t.title}
-      subtitle={t.subtitle}
-      locale={locale}
-      theme={theme}
-      localeLabel={t.languageLabel}
-      themeLabel={t.themeLabel}
-      sidebarTitle={t.title}
-      userName={user?.name}
-      userMeta={user?.email}
-      menu={menu}
+    <UserShell
       activeKey="sms-send"
       defaultExpandedKey="sms"
-      onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
-      onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+      pageTitle={{ bn: "SMS পাঠান", en: "Send SMS" }}
+      pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
       <section className="catv-panel max-w-3xl p-4 sm:p-5">
         <form className="space-y-4" onSubmit={handleSend}>
@@ -451,6 +366,6 @@ export default function UserSmsSendPage() {
           ) : null}
         </form>
       </section>
-    </CatvShell>
+    </UserShell>
   );
 }

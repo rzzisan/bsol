@@ -1,6 +1,6 @@
 # F-Commerce SaaS — Module Context
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 Status: **Phase 1 COMPLETE ✅** — All 6 modules implemented and deployed.
 
 ---
@@ -496,3 +496,22 @@ backend/app/
 1. **SMS Automation** — template engine, scheduled sends, event triggers
 2. **Accounting** — expense tracking, daily P&L, invoice generation
 3. **Analytics** — sales funnel, product performance, customer cohorts
+
+---
+
+## 13. বর্তমান কাজের চেকলিস্ট (Live)
+
+### Courier Stability / Steadfast Booking
+- [x] Steadfast API docs re-verify (headers, payload, endpoints)
+- [x] `create_order` payload-এ optional fields support add (`alternative_phone`, `recipient_email`, `item_description`, `total_lot`, `delivery_type`)
+- [x] Steadfast response parser harden (non-JSON fallback + clearer error message)
+- [x] Address ও phone normalization শক্ত করা
+- [x] Tracking status lookup fallback (`consignment_id` vs `tracking_code`)
+- [x] Backend syntax/diagnostic check run (no new PHP errors)
+- [ ] Production booking smoke test from `/dashboard/courier` (single + bulk)
+- [ ] Hotfix commit/tag + deploy note update
+
+### Phase 2 Readiness
+- [ ] SMS Automation DB schema + API শুরু
+- [ ] Accounting transactions module scaffold
+- [ ] Analytics data aggregation plan finalize
