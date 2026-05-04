@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EmailOtpController;
 use App\Http\Controllers\OtpController;
@@ -60,6 +61,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/sms/preview', [AdminSmsGatewayController::class, 'preview']);
     Route::post('/sms/send', [AdminSmsGatewayController::class, 'send']);
     Route::get('/sms/history', [AdminSmsGatewayController::class, 'myHistory']);
+    Route::get('/sms/automation/rules', [SmsAutomationController::class, 'index']);
+    Route::post('/sms/automation/rules', [SmsAutomationController::class, 'store']);
+    Route::put('/sms/automation/rules/{id}', [SmsAutomationController::class, 'update']);
+    Route::delete('/sms/automation/rules/{id}', [SmsAutomationController::class, 'destroy']);
+    Route::get('/sms/automation/logs', [SmsAutomationController::class, 'logs']);
 
     // ── Product Management ────────────────────────────────────────────────────
     Route::get('/products/stats', [ProductController::class, 'stats']);

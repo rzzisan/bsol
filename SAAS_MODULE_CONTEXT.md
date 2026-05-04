@@ -512,6 +512,78 @@ backend/app/
 - [ ] Hotfix commit/tag + deploy note update
 
 ### Phase 2 Readiness
-- [ ] SMS Automation DB schema + API শুরু
+- [x] SMS Automation DB schema + API শুরু
 - [ ] Accounting transactions module scaffold
 - [ ] Analytics data aggregation plan finalize
+
+---
+
+## 14. Phase 2 Execution Board (Checkbox-Ready)
+
+> **Goal:** Automation + Courier + Accounting + Analytics module production-ready করা।
+
+### 14.1 Courier Integration Hardening (Pathao + Steadfast + RedX)
+- [ ] `courier_accounts` schema finalize (সব provider credential + validation)
+- [ ] `courier_bookings` table create (payload, response, status, cost, error লগ)
+- [ ] Common provider contract define: `create()`, `track()`, `cancel()`, `price()`
+- [ ] `PathaoCourierService` retry + token refresh flow harden
+- [ ] `Steadfast` booking/status sync job + error normalization
+- [ ] `RedxCourierService` minimum viable integration (booking + tracking)
+- [ ] `CourierFactory` dispatch + fallback logic complete
+- [ ] Bulk booking unified API (partial success response structure)
+- [ ] Status sync scheduler/webhook pipeline implement
+- [ ] Courier performance metrics API finalize (success/return/avg delivery time)
+
+### 14.2 SMS Automation
+- [x] Migration: `sms_automation_rules`
+- [x] Migration: `sms_automation_logs`
+- [x] API: `GET /api/sms/automation/rules`
+- [x] API: `POST /api/sms/automation/rules`
+- [x] API: `PUT /api/sms/automation/rules/{id}`
+- [x] API: `DELETE /api/sms/automation/rules/{id}`
+- [x] Template variable parser implement (`{customer_name}`, `{order_number}`, `{tracking_id}`)
+- [ ] Event: `OrderStatusChanged`
+- [ ] Listener: `SmsAutomationListener`
+- [x] Job: `SendAutomationSmsJob` with delay support
+- [x] Duplicate send guard (idempotency key)
+- [ ] Retry + failure reason log pipeline
+- [x] Frontend UI: `/dashboard/sms/automation` rule builder
+
+### 14.3 Accounting
+- [ ] Migration: `transactions`
+- [ ] Auto-ledger rules: order created (pending income)
+- [ ] Auto-ledger rules: order delivered (confirmed income)
+- [ ] Auto-ledger rules: courier charge (expense)
+- [ ] Manual expense CRUD API
+- [ ] API: `GET /api/accounting/summary`
+- [ ] API: `GET /api/accounting/transactions`
+- [ ] API: `POST /api/accounting/transactions`
+- [ ] API: `PUT /api/accounting/transactions/{id}`
+- [ ] API: `DELETE /api/accounting/transactions/{id}`
+- [ ] Frontend: `/dashboard/accounting`
+- [ ] Frontend: `/dashboard/accounting/expenses`
+- [ ] Frontend: `/dashboard/accounting/profit`
+
+### 14.4 Analytics
+- [ ] Sales funnel API (pending → confirmed → shipped → delivered)
+- [ ] Product performance API (top SKU, margin, return ratio)
+- [ ] Customer cohort API (repeat buyer, AOV, LTV-lite)
+- [ ] Courier analytics API (provider-wise delivery/return)
+- [ ] Frontend: `/dashboard/analytics/sales`
+- [ ] Frontend: `/dashboard/analytics/intelligence`
+- [ ] Frontend: `/dashboard/analytics/courier`
+- [ ] Date range + export (CSV)
+
+### 14.5 Phase 2 Quality Gate
+- [ ] সব controller-এ per-user scoping validate (`where('user_id', auth()->id())`)
+- [ ] Form Request validation coverage complete
+- [ ] Queue worker + scheduler production config verify
+- [ ] Error monitoring + audit log checklist finalize
+- [ ] Build + smoke test report prepared
+- [ ] Release note + rollback plan documented
+
+### 14.6 Suggested Implementation Order
+1. [ ] SMS Automation
+2. [ ] Accounting
+3. [ ] Analytics
+4. [ ] Courier hardening + RedX completion (parallel track)

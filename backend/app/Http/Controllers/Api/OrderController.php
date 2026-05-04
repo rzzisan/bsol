@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderStatusLog;
+use App\Services\SmsAutomationService;
 use App\Support\PhoneIntelCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
+    public function __construct(private readonly SmsAutomationService $smsAutomationService) {}
+
     private const VALID_STATUSES = [
         'pending', 'confirmed', 'processing', 'shipped',
         'delivered', 'cancelled', 'returned',
@@ -274,6 +277,8 @@ class OrderController extends Controller
             'changed_by' => auth()->id(),
         ]);
 
+        $this->smsAutomationService->handleOrderStatusChanged($order, $oldStatus, $data['status']);
+
         return response()->json(['success' => true, 'data' => $order]);
     }
 
@@ -303,6 +308,8 @@ class OrderController extends Controller
                 'note'       => $data['note'] ?? 'Bulk update.',
                 'changed_by' => auth()->id(),
             ]);
+
+            $this->smsAutomationService->handleOrderStatusChanged($order, $old, $data['status']);
         }
 
         return response()->json([
