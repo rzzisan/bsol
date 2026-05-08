@@ -49,6 +49,7 @@ type OrderItem = {
   id: number; product_name: string; sku: string | null;
   quantity: number; unit_price: string; total: string;
   variant_info: Record<string, string> | null;
+  product?: { thumbnail?: string | null } | null;
 };
 
 type StatusLog = {
@@ -497,11 +498,20 @@ export default function OrderDetailPage() {
                   {order.items.map(item => (
                     <tr key={item.id} className="border-b border-[var(--border)]/50">
                       <td className="py-2 pr-4">
-                        <p className="font-medium">{item.product_name}</p>
-                        {item.sku && <p className="text-[var(--muted)]">SKU: {item.sku}</p>}
-                        {item.variant_info && Object.entries(item.variant_info).map(([k, v]) => (
-                          <p key={k} className="text-[var(--muted)]">{k}: {v}</p>
-                        ))}
+                        <div className="flex items-center gap-3">
+                          {item.product?.thumbnail ? (
+                            <img src={item.product.thumbnail} alt={item.product_name} className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                          ) : (
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-soft)] text-[9px] text-[var(--muted)]">No Img</div>
+                          )}
+                          <div>
+                            <p className="font-medium">{item.product_name}</p>
+                            {item.sku && <p className="text-[var(--muted)]">SKU: {item.sku}</p>}
+                            {item.variant_info && Object.entries(item.variant_info).map(([k, v]) => (
+                              <p key={k} className="text-[var(--muted)]">{k}: {v}</p>
+                            ))}
+                          </div>
+                        </div>
                       </td>
                       <td className="py-2 pr-4 text-right">{item.quantity}</td>
                       <td className="py-2 pr-4 text-right">৳{Number(item.unit_price).toLocaleString()}</td>

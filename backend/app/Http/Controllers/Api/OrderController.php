@@ -224,7 +224,7 @@ class OrderController extends Controller
     public function show(int $id): JsonResponse
     {
         $order = Order::where('user_id', auth()->id())
-            ->with(['items', 'statusLogs.changedByUser:id,name'])
+            ->with(['items.product:id,thumbnail', 'statusLogs.changedByUser:id,name'])
             ->findOrFail($id);
 
         return response()->json(['success' => true, 'data' => $order]);
