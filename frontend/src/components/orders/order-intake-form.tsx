@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredToken } from "@/lib/dashboard-client";
 import { useLocationDropdowns } from "@/lib/use-location-dropdowns";
@@ -9,7 +9,15 @@ import OrderSummarySticky from "@/components/orders/order-summary-sticky";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
-type Product = { id: number; name: string; sku: string | null; selling_price: string; track_stock?: boolean; stock?: number };
+type Product = {
+  id: number;
+  name: string;
+  sku: string | null;
+  selling_price: string;
+  thumbnail?: string | null;
+  track_stock?: boolean;
+  stock?: number;
+};
 type OrderItem = { product_id: number | null; product_name: string; sku: string; quantity: number; unit_price: number; track_stock?: boolean; stock?: number };
 
 const normalizePhone = (value: string): string => {
@@ -40,6 +48,25 @@ export default function OrderIntakeForm() {
 
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const [favorites, setFavorites] = useState<Set<number>>(() => {
+    try {
+      const stored = localStorage.getItem("order_form_favorite_products");
+      if (stored) return new Set(JSON.parse(stored) as number[]);
+    } catch {}
+    return new Set();
+  });
+
+  const toggleFavorite = (e: MouseEvent, productId: number) => {
+    e.stopPropagation();
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      try { localStorage.setItem("order_form_favorite_products", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     const run = async () => {
@@ -72,11 +99,17 @@ export default function OrderIntakeForm() {
     return () => clearTimeout(t);
   }, [customerPhone, token]);
 
-  const filteredProducts = useMemo(() => {
+  const productSuggestions = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return products.slice(0, 10);
-    return products.filter((p) => [p.name, p.sku ?? ""].join(" ").toLowerCase().includes(q)).slice(0, 10);
-  }, [products, search]);
+    const filtered = q
+      ? products.filter((p) => [p.name, p.sku ?? ""].join(" ").toLowerCase().includes(q))
+      : products;
+    return [...filtered].sort((a, b) => {
+      const aFav = favorites.has(a.id) ? 0 : 1;
+      const bFav = favorites.has(b.id) ? 0 : 1;
+      return aFav - bFav;
+    });
+  }, [products, search, favorites]);
 
   const addProduct = (p: Product) => {
     setItems((prev) => {
@@ -208,17 +241,59 @@ export default function OrderIntakeForm() {
           <h3 className="mb-3 text-sm font-semibold">Products & Items</h3>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search product by name/SKU"
             className="mb-2 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
-          {search.trim() ? (
-            <div className="mb-3 max-h-52 overflow-auto rounded-xl border border-[var(--border)]">
-              {filteredProducts.map((p) => (
-                <button key={p.id} type="button" onClick={() => addProduct(p)} className="flex w-full items-center justify-between border-b border-[var(--border)] px-3 py-2 text-left text-sm hover:bg-[var(--surface-soft)]">
-                  <span>{p.name} {p.sku ? <span className="text-xs text-[var(--muted)]">({p.sku})</span> : null}</span>
-                  <span className="font-semibold">৳{Number(p.selling_price).toLocaleString()}</span>
+          <div className="mb-3 max-h-64 overflow-auto rounded-xl border border-[var(--border)]">
+            {productSuggestions.map((p) => (
+              <div
+                key={p.id}
+                className="flex w-full items-center gap-3 border-b border-[var(--border)] px-3 py-2 text-sm hover:bg-[var(--surface-soft)]"
+              >
+                {/* Thumbnail + info — click to add product */}
+                <button
+                  type="button"
+                  onClick={() => addProduct(p)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  {p.thumbnail ? (
+                    <img src={p.thumbnail} alt={p.name} className="h-11 w-11 shrink-0 rounded-lg object-cover" />
+                  ) : (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-soft)] text-[10px] text-[var(--muted)]">
+                      No Image
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{p.name}</p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
+                      {p.sku ? <span>SKU: {p.sku}</span> : null}
+                      {typeof p.stock === "number" ? <span>Stock: {p.stock}</span> : null}
+                    </div>
+                  </div>
                 </button>
-              ))}
-              {filteredProducts.length === 0 ? <p className="px-3 py-2 text-xs text-[var(--muted)]">No product matched.</p> : null}
-            </div>
-          ) : null}
+
+                {/* Price */}
+                <span className="shrink-0 font-semibold">৳{Number(p.selling_price).toLocaleString()}</span>
+
+                {/* Favorite toggle */}
+                <button
+                  type="button"
+                  onClick={(e) => toggleFavorite(e, p.id)}
+                  title={favorites.has(p.id) ? "Favorite থেকে সরান" : "Favorite যোগ করুন"}
+                  className={`shrink-0 text-xl leading-none transition-colors ${
+                    favorites.has(p.id)
+                      ? "text-yellow-400 hover:text-yellow-500"
+                      : "text-[var(--muted)] hover:text-yellow-400"
+                  }`}
+                >
+                  ★
+                </button>
+              </div>
+            ))}
+
+            {productSuggestions.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-[var(--muted)]">
+                {search.trim() ? "No product matched." : "No products available."}
+              </p>
+            ) : null}
+          </div>
 
           <OrderItemGrid items={items} onUpdate={updateItem} onRemove={removeItem} />
         </section>
