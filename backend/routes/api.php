@@ -10,7 +10,9 @@ use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\FraudController;
+use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SmsAutomationController;
@@ -70,12 +72,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Product Management ────────────────────────────────────────────────────
     Route::get('/products/stats', [ProductController::class, 'stats']);
+    Route::get('/products/media-policy', [ProductMediaController::class, 'policy']);
+    Route::get('/products/{product}/media', [ProductMediaController::class, 'index']);
+    Route::post('/products/{product}/media', [ProductMediaController::class, 'store']);
+    Route::put('/products/{product}/media/reorder', [ProductMediaController::class, 'reorder']);
+    Route::put('/products/{product}/media/{mediaId}/set-thumbnail', [ProductMediaController::class, 'setThumbnail']);
+    Route::delete('/products/{product}/media/{mediaId}', [ProductMediaController::class, 'destroy']);
     Route::post('/products/{product}/adjust-stock', [ProductController::class, 'adjustStock']);
     Route::apiResource('/products', ProductController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
     Route::apiResource('/categories', ProductCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
 
     // ── Order Management ──────────────────────────────────────────────────────
     Route::get('/orders/stats', [OrderController::class, 'stats']);
+    Route::get('/orders/create/bootstrap', [OrderController::class, 'createBootstrap']);
     Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
     Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
     Route::apiResource('/orders', OrderController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
@@ -185,6 +194,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/notification-use-case-bindings/{id}', [NotificationUseCaseBindingController::class, 'show']);
         Route::put('/notification-use-case-bindings/{id}', [NotificationUseCaseBindingController::class, 'update']);
         Route::delete('/notification-use-case-bindings/{id}', [NotificationUseCaseBindingController::class, 'destroy']);
+
+        // Product media settings (shared admin config)
+        Route::get('/settings/product-media', [ProductMediaSettingsController::class, 'show']);
+        Route::put('/settings/product-media', [ProductMediaSettingsController::class, 'update']);
 
         // Notification Dispatch Routes
         Route::post('/notification-dispatch', [NotificationDispatchController::class, 'dispatch']);

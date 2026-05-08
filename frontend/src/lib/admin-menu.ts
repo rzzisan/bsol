@@ -18,6 +18,7 @@ export type AdminMenuLabels = {
   notificationTemplates?: string;
   notificationUseCases?: string;
   notificationLogs?: string;
+  productMediaSettings?: string;
 };
 
 export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
@@ -26,6 +27,11 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
 
   const settingsChildren: Array<{ key: string; label: string; href?: string }> = [
     { key: "settings-email", label: labels.emailSettings, href: "/admin/settings/email" },
+    {
+      key: "settings-product-media",
+      label: labels.productMediaSettings ?? "Product Media",
+      href: "/admin/settings/product-media",
+    },
     {
       key: "settings-notification-templates",
       label: notificationTemplatesLabel,

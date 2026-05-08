@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
+import ProductMediaUploader from "@/components/products/product-media-uploader";
+import ProductGalleryManager from "@/components/products/product-gallery-manager";
+import MediaPolicyHint from "@/components/products/media-policy-hint";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -102,7 +105,14 @@ type Product = {
   cost_price: string; stock: number; track_stock: boolean;
   unit: string; status: string; description: string | null;
   category_id: number | null; category: { id: number; name: string } | null;
-  low_stock_alert: number;
+  low_stock_alert: number; thumbnail?: string | null;
+};
+type MediaItem = { id: number; url: string; is_primary: boolean; sort_order: number; file_name?: string | null };
+type MediaPolicy = {
+  max_gallery_images: number;
+  max_file_size_mb: number;
+  allowed_mime_types: string[];
+  thumbnail_required?: boolean;
 };
 type Stats = { total: number; active: number; lowStock: number };
 type FormState = Partial<Omit<Product, "id" | "category">>;
@@ -134,8 +144,11 @@ export default function ProductsPage() {
   const [form, setForm] = useState<FormState>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [mediaPolicy, setMediaPolicy] = useState<MediaPolicy | null>(null);
+  const [mediaProduct, setMediaProduct] = useState<Product | null>(null);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
 
-  const token = getStoredToken();
+  const token = getStoredToken() ?? "";
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -145,10 +158,11 @@ export default function ProductsPage() {
       if (filterStatus !== "all") params.set("status", filterStatus);
       if (filterLowStock) params.set("low_stock", "1");
 
-      const [prodRes, catRes, statRes] = await Promise.all([
+      const [prodRes, catRes, statRes, policyRes] = await Promise.all([
         fetch(`${API}/products?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API}/categories`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API}/products/stats`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/products/media-policy`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
 
       if (prodRes.ok) {
@@ -164,6 +178,10 @@ export default function ProductsPage() {
       if (statRes.ok) {
         const d = await statRes.json();
         setStats({ total: d.data?.total ?? 0, active: d.data?.active ?? 0, lowStock: d.data?.lowStock ?? 0 });
+      }
+      if (policyRes.ok) {
+        const d = await policyRes.json();
+        setMediaPolicy(d.data ?? null);
       }
     } finally {
       setLoading(false);
@@ -228,6 +246,31 @@ export default function ProductsPage() {
 
   const setField = (key: keyof FormState, value: unknown) => setForm(f => ({ ...f, [key]: value }));
 
+  const loadMedia = useCallback(async (productId: number) => {
+    const res = await fetch(`${API}/products/${productId}/media`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMediaItems((data?.data ?? []) as MediaItem[]);
+      setProducts((prev) => prev.map((p) => (
+        p.id === productId
+          ? { ...p, thumbnail: (data?.data ?? []).find((m: MediaItem) => m.is_primary)?.url ?? p.thumbnail }
+          : p
+      )));
+    }
+  }, [token]);
+
+  const openMedia = async (p: Product) => {
+    setMediaProduct(p);
+    await loadMedia(p.id);
+  };
+
+  const closeMedia = () => {
+    setMediaProduct(null);
+    setMediaItems([]);
+  };
+
   return (
     <UserShell activeKey="product-list" defaultExpandedKey="products"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
@@ -270,10 +313,13 @@ export default function ProductsPage() {
             className="accent-[var(--accent)]" />
           {txt.lowStock}
         </label>
-        <button onClick={openAdd}
-          className="ml-auto rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-          + {txt.addProduct}
-        </button>
+        <div className="ml-auto flex flex-col items-end gap-1">
+          <button onClick={openAdd}
+            className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+            + {txt.addProduct}
+          </button>
+          <MediaPolicyHint policy={mediaPolicy} />
+        </div>
       </div>
 
       {/* Table */}
@@ -297,8 +343,17 @@ export default function ProductsPage() {
             ) : products.map(p => (
               <tr key={p.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-soft)] transition-colors">
                 <td className="px-4 py-3">
-                  <p className="font-medium">{p.name}</p>
-                  {p.sku && <p className="text-xs text-[var(--muted)]">SKU: {p.sku}</p>}
+                  <div className="flex items-center gap-3">
+                    {p.thumbnail ? (
+                      <img src={p.thumbnail} alt={p.name} className="h-10 w-10 rounded-lg object-cover" />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--surface-soft)] text-xs text-[var(--muted)]">N/A</div>
+                    )}
+                    <div>
+                      <p className="font-medium">{p.name}</p>
+                      {p.sku && <p className="text-xs text-[var(--muted)]">SKU: {p.sku}</p>}
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3 hidden md:table-cell text-[var(--muted)]">
                   {p.category?.name ?? txt.uncategorized}
@@ -322,6 +377,10 @@ export default function ProductsPage() {
                   <button onClick={() => openEdit(p)}
                     className="mr-2 rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]">
                     {txt.edit}
+                  </button>
+                  <button onClick={() => void openMedia(p)}
+                    className="mr-2 rounded-lg border border-indigo-300 px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50">
+                    Media
                   </button>
                   <button onClick={() => handleDelete(p.id)}
                     className="rounded-lg border border-red-500/30 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10">
@@ -351,6 +410,41 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Media Modal */}
+      {mediaProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && closeMedia()}>
+          <div className="w-full max-w-4xl rounded-2xl bg-[var(--surface)] p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-bold">Media: {mediaProduct.name}</h3>
+              <button onClick={closeMedia} className="rounded-lg border border-[var(--border)] px-3 py-1 text-sm">Close</button>
+            </div>
+            <div className="mb-3">
+              <MediaPolicyHint policy={mediaPolicy} />
+            </div>
+            <div className="mb-4">
+              <ProductMediaUploader
+                productId={mediaProduct.id}
+                token={token}
+                policy={mediaPolicy}
+                onUploaded={async () => {
+                  await loadMedia(mediaProduct.id);
+                  await fetchData();
+                }}
+              />
+            </div>
+            <ProductGalleryManager
+              productId={mediaProduct.id}
+              token={token}
+              items={mediaItems}
+              onChanged={async () => {
+                await loadMedia(mediaProduct.id);
+                await fetchData();
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Modal */}
       {modal && (

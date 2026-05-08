@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductImage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
@@ -51,8 +52,13 @@ class ProductController extends Controller
         $data = $request->validate([
             'name'             => 'required|string|max:255',
             'category_id'      => 'nullable|integer|exists:product_categories,id',
-            'sku'              => 'nullable|string|max:100',
-            'description'      => 'nullable|string',
+            'sku'              => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('products', 'sku')->where(fn ($q) => $q->where('user_id', auth()->id())->whereNull('deleted_at')),
+            ],
+            'description'      => 'required|string',
             'selling_price'    => 'required|numeric|min:0',
             'cost_price'       => 'nullable|numeric|min:0',
             'stock'            => 'nullable|integer|min:0',
@@ -112,8 +118,14 @@ class ProductController extends Controller
         $data = $request->validate([
             'name'            => 'sometimes|required|string|max:255',
             'category_id'     => 'nullable|integer|exists:product_categories,id',
-            'sku'             => 'nullable|string|max:100',
-            'description'     => 'nullable|string',
+            'sku'             => [
+                'sometimes',
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('products', 'sku')->where(fn ($q) => $q->where('user_id', auth()->id())->whereNull('deleted_at'))->ignore($product->id),
+            ],
+            'description'     => 'sometimes|required|string',
             'selling_price'   => 'sometimes|required|numeric|min:0',
             'cost_price'      => 'nullable|numeric|min:0',
             'stock'           => 'nullable|integer|min:0',
