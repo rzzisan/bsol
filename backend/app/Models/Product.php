@@ -14,11 +14,14 @@ class Product extends Model
 
     protected $fillable = [
         'user_id', 'category_id', 'name', 'sku', 'description',
-        'selling_price', 'cost_price', 'stock', 'low_stock_alert',
+        'regular_price', 'discount', 'discount_type', 'selling_price', 'cost_price', 'stock', 'low_stock_alert',
         'track_stock', 'unit', 'status', 'variants', 'thumbnail',
     ];
 
     protected $casts = [
+        'regular_price' => 'decimal:2',
+        'discount'      => 'decimal:2',
+        'discount_type' => 'string',
         'selling_price' => 'decimal:2',
         'cost_price'    => 'decimal:2',
         'track_stock'   => 'boolean',

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredToken } from "@/lib/dashboard-client";
 import { useLocationDropdowns } from "@/lib/use-location-dropdowns";
+import { computeSellingPrice } from "@/lib/pricing";
 import OrderItemGrid from "@/components/orders/order-item-grid";
 import OrderSummarySticky from "@/components/orders/order-summary-sticky";
 
@@ -13,12 +14,26 @@ type Product = {
   id: number;
   name: string;
   sku: string | null;
+  regular_price: string | null;
+  discount: string | null;
+  discount_type: "amount" | "percent";
   selling_price: string;
   thumbnail?: string | null;
   track_stock?: boolean;
   stock?: number;
 };
-type OrderItem = { product_id: number | null; product_name: string; sku: string; quantity: number; unit_price: number; track_stock?: boolean; stock?: number };
+type OrderItem = {
+  product_id: number | null;
+  product_name: string;
+  sku: string;
+  quantity: number;
+  regular_price?: number;
+  discount?: number;
+  discount_type?: "amount" | "percent";
+  unit_price: number;
+  track_stock?: boolean;
+  stock?: number;
+};
 
 const normalizePhone = (value: string): string => {
   const digits = value.replace(/\D/g, "");
@@ -126,7 +141,14 @@ export default function OrderIntakeForm() {
           product_name: p.name,
           sku: p.sku ?? "",
           quantity: 1,
-          unit_price: Number(p.selling_price),
+          regular_price: Number(p.regular_price ?? p.selling_price),
+          discount: Number(p.discount ?? 0),
+          discount_type: p.discount_type ?? "amount",
+          unit_price: computeSellingPrice(
+            Number(p.regular_price ?? p.selling_price),
+            Number(p.discount ?? 0),
+            p.discount_type ?? "amount",
+          ),
           track_stock: !!p.track_stock,
           stock: p.stock,
         },
@@ -181,6 +203,9 @@ export default function OrderIntakeForm() {
             product_name: i.product_name,
             sku: i.sku || null,
             quantity: i.quantity,
+            regular_price: i.regular_price ?? i.unit_price,
+            discount: i.discount ?? 0,
+            discount_type: i.discount_type ?? "amount",
             unit_price: i.unit_price,
           })),
         }),
@@ -270,7 +295,18 @@ export default function OrderIntakeForm() {
                 </button>
 
                 {/* Price */}
-                <span className="shrink-0 font-semibold">৳{Number(p.selling_price).toLocaleString()}</span>
+                <div className="shrink-0 text-right">
+                  <p className="font-semibold">৳{computeSellingPrice(
+                    Number(p.regular_price ?? p.selling_price),
+                    Number(p.discount ?? 0),
+                    p.discount_type ?? "amount",
+                  ).toLocaleString()}</p>
+                  <p className="text-[10px] text-[var(--muted)]">
+                    ৳{Number(p.regular_price ?? p.selling_price).toLocaleString()} - {p.discount_type === "percent"
+                      ? `${Number(p.discount ?? 0).toLocaleString()}%`
+                      : `৳${Number(p.discount ?? 0).toLocaleString()}`}
+                  </p>
+                </div>
 
                 {/* Favorite toggle */}
                 <button

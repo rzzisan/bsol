@@ -15,6 +15,7 @@ use App\Support\PhoneIntelCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
@@ -117,7 +118,7 @@ class OrderController extends Controller
         $products = Product::query()
             ->where('user_id', $userId)
             ->where('status', 'active')
-            ->select(['id', 'name', 'sku', 'selling_price', 'stock', 'track_stock', 'thumbnail'])
+            ->select(['id', 'name', 'sku', 'regular_price', 'discount', 'discount_type', 'selling_price', 'stock', 'track_stock', 'thumbnail'])
             ->orderBy('name')
             ->limit(200)
             ->get();
@@ -184,13 +185,52 @@ class OrderController extends Controller
                 'risk_level'        => 'low',
             ]);
 
+            $productIds = collect($data['items'])
+                ->pluck('product_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            $productsById = Product::query()
+                ->where('user_id', $userId)
+                ->whereIn('id', $productIds)
+                ->get(['id', 'regular_price', 'discount', 'discount_type'])
+                ->keyBy('id');
+
             foreach ($data['items'] as $item) {
+                $productModel = null;
+                if (!empty($item['product_id'])) {
+                    $productModel = $productsById->get((int) $item['product_id']);
+                    if (!$productModel) {
+                        throw ValidationException::withMessages([
+                            'items' => ['One or more selected products are invalid for this account.'],
+                        ]);
+                    }
+                }
+
+                $regularPrice = isset($item['regular_price'])
+                    ? (float) $item['regular_price']
+                    : (float) ($productModel?->regular_price ?? $item['unit_price']);
+                $discountValue = isset($item['discount'])
+                    ? (float) $item['discount']
+                    : (float) ($productModel?->discount ?? 0);
+                $discountType = (string) ($item['discount_type'] ?? ($productModel?->discount_type ?? 'amount'));
+
+                if ($discountType === 'percent' && $discountValue > 100) {
+                    throw ValidationException::withMessages([
+                        'items' => ['Discount percent cannot be more than 100.'],
+                    ]);
+                }
+
                 OrderItem::create([
                     'order_id'     => $order->id,
                     'product_id'   => $item['product_id'] ?? null,
                     'product_name' => $item['product_name'],
                     'sku'          => $item['sku'] ?? null,
                     'quantity'     => $item['quantity'],
+                    'regular_price'=> $regularPrice,
+                    'discount'     => $discountValue,
+                    'discount_type'=> $discountType,
                     'unit_price'   => $item['unit_price'],
                     'total'        => $item['quantity'] * $item['unit_price'],
                     'variant_info' => $item['variant_info'] ?? null,

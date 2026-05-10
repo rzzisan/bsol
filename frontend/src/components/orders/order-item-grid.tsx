@@ -1,6 +1,17 @@
 "use client";
 
-type OrderItem = { product_id: number | null; product_name: string; sku: string; quantity: number; unit_price: number; track_stock?: boolean; stock?: number };
+type OrderItem = {
+  product_id: number | null;
+  product_name: string;
+  sku: string;
+  quantity: number;
+  regular_price?: number;
+  discount?: number;
+  discount_type?: "amount" | "percent";
+  unit_price: number;
+  track_stock?: boolean;
+  stock?: number;
+};
 
 export default function OrderItemGrid({
   items,
@@ -33,6 +44,13 @@ export default function OrderItemGrid({
               <td className="px-3 py-2">
                 <p className="font-medium">{item.product_name}</p>
                 {item.sku ? <p className="text-xs text-[var(--muted)]">SKU: {item.sku}</p> : null}
+                {typeof item.regular_price === "number" ? (
+                  <p className="text-xs text-[var(--muted)]">
+                    Regular: ৳{item.regular_price.toLocaleString()} · Discount: {item.discount_type === "percent"
+                      ? `${Number(item.discount ?? 0).toLocaleString()}%`
+                      : `৳${Number(item.discount ?? 0).toLocaleString()}`}
+                  </p>
+                ) : null}
                 {item.track_stock && typeof item.stock === "number" ? (
                   <p className={`text-xs ${item.stock < item.quantity ? "text-red-500" : "text-[var(--muted)]"}`}>Stock: {item.stock}</p>
                 ) : null}

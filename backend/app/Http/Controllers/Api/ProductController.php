@@ -8,6 +8,7 @@ use App\Models\ProductImage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -59,7 +60,10 @@ class ProductController extends Controller
                 Rule::unique('products', 'sku')->where(fn ($q) => $q->where('user_id', auth()->id())->whereNull('deleted_at')),
             ],
             'description'      => 'required|string',
-            'selling_price'    => 'required|numeric|min:0',
+            'regular_price'    => 'nullable|numeric|min:0',
+            'discount'         => 'nullable|numeric|min:0',
+            'discount_type'    => 'nullable|in:amount,percent',
+            'selling_price'    => 'nullable|numeric|min:0',
             'cost_price'       => 'nullable|numeric|min:0',
             'stock'            => 'nullable|integer|min:0',
             'low_stock_alert'  => 'nullable|integer|min:0',
@@ -73,6 +77,15 @@ class ProductController extends Controller
         ]);
 
         $data['user_id']     = auth()->id();
+        $data['discount_type'] = $data['discount_type'] ?? 'amount';
+        $data['regular_price'] = isset($data['regular_price']) ? (float) $data['regular_price'] : (float) ($data['selling_price'] ?? 0);
+        $data['discount']    = $data['discount'] ?? 0;
+        $this->ensureValidDiscountValue($data['discount_type'], (float) $data['discount']);
+        $data['selling_price'] = $this->calculateSellingPrice(
+            (float) $data['regular_price'],
+            (float) $data['discount'],
+            (string) $data['discount_type']
+        );
         $data['cost_price']  = $data['cost_price'] ?? 0;
         $data['track_stock'] = $data['track_stock'] ?? false;
         $data['status']      = $data['status'] ?? 'active';
@@ -126,7 +139,10 @@ class ProductController extends Controller
                 Rule::unique('products', 'sku')->where(fn ($q) => $q->where('user_id', auth()->id())->whereNull('deleted_at'))->ignore($product->id),
             ],
             'description'     => 'sometimes|required|string',
-            'selling_price'   => 'sometimes|required|numeric|min:0',
+            'regular_price'   => 'nullable|numeric|min:0',
+            'discount'        => 'nullable|numeric|min:0',
+            'discount_type'   => 'nullable|in:amount,percent',
+            'selling_price'   => 'nullable|numeric|min:0',
             'cost_price'      => 'nullable|numeric|min:0',
             'stock'           => 'nullable|integer|min:0',
             'low_stock_alert' => 'nullable|integer|min:0',
@@ -140,6 +156,19 @@ class ProductController extends Controller
         if (!empty($data['category_id'])) {
             $this->validateCategoryOwnership($data['category_id']);
         }
+
+        $discountType = $data['discount_type'] ?? (string) ($product->discount_type ?: 'amount');
+        $discountValue = array_key_exists('discount', $data) ? (float) $data['discount'] : (float) ($product->discount ?? 0);
+        $regularPrice = array_key_exists('regular_price', $data)
+            ? (float) $data['regular_price']
+            : (float) ($product->regular_price ?? $product->selling_price ?? 0);
+
+        $this->ensureValidDiscountValue($discountType, $discountValue);
+
+        $data['discount_type'] = $discountType;
+        $data['discount'] = $discountValue;
+        $data['regular_price'] = $regularPrice;
+        $data['selling_price'] = $this->calculateSellingPrice($regularPrice, $discountValue, $discountType);
 
         $product->update($data);
         $product->load(['category:id,name', 'images']);
@@ -200,5 +229,26 @@ class ProductController extends Controller
     {
         \App\Models\ProductCategory::where('user_id', auth()->id())
             ->findOrFail($categoryId);
+    }
+
+    private function calculateSellingPrice(float $regularPrice, float $discount, string $discountType): float
+    {
+        if ($discountType === 'percent') {
+            return max(0, $regularPrice - (($regularPrice * $discount) / 100));
+        }
+
+        return max(0, $regularPrice - $discount);
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function ensureValidDiscountValue(string $discountType, float $discount): void
+    {
+        if ($discountType === 'percent' && $discount > 100) {
+            throw ValidationException::withMessages([
+                'discount' => ['Percentage discount cannot be more than 100.'],
+            ]);
+        }
     }
 }

@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
 import ProductMediaUploader from "@/components/products/product-media-uploader";
 import ProductGalleryManager from "@/components/products/product-gallery-manager";
 import MediaPolicyHint from "@/components/products/media-policy-hint";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
+import { computeSellingPrice } from "@/lib/pricing";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -27,6 +29,7 @@ const t = {
     stock: "স্টক",
     status: "স্ট্যাটাস",
     actions: "অ্যাকশন",
+    view: "দেখুন",
     edit: "সম্পাদনা",
     delete: "মুছুন",
     confirmDelete: "এই পণ্যটি মুছে ফেলবেন?",
@@ -43,6 +46,12 @@ const t = {
     fieldCategory: "ক্যাটাগরি",
     fieldSku: "SKU",
     fieldSellingPrice: "বিক্রয় মূল্য (৳) *",
+    fieldRegularPrice: "রেগুলার দাম (৳)",
+    fieldDiscount: "ডিসকাউন্ট (৳)",
+    fieldDiscountType: "ডিসকাউন্ট ধরন",
+    discountAmount: "টাকা (৳)",
+    discountPercent: "পার্সেন্ট (%)",
+    autoSellingPrice: "অটো সেলিং প্রাইস",
     fieldCostPrice: "ক্রয় মূল্য (৳)",
     fieldStock: "স্টক",
     fieldUnit: "ইউনিট",
@@ -71,6 +80,7 @@ const t = {
     stock: "Stock",
     status: "Status",
     actions: "Actions",
+    view: "View",
     edit: "Edit",
     delete: "Delete",
     confirmDelete: "Delete this product?",
@@ -86,6 +96,12 @@ const t = {
     fieldCategory: "Category",
     fieldSku: "SKU",
     fieldSellingPrice: "Selling Price (৳) *",
+    fieldRegularPrice: "Regular Price (৳)",
+    fieldDiscount: "Discount (৳)",
+    fieldDiscountType: "Discount Type",
+    discountAmount: "Amount (৳)",
+    discountPercent: "Percent (%)",
+    autoSellingPrice: "Auto Selling Price",
     fieldCostPrice: "Cost Price (৳)",
     fieldStock: "Stock",
     fieldUnit: "Unit",
@@ -102,7 +118,7 @@ const t = {
 type Category = { id: number; name: string };
 type Product = {
   id: number; name: string; sku: string | null; selling_price: string;
-  cost_price: string; stock: number; track_stock: boolean;
+  regular_price: string | null; discount: string | null; discount_type: "amount" | "percent"; cost_price: string; stock: number; track_stock: boolean;
   unit: string; status: string; description: string | null;
   category_id: number | null; category: { id: number; name: string } | null;
   low_stock_alert: number; thumbnail?: string | null;
@@ -194,7 +210,7 @@ export default function ProductsPage() {
   useEffect(() => { setPage(1); }, [search, filterStatus, filterLowStock]);
 
   const openAdd = () => {
-    setForm({ status: "active", unit: "pcs", track_stock: false });
+    setForm({ status: "active", unit: "pcs", track_stock: false, discount_type: "amount", discount: "0" });
     setFormError("");
     setEditProduct(null);
     setModal("add");
@@ -208,8 +224,17 @@ export default function ProductsPage() {
   const closeModal = () => { setModal(null); setEditProduct(null); };
 
   const handleSave = async () => {
-    if (!form.name || !form.selling_price) {
-      setFormError(locale === "bn" ? "নাম এবং বিক্রয় মূল্য আবশ্যক।" : "Name and selling price are required.");
+    const regularPrice = Number(form.regular_price ?? form.selling_price ?? 0);
+    const discountValue = Number(form.discount ?? 0);
+    const discountType = (form.discount_type ?? "amount") as "amount" | "percent";
+    const computedSelling = computeSellingPrice(regularPrice, discountValue, discountType);
+
+    if (!form.name || regularPrice <= 0) {
+      setFormError(locale === "bn" ? "নাম এবং রেগুলার মূল্য আবশ্যক।" : "Name and regular price are required.");
+      return;
+    }
+    if (discountType === "percent" && discountValue > 100) {
+      setFormError(locale === "bn" ? "পার্সেন্ট ডিসকাউন্ট ১০০% এর বেশি হতে পারবে না।" : "Percentage discount cannot exceed 100.");
       return;
     }
     setSaving(true);
@@ -217,10 +242,26 @@ export default function ProductsPage() {
     try {
       const url    = modal === "edit" ? `${API}/products/${editProduct!.id}` : `${API}/products`;
       const method = modal === "edit" ? "PUT" : "POST";
+      const payload = {
+        name: form.name,
+        category_id: form.category_id ?? null,
+        sku: form.sku,
+        description: form.description,
+        regular_price: regularPrice,
+        discount: discountValue,
+        discount_type: discountType,
+        selling_price: computedSelling,
+        cost_price: Number(form.cost_price ?? 0),
+        stock: Number(form.stock ?? 0),
+        low_stock_alert: Number(form.low_stock_alert ?? 5),
+        track_stock: !!form.track_stock,
+        unit: form.unit ?? "pcs",
+        status: form.status ?? "active",
+      };
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -374,6 +415,10 @@ export default function ProductsPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
+                  <Link href={`/dashboard/products/${p.id}`}
+                    className="mr-2 inline-block rounded-lg border border-sky-300 px-2 py-1 text-xs text-sky-600 hover:bg-sky-50">
+                    {txt.view}
+                  </Link>
                   <button onClick={() => openEdit(p)}
                     className="mr-2 rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]">
                     {txt.edit}
@@ -476,9 +521,31 @@ export default function ProductsPage() {
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
               </label>
               <label>
-                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.fieldSellingPrice}</span>
-                <input type="number" min="0" value={form.selling_price ?? ""} onChange={e => setField("selling_price", e.target.value)}
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.fieldRegularPrice}</span>
+                <input type="number" min="0" value={form.regular_price ?? ""} onChange={e => setField("regular_price", e.target.value)}
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.fieldDiscount}</span>
+                <input type="number" min="0" value={form.discount ?? ""} onChange={e => setField("discount", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.fieldDiscountType}</span>
+                <select value={form.discount_type ?? "amount"} onChange={e => setField("discount_type", e.target.value as "amount" | "percent")}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                  <option value="amount">{txt.discountAmount}</option>
+                  <option value="percent">{txt.discountPercent}</option>
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.autoSellingPrice}</span>
+                <input type="number" readOnly value={computeSellingPrice(
+                  Number(form.regular_price ?? form.selling_price ?? 0),
+                  Number(form.discount ?? 0),
+                  (form.discount_type ?? "amount") as "amount" | "percent"
+                )}
+                  className="w-full cursor-not-allowed rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
               </label>
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.fieldCostPrice}</span>

@@ -9,10 +9,13 @@ class OrderItem extends Model
 {
     protected $fillable = [
         'order_id', 'product_id', 'product_name', 'sku',
-        'quantity', 'unit_price', 'total', 'variant_info',
+        'quantity', 'regular_price', 'discount', 'discount_type', 'unit_price', 'total', 'variant_info',
     ];
 
     protected $casts = [
+        'regular_price' => 'decimal:2',
+        'discount'     => 'decimal:2',
+        'discount_type'=> 'string',
         'unit_price'   => 'decimal:2',
         'total'        => 'decimal:2',
         'variant_info' => 'array',

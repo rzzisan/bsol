@@ -47,7 +47,7 @@ const COURIER_STATUS_STYLE: Record<string, string> = {
 
 type OrderItem = {
   id: number; product_name: string; sku: string | null;
-  quantity: number; unit_price: string; total: string;
+  quantity: number; regular_price: string | null; discount: string | null; discount_type: "amount" | "percent" | null; unit_price: string; total: string;
   variant_info: Record<string, string> | null;
   product?: { thumbnail?: string | null } | null;
 };
@@ -507,6 +507,11 @@ export default function OrderDetailPage() {
                           <div>
                             <p className="font-medium">{item.product_name}</p>
                             {item.sku && <p className="text-[var(--muted)]">SKU: {item.sku}</p>}
+                            <p className="text-[var(--muted)]">
+                              Regular: ৳{Number(item.regular_price ?? item.unit_price).toLocaleString()} · Discount: {item.discount_type === "percent"
+                                ? `${Number(item.discount ?? 0).toLocaleString()}%`
+                                : `৳${Number(item.discount ?? 0).toLocaleString()}`} · Selling: ৳{Number(item.unit_price).toLocaleString()}
+                            </p>
                             {item.variant_info && Object.entries(item.variant_info).map(([k, v]) => (
                               <p key={k} className="text-[var(--muted)]">{k}: {v}</p>
                             ))}
