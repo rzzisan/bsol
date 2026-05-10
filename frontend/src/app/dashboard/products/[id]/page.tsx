@@ -7,6 +7,7 @@ import UserShell from "@/components/user-shell";
 import MediaPolicyHint from "@/components/products/media-policy-hint";
 import ProductGalleryManager from "@/components/products/product-gallery-manager";
 import ProductMediaUploader from "@/components/products/product-media-uploader";
+import VariantsTab from "@/components/products/variants-tab";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
 import { computeSellingPrice } from "@/lib/pricing";
 
@@ -568,6 +569,30 @@ export default function ProductDetailPage() {
               {saving ? txt.saving : txt.save}
             </button>
           </div>
+        </section>
+
+        {/* ── Variants Section ────────────────────────────────────── */}
+        <section className="catv-panel p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold">
+                {locale === "bn" ? "ভেরিয়েন্ট ম্যানেজমেন্ট" : "Variant Management"}
+              </h3>
+              <p className="text-xs text-[var(--muted)] mt-0.5">
+                {locale === "bn"
+                  ? "কালার, সাইজ বা যেকোনো অপশন যুক্ত করুন এবং ভেরিয়েন্ট তৈরি করুন।"
+                  : "Add options like Color, Size, Material etc. and generate variants."}
+              </p>
+            </div>
+          </div>
+          <VariantsTab
+            productId={product.id}
+            productName={product.name}
+            productThumbnail={product.thumbnail}
+            defaultPrice={Number(product.regular_price ?? product.selling_price ?? 0)}
+            token={token}
+            apiBase={API}
+          />
         </section>
       </div>
     </UserShell>

@@ -2,6 +2,7 @@
 
 type OrderItem = {
   product_id: number | null;
+  product_variant_id?: number | null;
   product_name: string;
   sku: string;
   quantity: number;
@@ -11,6 +12,7 @@ type OrderItem = {
   unit_price: number;
   track_stock?: boolean;
   stock?: number;
+  variant_info?: Record<string, unknown> | null;
 };
 
 export default function OrderItemGrid({
@@ -44,6 +46,11 @@ export default function OrderItemGrid({
               <td className="px-3 py-2">
                 <p className="font-medium">{item.product_name}</p>
                 {item.sku ? <p className="text-xs text-[var(--muted)]">SKU: {item.sku}</p> : null}
+                {item.variant_info && Object.keys(item.variant_info).length > 0 ? (
+                  <p className="text-xs text-[var(--muted)]">
+                    {Object.entries(item.variant_info).map(([k, v]) => `${k}: ${String(v)}`).join(" · ")}
+                  </p>
+                ) : null}
                 {typeof item.regular_price === "number" ? (
                   <p className="text-xs text-[var(--muted)]">
                     Regular: ৳{item.regular_price.toLocaleString()} · Discount: {item.discount_type === "percent"

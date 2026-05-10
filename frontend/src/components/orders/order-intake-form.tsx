@@ -7,6 +7,8 @@ import { useLocationDropdowns } from "@/lib/use-location-dropdowns";
 import { computeSellingPrice } from "@/lib/pricing";
 import OrderItemGrid from "@/components/orders/order-item-grid";
 import OrderSummarySticky from "@/components/orders/order-summary-sticky";
+import VariantPickerModal from "@/components/products/variant-picker-modal";
+import type { ProductVariant } from "@/types/variant";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -21,9 +23,12 @@ type Product = {
   thumbnail?: string | null;
   track_stock?: boolean;
   stock?: number;
+  has_variants?: boolean;
+  active_variants_count?: number;
 };
 type OrderItem = {
   product_id: number | null;
+  product_variant_id?: number | null;
   product_name: string;
   sku: string;
   quantity: number;
@@ -33,6 +38,7 @@ type OrderItem = {
   unit_price: number;
   track_stock?: boolean;
   stock?: number;
+  variant_info?: Record<string, unknown> | null;
 };
 
 const normalizePhone = (value: string): string => {
@@ -63,6 +69,7 @@ export default function OrderIntakeForm() {
 
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [variantProduct, setVariantProduct] = useState<Product | null>(null);
 
   const [favorites, setFavorites] = useState<Set<number>>(() => {
     try {
@@ -127,8 +134,15 @@ export default function OrderIntakeForm() {
   }, [products, search, favorites]);
 
   const addProduct = (p: Product) => {
+    const hasSelectableVariants = (p.active_variants_count ?? 0) > 0;
+
+    if (p.has_variants && hasSelectableVariants) {
+      setVariantProduct(p);
+      return;
+    }
+
     setItems((prev) => {
-      const idx = prev.findIndex((i) => i.product_id === p.id);
+      const idx = prev.findIndex((i) => i.product_id === p.id && !i.product_variant_id);
       if (idx >= 0) {
         const clone = [...prev];
         clone[idx] = { ...clone[idx], quantity: clone[idx].quantity + 1 };
@@ -155,6 +169,44 @@ export default function OrderIntakeForm() {
       ];
     });
     setSearch("");
+  };
+
+  const addVariantProduct = (p: Product, variant: ProductVariant) => {
+    setItems((prev) => {
+      const idx = prev.findIndex((i) => i.product_variant_id === variant.id);
+      if (idx >= 0) {
+        const clone = [...prev];
+        clone[idx] = { ...clone[idx], quantity: clone[idx].quantity + 1 };
+        return clone;
+      }
+
+      const variantInfo: Record<string, string> = {};
+      for (const opt of variant.options ?? []) {
+        if (opt.option_name) {
+          variantInfo[opt.option_name] = String(opt.label ?? opt.value ?? "");
+        }
+      }
+
+      return [
+        ...prev,
+        {
+          product_id: p.id,
+          product_variant_id: variant.id,
+          product_name: p.name,
+          sku: variant.sku ?? p.sku ?? "",
+          quantity: 1,
+          regular_price: Number(variant.regular_price ?? p.regular_price ?? p.selling_price),
+          discount: Number(variant.discount ?? p.discount ?? 0),
+          discount_type: variant.discount_type ?? p.discount_type ?? "amount",
+          unit_price: Number(variant.selling_price ?? p.selling_price ?? 0),
+          track_stock: true,
+          stock: variant.stock_qty,
+          variant_info: variantInfo,
+        },
+      ];
+    });
+    setSearch("");
+    setVariantProduct(null);
   };
 
   const updateItem = (idx: number, field: keyof OrderItem, value: string | number | boolean | null) => {
@@ -200,6 +252,7 @@ export default function OrderIntakeForm() {
           notes: notes || null,
           items: items.map((i) => ({
             product_id: i.product_id,
+            product_variant_id: i.product_variant_id ?? null,
             product_name: i.product_name,
             sku: i.sku || null,
             quantity: i.quantity,
@@ -207,6 +260,7 @@ export default function OrderIntakeForm() {
             discount: i.discount ?? 0,
             discount_type: i.discount_type ?? "amount",
             unit_price: i.unit_price,
+            variant_info: i.variant_info ?? null,
           })),
         }),
       });
@@ -360,6 +414,17 @@ export default function OrderIntakeForm() {
       </div>
 
       <OrderSummarySticky subtotal={subtotal} shipping={shippingCharge} discount={discount} total={total} onSubmit={submit} submitting={submitting} />
+
+      {variantProduct ? (
+        <VariantPickerModal
+          productId={variantProduct.id}
+          productName={variantProduct.name}
+          token={token}
+          apiBase={API}
+          onSelect={(variant) => addVariantProduct(variantProduct, variant)}
+          onClose={() => setVariantProduct(null)}
+        />
+      ) : null}
     </div>
   );
 }

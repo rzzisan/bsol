@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\AuthController;
@@ -80,6 +81,29 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/products/{product}/media/{mediaId}', [ProductMediaController::class, 'destroy']);
     Route::post('/products/{product}/adjust-stock', [ProductController::class, 'adjustStock']);
     Route::apiResource('/products', ProductController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+
+    // ── Product Variant & Option Management ───────────────────────────────────
+    Route::prefix('products/{product}')->group(function () {
+        // Options
+        Route::get('/options',                                    [ProductVariantController::class, 'optionIndex']);
+        Route::post('/options',                                   [ProductVariantController::class, 'optionStore']);
+        Route::put('/options/{option}',                           [ProductVariantController::class, 'optionUpdate']);
+        Route::delete('/options/{option}',                        [ProductVariantController::class, 'optionDestroy']);
+        Route::post('/options/{option}/values',                   [ProductVariantController::class, 'valueStore']);
+        Route::put('/options/{option}/values/{value}',            [ProductVariantController::class, 'valueUpdate']);
+        Route::delete('/options/{option}/values/{value}',         [ProductVariantController::class, 'valueDestroy']);
+
+        // Variants
+        Route::get('/variants/resolve',                           [ProductVariantController::class, 'resolve']);
+        Route::post('/variants/resolve',                          [ProductVariantController::class, 'resolve']);
+        Route::post('/variants/generate',                         [ProductVariantController::class, 'generate']);
+        Route::put('/variants/bulk',                              [ProductVariantController::class, 'bulkUpdate']);
+        Route::get('/variants',                                   [ProductVariantController::class, 'index']);
+        Route::post('/variants',                                  [ProductVariantController::class, 'store']);
+        Route::put('/variants/{variant}',                         [ProductVariantController::class, 'update']);
+        Route::delete('/variants/{variant}',                      [ProductVariantController::class, 'destroy']);
+    });
+
     Route::apiResource('/categories', ProductCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
 
     // ── Order Management ──────────────────────────────────────────────────────

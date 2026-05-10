@@ -15,7 +15,7 @@ class Product extends Model
     protected $fillable = [
         'user_id', 'category_id', 'name', 'sku', 'description',
         'regular_price', 'discount', 'discount_type', 'selling_price', 'cost_price', 'stock', 'low_stock_alert',
-        'track_stock', 'unit', 'status', 'variants', 'thumbnail',
+        'track_stock', 'unit', 'status', 'variants', 'thumbnail', 'has_variants',
     ];
 
     protected $casts = [
@@ -25,6 +25,7 @@ class Product extends Model
         'selling_price' => 'decimal:2',
         'cost_price'    => 'decimal:2',
         'track_stock'   => 'boolean',
+        'has_variants'  => 'boolean',
         'variants'      => 'array',
     ];
 
@@ -46,5 +47,15 @@ class Product extends Model
     public function primaryImage(): HasOne
     {
         return $this->hasOne(ProductImage::class)->where('is_primary', true);
+    }
+
+    public function options(): HasMany
+    {
+        return $this->hasMany(ProductOption::class)->orderBy('position');
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(ProductVariant::class)->orderBy('position');
     }
 }

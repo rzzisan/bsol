@@ -9,6 +9,7 @@ use App\Models\OrderItem;
 use App\Models\OrderStatusLog;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\ProductVariant;
 use App\Services\AccountingService;
 use App\Services\SmsAutomationService;
 use App\Support\PhoneIntelCache;
@@ -118,7 +119,9 @@ class OrderController extends Controller
         $products = Product::query()
             ->where('user_id', $userId)
             ->where('status', 'active')
-            ->select(['id', 'name', 'sku', 'regular_price', 'discount', 'discount_type', 'selling_price', 'stock', 'track_stock', 'thumbnail'])
+            ->withCount([
+                'variants as active_variants_count' => fn ($q) => $q->where('is_active', true),
+            ])
             ->orderBy('name')
             ->limit(200)
             ->get();
@@ -129,10 +132,28 @@ class OrderController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Map products to array with all necessary fields including active_variants_count
+        $productsArray = $products->map(function ($p) {
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'sku' => $p->sku,
+                'regular_price' => $p->regular_price,
+                'discount' => $p->discount,
+                'discount_type' => $p->discount_type,
+                'selling_price' => $p->selling_price,
+                'stock' => $p->stock,
+                'track_stock' => $p->track_stock,
+                'thumbnail' => $p->thumbnail,
+                'has_variants' => $p->has_variants,
+                'active_variants_count' => $p->active_variants_count ?? 0,
+            ];
+        })->values();
+
         return response()->json([
             'success' => true,
             'data' => [
-                'products' => $products,
+                'products' => $productsArray,
                 'categories' => $categories,
                 'defaults' => [
                     'source' => 'manual',
@@ -194,11 +215,24 @@ class OrderController extends Controller
             $productsById = Product::query()
                 ->where('user_id', $userId)
                 ->whereIn('id', $productIds)
-                ->get(['id', 'regular_price', 'discount', 'discount_type'])
+                ->get(['id', 'regular_price', 'discount', 'discount_type', 'has_variants'])
+                ->keyBy('id');
+
+            $variantIds = collect($data['items'])
+                ->pluck('product_variant_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            $variantsById = ProductVariant::query()
+                ->whereIn('id', $variantIds)
+                ->whereNull('deleted_at')
+                ->get(['id', 'product_id', 'sku', 'regular_price', 'discount', 'discount_type', 'selling_price', 'stock_qty', 'is_active'])
                 ->keyBy('id');
 
             foreach ($data['items'] as $item) {
                 $productModel = null;
+                $variantModel = null;
                 if (!empty($item['product_id'])) {
                     $productModel = $productsById->get((int) $item['product_id']);
                     if (!$productModel) {
@@ -208,13 +242,38 @@ class OrderController extends Controller
                     }
                 }
 
+                if (!empty($item['product_variant_id'])) {
+                    $variantModel = $variantsById->get((int) $item['product_variant_id']);
+                    if (!$variantModel) {
+                        throw ValidationException::withMessages([
+                            'items' => ['One or more selected variants are invalid.'],
+                        ]);
+                    }
+                    if (!empty($item['product_id']) && (int) $variantModel->product_id !== (int) $item['product_id']) {
+                        throw ValidationException::withMessages([
+                            'items' => ['Selected variant does not belong to the selected product.'],
+                        ]);
+                    }
+                    if (!$variantModel->is_active) {
+                        throw ValidationException::withMessages([
+                            'items' => ['One or more selected variants are inactive.'],
+                        ]);
+                    }
+                }
+
                 $regularPrice = isset($item['regular_price'])
                     ? (float) $item['regular_price']
-                    : (float) ($productModel?->regular_price ?? $item['unit_price']);
+                    : (float) ($variantModel?->regular_price ?? $productModel?->regular_price ?? $item['unit_price']);
                 $discountValue = isset($item['discount'])
                     ? (float) $item['discount']
-                    : (float) ($productModel?->discount ?? 0);
-                $discountType = (string) ($item['discount_type'] ?? ($productModel?->discount_type ?? 'amount'));
+                    : (float) ($variantModel?->discount ?? $productModel?->discount ?? 0);
+                $discountType = (string) ($item['discount_type'] ?? ($variantModel?->discount_type ?? $productModel?->discount_type ?? 'amount'));
+
+                if ($variantModel && (int) $item['quantity'] > (int) $variantModel->stock_qty) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Insufficient stock for variant SKU {$variantModel->sku}."],
+                    ]);
+                }
 
                 if ($discountType === 'percent' && $discountValue > 100) {
                     throw ValidationException::withMessages([
@@ -225,14 +284,15 @@ class OrderController extends Controller
                 OrderItem::create([
                     'order_id'     => $order->id,
                     'product_id'   => $item['product_id'] ?? null,
+                    'product_variant_id' => $item['product_variant_id'] ?? null,
                     'product_name' => $item['product_name'],
-                    'sku'          => $item['sku'] ?? null,
+                    'sku'          => $item['sku'] ?? $variantModel?->sku ?? null,
                     'quantity'     => $item['quantity'],
                     'regular_price'=> $regularPrice,
                     'discount'     => $discountValue,
                     'discount_type'=> $discountType,
-                    'unit_price'   => $item['unit_price'],
-                    'total'        => $item['quantity'] * $item['unit_price'],
+                    'unit_price'   => $item['unit_price'] ?? (float) ($variantModel?->selling_price ?? 0),
+                    'total'        => $item['quantity'] * ($item['unit_price'] ?? (float) ($variantModel?->selling_price ?? 0)),
                     'variant_info' => $item['variant_info'] ?? null,
                 ]);
             }
@@ -264,7 +324,7 @@ class OrderController extends Controller
     public function show(int $id): JsonResponse
     {
         $order = Order::where('user_id', auth()->id())
-            ->with(['items.product:id,thumbnail', 'statusLogs.changedByUser:id,name'])
+            ->with(['items.product:id,thumbnail', 'items.variant:id,sku,image_url', 'statusLogs.changedByUser:id,name'])
             ->findOrFail($id);
 
         return response()->json(['success' => true, 'data' => $order]);
@@ -332,6 +392,8 @@ class OrderController extends Controller
         $order->update(['status' => $data['status']]);
         PhoneIntelCache::bump($order->customer_phone);
 
+        $this->adjustVariantInventoryForStatusTransition($order, $oldStatus, $data['status']);
+
         OrderStatusLog::create([
             'order_id'   => $order->id,
             'old_status' => $oldStatus,
@@ -351,6 +413,32 @@ class OrderController extends Controller
         }
 
         return response()->json(['success' => true, 'data' => $order]);
+    }
+
+    private function adjustVariantInventoryForStatusTransition(Order $order, string $oldStatus, string $newStatus): void
+    {
+        $reserveStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
+        $releaseStatuses = ['cancelled', 'returned'];
+
+        $wasReserved = in_array($oldStatus, $reserveStatuses, true);
+        $isReserved  = in_array($newStatus, $reserveStatuses, true);
+
+        if (!$wasReserved && $isReserved) {
+            foreach ($order->items()->whereNotNull('product_variant_id')->get() as $item) {
+                ProductVariant::where('id', $item->product_variant_id)
+                    ->whereNull('deleted_at')
+                    ->decrement('stock_qty', (int) $item->quantity);
+            }
+            return;
+        }
+
+        if ($wasReserved && in_array($newStatus, $releaseStatuses, true)) {
+            foreach ($order->items()->whereNotNull('product_variant_id')->get() as $item) {
+                ProductVariant::where('id', $item->product_variant_id)
+                    ->whereNull('deleted_at')
+                    ->increment('stock_qty', (int) $item->quantity);
+            }
+        }
     }
 
     // ── Bulk Status ───────────────────────────────────────────────────────────

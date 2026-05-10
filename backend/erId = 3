@@ -1,0 +1,46 @@
+Response (first 3 products with variant info):
+{
+    "id": 4,
+    "name": "Banana",
+    "sku": "bna",
+    "regular_price": null,
+    "discount": "0.00",
+    "discount_type": "amount",
+    "selling_price": "25.00",
+    "stock": 80,
+    "track_stock": true,
+    "thumbnail": null,
+    "has_variants": false,
+    "active_variants_count": 0
+}
+
+{
+    "id": 3,
+    "name": "Headphones",
+    "sku": "wh",
+    "regular_price": "1500.00",
+    "discount": "15.00",
+    "discount_type": "percent",
+    "selling_price": "1275.00",
+    "stock": 50,
+    "track_stock": true,
+    "thumbnail": "https:\/\/bsol.zyrotechbd.com\/storage\/product-media\/3\/3\/roJ4LE9qUDacJTH2Jq5CuinkY445CMbWl3XuOtrt.jpg",
+    "has_variants": true,
+    "active_variants_count": 0
+}
+
+{
+    "id": 2,
+    "name": "Jhal Muri",
+    "sku": "JHM",
+    "regular_price": null,
+    "discount": "0.00",
+    "discount_type": "amount",
+    "selling_price": "450.00",
+    "stock": 15,
+    "track_stock": true,
+    "thumbnail": "https:\/\/bsol.zyrotechbd.com\/storage\/product-media\/3\/2\/i9guXvyTKb5eeUJMDcAeUSmbpUmzkFwDgVoqwFxM.png",
+    "has_variants": false,
+    "active_variants_count": 0
+}
+

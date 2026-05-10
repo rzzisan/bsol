@@ -68,6 +68,7 @@ class ProductController extends Controller
             'stock'            => 'nullable|integer|min:0',
             'low_stock_alert'  => 'nullable|integer|min:0',
             'track_stock'      => 'nullable|boolean',
+            'has_variants'     => 'nullable|boolean',
             'unit'             => 'nullable|string|max:50',
             'status'           => 'nullable|in:active,inactive,archived',
             'variants'         => 'nullable|array',
@@ -88,6 +89,7 @@ class ProductController extends Controller
         );
         $data['cost_price']  = $data['cost_price'] ?? 0;
         $data['track_stock'] = $data['track_stock'] ?? false;
+        $data['has_variants'] = $data['has_variants'] ?? false;
         $data['status']      = $data['status'] ?? 'active';
 
         // Validate category belongs to this user
@@ -147,6 +149,7 @@ class ProductController extends Controller
             'stock'           => 'nullable|integer|min:0',
             'low_stock_alert' => 'nullable|integer|min:0',
             'track_stock'     => 'nullable|boolean',
+            'has_variants'    => 'nullable|boolean',
             'unit'            => 'nullable|string|max:50',
             'status'          => 'nullable|in:active,inactive,archived',
             'variants'        => 'nullable|array',
