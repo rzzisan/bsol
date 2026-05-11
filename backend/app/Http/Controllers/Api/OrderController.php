@@ -15,6 +15,7 @@ use App\Services\SmsAutomationService;
 use App\Support\PhoneIntelCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -115,6 +116,7 @@ class OrderController extends Controller
     public function createBootstrap(): JsonResponse
     {
         $userId = auth()->id();
+        $productColumns = $this->productSelectColumns();
 
         $products = Product::query()
             ->where('user_id', $userId)
@@ -124,7 +126,7 @@ class OrderController extends Controller
             ])
             ->orderBy('name')
             ->limit(200)
-            ->get();
+            ->get($productColumns);
 
         $categories = ProductCategory::query()
             ->where('user_id', $userId)
@@ -138,14 +140,14 @@ class OrderController extends Controller
                 'id' => $p->id,
                 'name' => $p->name,
                 'sku' => $p->sku,
-                'regular_price' => $p->regular_price,
-                'discount' => $p->discount,
-                'discount_type' => $p->discount_type,
-                'selling_price' => $p->selling_price,
-                'stock' => $p->stock,
-                'track_stock' => $p->track_stock,
+                'regular_price' => $p->regular_price ?? $p->selling_price ?? 0,
+                'discount' => $p->discount ?? 0,
+                'discount_type' => $p->discount_type ?? 'amount',
+                'selling_price' => $p->selling_price ?? 0,
+                'stock' => $p->stock ?? 0,
+                'track_stock' => (bool) ($p->track_stock ?? false),
                 'thumbnail' => $p->thumbnail,
-                'has_variants' => $p->has_variants,
+                'has_variants' => (bool) ($p->has_variants ?? false),
                 'active_variants_count' => $p->active_variants_count ?? 0,
             ];
         })->values();
@@ -215,7 +217,7 @@ class OrderController extends Controller
             $productsById = Product::query()
                 ->where('user_id', $userId)
                 ->whereIn('id', $productIds)
-                ->get(['id', 'regular_price', 'discount', 'discount_type', 'has_variants'])
+                ->get($this->productOrderLookupColumns())
                 ->keyBy('id');
 
             $variantIds = collect($data['items'])
@@ -495,5 +497,37 @@ class OrderController extends Controller
         PhoneIntelCache::bump($phone);
 
         return response()->json(['success' => true, 'message' => 'Order deleted.']);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function productSelectColumns(): array
+    {
+        $columns = ['id', 'name', 'sku', 'selling_price', 'stock', 'track_stock', 'thumbnail'];
+
+        foreach (['regular_price', 'discount', 'discount_type', 'has_variants'] as $optionalColumn) {
+            if (Schema::hasColumn('products', $optionalColumn)) {
+                $columns[] = $optionalColumn;
+            }
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function productOrderLookupColumns(): array
+    {
+        $columns = ['id', 'selling_price'];
+
+        foreach (['regular_price', 'discount', 'discount_type', 'has_variants'] as $optionalColumn) {
+            if (Schema::hasColumn('products', $optionalColumn)) {
+                $columns[] = $optionalColumn;
+            }
+        }
+
+        return $columns;
     }
 }
