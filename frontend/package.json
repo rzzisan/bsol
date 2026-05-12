@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node -e \"const fs=require('fs'); fs.rmSync('.next',{recursive:true,force:true}); fs.mkdirSync('.next',{recursive:true});\"",
     "build": "next build",
     "start": "next start",
+    "deploy:prod:safe": "bash ./scripts/deploy-safe.sh",
     "lint": "eslint",
     "test": "jest"
   },

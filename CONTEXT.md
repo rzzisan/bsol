@@ -883,3 +883,74 @@ NotificationTemplate::all()  // সব user-এর data leak হবে
 
 - `38c3967` — Initial adminScopeUserIds implementation (3 controllers)
 - `NotificationDispatchController` logs fix — same session (2026-04-29)
+
+---
+
+## 26. CSS chunk outage + permanent prevention update (2026-05-12)
+
+### Incident summary
+
+`/dashboard` route-এ মাঝে মাঝে UI plain/unstyled হচ্ছিল। Live checks-এ দেখা যায়:
+
+- HTML stylesheet reference: `/_next/static/chunks/1361_rsy~dklu.css`
+- ওই CSS request: `500 Internal Server Error`
+- Preloaded CSS path: `/_next/static/chunks/188dtksfo.8-3.css`
+- preload CSS request: `404 Not Found`
+
+### Verified root cause
+
+Problem backend/Laravel issue না; এটি frontend runtime/build artifact mismatch:
+
+1. Running Next.js process যে chunk reference করছিল, filesystem artifact state তার সাথে consistent ছিল না
+2. `.next` build output stale/inconsistent state-এ ছিল (manifest/chunk mismatch)
+3. Result: HTML পুরনো/invalid CSS chunk reference করছিল, stylesheet fail হচ্ছিল, page unstyled দেখাচ্ছিল
+
+### Permanent fix applied (this session)
+
+1. `frontend/.next` clean করা হয়েছে
+2. Clean production build run করা হয়েছে
+3. Supervisor process restart করা হয়েছে (`hybrid-stack-frontend`)
+4. Live smoke checks run করা হয়েছে:
+	- `/dashboard` HTML load OK
+	- active CSS chunk returns `200 OK`
+	- `/api/health` returns `200 OK`
+
+### Engineering hardening added (code-level)
+
+#### `/var/www/hybrid-stack/frontend/package.json`
+
+- `prebuild` hook add করা হয়েছে যাতে build-এর আগে `.next` force-clean হয়
+- `deploy:prod:safe` script add করা হয়েছে যাতে standardized safe deploy flow run করা যায়
+
+#### `/var/www/hybrid-stack/frontend/scripts/deploy-safe.sh`
+
+একটি repeatable production-safe deploy script add করা হয়েছে যা:
+
+1. `.next` clean করে
+2. build output ownership align করে (`www-data`)
+3. frontend build run করে
+4. supervisor stop/start flow use করে
+5. port `3001`-এ stale/orphan `next` process থাকলে terminate করে
+6. supervisor status verify করে
+7. live smoke check করে (`/dashboard`, `/api/health`)
+8. active CSS chunk detect করে HTTP `200` validate করে
+
+### Mandatory future prevention rules
+
+Frontend deploy complete বলার আগে **সবগুলো** pass করতে হবে:
+
+1. Clean build (prebuild auto-clean active)
+2. Supervisor restart
+3. Supervisor running status verify
+4. Live smoke check (`/dashboard`, `/api/health`)
+5. Active CSS chunk URL detect + `200 OK` confirmation
+6. Port `3001` conflict (`EADDRINUSE`) না থাকাটা ensure করতে হবে
+
+### Operational command (recommended)
+
+```
+cd /var/www/hybrid-stack/frontend
+npm run deploy:prod:safe
+```
+
+এই command pass না করলে deployment complete হিসেবে ধরা যাবে না।

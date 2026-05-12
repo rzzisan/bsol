@@ -33,6 +33,151 @@ export default function LandingRenderer({
       page.title,
   );
 
+  if (templateCode === "goofi_flashcard_offer") {
+    const hero = sections.find((item) => item.type === "hero")?.data ?? {};
+    const authority = sections.find((item) => item.type === "authority")?.data ?? {};
+    const reviews = objectArray(sections.find((item) => item.type === "reviews")?.data?.review_images);
+    const faqs = objectArray(sections.find((item) => item.type === "faq")?.data?.faq_items);
+    const guaranteeItems = sectionList(sections.find((item) => item.type === "guarantees")?.data?.guarantee_items);
+
+    return (
+      <div
+        className="mx-auto w-full max-w-5xl overflow-hidden rounded-[28px] border border-[#e9ecef] bg-[#fffdf7] text-slate-900 shadow-[0_20px_48px_rgba(15,23,42,0.12)]"
+        style={{ fontFamily: page.theme_tokens_json?.font_family || "inherit" }}
+      >
+        <section className="px-5 py-7 sm:px-8 sm:py-9" style={{ background: `linear-gradient(145deg, ${primary}, ${accent})` }}>
+          <div className="max-w-3xl text-white">
+            <p className="inline-flex rounded-full bg-white/20 px-3 py-1 text-xs font-semibold tracking-[0.16em]">FLASHCARD LEARNING OFFER</p>
+            <h1 className="mt-3 text-3xl font-black leading-tight sm:text-5xl">
+              {String(hero.hero_title ?? heroTitle)}
+            </h1>
+            <p className="mt-3 text-sm text-white/90 sm:text-base">
+              {String(hero.hero_subtitle ?? page.meta_description ?? (locale === "bn" ? "খেলতে খেলতে শেখার স্মার্ট সমাধান।" : "A smart way to build learning through play."))}
+            </p>
+            <button
+              type="button"
+              onClick={onPrimaryCta}
+              className="mt-5 rounded-full bg-[#ffd84d] px-6 py-3 text-sm font-extrabold text-slate-900 transition hover:-translate-y-0.5"
+            >
+              {String(hero.cta_text_primary ?? (locale === "bn" ? "এখনই অর্ডার করুন" : "Order Now"))}
+            </button>
+          </div>
+        </section>
+
+        <section className="grid gap-3 border-b border-[#ece6d8] bg-[#fff7d2] px-5 py-4 text-sm font-semibold text-slate-700 sm:grid-cols-3 sm:px-8">
+          {[
+            String(authority.authority_text ?? (locale === "bn" ? "Expert-informed learning framework" : "Expert-informed learning framework")),
+            String(authority.reach_text ?? (locale === "bn" ? "হাজারো পরিবারের আস্থা" : "Trusted by thousands of families")),
+            String(authority.proof_text ?? (locale === "bn" ? "Science-backed play cards" : "Science-backed play cards")),
+          ].map((item) => (
+            <div key={item} className="rounded-2xl border border-[#f1df9c] bg-white/70 px-4 py-3">✅ {item}</div>
+          ))}
+        </section>
+
+        <div className="space-y-6 px-5 py-6 sm:px-8">
+          <section className="rounded-3xl border border-[#ece6d8] bg-white p-5">
+            <h2 className="text-xl font-black">{locale === "bn" ? "অভিভাবকদের রিভিউ" : "Parent Reviews"}</h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {reviews.length > 0 ? reviews.map((item, index) => (
+                <div key={String(item.title ?? index)} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">{String(item.title ?? `Review ${index + 1}`)}</p>
+                  <p className="mt-2 text-sm text-slate-600">{String(item.caption ?? "Happy parent feedback")}</p>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">{locale === "bn" ? "রিভিউ যোগ করুন" : "Add review items"}</div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-[#ece6d8] bg-white p-5">
+            <h2 className="text-xl font-black">FAQ</h2>
+            <div className="mt-3 space-y-3">
+              {faqs.map((item, index) => (
+                <details key={String(item.question ?? index)} className="rounded-2xl bg-slate-50 p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-900">{String(item.question ?? `FAQ ${index + 1}`)}</summary>
+                  <p className="mt-2 text-sm text-slate-600">{String(item.answer ?? "")}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-[#ece6d8] bg-white p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-xl font-black">{locale === "bn" ? "পছন্দের সেট বেছে নিন" : "Select Your Product"}</h2>
+              <button
+                type="button"
+                onClick={onPrimaryCta}
+                className="rounded-full px-5 py-2 text-xs font-black text-white"
+                style={{ backgroundColor: primary }}
+              >
+                {locale === "bn" ? "চেকআউট" : "Checkout"}
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {(page.products ?? []).map((item) => {
+                const sale = Number(item.custom_price ?? item.product?.selling_price ?? 0);
+                const regular = Math.round(sale * 1.3);
+                return (
+                  <article key={item.product_id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    {item.product?.thumbnail ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.product.thumbnail} alt={item.custom_title ?? item.product?.name ?? "Product"} className="h-44 w-full rounded-2xl object-cover" />
+                    ) : (
+                      <div className="flex h-44 w-full items-center justify-center rounded-2xl bg-slate-200 text-xs font-bold text-slate-500">NO IMAGE</div>
+                    )}
+                    <h3 className="mt-3 text-base font-bold">{item.custom_title ?? item.product?.name ?? `Product #${item.product_id}`}</h3>
+                    <div className="mt-2 flex items-end gap-2">
+                      <span className="text-xl font-black text-slate-900">৳{sale.toLocaleString()}</span>
+                      <span className="text-sm font-semibold text-slate-400 line-through">৳{regular.toLocaleString()}</span>
+                    </div>
+                    <p className="mt-1 text-xs font-semibold text-emerald-700">
+                      {locale === "bn" ? `আপনি সাশ্রয় করছেন ৳${(regular - sale).toLocaleString()}` : `You save ৳${(regular - sale).toLocaleString()}`}
+                    </p>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-[#ece6d8] bg-[#f8fbff] p-5">
+            <h2 className="text-xl font-black">{locale === "bn" ? "ডেলিভারি ও পেমেন্ট সুবিধা" : "Delivery & Payment Assurances"}</h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {(guaranteeItems.length > 0 ? guaranteeItems : [
+                locale === "bn" ? "Cash on Delivery - সারা বাংলাদেশ" : "Cash on Delivery - Nationwide",
+                locale === "bn" ? "Secure Payment Gateway" : "Secure Payment Gateway",
+                locale === "bn" ? "Easy Return Support" : "Easy Return Support",
+                locale === "bn" ? "দ্রুত ডেলিভারি ট্র্যাকিং" : "Fast delivery tracking",
+              ]).map((item) => (
+                <div key={item} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">🔒 {item}</div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <section className="bg-slate-900 px-5 py-6 text-white sm:px-8">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/70">{locale === "bn" ? "সহায়তা" : "Support"}</p>
+              <p className="mt-2 text-lg font-bold">{String(contact.phone ?? "+8801XXXXXXXXX")}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/70">WhatsApp</p>
+              <p className="mt-2 text-lg font-bold">{String(contact.whatsapp ?? contact.phone ?? "Not set")}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/70">{locale === "bn" ? "পলিসি" : "Policy"}</p>
+              <div className="mt-2 flex flex-wrap gap-3 text-sm text-white/90">
+                <a href={String(policy.privacy_url ?? "#")} target="_blank" rel="noreferrer">{locale === "bn" ? "প্রাইভেসি" : "Privacy"}</a>
+                <a href={String(policy.terms_url ?? "#")} target="_blank" rel="noreferrer">{locale === "bn" ? "শর্তাবলী" : "Terms"}</a>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div
       className="mx-auto w-full max-w-5xl rounded-[28px] border border-black/5 bg-white text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.12)]"

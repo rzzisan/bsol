@@ -143,10 +143,67 @@ function buildFallbackSections(template?: LandingTemplate | null): Section[] {
 
   if (code === "goofi_flashcard_offer") {
     return [
-      { id: "hero", type: "hero", enabled: true, order: 1, data: { hero_title: "শিশুর শেখা হোক আরও আনন্দময়", hero_subtitle: "Problem-solution hero section" } },
-      { id: "reviews", type: "reviews", enabled: true, order: 2, data: { review_images: [{ title: "Parent review", caption: "Visual testimonial block" }] } },
-      { id: "faq", type: "faq", enabled: true, order: 3, data: { faq_items: [{ question: "ডেলিভারি কত দিনে?", answer: "ঢাকার ভিতরে ১-২ দিন, বাইরে ২-৪ দিন।" }] } },
-      { id: "cta", type: "cta", enabled: true, order: 4, data: { cta_text_primary: "অর্ডার করতে নিচে যান" } },
+      {
+        id: "hero",
+        type: "hero",
+        enabled: true,
+        order: 1,
+        data: {
+          hero_title: "সন্তানের শেখা আরও মজার ও স্মার্ট করুন",
+          hero_subtitle: "Play-based flashcard journey with strong parent trust signals and fast checkout flow.",
+          cta_text_primary: "এখনই অর্ডার করুন",
+        },
+      },
+      {
+        id: "authority",
+        type: "authority",
+        enabled: true,
+        order: 2,
+        data: {
+          authority_text: "Early learning experts inspired framework",
+          reach_text: "১২,০০০+ পরিবারের আস্থা",
+          proof_text: "Research-informed activity cards",
+        },
+      },
+      {
+        id: "reviews",
+        type: "reviews",
+        enabled: true,
+        order: 3,
+        data: {
+          review_images: [
+            { title: "Parent review #1", caption: "Before/after learning confidence improvement" },
+            { title: "Parent review #2", caption: "Daily engagement boosted through playful cards" },
+          ],
+        },
+      },
+      {
+        id: "faq",
+        type: "faq",
+        enabled: true,
+        order: 4,
+        data: {
+          faq_items: [
+            { question: "ডেলিভারি কত দিনে?", answer: "ঢাকার ভিতরে ১-২ দিন, ঢাকার বাইরে ২-৪ দিন।" },
+            { question: "বয়স কত হলে ব্যবহার করা যাবে?", answer: "সাধারণত ২+ থেকে শুরু করা যায়, প্যাকভেদে গাইড থাকবে।" },
+          ],
+        },
+      },
+      {
+        id: "guarantees",
+        type: "guarantees",
+        enabled: true,
+        order: 5,
+        data: {
+          guarantee_items: [
+            "Cash on Delivery available",
+            "Secure payment and order support",
+            "Easy replacement support",
+            "Fast nationwide delivery",
+          ],
+        },
+      },
+      { id: "cta", type: "cta", enabled: true, order: 6, data: { cta_text_primary: "চেকআউটে যান" } },
     ];
   }
 

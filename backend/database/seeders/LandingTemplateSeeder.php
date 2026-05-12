@@ -29,19 +29,31 @@ class LandingTemplateSeeder extends Seeder
                             'enabled' => true,
                             'order' => 1,
                             'data' => [
-                                'hero_title' => 'শিশুর শেখা হোক খেলার ছলে',
-                                'hero_subtitle' => 'ফ্ল্যাশকার্ড, visual proof, FAQ আর frictionless checkout — সব এক template-এ।',
+                                'hero_title' => 'সন্তানের শেখা আরও মজার ও স্মার্ট করুন',
+                                'hero_subtitle' => 'Play-based flashcard learning journey with parent-trust and quick checkout.',
                                 'cta_text_primary' => 'এখনই অর্ডার করুন',
+                            ],
+                        ],
+                        [
+                            'id' => 'authority',
+                            'type' => 'authority',
+                            'enabled' => true,
+                            'order' => 2,
+                            'data' => [
+                                'authority_text' => 'Early learning experts inspired framework',
+                                'reach_text' => '১২,০০০+ পরিবারের আস্থা',
+                                'proof_text' => 'Research-informed activity cards',
                             ],
                         ],
                         [
                             'id' => 'reviews',
                             'type' => 'reviews',
                             'enabled' => true,
-                            'order' => 2,
+                            'order' => 3,
                             'data' => [
                                 'review_images' => [
-                                    ['title' => 'Parent feedback', 'caption' => 'ছবিসহ review block'],
+                                    ['title' => 'Parent feedback #1', 'caption' => 'ছবিসহ parent testimonial block'],
+                                    ['title' => 'Parent feedback #2', 'caption' => 'Daily learning confidence improvement story'],
                                 ],
                             ],
                         ],
@@ -49,10 +61,25 @@ class LandingTemplateSeeder extends Seeder
                             'id' => 'faq',
                             'type' => 'faq',
                             'enabled' => true,
-                            'order' => 3,
+                            'order' => 4,
                             'data' => [
                                 'faq_items' => [
                                     ['question' => 'ডেলিভারি কতদিনে?', 'answer' => 'ঢাকায় ১-২ দিন, বাইরে ২-৪ দিন।'],
+                                    ['question' => 'কোন বয়সে উপযোগী?', 'answer' => 'সাধারণত ২+ বয়স থেকে শুরু করা যায়।'],
+                                ],
+                            ],
+                        ],
+                        [
+                            'id' => 'guarantees',
+                            'type' => 'guarantees',
+                            'enabled' => true,
+                            'order' => 5,
+                            'data' => [
+                                'guarantee_items' => [
+                                    'Cash on Delivery available',
+                                    'Secure payment support',
+                                    'Easy return/replacement assistance',
+                                    'Fast nationwide delivery',
                                 ],
                             ],
                         ],
