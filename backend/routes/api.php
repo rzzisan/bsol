@@ -3,6 +3,10 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminSmsCreditController;
 use App\Http\Controllers\AdminSmsGatewayController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\EmailOtpController;
+use App\Http\Controllers\OtpController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\Api\EmailConfigurationController;
 use App\Http\Controllers\Api\NotificationDispatchController;
 use App\Http\Controllers\Api\NotificationTemplateController;
@@ -12,6 +16,8 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\LandingPageController;
 use App\Http\Controllers\Api\LandingTrackingController;
+use App\Http\Controllers\Api\SmsAutomationController;
+use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
 use App\Http\Controllers\Api\Admin\LandingTemplateController;
 use App\Http\Controllers\Api\OrderController;
@@ -19,13 +25,9 @@ use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
-use App\Http\Controllers\Api\SmsAutomationController;
-use App\Http\Controllers\Api\TransactionController;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\EmailOtpController;
-use App\Http\Controllers\OtpController;
-use App\Http\Controllers\PasswordResetController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\FunnelController;
+use App\Http\Controllers\Api\FunnelFlowStepController;
+use App\Http\Controllers\Api\LandingPageBlockController;
 
 Route::get('/health', function () {
     return response()->json([
@@ -59,6 +61,10 @@ Route::get('/landing/public/{slug}', [LandingPageController::class, 'publicShow'
 Route::post('/landing/public/{slug}/order', [LandingPageController::class, 'submitOrder']);
 Route::post('/landing/track/view', [LandingTrackingController::class, 'trackView']);
 Route::post('/landing/track/cta', [LandingTrackingController::class, 'trackCta']);
+Route::post('/landing/track/checkout-start', [LandingTrackingController::class, 'trackCheckoutStart']);
+Route::post('/landing/track/order-bump', [LandingTrackingController::class, 'trackOrderBump']);
+Route::post('/landing/track/order-complete', [LandingTrackingController::class, 'trackOrderComplete']);
+Route::post('/landing/track/upsell', [LandingTrackingController::class, 'trackUpsell']);
 
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
@@ -187,6 +193,28 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/landing/pages/{id}/archive', [LandingPageController::class, 'archive']);
     Route::get('/landing/pages/{id}/preview', [LandingPageController::class, 'preview']);
     Route::get('/landing/pages/{id}/analytics', [LandingPageController::class, 'analytics']);
+    Route::post('/landing/pages/{landingPage}/blocks', [LandingPageBlockController::class, 'store']);
+    Route::get('/landing/pages/{landingPage}/blocks', [LandingPageBlockController::class, 'index']);
+    Route::put('/landing/pages/{landingPage}/blocks/{block}', [LandingPageBlockController::class, 'update']);
+    Route::delete('/landing/pages/{landingPage}/blocks/{block}', [LandingPageBlockController::class, 'destroy']);
+    Route::put('/landing/pages/{landingPage}/blocks/reorder', [LandingPageBlockController::class, 'reorder']);
+    Route::post('/landing/pages/{landingPage}/blocks/{block}/duplicate', [LandingPageBlockController::class, 'duplicate']);
+
+    // ── Seller Funnel Builder ───────────────────────────────────────────────
+    Route::get('/funnels', [FunnelController::class, 'index']);
+    Route::post('/funnels', [FunnelController::class, 'store']);
+    Route::get('/funnels/{funnel}', [FunnelController::class, 'show']);
+    Route::put('/funnels/{funnel}', [FunnelController::class, 'update']);
+    Route::put('/funnels/{funnel}/publish', [FunnelController::class, 'publish']);
+    Route::put('/funnels/{funnel}/archive', [FunnelController::class, 'archive']);
+    Route::delete('/funnels/{funnel}', [FunnelController::class, 'destroy']);
+    Route::get('/funnels/{funnel}/preview', [FunnelController::class, 'preview']);
+    Route::get('/funnels/{funnel}/analytics', [FunnelController::class, 'analytics']);
+    Route::get('/funnels/{funnel}/flows/{flow}/steps', [FunnelFlowStepController::class, 'index']);
+    Route::post('/funnels/{funnel}/flows/{flow}/steps', [FunnelFlowStepController::class, 'store']);
+    Route::put('/funnels/{funnel}/flows/{flow}/steps/reorder', [FunnelFlowStepController::class, 'reorder']);
+    Route::put('/funnels/{funnel}/flows/{flow}/steps/{step}', [FunnelFlowStepController::class, 'update']);
+    Route::delete('/funnels/{funnel}/flows/{flow}/steps/{step}', [FunnelFlowStepController::class, 'destroy']);
 
     Route::middleware('is_admin')->prefix('admin')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);

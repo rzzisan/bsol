@@ -46,6 +46,8 @@ const menuText = {
     landing: "ল্যান্ডিং পেইজ",
     landingPages: "ল্যান্ডিং পেইজসমূহ",
     landingCreate: "নতুন ল্যান্ডিং",
+    funnels: "ফানেলসমূহ",
+    funnelCreate: "নতুন ফানেল",
 
     customers: "কাস্টমার",
     customerList: "কাস্টমার তালিকা",
@@ -102,6 +104,8 @@ const menuText = {
     landing: "Landing Pages",
     landingPages: "Landing Pages",
     landingCreate: "Create Landing",
+    funnels: "Funnels",
+    funnelCreate: "Create Funnel",
 
     customers: "Customers",
     customerList: "Customer List",
@@ -174,6 +178,8 @@ function buildMenu(t: typeof menuText.bn): ShellMenuItem[] {
       children: [
         { key: "landing-pages", label: t.landingPages, href: "/dashboard/landing-pages" },
         { key: "landing-create", label: t.landingCreate, href: "/dashboard/landing-pages/create" },
+        { key: "funnels", label: t.funnels, href: "/dashboard/funnels" },
+        { key: "funnel-create", label: t.funnelCreate, href: "/dashboard/funnels/create" },
       ],
     },
     {

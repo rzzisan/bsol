@@ -20,6 +20,8 @@ class LandingTemplateSeeder extends Seeder
                 'description_bn' => 'Education-style offer template with FAQ, review wall, and full checkout flow.',
                 'description_en' => 'Education-style offer template with FAQ, review wall, and full checkout flow.',
                 'category' => 'education',
+                'layout_profile' => null,
+                'editor_mode' => 'flex',
                 'sort_order' => 1,
                 'default_schema_json' => [
                     'sections' => [
@@ -93,6 +95,8 @@ class LandingTemplateSeeder extends Seeder
                 'description_bn' => 'Story-led health and wellness offer template with strong CTA anchors.',
                 'description_en' => 'Story-led health and wellness offer template with strong CTA anchors.',
                 'category' => 'story',
+                'layout_profile' => null,
+                'editor_mode' => 'flex',
                 'sort_order' => 2,
                 'default_schema_json' => [
                     'sections' => [
@@ -136,51 +140,89 @@ class LandingTemplateSeeder extends Seeder
                 'description_bn' => 'Package comparison with one-time upsell and sticky checkout section.',
                 'description_en' => 'Package comparison with one-time upsell and sticky checkout section.',
                 'category' => 'package',
+                'layout_profile' => 'naturiva_exact_clone_locked',
+                'editor_mode' => 'locked',
                 'sort_order' => 3,
                 'default_schema_json' => [
-                    'sections' => [
-                        [
-                            'id' => 'hero',
-                            'type' => 'hero',
-                            'enabled' => true,
-                            'order' => 1,
-                            'data' => [
-                                'hero_title' => 'স্মার্ট প্যাকেজ অফার, স্মার্ট সিদ্ধান্ত',
-                                'hero_subtitle' => 'Package comparison, quick trust blocks, upsell-ready flow.',
+                    'layout_profile' => 'naturiva_exact_clone_locked',
+                    'hero' => [
+                        'title' => 'অ্যাজমা, কাশি ও শ্বাসকষ্টের যত্নে প্রাকৃতিক সাপোর্ট',
+                        'subtitle' => 'প্যাকেজ বেছে নিয়ে নিচের ফর্ম পূরণ করে সরাসরি অর্ডার কনফার্ম করুন।',
+                        'disclaimer' => '',
+                    ],
+                    'proof' => [
+                        'video_url' => '',
+                        'review_images' => [],
+                    ],
+                    'offer_strip' => [
+                        'cta_label' => 'অর্ডার করতে চাই',
+                        'package_highlights' => [
+                            ['text' => '৩ মাসের জন্য ৩০০ গ্রাম', 'emphasis' => '৫০০০ টাকা'],
+                            ['text' => '১ মাসের জন্য ১০০ গ্রাম', 'emphasis' => '১৮০০ টাকা'],
+                            ['text' => '১৫ দিনের জন্য ৫০ গ্রাম', 'emphasis' => '১০০০ টাকা'],
+                        ],
+                    ],
+                    'contact' => [
+                        'call_numbers' => [],
+                        'whatsapp_numbers' => [],
+                    ],
+                    'checkout' => [
+                        'section_title' => 'অর্ডার করতে আপনার সঠিক তথ্য দিন',
+                        'packages' => [
+                            [
+                                'id' => 'pkg_1m',
+                                'title' => '১ মাসের প্যাকেজ',
+                                'subtitle' => '',
+                                'price' => 1800,
+                                'compare_at_price' => null,
+                                'badge' => 'জনপ্রিয়',
+                                'image' => '',
+                                'is_default' => true,
+                            ],
+                            [
+                                'id' => 'pkg_15d',
+                                'title' => '১৫ দিনের প্যাকেজ',
+                                'subtitle' => '',
+                                'price' => 1000,
+                                'compare_at_price' => null,
+                                'badge' => '',
+                                'image' => '',
+                                'is_default' => false,
                             ],
                         ],
-                        [
-                            'id' => 'reviews',
-                            'type' => 'reviews',
-                            'enabled' => true,
-                            'order' => 2,
-                            'data' => [
-                                'reviews' => [
-                                    ['title' => 'Customer proof', 'caption' => 'Package conversion oriented testimonial block'],
-                                ],
-                            ],
+                        'billing_fields' => [
+                            'name' => true,
+                            'phone' => true,
+                            'address' => true,
+                            'country' => true,
                         ],
-                        [
-                            'id' => 'packages',
-                            'type' => 'packages',
-                            'enabled' => true,
-                            'order' => 3,
-                            'data' => [
-                                'packages' => [
-                                    ['name' => '১ মাসের প্যাক', 'price' => '1490', 'bonus' => 'Free support'],
-                                    ['name' => '৩ মাসের প্যাক', 'price' => '3990', 'bonus' => 'Best value'],
-                                ],
-                            ],
+                        'shipping_options' => [
+                            ['id' => 'outside_dhaka', 'label' => 'ঢাকা সিটির বাহিরে', 'fee' => 100, 'is_default' => true],
+                            ['id' => 'inside_dhaka', 'label' => 'ঢাকা সিটিতে', 'fee' => 50, 'is_default' => false],
                         ],
-                        [
-                            'id' => 'final_cta',
-                            'type' => 'final_cta',
+                        'upsell' => [
                             'enabled' => true,
-                            'order' => 4,
-                            'data' => [
-                                'final_cta_text' => 'আজই অর্ডার নিশ্চিত করুন',
-                            ],
+                            'checkbox_label' => 'স্পেশাল কম্বোসহ নিতে চাই',
+                            'title' => 'One Time Special Offer',
+                            'description_html' => '',
+                            'image' => '',
+                            'price' => 999,
                         ],
+                        'cod_confirmation_text' => 'আমি পণ্য হাতে পেয়ে টাকা পরিশোধ করবো, ইনশাআল্লাহ।',
+                        'submit_label' => 'Confirm Order',
+                    ],
+                    'bottom_cta' => [
+                        'text' => 'Click to Call',
+                        'phone' => '',
+                    ],
+                    'policy' => [
+                        'privacy_url' => '',
+                        'terms_url' => '',
+                    ],
+                    'theme' => [
+                        'primary' => '#0b7a2a',
+                        'accent' => '#ff6a00',
+                        'button_text' => '#ffffff',
                     ],
                 ],
             ],

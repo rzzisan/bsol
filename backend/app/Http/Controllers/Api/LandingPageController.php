@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\LandingPage;
 use App\Models\LandingPageAnalyticsDaily;
+use App\Models\LandingPageConversionTracking;
 use App\Models\LandingPageProduct;
 use App\Models\LandingTemplate;
 use App\Models\Order;
@@ -33,6 +34,15 @@ class LandingPageController extends Controller
             ->orderBy('id')
             ->get()
             ->filter(fn (LandingTemplate $template) => $this->isTemplateAllowedForPackage($template, $packageId))
+            ->map(function (LandingTemplate $template) {
+                $data = $template->toArray();
+                $data['template_code'] = $template->code;
+                $data['layout_profile'] = $template->layout_profile;
+                $data['editor_mode'] = $template->editor_mode;
+                $data['editable_fields_manifest'] = $this->editableFieldsManifest($template);
+
+                return $data;
+            })
             ->values();
 
         return response()->json([
@@ -108,6 +118,13 @@ class LandingPageController extends Controller
         $page = DB::transaction(function () use ($validated, $user, $template) {
             $slug = $this->ensureUniqueSlug($validated['slug'] ?? $validated['title']);
 
+            $contentJson = $validated['content_json']
+                ?? ($template->default_schema_json ?: ['sections' => [], 'theme' => [], 'contact' => [], 'policy' => []]);
+
+            if ($this->isNaturivaLockedProfile($template)) {
+                $this->validateLockedContentJson($contentJson);
+            }
+
             $page = LandingPage::create([
                 'user_id' => $user->id,
                 'template_id' => $template->id,
@@ -118,7 +135,11 @@ class LandingPageController extends Controller
                 'meta_title' => $validated['meta_title'] ?? null,
                 'meta_description' => $validated['meta_description'] ?? null,
                 'theme_tokens_json' => $validated['theme_tokens_json'] ?? null,
-                'content_json' => $validated['content_json'] ?? ['sections' => [], 'theme' => [], 'contact' => [], 'policy' => []],
+                'content_json' => $contentJson,
+                'renderer_version' => $this->isNaturivaLockedProfile($template) ? 'naturiva-c2-v1' : null,
+                'validation_snapshot_json' => $this->isNaturivaLockedProfile($template)
+                    ? ['validated_at' => now()->toISOString(), 'layout_profile' => $template->layout_profile]
+                    : null,
             ]);
 
             $this->syncPageProducts($page, $validated['products'] ?? [], $user->id);
@@ -180,6 +201,28 @@ class LandingPageController extends Controller
         }
 
         DB::transaction(function () use ($validated, $request, $page) {
+            $targetTemplate = isset($validated['template_id'])
+                ? LandingTemplate::query()->find($validated['template_id'])
+                : $page->template;
+
+            if (! $targetTemplate) {
+                throw ValidationException::withMessages([
+                    'template_id' => ['Template not found.'],
+                ]);
+            }
+
+            if ($this->isNaturivaLockedProfile($targetTemplate)) {
+                if (array_key_exists('content_json', $validated)) {
+                    $this->validateLockedContentJson((array) ($validated['content_json'] ?? []));
+                }
+
+                $validated['renderer_version'] = 'naturiva-c2-v1';
+                $validated['validation_snapshot_json'] = [
+                    'validated_at' => now()->toISOString(),
+                    'layout_profile' => $targetTemplate->layout_profile,
+                ];
+            }
+
             if (isset($validated['slug']) && $validated['slug'] !== $page->slug) {
                 $validated['slug'] = $this->ensureUniqueSlug($validated['slug'], $page->id);
                 $validated['public_url'] = '/store/' . $validated['slug'];
@@ -254,12 +297,19 @@ class LandingPageController extends Controller
             ->with(['template', 'products.product:id,name,selling_price,thumbnail,status'])
             ->findOrFail($id);
 
+        $previewData = [
+            'page' => $page,
+            'preview_url' => '/store/' . $page->slug . '?preview=1',
+        ];
+
+        if ($page->template && $this->isNaturivaLockedProfile($page->template)) {
+            $previewData['totals_snapshot'] = $this->lockedTotalsSnapshot((array) ($page->content_json ?? []));
+            $previewData['validation_warnings'] = $this->lockedValidationWarnings((array) ($page->content_json ?? []));
+        }
+
         return response()->json([
             'success' => true,
-            'data' => [
-                'page' => $page,
-                'preview_url' => '/store/' . $page->slug . '?preview=1',
-            ],
+            'data' => $previewData,
         ]);
     }
 
@@ -269,23 +319,135 @@ class LandingPageController extends Controller
             ->where('user_id', $request->user()->id)
             ->findOrFail($id);
 
-        $rows = LandingPageAnalyticsDaily::query()
+        $validated = $request->validate([
+            'range' => ['nullable', 'string', 'in:7d,30d,custom'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date'],
+        ]);
+
+        $range = (string) ($validated['range'] ?? '30d');
+        $today = Carbon::today();
+
+        if ($range === 'custom') {
+            if (empty($validated['start_date']) || empty($validated['end_date'])) {
+                throw ValidationException::withMessages([
+                    'range' => ['Custom range requires both start_date and end_date.'],
+                ]);
+            }
+
+            $startDate = Carbon::parse($validated['start_date'])->startOfDay();
+            $endDate = Carbon::parse($validated['end_date'])->endOfDay();
+        } elseif ($range === '7d') {
+            $startDate = $today->copy()->subDays(6)->startOfDay();
+            $endDate = $today->copy()->endOfDay();
+        } else {
+            $startDate = $today->copy()->subDays(29)->startOfDay();
+            $endDate = $today->copy()->endOfDay();
+        }
+
+        if ($startDate->gt($endDate)) {
+            throw ValidationException::withMessages([
+                'range' => ['start_date cannot be greater than end_date.'],
+            ]);
+        }
+
+        $rowsBaseQuery = LandingPageAnalyticsDaily::query()
             ->where('landing_page_id', $page->id)
+            ->whereBetween('view_date', [$startDate->toDateString(), $endDate->toDateString()]);
+
+        $rows = (clone $rowsBaseQuery)
             ->orderByDesc('view_date')
-            ->limit(60)
+            ->get();
+
+        $rowsByDate = (clone $rowsBaseQuery)
+            ->orderBy('view_date')
+            ->get()
+            ->keyBy(fn (LandingPageAnalyticsDaily $row) => Carbon::parse($row->view_date)->toDateString());
+
+        $totalViews = (int) $rows->sum('total_views');
+        $checkoutStarts = (int) $rows->sum('checkout_starts');
+        $ordersCompleted = (int) $rows->sum('orders_completed');
+
+        $trend = [];
+        $cursor = $startDate->copy()->startOfDay();
+
+        while ($cursor->lte($endDate)) {
+            $dateKey = $cursor->toDateString();
+            /** @var LandingPageAnalyticsDaily|null $daily */
+            $daily = $rowsByDate->get($dateKey);
+
+            $trend[] = [
+                'date' => $dateKey,
+                'total_views' => (int) ($daily?->total_views ?? 0),
+                'checkout_starts' => (int) ($daily?->checkout_starts ?? 0),
+                'orders_completed' => (int) ($daily?->orders_completed ?? 0),
+                'revenue' => (float) ($daily?->revenue ?? 0),
+            ];
+
+            $cursor->addDay();
+        }
+
+        $trackingBaseQuery = LandingPageConversionTracking::query()
+            ->where('landing_page_id', $page->id)
+            ->whereBetween('tracked_at', [$startDate->toDateTimeString(), $endDate->toDateTimeString()]);
+
+        $sourceBreakdown = (clone $trackingBaseQuery)
+            ->selectRaw("COALESCE(source, 'direct') as key, COUNT(*) as total")
+            ->groupBy('key')
+            ->orderByDesc('total')
+            ->limit(8)
+            ->get();
+
+        $deviceBreakdown = (clone $trackingBaseQuery)
+            ->selectRaw("COALESCE(device, 'unknown') as key, COUNT(*) as total")
+            ->groupBy('key')
+            ->orderByDesc('total')
+            ->limit(8)
+            ->get();
+
+        $sourceTrend = (clone $trackingBaseQuery)
+            ->selectRaw("DATE(tracked_at) as trend_date, COALESCE(source, 'direct') as key, COUNT(*) as total")
+            ->groupBy('trend_date', 'key')
+            ->orderBy('trend_date')
+            ->orderByDesc('total')
+            ->limit(300)
+            ->get();
+
+        $deviceTrend = (clone $trackingBaseQuery)
+            ->selectRaw("DATE(tracked_at) as trend_date, COALESCE(device, 'unknown') as key, COUNT(*) as total")
+            ->groupBy('trend_date', 'key')
+            ->orderBy('trend_date')
+            ->orderByDesc('total')
+            ->limit(300)
             ->get();
 
         return response()->json([
             'success' => true,
             'data' => [
                 'rows' => $rows,
+                'range' => [
+                    'range' => $range,
+                    'start_date' => $startDate->toDateString(),
+                    'end_date' => $endDate->toDateString(),
+                ],
                 'summary' => [
-                    'total_views' => (int) $rows->sum('total_views'),
+                    'total_views' => $totalViews,
                     'unique_visitors' => (int) $rows->sum('unique_visitors'),
                     'cta_clicks' => (int) $rows->sum('cta_clicks'),
-                    'checkout_starts' => (int) $rows->sum('checkout_starts'),
-                    'orders_completed' => (int) $rows->sum('orders_completed'),
+                    'checkout_starts' => $checkoutStarts,
+                    'order_bumps_accepted' => (int) $rows->sum('order_bumps_accepted'),
+                    'upsells_accepted' => (int) $rows->sum('upsells_accepted'),
+                    'orders_completed' => $ordersCompleted,
                     'revenue' => (float) $rows->sum('revenue'),
+                    'view_to_checkout_rate' => $totalViews > 0 ? round(($checkoutStarts / $totalViews) * 100, 2) : 0,
+                    'checkout_to_order_rate' => $checkoutStarts > 0 ? round(($ordersCompleted / $checkoutStarts) * 100, 2) : 0,
+                ],
+                'trend' => $trend,
+                'attribution' => [
+                    'sources' => $sourceBreakdown,
+                    'devices' => $deviceBreakdown,
+                    'source_trend' => $sourceTrend,
+                    'device_trend' => $deviceTrend,
                 ],
             ],
         ]);
@@ -313,7 +475,7 @@ class LandingPageController extends Controller
         $page = LandingPage::query()
             ->where('slug', $slug)
             ->where('status', 'published')
-            ->with('products.product')
+            ->with(['products.product', 'template'])
             ->firstOrFail();
 
         $validated = $request->validate([
@@ -326,50 +488,90 @@ class LandingPageController extends Controller
             'notes' => ['nullable', 'string', 'max:1000'],
             'shipping_charge' => ['nullable', 'numeric', 'min:0'],
             'discount' => ['nullable', 'numeric', 'min:0'],
+            'selected_package_id' => ['nullable', 'string', 'max:120'],
+            'selected_shipping_id' => ['nullable', 'string', 'max:120'],
+            'upsell_checked' => ['nullable', 'boolean'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $order = DB::transaction(function () use ($validated, $page, $slug) {
+        $isLockedProfile = $page->template && $this->isNaturivaLockedProfile($page->template);
+        $lockedSelection = $isLockedProfile
+            ? $this->resolveLockedOrderSelection(
+                (array) ($page->content_json ?? []),
+                isset($validated['selected_package_id']) ? (string) $validated['selected_package_id'] : null,
+                isset($validated['selected_shipping_id']) ? (string) $validated['selected_shipping_id'] : null,
+                (bool) ($validated['upsell_checked'] ?? false)
+            )
+            : null;
+
+        $order = DB::transaction(function () use ($validated, $page, $slug, $isLockedProfile, $lockedSelection) {
             $landingProducts = $page->products->keyBy('product_id');
             $subtotal = 0.0;
             $normalizedItems = [];
 
-            foreach ($validated['items'] as $item) {
-                $productId = (int) $item['product_id'];
-                $qty = (int) $item['quantity'];
-
-                $landingBinding = $landingProducts->get($productId);
-                if (! $landingBinding) {
+            if ($isLockedProfile) {
+                $primaryBinding = $page->products->sortBy('display_order')->first();
+                if (! $primaryBinding || ! $primaryBinding->product || $primaryBinding->product->status !== 'active') {
                     throw ValidationException::withMessages([
-                        'items' => ["Product {$productId} is not part of this landing page."],
+                        'items' => ['No active product attached for locked landing checkout.'],
                     ]);
                 }
 
-                $product = $landingBinding->product;
-                if (! $product || $product->status !== 'active') {
-                    throw ValidationException::withMessages([
-                        'items' => ["Product {$productId} is unavailable."],
-                    ]);
-                }
-
-                $unitPrice = (float) ($landingBinding->custom_price ?? $product->selling_price ?? 0);
-                $lineTotal = $unitPrice * $qty;
-                $subtotal += $lineTotal;
+                $packagePrice = (float) data_get($lockedSelection, 'package_price', 0);
+                $subtotal = $packagePrice;
 
                 $normalizedItems[] = [
-                    'product' => $product,
-                    'qty' => $qty,
-                    'unit_price' => $unitPrice,
-                    'line_total' => $lineTotal,
-                    'custom_title' => $landingBinding->custom_title,
+                    'product' => $primaryBinding->product,
+                    'qty' => 1,
+                    'unit_price' => $packagePrice,
+                    'line_total' => $packagePrice,
+                    'custom_title' => (string) (data_get($lockedSelection, 'package_title', '') ?: $primaryBinding->custom_title),
                 ];
+            } else {
+                foreach ($validated['items'] as $item) {
+                    $productId = (int) $item['product_id'];
+                    $qty = (int) $item['quantity'];
+
+                    $landingBinding = $landingProducts->get($productId);
+                    if (! $landingBinding) {
+                        throw ValidationException::withMessages([
+                            'items' => ["Product {$productId} is not part of this landing page."],
+                        ]);
+                    }
+
+                    $product = $landingBinding->product;
+                    if (! $product || $product->status !== 'active') {
+                        throw ValidationException::withMessages([
+                            'items' => ["Product {$productId} is unavailable."],
+                        ]);
+                    }
+
+                    $unitPrice = (float) ($landingBinding->custom_price ?? $product->selling_price ?? 0);
+                    $lineTotal = $unitPrice * $qty;
+                    $subtotal += $lineTotal;
+
+                    $normalizedItems[] = [
+                        'product' => $product,
+                        'qty' => $qty,
+                        'unit_price' => $unitPrice,
+                        'line_total' => $lineTotal,
+                        'custom_title' => $landingBinding->custom_title,
+                    ];
+                }
             }
 
-            $shipping = (float) ($validated['shipping_charge'] ?? 0);
+            $shipping = $isLockedProfile
+                ? (float) data_get($lockedSelection, 'shipping_fee', 0) + (float) data_get($lockedSelection, 'upsell_price', 0)
+                : (float) ($validated['shipping_charge'] ?? 0);
             $discount = (float) ($validated['discount'] ?? 0);
             $total = max(0, $subtotal + $shipping - $discount);
+
+            if ($isLockedProfile && $lockedSelection) {
+                $expectedTotal = (float) data_get($lockedSelection, 'total', $total);
+                $total = $expectedTotal;
+            }
 
             $order = Order::create([
                 'user_id' => $page->user_id,
@@ -389,7 +591,15 @@ class LandingPageController extends Controller
                 'shipping_charge' => $shipping,
                 'discount' => $discount,
                 'total' => $total,
-                'notes' => trim(($validated['notes'] ?? '') . "\nLanding Page: #{$page->id} ({$page->slug})"),
+                'notes' => trim(($validated['notes'] ?? '')
+                    . "\nLanding Page: #{$page->id} ({$page->slug})"
+                    . ($isLockedProfile ? "\nLocked Checkout: " . json_encode([
+                        'package_id' => data_get($lockedSelection, 'package_id'),
+                        'shipping_id' => data_get($lockedSelection, 'shipping_id'),
+                        'upsell_checked' => data_get($lockedSelection, 'upsell_checked'),
+                        'upsell_price' => data_get($lockedSelection, 'upsell_price'),
+                    ]) : '')
+                ),
                 'fraud_score' => 0,
                 'risk_level' => 'low',
             ]);
@@ -547,5 +757,247 @@ class LandingPageController extends Controller
         }
 
         $row->increment($metric, (int) $value);
+    }
+
+    private function isNaturivaLockedProfile(LandingTemplate $template): bool
+    {
+        return $template->code === 'naturiva_package_upsell'
+            && $template->layout_profile === 'naturiva_exact_clone_locked'
+            && $template->editor_mode === 'locked';
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function editableFieldsManifest(LandingTemplate $template): array
+    {
+        if (! $this->isNaturivaLockedProfile($template)) {
+            return [
+                'mode' => ['flex'],
+                'editable' => ['*'],
+            ];
+        }
+
+        return [
+            'mode' => ['locked'],
+            'editable' => [
+                'hero.title',
+                'hero.subtitle',
+                'hero.disclaimer',
+                'proof.video_url',
+                'proof.review_images',
+                'offer_strip.cta_label',
+                'offer_strip.package_highlights',
+                'contact.call_numbers',
+                'contact.whatsapp_numbers',
+                'checkout.section_title',
+                'checkout.packages',
+                'checkout.shipping_options',
+                'checkout.upsell',
+                'checkout.cod_confirmation_text',
+                'checkout.submit_label',
+                'bottom_cta.text',
+                'bottom_cta.phone',
+                'policy.privacy_url',
+                'policy.terms_url',
+                'theme.primary',
+                'theme.accent',
+                'theme.button_text',
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $contentJson
+     */
+    private function validateLockedContentJson(array $contentJson): void
+    {
+        $allowedTopKeys = [
+            'layout_profile',
+            'hero',
+            'proof',
+            'offer_strip',
+            'contact',
+            'checkout',
+            'bottom_cta',
+            'policy',
+            'theme',
+        ];
+
+        $unknown = collect(array_keys($contentJson))
+            ->reject(fn ($key) => in_array($key, $allowedTopKeys, true))
+            ->values()
+            ->all();
+
+        if (! empty($unknown)) {
+            throw ValidationException::withMessages([
+                'content_json' => ['Unknown keys are not allowed for locked template: ' . implode(', ', $unknown)],
+            ]);
+        }
+
+        $profile = (string) ($contentJson['layout_profile'] ?? '');
+        if ($profile !== 'naturiva_exact_clone_locked') {
+            throw ValidationException::withMessages([
+                'content_json.layout_profile' => ['Locked template requires layout_profile=naturiva_exact_clone_locked.'],
+            ]);
+        }
+
+        $packages = data_get($contentJson, 'checkout.packages', []);
+        if (! is_array($packages) || count($packages) < 2 || count($packages) > 4) {
+            throw ValidationException::withMessages([
+                'content_json.checkout.packages' => ['Locked template requires 2 to 4 packages.'],
+            ]);
+        }
+
+        $defaultPackageCount = collect($packages)->filter(fn ($pkg) => (bool) data_get($pkg, 'is_default', false))->count();
+        if ($defaultPackageCount !== 1) {
+            throw ValidationException::withMessages([
+                'content_json.checkout.packages' => ['Exactly one package must be marked as default.'],
+            ]);
+        }
+
+        $shippingOptions = data_get($contentJson, 'checkout.shipping_options', []);
+        if (! is_array($shippingOptions) || count($shippingOptions) < 1 || count($shippingOptions) > 3) {
+            throw ValidationException::withMessages([
+                'content_json.checkout.shipping_options' => ['Locked template requires 1 to 3 shipping options.'],
+            ]);
+        }
+
+        $defaultShippingCount = collect($shippingOptions)->filter(fn ($ship) => (bool) data_get($ship, 'is_default', false))->count();
+        if ($defaultShippingCount !== 1) {
+            throw ValidationException::withMessages([
+                'content_json.checkout.shipping_options' => ['Exactly one shipping option must be default.'],
+            ]);
+        }
+
+        $upsellPrice = data_get($contentJson, 'checkout.upsell.price', 0);
+        if (! is_numeric($upsellPrice) || (float) $upsellPrice < 0) {
+            throw ValidationException::withMessages([
+                'content_json.checkout.upsell.price' => ['Upsell price must be a non-negative number.'],
+            ]);
+        }
+
+        $privacyUrl = (string) data_get($contentJson, 'policy.privacy_url', '');
+        $termsUrl = (string) data_get($contentJson, 'policy.terms_url', '');
+        if ($privacyUrl === '' || $termsUrl === '') {
+            throw ValidationException::withMessages([
+                'content_json.policy' => ['Privacy and terms URLs are required for locked template.'],
+            ]);
+        }
+
+        $phones = [
+            ...collect((array) data_get($contentJson, 'contact.call_numbers', []))->map(fn ($v) => (string) $v)->all(),
+            ...collect((array) data_get($contentJson, 'contact.whatsapp_numbers', []))->map(fn ($v) => (string) $v)->all(),
+            (string) data_get($contentJson, 'bottom_cta.phone', ''),
+        ];
+
+        $normalizedPhones = collect($phones)
+            ->map(fn ($phone) => preg_replace('/\s+/', '', trim($phone ?? '')))
+            ->filter(fn ($phone) => filled($phone))
+            ->values();
+
+        if ($normalizedPhones->isEmpty()) {
+            throw ValidationException::withMessages([
+                'content_json.contact' => ['At least one contact number is required.'],
+            ]);
+        }
+
+        $invalidPhone = $normalizedPhones->first(fn ($phone) => ! preg_match('/^(\\+?88)?01[3-9][0-9]{8}$/', $phone));
+        if ($invalidPhone) {
+            throw ValidationException::withMessages([
+                'content_json.contact' => ['Invalid Bangladeshi phone format found: ' . $invalidPhone],
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $contentJson
+     * @return array<string, float|int|string|bool|null>
+     */
+    private function lockedTotalsSnapshot(array $contentJson): array
+    {
+        $packages = (array) data_get($contentJson, 'checkout.packages', []);
+        $shippingOptions = (array) data_get($contentJson, 'checkout.shipping_options', []);
+
+        $defaultPackage = collect($packages)->first(fn ($pkg) => (bool) data_get($pkg, 'is_default', false));
+        $defaultShipping = collect($shippingOptions)->first(fn ($ship) => (bool) data_get($ship, 'is_default', false));
+
+        $packagePrice = (float) data_get($defaultPackage, 'price', 0);
+        $shippingFee = (float) data_get($defaultShipping, 'fee', 0);
+        $upsellEnabled = (bool) data_get($contentJson, 'checkout.upsell.enabled', false);
+        $upsellPrice = $upsellEnabled ? (float) data_get($contentJson, 'checkout.upsell.price', 0) : 0.0;
+
+        return [
+            'default_package_id' => data_get($defaultPackage, 'id'),
+            'default_shipping_id' => data_get($defaultShipping, 'id'),
+            'package_price' => $packagePrice,
+            'shipping_fee' => $shippingFee,
+            'upsell_enabled' => $upsellEnabled,
+            'upsell_price' => $upsellPrice,
+            'total' => $packagePrice + $shippingFee + $upsellPrice,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $contentJson
+     * @return array<int, string>
+     */
+    private function lockedValidationWarnings(array $contentJson): array
+    {
+        $warnings = [];
+
+        if (! filled((string) data_get($contentJson, 'proof.video_url', '')) && empty((array) data_get($contentJson, 'proof.review_images', []))) {
+            $warnings[] = 'No proof video or review images configured.';
+        }
+
+        if (! filled((string) data_get($contentJson, 'checkout.cod_confirmation_text', ''))) {
+            $warnings[] = 'COD confirmation text is empty.';
+        }
+
+        if (! filled((string) data_get($contentJson, 'bottom_cta.phone', ''))) {
+            $warnings[] = 'Bottom CTA phone is empty.';
+        }
+
+        return $warnings;
+    }
+
+    /**
+     * @param  array<string, mixed>  $contentJson
+     * @return array<string, float|int|string|bool|null>
+     */
+    private function resolveLockedOrderSelection(array $contentJson, ?string $selectedPackageId, ?string $selectedShippingId, bool $upsellChecked): array
+    {
+        $packages = collect((array) data_get($contentJson, 'checkout.packages', []));
+        $shippingOptions = collect((array) data_get($contentJson, 'checkout.shipping_options', []));
+
+        $package = $selectedPackageId
+            ? $packages->first(fn ($pkg) => (string) data_get($pkg, 'id') === $selectedPackageId)
+            : $packages->first(fn ($pkg) => (bool) data_get($pkg, 'is_default', false));
+
+        $shipping = $selectedShippingId
+            ? $shippingOptions->first(fn ($opt) => (string) data_get($opt, 'id') === $selectedShippingId)
+            : $shippingOptions->first(fn ($opt) => (bool) data_get($opt, 'is_default', false));
+
+        if (! $package || ! $shipping) {
+            throw ValidationException::withMessages([
+                'selected_package_id' => ['Invalid package or shipping selection for locked checkout.'],
+            ]);
+        }
+
+        $packagePrice = (float) data_get($package, 'price', 0);
+        $shippingFee = (float) data_get($shipping, 'fee', 0);
+        $upsellEnabled = (bool) data_get($contentJson, 'checkout.upsell.enabled', false);
+        $upsellPrice = $upsellChecked && $upsellEnabled ? (float) data_get($contentJson, 'checkout.upsell.price', 0) : 0.0;
+
+        return [
+            'package_id' => (string) data_get($package, 'id', ''),
+            'package_title' => (string) data_get($package, 'title', ''),
+            'shipping_id' => (string) data_get($shipping, 'id', ''),
+            'package_price' => $packagePrice,
+            'shipping_fee' => $shippingFee,
+            'upsell_checked' => $upsellChecked,
+            'upsell_price' => $upsellPrice,
+            'total' => $packagePrice + $shippingFee + $upsellPrice,
+        ];
     }
 }

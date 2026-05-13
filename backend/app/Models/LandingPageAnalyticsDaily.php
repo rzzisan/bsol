@@ -16,6 +16,8 @@ class LandingPageAnalyticsDaily extends Model
         'unique_visitors',
         'cta_clicks',
         'checkout_starts',
+        'order_bumps_accepted',
+        'upsells_accepted',
         'orders_completed',
         'revenue',
     ];

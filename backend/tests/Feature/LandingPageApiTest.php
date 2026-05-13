@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\LandingPage;
+use App\Models\LandingPageAnalyticsDaily;
+use App\Models\LandingPageConversionTracking;
 use App\Models\LandingPageProduct;
 use App\Models\LandingTemplate;
 use App\Models\LandingTemplateAccessRule;
@@ -255,5 +257,352 @@ class LandingPageApiTest extends TestCase
         $order = Order::query()->where('source_ref', 'public-landing')->first();
         $this->assertNotNull($order);
         $this->assertSame('pending', $order->status);
+    }
+
+    public function test_locked_preview_returns_totals_snapshot_and_warnings(): void
+    {
+        $seller = User::factory()->create(['role' => 'user']);
+
+        $template = LandingTemplate::create([
+            'code' => 'naturiva_package_upsell',
+            'name_bn' => 'Naturiva',
+            'name_en' => 'Naturiva',
+            'layout_profile' => 'naturiva_exact_clone_locked',
+            'editor_mode' => 'locked',
+            'default_schema_json' => ['layout_profile' => 'naturiva_exact_clone_locked'],
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+
+        $page = LandingPage::create([
+            'user_id' => $seller->id,
+            'template_id' => $template->id,
+            'title' => 'Locked Preview Page',
+            'slug' => 'locked-preview-page',
+            'status' => 'draft',
+            'content_json' => [
+                'layout_profile' => 'naturiva_exact_clone_locked',
+                'hero' => ['title' => 'Test', 'subtitle' => 'Test', 'disclaimer' => ''],
+                'proof' => ['video_url' => '', 'review_images' => []],
+                'offer_strip' => ['cta_label' => 'অর্ডার', 'package_highlights' => []],
+                'contact' => ['call_numbers' => ['01712345678'], 'whatsapp_numbers' => []],
+                'checkout' => [
+                    'section_title' => 'Checkout',
+                    'packages' => [
+                        ['id' => 'p1', 'title' => 'P1', 'price' => 1800, 'is_default' => true],
+                        ['id' => 'p2', 'title' => 'P2', 'price' => 1000, 'is_default' => false],
+                    ],
+                    'shipping_options' => [
+                        ['id' => 's1', 'label' => 'ঢাকা', 'fee' => 50, 'is_default' => true],
+                        ['id' => 's2', 'label' => 'বাহিরে', 'fee' => 100, 'is_default' => false],
+                    ],
+                    'upsell' => [
+                        'enabled' => true,
+                        'price' => 999,
+                    ],
+                    'cod_confirmation_text' => '',
+                    'submit_label' => 'Confirm Order',
+                ],
+                'bottom_cta' => ['text' => 'Call', 'phone' => ''],
+                'policy' => ['privacy_url' => 'https://example.com/privacy', 'terms_url' => 'https://example.com/terms'],
+                'theme' => ['primary' => '#0b7a2a', 'accent' => '#ff6a00', 'button_text' => '#fff'],
+            ],
+        ]);
+
+        $token = $seller->createToken('test-suite')->plainTextToken;
+
+        $this->getJson('/api/landing/pages/'.$page->id.'/preview', [
+            'Authorization' => 'Bearer '.$token,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.totals_snapshot.package_price', 1800)
+            ->assertJsonPath('data.totals_snapshot.shipping_fee', 50)
+            ->assertJsonPath('data.totals_snapshot.upsell_price', 999)
+            ->assertJsonPath('data.totals_snapshot.total', 2849)
+            ->assertJsonStructure([
+                'data' => [
+                    'validation_warnings',
+                ],
+            ]);
+    }
+
+    public function test_locked_template_rejects_invalid_phone_and_missing_policy_on_store(): void
+    {
+        $seller = User::factory()->create(['role' => 'user']);
+
+        $template = LandingTemplate::create([
+            'code' => 'naturiva_package_upsell',
+            'name_bn' => 'Naturiva',
+            'name_en' => 'Naturiva',
+            'layout_profile' => 'naturiva_exact_clone_locked',
+            'editor_mode' => 'locked',
+            'default_schema_json' => ['layout_profile' => 'naturiva_exact_clone_locked'],
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+
+        $token = $seller->createToken('test-suite')->plainTextToken;
+
+        $payload = [
+            'template_id' => $template->id,
+            'title' => 'Invalid Locked Content',
+            'content_json' => [
+                'layout_profile' => 'naturiva_exact_clone_locked',
+                'hero' => ['title' => 'Test', 'subtitle' => 'Test', 'disclaimer' => ''],
+                'proof' => ['video_url' => '', 'review_images' => []],
+                'offer_strip' => ['cta_label' => 'অর্ডার', 'package_highlights' => []],
+                'contact' => ['call_numbers' => ['12345'], 'whatsapp_numbers' => []],
+                'checkout' => [
+                    'section_title' => 'Checkout',
+                    'packages' => [
+                        ['id' => 'p1', 'title' => 'P1', 'price' => 1800, 'is_default' => true],
+                        ['id' => 'p2', 'title' => 'P2', 'price' => 1000, 'is_default' => false],
+                    ],
+                    'shipping_options' => [
+                        ['id' => 's1', 'label' => 'ঢাকা', 'fee' => 50, 'is_default' => true],
+                    ],
+                    'upsell' => [
+                        'enabled' => true,
+                        'price' => 999,
+                    ],
+                    'cod_confirmation_text' => 'ok',
+                    'submit_label' => 'Confirm Order',
+                ],
+                'bottom_cta' => ['text' => 'Call', 'phone' => ''],
+                'policy' => ['privacy_url' => '', 'terms_url' => ''],
+                'theme' => ['primary' => '#0b7a2a', 'accent' => '#ff6a00', 'button_text' => '#fff'],
+            ],
+        ];
+
+        $this->postJson('/api/landing/pages', $payload, [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertStatus(422);
+    }
+
+    public function test_public_tracking_endpoints_update_daily_metrics(): void
+    {
+        $seller = User::factory()->create(['role' => 'user']);
+
+        $template = LandingTemplate::create([
+            'code' => 'tracking_template',
+            'name_bn' => 'Tracking',
+            'name_en' => 'Tracking',
+            'default_schema_json' => ['sections' => []],
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+
+        LandingPage::create([
+            'user_id' => $seller->id,
+            'template_id' => $template->id,
+            'title' => 'Tracking Landing',
+            'slug' => 'tracking-landing',
+            'status' => 'published',
+            'public_url' => '/store/tracking-landing',
+            'content_json' => [
+                'sections' => [],
+                'policy' => [
+                    'privacy_url' => 'https://example.com/privacy',
+                    'terms_url' => 'https://example.com/terms',
+                ],
+            ],
+        ]);
+
+        $this->postJson('/api/landing/track/view', [
+            'slug' => 'tracking-landing',
+            'session_id' => 'sess-test-1',
+            'visitor_id' => 'visitor-test-1',
+            'source' => 'facebook_ads',
+            'device' => 'mobile',
+            'country' => 'BD',
+        ])->assertOk();
+
+        $this->postJson('/api/landing/track/cta', [
+            'slug' => 'tracking-landing',
+            'session_id' => 'sess-test-1',
+            'visitor_id' => 'visitor-test-1',
+            'source' => 'facebook_ads',
+            'device' => 'mobile',
+            'country' => 'BD',
+        ])->assertOk();
+
+        $this->postJson('/api/landing/track/checkout-start', [
+            'slug' => 'tracking-landing',
+            'session_id' => 'sess-test-1',
+            'visitor_id' => 'visitor-test-1',
+            'source' => 'facebook_ads',
+            'device' => 'mobile',
+            'country' => 'BD',
+        ])->assertOk();
+
+        $this->postJson('/api/landing/track/order-bump', [
+            'slug' => 'tracking-landing',
+            'session_id' => 'sess-test-1',
+            'visitor_id' => 'visitor-test-1',
+            'source' => 'facebook_ads',
+            'device' => 'mobile',
+            'country' => 'BD',
+        ])->assertOk();
+
+        $this->postJson('/api/landing/track/upsell', [
+            'slug' => 'tracking-landing',
+            'session_id' => 'sess-test-1',
+            'visitor_id' => 'visitor-test-1',
+            'source' => 'facebook_ads',
+            'device' => 'mobile',
+            'country' => 'BD',
+        ])->assertOk();
+
+        $this->postJson('/api/landing/track/order-complete', [
+            'slug' => 'tracking-landing',
+            'revenue' => 1200,
+            'session_id' => 'sess-test-1',
+            'visitor_id' => 'visitor-test-1',
+            'source' => 'facebook_ads',
+            'device' => 'mobile',
+            'country' => 'BD',
+        ])->assertOk();
+
+        $row = LandingPageAnalyticsDaily::query()->first();
+        $this->assertNotNull($row);
+        $this->assertSame(1, (int) $row->total_views);
+        $this->assertSame(1, (int) $row->cta_clicks);
+        $this->assertSame(1, (int) $row->checkout_starts);
+        $this->assertSame(1, (int) $row->order_bumps_accepted);
+        $this->assertSame(1, (int) $row->upsells_accepted);
+        $this->assertSame(1, (int) $row->orders_completed);
+        $this->assertSame(1200.0, (float) $row->revenue);
+
+        $this->assertDatabaseHas('landing_page_conversion_tracking', [
+            'landing_page_id' => $row->landing_page_id,
+            'event_type' => 'order_complete',
+            'session_id' => 'sess-test-1',
+            'visitor_id' => 'visitor-test-1',
+            'source' => 'facebook_ads',
+            'device' => 'mobile',
+            'country' => 'BD',
+        ]);
+
+        $this->assertSame(6, LandingPageConversionTracking::query()->count());
+    }
+
+    public function test_authenticated_analytics_supports_date_range_and_trend_payload(): void
+    {
+        $seller = User::factory()->create(['role' => 'user']);
+
+        $template = LandingTemplate::create([
+            'code' => 'analytics_range_template',
+            'name_bn' => 'Analytics Range',
+            'name_en' => 'Analytics Range',
+            'default_schema_json' => ['sections' => []],
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+
+        $page = LandingPage::create([
+            'user_id' => $seller->id,
+            'template_id' => $template->id,
+            'title' => 'Analytics Range Landing',
+            'slug' => 'analytics-range-landing',
+            'status' => 'published',
+            'public_url' => '/store/analytics-range-landing',
+            'content_json' => ['sections' => []],
+        ]);
+
+        $outsideDate = now()->subDays(10)->toDateString();
+        $insideDateA = now()->subDays(3)->toDateString();
+        $insideDateB = now()->subDay()->toDateString();
+
+        LandingPageAnalyticsDaily::create([
+            'landing_page_id' => $page->id,
+            'view_date' => $outsideDate,
+            'total_views' => 100,
+            'unique_visitors' => 90,
+            'cta_clicks' => 50,
+            'checkout_starts' => 40,
+            'order_bumps_accepted' => 10,
+            'upsells_accepted' => 8,
+            'orders_completed' => 20,
+            'revenue' => 20000,
+        ]);
+
+        LandingPageAnalyticsDaily::create([
+            'landing_page_id' => $page->id,
+            'view_date' => $insideDateA,
+            'total_views' => 10,
+            'unique_visitors' => 9,
+            'cta_clicks' => 5,
+            'checkout_starts' => 4,
+            'order_bumps_accepted' => 1,
+            'upsells_accepted' => 1,
+            'orders_completed' => 2,
+            'revenue' => 2000,
+        ]);
+
+        LandingPageAnalyticsDaily::create([
+            'landing_page_id' => $page->id,
+            'view_date' => $insideDateB,
+            'total_views' => 12,
+            'unique_visitors' => 11,
+            'cta_clicks' => 6,
+            'checkout_starts' => 5,
+            'order_bumps_accepted' => 2,
+            'upsells_accepted' => 1,
+            'orders_completed' => 3,
+            'revenue' => 3000,
+        ]);
+
+        LandingPageConversionTracking::create([
+            'landing_page_id' => $page->id,
+            'event_type' => 'page_view',
+            'session_id' => 'sess-range-1',
+            'visitor_id' => 'visitor-range-1',
+            'source' => 'facebook',
+            'device' => 'mobile',
+            'country' => 'BD',
+            'tracked_at' => now()->subDays(3),
+        ]);
+
+        LandingPageConversionTracking::create([
+            'landing_page_id' => $page->id,
+            'event_type' => 'checkout_start',
+            'session_id' => 'sess-range-2',
+            'visitor_id' => 'visitor-range-2',
+            'source' => 'google',
+            'device' => 'desktop',
+            'country' => 'BD',
+            'tracked_at' => now()->subDay(),
+        ]);
+
+        LandingPageConversionTracking::create([
+            'landing_page_id' => $page->id,
+            'event_type' => 'order_complete',
+            'session_id' => 'sess-range-3',
+            'visitor_id' => 'visitor-range-3',
+            'source' => 'legacy',
+            'device' => 'tablet',
+            'country' => 'BD',
+            'tracked_at' => now()->subDays(12),
+        ]);
+
+        $token = $seller->createToken('test-suite')->plainTextToken;
+
+        $response = $this->getJson('/api/landing/pages/'.$page->id.'/analytics?range=7d', [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertOk();
+
+        $response
+            ->assertJsonPath('data.range.range', '7d')
+            ->assertJsonPath('data.summary.total_views', 22)
+            ->assertJsonPath('data.summary.orders_completed', 5)
+            ->assertJsonCount(2, 'data.rows')
+            ->assertJsonCount(7, 'data.trend');
+
+        $sourceKeys = collect($response->json('data.attribution.sources', []))
+            ->pluck('key')
+            ->all();
+
+        $this->assertContains('facebook', $sourceKeys);
+        $this->assertContains('google', $sourceKeys);
     }
 }

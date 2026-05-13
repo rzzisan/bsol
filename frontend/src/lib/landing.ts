@@ -47,12 +47,19 @@ export async function readApiResponse<T = unknown>(response: Response): Promise<
 export type LandingTemplate = {
   id: number;
   code: string;
+  template_code?: string;
   name_bn: string;
   name_en: string;
   description_bn: string | null;
   description_en: string | null;
   thumbnail_url: string | null;
   category: string;
+  layout_profile?: string | null;
+  editor_mode?: "flex" | "locked" | string;
+  editable_fields_manifest?: {
+    mode?: string[];
+    editable?: string[];
+  } | null;
   default_schema_json: Record<string, unknown> | null;
   is_active: boolean;
   sort_order: number;
@@ -125,6 +132,8 @@ export type LandingPageData = {
       return_url?: string;
     };
   } | null;
+  renderer_version?: string | null;
+  validation_snapshot_json?: Record<string, unknown> | null;
   template?: LandingTemplate | null;
   products?: LandingPageProduct[];
   published_at?: string | null;
@@ -137,8 +146,48 @@ export type LandingAnalyticsRow = {
   unique_visitors: number;
   cta_clicks: number;
   checkout_starts: number;
+  order_bumps_accepted?: number;
+  upsells_accepted?: number;
   orders_completed: number;
   revenue: number | string;
+};
+
+export type LandingAnalyticsSummary = {
+  total_views: number;
+  unique_visitors: number;
+  cta_clicks: number;
+  checkout_starts: number;
+  order_bumps_accepted: number;
+  upsells_accepted: number;
+  orders_completed: number;
+  revenue: number;
+  view_to_checkout_rate: number;
+  checkout_to_order_rate: number;
+};
+
+export type LandingAttributionBucket = {
+  key: string;
+  total: number;
+};
+
+export type LandingAttributionTrendPoint = {
+  trend_date: string;
+  key: string;
+  total: number;
+};
+
+export type LandingAnalyticsTrendPoint = {
+  date: string;
+  total_views: number;
+  checkout_starts: number;
+  orders_completed: number;
+  revenue: number;
+};
+
+export type LandingAnalyticsRange = {
+  range: "7d" | "30d" | "custom";
+  start_date: string;
+  end_date: string;
 };
 
 export type ProductOption = {

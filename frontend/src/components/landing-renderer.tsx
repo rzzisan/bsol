@@ -18,10 +18,11 @@ export default function LandingRenderer({
   onPrimaryCta?: () => void;
 }) {
   const templateCode = page.template?.code ?? "generic";
-  const content = page.content_json ?? {};
-  const contact = content.contact ?? {};
-  const policy = content.policy ?? {};
-  const sections = [...(content.sections ?? [])]
+  const content = (page.content_json ?? {}) as Record<string, unknown>;
+  const layoutProfile = String((content.layout_profile ?? page.template?.layout_profile ?? "") as string);
+  const contact = (content.contact ?? {}) as Record<string, unknown>;
+  const policy = (content.policy ?? {}) as Record<string, unknown>;
+  const sections = [...((content.sections ?? []) as Array<{ id: string; type: string; enabled?: boolean; order: number; data: Record<string, unknown> }>)]
     .filter((section) => section.enabled !== false)
     .sort((a, b) => a.order - b.order);
   const primary = page.theme_tokens_json?.primary_color ?? "#0f7c7b";
@@ -32,6 +33,85 @@ export default function LandingRenderer({
       sections.find((item) => item.type === "hook")?.data?.hook_headline ??
       page.title,
   );
+
+  if (templateCode === "naturiva_package_upsell" && layoutProfile === "naturiva_exact_clone_locked") {
+    const hero = (content.hero ?? {}) as Record<string, unknown>;
+    const proof = (content.proof ?? {}) as Record<string, unknown>;
+    const offerStrip = (content.offer_strip ?? {}) as Record<string, unknown>;
+    const lockedContact = (content.contact ?? {}) as Record<string, unknown>;
+    const checkout = (content.checkout ?? {}) as Record<string, unknown>;
+    const bottomCta = (content.bottom_cta ?? {}) as Record<string, unknown>;
+    const lockedPolicy = (content.policy ?? {}) as Record<string, unknown>;
+    const packages = objectArray(checkout.packages);
+    const shippingOptions = objectArray(checkout.shipping_options);
+    const reviewImages = objectArray(proof.review_images);
+
+    return (
+      <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-[24px] border border-[#d4ddd1] bg-[#eef8e9] shadow-[0_20px_40px_rgba(15,23,42,0.12)]">
+        <section className="bg-[#dfd0c1] px-4 py-8 text-center sm:px-8">
+          <h1 className="text-2xl font-black text-[#0b7a2a] sm:text-4xl">{String(hero.title ?? page.title)}</h1>
+          <p className="mx-auto mt-3 max-w-3xl text-sm font-semibold text-[#21693d] sm:text-base">{String(hero.subtitle ?? "")}</p>
+          <button type="button" onClick={onPrimaryCta} className="mt-5 rounded-xl bg-[#00d62f] px-6 py-3 text-base font-black text-[#05370f]">
+            {String(offerStrip.cta_label ?? checkout.submit_label ?? (locale === "bn" ? "অর্ডার করতে চাই" : "Order now"))}
+          </button>
+        </section>
+
+        <section className="bg-black px-4 py-6 sm:px-8">
+          <div className="mx-auto max-w-2xl rounded-2xl bg-[#101010] p-4 text-center text-white">
+            {String(proof.video_url ?? "ভিডিও/প্রুফ সেকশন")}
+          </div>
+        </section>
+
+        <section className="px-4 py-6 sm:px-8">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {reviewImages.length > 0 ? reviewImages.map((item, index) => (
+              <div key={String(item.title ?? index)} className="rounded-xl border border-[#dce6d7] bg-white p-3 text-xs font-semibold text-slate-700">
+                {String(item.title ?? item.caption ?? `Review ${index + 1}`)}
+              </div>
+            )) : (
+              <div className="rounded-xl border border-dashed border-[#c7d6c0] bg-white p-3 text-xs text-slate-500">{locale === "bn" ? "রিভিউ ইমেজ যোগ করুন" : "Add review images"}</div>
+            )}
+          </div>
+        </section>
+
+        <section className="px-4 pb-4 sm:px-8">
+          <div className="space-y-2 rounded-2xl bg-white p-4 shadow-sm">
+            {packages.map((pkg, index) => (
+              <div key={String(pkg.id ?? index)} className="rounded-lg bg-[#f97316] px-4 py-3 text-center text-sm font-black text-white">
+                {String(pkg.title ?? `Package ${index + 1}`)} = {Number(pkg.price ?? 0).toLocaleString()}৳
+              </div>
+            ))}
+            <div className="rounded-lg bg-[#0b7a2a] px-4 py-3 text-center text-sm font-black text-white">
+              {String(((lockedContact.call_numbers as unknown[])?.[0] ?? "") as string)}
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 py-6 sm:px-8">
+          <div className="rounded-2xl border border-[#7abf89] bg-[#dff0d8] p-4">
+            <h2 className="text-base font-black text-[#0b7a2a]">{String(checkout.section_title ?? (locale === "bn" ? "অর্ডার সেকশন" : "Checkout"))}</h2>
+            <div className="mt-3 space-y-2 text-sm text-[#184c2a]">
+              {shippingOptions.map((ship, index) => (
+                <div key={String(ship.id ?? index)}>{String(ship.label ?? "Shipping")} - {Number(ship.fee ?? 0).toLocaleString()}৳</div>
+              ))}
+            </div>
+            <button type="button" onClick={onPrimaryCta} className="mt-4 w-full rounded-xl bg-[#f97316] px-5 py-3 text-base font-black text-white">
+              {String(checkout.submit_label ?? "Confirm Order")}
+            </button>
+          </div>
+        </section>
+
+        <section className="bg-[#056b1f] px-4 py-4 text-center sm:px-8">
+          <a href={`tel:${String(bottomCta.phone ?? "")}`} className="text-xl font-black text-white">{String(bottomCta.text ?? "Click to Call")}</a>
+        </section>
+
+        <section className="bg-[#f5f5f5] px-4 py-4 text-center text-xs font-semibold text-slate-600 sm:px-8">
+          <a href={String(lockedPolicy.privacy_url ?? "#")} className="mx-2">Privacy policy</a>
+          <a href={String(lockedPolicy.terms_url ?? "#")} className="mx-2">Terms of service</a>
+        </section>
+      </div>
+    );
+  }
 
   if (templateCode === "goofi_flashcard_offer") {
     const hero = sections.find((item) => item.type === "hero")?.data ?? {};

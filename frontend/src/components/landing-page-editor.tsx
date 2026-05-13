@@ -29,6 +29,9 @@ const text = {
     noProducts: "কোনো প্রডাক্ট নির্বাচন করা হয়নি",
     addProduct: "প্রডাক্ট যোগ করুন",
     sectionContent: "সেকশন কনটেন্ট",
+    lockedLayout: "Locked Layout Mode",
+    lockedLayoutHint: "এই টেমপ্লেটে section order/structure পরিবর্তন করা যাবে না।",
+    lockedData: "Locked Content Data",
     preview: "লাইভ প্রিভিউ",
     saveDraft: "ড্রাফট সেভ",
     publish: "পাবলিশ",
@@ -57,6 +60,7 @@ const text = {
     returnUrl: "Return URL",
     fieldRequired: "টাইটেল এবং টেমপ্লেট আবশ্যক।",
     publishHint: "পাবলিশ করার আগে অন্তত ১টি প্রডাক্ট, privacy ও terms URL যুক্ত করুন।",
+    invalidLockedJson: "Locked template data invalid. Required কাঠামো ঠিক করুন।",
   },
   en: {
     loading: "Loading...",
@@ -70,6 +74,9 @@ const text = {
     noProducts: "No product selected yet",
     addProduct: "Add product",
     sectionContent: "Section content",
+    lockedLayout: "Locked Layout Mode",
+    lockedLayoutHint: "Section order and structure cannot be changed in this template.",
+    lockedData: "Locked Content Data",
     preview: "Live preview",
     saveDraft: "Save Draft",
     publish: "Publish",
@@ -98,6 +105,7 @@ const text = {
     returnUrl: "Return URL",
     fieldRequired: "Title and template are required.",
     publishHint: "Before publishing, add at least one product plus privacy and terms URLs.",
+    invalidLockedJson: "Locked template data is invalid. Please fix required structure.",
   },
 };
 
@@ -137,6 +145,94 @@ type FormState = {
   };
   products: LandingPageProduct[];
 };
+
+type LockedContent = {
+  layout_profile: string;
+  hero: { title: string; subtitle: string; disclaimer: string };
+  proof: { video_url: string; review_images: Array<Record<string, unknown>> };
+  offer_strip: { cta_label: string; package_highlights: Array<Record<string, unknown>> };
+  contact: { call_numbers: string[]; whatsapp_numbers: string[] };
+  checkout: {
+    section_title: string;
+    packages: Array<Record<string, unknown>>;
+    shipping_options: Array<Record<string, unknown>>;
+    upsell: { enabled: boolean; title: string; price: number; checkbox_label?: string; description_html?: string; image?: string };
+    cod_confirmation_text: string;
+    submit_label: string;
+  };
+  bottom_cta: { text: string; phone: string };
+  policy: { privacy_url: string; terms_url: string };
+  theme: { primary: string; accent: string; button_text: string };
+};
+
+function normalizeLockedContent(raw: unknown): LockedContent {
+  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const checkout = (src.checkout && typeof src.checkout === "object" ? src.checkout : {}) as Record<string, unknown>;
+  const upsell = (checkout.upsell && typeof checkout.upsell === "object" ? checkout.upsell : {}) as Record<string, unknown>;
+
+  return {
+    layout_profile: "naturiva_exact_clone_locked",
+    hero: {
+      title: String((src.hero as Record<string, unknown> | undefined)?.title ?? ""),
+      subtitle: String((src.hero as Record<string, unknown> | undefined)?.subtitle ?? ""),
+      disclaimer: String((src.hero as Record<string, unknown> | undefined)?.disclaimer ?? ""),
+    },
+    proof: {
+      video_url: String((src.proof as Record<string, unknown> | undefined)?.video_url ?? ""),
+      review_images: Array.isArray((src.proof as Record<string, unknown> | undefined)?.review_images)
+        ? ((src.proof as Record<string, unknown>).review_images as Array<Record<string, unknown>>)
+        : [],
+    },
+    offer_strip: {
+      cta_label: String((src.offer_strip as Record<string, unknown> | undefined)?.cta_label ?? ""),
+      package_highlights: Array.isArray((src.offer_strip as Record<string, unknown> | undefined)?.package_highlights)
+        ? ((src.offer_strip as Record<string, unknown>).package_highlights as Array<Record<string, unknown>>)
+        : [],
+    },
+    contact: {
+      call_numbers: Array.isArray((src.contact as Record<string, unknown> | undefined)?.call_numbers)
+        ? ((src.contact as Record<string, unknown>).call_numbers as unknown[]).map((v) => String(v ?? ""))
+        : [],
+      whatsapp_numbers: Array.isArray((src.contact as Record<string, unknown> | undefined)?.whatsapp_numbers)
+        ? ((src.contact as Record<string, unknown>).whatsapp_numbers as unknown[]).map((v) => String(v ?? ""))
+        : [],
+    },
+    checkout: {
+      section_title: String(checkout.section_title ?? ""),
+      packages: Array.isArray(checkout.packages) ? (checkout.packages as Array<Record<string, unknown>>) : [],
+      shipping_options: Array.isArray(checkout.shipping_options) ? (checkout.shipping_options as Array<Record<string, unknown>>) : [],
+      upsell: {
+        enabled: Boolean(upsell.enabled ?? false),
+        title: String(upsell.title ?? ""),
+        price: Number(upsell.price ?? 0),
+        checkbox_label: String(upsell.checkbox_label ?? ""),
+        description_html: String(upsell.description_html ?? ""),
+        image: String(upsell.image ?? ""),
+      },
+      cod_confirmation_text: String(checkout.cod_confirmation_text ?? ""),
+      submit_label: String(checkout.submit_label ?? "Confirm Order"),
+    },
+    bottom_cta: {
+      text: String((src.bottom_cta as Record<string, unknown> | undefined)?.text ?? "Click to Call"),
+      phone: String((src.bottom_cta as Record<string, unknown> | undefined)?.phone ?? ""),
+    },
+    policy: {
+      privacy_url: String((src.policy as Record<string, unknown> | undefined)?.privacy_url ?? ""),
+      terms_url: String((src.policy as Record<string, unknown> | undefined)?.terms_url ?? ""),
+    },
+    theme: {
+      primary: String((src.theme as Record<string, unknown> | undefined)?.primary ?? "#0b7a2a"),
+      accent: String((src.theme as Record<string, unknown> | undefined)?.accent ?? "#ff6a00"),
+      button_text: String((src.theme as Record<string, unknown> | undefined)?.button_text ?? "#ffffff"),
+    },
+  };
+}
+
+function isLockedTemplate(template?: LandingTemplate | null): boolean {
+  return template?.code === "naturiva_package_upsell"
+    && template?.layout_profile === "naturiva_exact_clone_locked"
+    && template?.editor_mode === "locked";
+}
 
 function buildFallbackSections(template?: LandingTemplate | null): Section[] {
   const code = template?.code ?? "generic";
@@ -247,6 +343,7 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
   const [templates, setTemplates] = useState<LandingTemplate[]>([]);
   const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [currentPage, setCurrentPage] = useState<LandingPageData | null>(null);
+  const [lockedContent, setLockedContent] = useState<LockedContent | null>(null);
 
   const [form, setForm] = useState<FormState>({
     template_id: "",
@@ -271,6 +368,8 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
     [form.template_id, templates],
   );
 
+  const lockedMode = useMemo(() => isLockedTemplate(selectedTemplate), [selectedTemplate]);
+
   const previewPage = useMemo<LandingPageData>(() => ({
     id: currentPage?.id ?? 0,
     user_id: currentPage?.user_id ?? 0,
@@ -282,13 +381,13 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
     meta_title: form.meta_title,
     meta_description: form.meta_description,
     theme_tokens_json: form.theme_tokens_json,
-    content_json: form.content_json,
+    content_json: (lockedMode ? (lockedContent as unknown as LandingPageData["content_json"]) : form.content_json) ?? form.content_json,
     template: selectedTemplate,
     products: form.products.map((item) => ({
       ...item,
       product: item.product ?? productOptions.find((product) => product.id === item.product_id) ?? null,
     })),
-  }), [currentPage, form, locale, productOptions, selectedTemplate]);
+  }), [currentPage, form, locale, productOptions, selectedTemplate, lockedContent, lockedMode]);
 
   useEffect(() => {
     const load = async () => {
@@ -332,6 +431,9 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
         if (pageRes && pageResult?.ok && pageResult.data) {
           const page = pageResult.data as LandingPageData;
           setCurrentPage(page);
+          if (isLockedTemplate(page.template)) {
+            setLockedContent(normalizeLockedContent(page.content_json));
+          }
           setForm({
             template_id: String(page.template_id),
             title: page.title ?? "",
@@ -382,6 +484,11 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
       return;
     }
 
+    if (lockedMode) {
+      setLockedContent(normalizeLockedContent(selectedTemplate.default_schema_json));
+      return;
+    }
+
     setForm((prev) => ({
       ...prev,
       content_json: {
@@ -389,7 +496,7 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
         sections: sectionsFromTemplate(selectedTemplate),
       },
     }));
-  }, [selectedTemplate]);
+  }, [selectedTemplate, lockedMode]);
 
   const updateSection = (index: number, field: string, value: string) => {
     setForm((prev) => {
@@ -497,7 +604,7 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
         meta_title: form.meta_title || undefined,
         meta_description: form.meta_description || undefined,
         theme_tokens_json: form.theme_tokens_json,
-        content_json: form.content_json,
+        content_json: lockedMode ? lockedContent : form.content_json,
         products: form.products
           .filter((item) => item.product_id)
           .map((item, index) => ({
@@ -509,6 +616,12 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
             is_featured: !!item.is_featured,
           })),
       };
+
+      if (lockedMode && (!lockedContent || lockedContent.layout_profile !== "naturiva_exact_clone_locked")) {
+        setError(t.invalidLockedJson);
+        setSavingState("idle");
+        return;
+      }
 
       const baseUrl = pageId ? `${LANDING_API_BASE}/landing/pages/${pageId}` : `${LANDING_API_BASE}/landing/pages`;
       const saveRes = await fetch(baseUrl, {
@@ -635,8 +748,108 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
 
         <article className="catv-panel p-5">
           <h3 className="text-base font-bold">{t.sectionContent}</h3>
+          {lockedMode ? <p className="mt-2 text-xs font-semibold text-amber-600">{t.lockedLayoutHint}</p> : null}
           <div className="mt-4 space-y-4">
-            {form.content_json.sections.map((section, sectionIndex) => (
+            {lockedMode && lockedContent ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm font-bold text-amber-700">{t.lockedLayout}</p>
+                  <p className="mt-1 text-xs text-amber-700">{t.lockedLayoutHint}</p>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                  <h4 className="mb-3 text-sm font-bold">Hero</h4>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <input value={lockedContent.hero.title} onChange={(e) => setLockedContent((prev) => prev ? { ...prev, hero: { ...prev.hero, title: e.target.value } } : prev)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" placeholder="hero title" />
+                    <input value={lockedContent.hero.subtitle} onChange={(e) => setLockedContent((prev) => prev ? { ...prev, hero: { ...prev.hero, subtitle: e.target.value } } : prev)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" placeholder="hero subtitle" />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                  <h4 className="mb-3 text-sm font-bold">Packages</h4>
+                  <div className="space-y-3">
+                    {lockedContent.checkout.packages.map((pkg, index) => (
+                      <div key={String(pkg.id ?? index)} className="grid gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 md:grid-cols-4">
+                        <input value={String(pkg.title ?? "")} onChange={(e) => setLockedContent((prev) => {
+                          if (!prev) return prev;
+                          const next = [...prev.checkout.packages];
+                          next[index] = { ...next[index], title: e.target.value };
+                          return { ...prev, checkout: { ...prev.checkout, packages: next } };
+                        })} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="title" />
+                        <input type="number" value={Number(pkg.price ?? 0)} onChange={(e) => setLockedContent((prev) => {
+                          if (!prev) return prev;
+                          const next = [...prev.checkout.packages];
+                          next[index] = { ...next[index], price: Number(e.target.value) };
+                          return { ...prev, checkout: { ...prev.checkout, packages: next } };
+                        })} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="price" />
+                        <input value={String(pkg.badge ?? "")} onChange={(e) => setLockedContent((prev) => {
+                          if (!prev) return prev;
+                          const next = [...prev.checkout.packages];
+                          next[index] = { ...next[index], badge: e.target.value };
+                          return { ...prev, checkout: { ...prev.checkout, packages: next } };
+                        })} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="badge" />
+                        <label className="flex items-center gap-2 text-xs font-semibold text-[var(--muted)]">
+                          <input type="radio" name="default_package" checked={Boolean(pkg.is_default)} onChange={() => setLockedContent((prev) => {
+                            if (!prev) return prev;
+                            const next = prev.checkout.packages.map((item, itemIndex) => ({ ...item, is_default: itemIndex === index }));
+                            return { ...prev, checkout: { ...prev.checkout, packages: next } };
+                          })} />
+                          default
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                  <h4 className="mb-3 text-sm font-bold">Shipping + Policy</h4>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <input value={lockedContent.contact.call_numbers[0] ?? ""} onChange={(e) => setLockedContent((prev) => {
+                      if (!prev) return prev;
+                      const callNumbers = [...prev.contact.call_numbers];
+                      callNumbers[0] = e.target.value;
+                      return { ...prev, contact: { ...prev.contact, call_numbers: callNumbers } };
+                    })} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="call number" />
+                    <input value={lockedContent.contact.whatsapp_numbers[0] ?? ""} onChange={(e) => setLockedContent((prev) => {
+                      if (!prev) return prev;
+                      const whatsappNumbers = [...prev.contact.whatsapp_numbers];
+                      whatsappNumbers[0] = e.target.value;
+                      return { ...prev, contact: { ...prev.contact, whatsapp_numbers: whatsappNumbers } };
+                    })} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="whatsapp number" />
+                    <input value={lockedContent.policy.privacy_url} onChange={(e) => setLockedContent((prev) => prev ? { ...prev, policy: { ...prev.policy, privacy_url: e.target.value } } : prev)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="privacy url" />
+                    <input value={lockedContent.policy.terms_url} onChange={(e) => setLockedContent((prev) => prev ? { ...prev, policy: { ...prev.policy, terms_url: e.target.value } } : prev)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="terms url" />
+                    <input value={lockedContent.bottom_cta.phone} onChange={(e) => setLockedContent((prev) => prev ? { ...prev, bottom_cta: { ...prev.bottom_cta, phone: e.target.value } } : prev)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="phone" />
+                    <input type="number" value={Number(lockedContent.checkout.upsell.price ?? 0)} onChange={(e) => setLockedContent((prev) => prev ? { ...prev, checkout: { ...prev.checkout, upsell: { ...prev.checkout.upsell, price: Number(e.target.value) } } } : prev)} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="upsell price" />
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {lockedContent.checkout.shipping_options.map((ship, index) => (
+                      <div key={String(ship.id ?? index)} className="grid gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 md:grid-cols-3">
+                        <input value={String(ship.label ?? "")} onChange={(e) => setLockedContent((prev) => {
+                          if (!prev) return prev;
+                          const next = [...prev.checkout.shipping_options];
+                          next[index] = { ...next[index], label: e.target.value };
+                          return { ...prev, checkout: { ...prev.checkout, shipping_options: next } };
+                        })} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="shipping label" />
+                        <input type="number" value={Number(ship.fee ?? 0)} onChange={(e) => setLockedContent((prev) => {
+                          if (!prev) return prev;
+                          const next = [...prev.checkout.shipping_options];
+                          next[index] = { ...next[index], fee: Number(e.target.value) };
+                          return { ...prev, checkout: { ...prev.checkout, shipping_options: next } };
+                        })} className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm" placeholder="fee" />
+                        <label className="flex items-center gap-2 text-xs font-semibold text-[var(--muted)]">
+                          <input type="radio" name="default_shipping" checked={Boolean(ship.is_default)} onChange={() => setLockedContent((prev) => {
+                            if (!prev) return prev;
+                            const next = prev.checkout.shipping_options.map((item, itemIndex) => ({ ...item, is_default: itemIndex === index }));
+                            return { ...prev, checkout: { ...prev.checkout, shipping_options: next } };
+                          })} />
+                          default shipping
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : form.content_json.sections.map((section, sectionIndex) => (
               <div key={section.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
@@ -687,7 +900,7 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
           </div>
         </article>
 
-        <article className="catv-panel p-5">
+        {!lockedMode ? <article className="catv-panel p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h3 className="text-base font-bold">{t.products}</h3>
             <button onClick={addProduct} className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">+ {t.addProduct}</button>
@@ -728,7 +941,7 @@ export default function LandingPageEditor({ pageId }: EditorProps) {
               </div>
             ))}
           </div>
-        </article>
+        </article> : null}
 
         <article className="catv-panel p-5">
           <div className="grid gap-4 md:grid-cols-2">

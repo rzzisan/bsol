@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class LandingTemplate extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'code',
         'name_bn',
@@ -16,6 +18,8 @@ class LandingTemplate extends Model
         'description_en',
         'thumbnail_url',
         'category',
+        'layout_profile',
+        'editor_mode',
         'default_schema_json',
         'is_active',
         'sort_order',
