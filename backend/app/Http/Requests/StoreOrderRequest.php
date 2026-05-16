@@ -23,7 +23,7 @@ class StoreOrderRequest extends FormRequest
             'pathao_city_id' => ['nullable', 'integer'],
             'pathao_zone_id' => ['nullable', 'integer'],
             'pathao_area_id' => ['nullable', 'integer'],
-            'source' => ['nullable', 'in:manual,facebook_inbox,landing_page'],
+            'source' => ['nullable', 'in:manual,facebook_inbox'],
             'source_ref' => ['nullable', 'string', 'max:255'],
             'payment_method' => ['nullable', 'in:cod,online,bkash'],
             'payment_status' => ['nullable', 'in:due,partial,paid'],

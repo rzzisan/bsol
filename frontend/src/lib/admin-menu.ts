@@ -5,9 +5,6 @@ export type AdminMenuLabels = {
   customers: string;
   activeCustomers: string;
   pendingCustomers: string;
-  landing?: string;
-  landingTemplates?: string;
-  landingAccess?: string;
   sms: string;
   smsGateway: string;
   smsSend: string;
@@ -27,9 +24,6 @@ export type AdminMenuLabels = {
 export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
   const notificationTemplatesLabel = labels.notificationTemplates ?? "Notification Templates";
   const notificationUseCasesLabel = labels.notificationUseCases ?? "Use-case Mapping";
-  const landingLabel = labels.landing ?? "Landing Pages";
-  const landingTemplatesLabel = labels.landingTemplates ?? "Landing Templates";
-  const landingAccessLabel = labels.landingAccess ?? "Template Access";
 
   const settingsChildren: Array<{ key: string; label: string; href?: string }> = [
     { key: "settings-email", label: labels.emailSettings, href: "/admin/settings/email" },
@@ -67,15 +61,6 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
       children: [
         { key: "customers-active", label: labels.activeCustomers, href: "/admin/customers/active" },
         { key: "customers-pending", label: labels.pendingCustomers },
-      ],
-    },
-    {
-      key: "landing",
-      label: landingLabel,
-      icon: "🧩",
-      children: [
-        { key: "landing-templates", label: landingTemplatesLabel, href: "/admin/landing/templates" },
-        { key: "landing-access", label: landingAccessLabel, href: "/admin/landing/templates/access" },
       ],
     },
     {

@@ -43,12 +43,6 @@ const menuText = {
     categories: "ক্যাটাগরি",
     stock: "স্টক ম্যানেজমেন্ট",
 
-    landing: "ল্যান্ডিং পেইজ",
-    landingPages: "ল্যান্ডিং পেইজসমূহ",
-    landingCreate: "নতুন ল্যান্ডিং",
-    funnels: "ফানেলসমূহ",
-    funnelCreate: "নতুন ফানেল",
-
     customers: "কাস্টমার",
     customerList: "কাস্টমার তালিকা",
     vipCustomers: "VIP কাস্টমার",
@@ -100,12 +94,6 @@ const menuText = {
     productList: "Product List",
     categories: "Categories",
     stock: "Stock Management",
-
-    landing: "Landing Pages",
-    landingPages: "Landing Pages",
-    landingCreate: "Create Landing",
-    funnels: "Funnels",
-    funnelCreate: "Create Funnel",
 
     customers: "Customers",
     customerList: "Customer List",
@@ -169,17 +157,6 @@ function buildMenu(t: typeof menuText.bn): ShellMenuItem[] {
         { key: "product-list", label: t.productList, href: "/dashboard/products" },
         { key: "categories", label: t.categories, href: "/dashboard/products/categories" },
         { key: "stock", label: t.stock, href: "/dashboard/products/stock" },
-      ],
-    },
-    {
-      key: "landing",
-      label: t.landing,
-      icon: "🧩",
-      children: [
-        { key: "landing-pages", label: t.landingPages, href: "/dashboard/landing-pages" },
-        { key: "landing-create", label: t.landingCreate, href: "/dashboard/landing-pages/create" },
-        { key: "funnels", label: t.funnels, href: "/dashboard/funnels" },
-        { key: "funnel-create", label: t.funnelCreate, href: "/dashboard/funnels/create" },
       ],
     },
     {

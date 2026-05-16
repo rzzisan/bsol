@@ -59,7 +59,7 @@ export default function OrderIntakeForm() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
-  const [source, setSource] = useState<"manual" | "facebook_inbox" | "landing_page">("manual");
+  const [source, setSource] = useState<"manual" | "facebook_inbox">("manual");
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online" | "bkash">("cod");
   const [paymentStatus, setPaymentStatus] = useState<"due" | "partial" | "paid">("due");
@@ -311,7 +311,6 @@ export default function OrderIntakeForm() {
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
               <option value="manual">Manual</option>
               <option value="facebook_inbox">Facebook Inbox</option>
-              <option value="landing_page">Landing Page</option>
             </select>
           </div>
         </section>

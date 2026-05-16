@@ -14,20 +14,14 @@ use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\FraudController;
-use App\Http\Controllers\Api\LandingPageController;
-use App\Http\Controllers\Api\LandingTrackingController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
-use App\Http\Controllers\Api\Admin\LandingTemplateController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
-use App\Http\Controllers\Api\FunnelController;
-use App\Http\Controllers\Api\FunnelFlowStepController;
-use App\Http\Controllers\Api\LandingPageBlockController;
 
 Route::get('/health', function () {
     return response()->json([
@@ -55,16 +49,6 @@ Route::post('/password/send-otp',     [PasswordResetController::class, 'sendOtp'
 Route::post('/password/resend-otp',   [PasswordResetController::class, 'resendOtp']);
 Route::post('/password/verify-otp',   [PasswordResetController::class, 'verifyOtp']);
 Route::post('/password/reset',        [PasswordResetController::class, 'resetPassword']);
-
-// Public landing render and tracking
-Route::get('/landing/public/{slug}', [LandingPageController::class, 'publicShow']);
-Route::post('/landing/public/{slug}/order', [LandingPageController::class, 'submitOrder']);
-Route::post('/landing/track/view', [LandingTrackingController::class, 'trackView']);
-Route::post('/landing/track/cta', [LandingTrackingController::class, 'trackCta']);
-Route::post('/landing/track/checkout-start', [LandingTrackingController::class, 'trackCheckoutStart']);
-Route::post('/landing/track/order-bump', [LandingTrackingController::class, 'trackOrderBump']);
-Route::post('/landing/track/order-complete', [LandingTrackingController::class, 'trackOrderComplete']);
-Route::post('/landing/track/upsell', [LandingTrackingController::class, 'trackUpsell']);
 
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
@@ -183,39 +167,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/blacklist/{id}', [FraudController::class, 'removeBlacklist']);
     });
 
-    // ── Seller Landing Pages ───────────────────────────────────────────────
-    Route::get('/landing/templates/available', [LandingPageController::class, 'availableTemplates']);
-    Route::get('/landing/pages', [LandingPageController::class, 'index']);
-    Route::post('/landing/pages', [LandingPageController::class, 'store']);
-    Route::get('/landing/pages/{id}', [LandingPageController::class, 'show']);
-    Route::put('/landing/pages/{id}', [LandingPageController::class, 'update']);
-    Route::put('/landing/pages/{id}/publish', [LandingPageController::class, 'publish']);
-    Route::put('/landing/pages/{id}/archive', [LandingPageController::class, 'archive']);
-    Route::get('/landing/pages/{id}/preview', [LandingPageController::class, 'preview']);
-    Route::get('/landing/pages/{id}/analytics', [LandingPageController::class, 'analytics']);
-    Route::post('/landing/pages/{landingPage}/blocks', [LandingPageBlockController::class, 'store']);
-    Route::get('/landing/pages/{landingPage}/blocks', [LandingPageBlockController::class, 'index']);
-    Route::put('/landing/pages/{landingPage}/blocks/{block}', [LandingPageBlockController::class, 'update']);
-    Route::delete('/landing/pages/{landingPage}/blocks/{block}', [LandingPageBlockController::class, 'destroy']);
-    Route::put('/landing/pages/{landingPage}/blocks/reorder', [LandingPageBlockController::class, 'reorder']);
-    Route::post('/landing/pages/{landingPage}/blocks/{block}/duplicate', [LandingPageBlockController::class, 'duplicate']);
-
-    // ── Seller Funnel Builder ───────────────────────────────────────────────
-    Route::get('/funnels', [FunnelController::class, 'index']);
-    Route::post('/funnels', [FunnelController::class, 'store']);
-    Route::get('/funnels/{funnel}', [FunnelController::class, 'show']);
-    Route::put('/funnels/{funnel}', [FunnelController::class, 'update']);
-    Route::put('/funnels/{funnel}/publish', [FunnelController::class, 'publish']);
-    Route::put('/funnels/{funnel}/archive', [FunnelController::class, 'archive']);
-    Route::delete('/funnels/{funnel}', [FunnelController::class, 'destroy']);
-    Route::get('/funnels/{funnel}/preview', [FunnelController::class, 'preview']);
-    Route::get('/funnels/{funnel}/analytics', [FunnelController::class, 'analytics']);
-    Route::get('/funnels/{funnel}/flows/{flow}/steps', [FunnelFlowStepController::class, 'index']);
-    Route::post('/funnels/{funnel}/flows/{flow}/steps', [FunnelFlowStepController::class, 'store']);
-    Route::put('/funnels/{funnel}/flows/{flow}/steps/reorder', [FunnelFlowStepController::class, 'reorder']);
-    Route::put('/funnels/{funnel}/flows/{flow}/steps/{step}', [FunnelFlowStepController::class, 'update']);
-    Route::delete('/funnels/{funnel}/flows/{flow}/steps/{step}', [FunnelFlowStepController::class, 'destroy']);
-
     Route::middleware('is_admin')->prefix('admin')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);
 
@@ -276,13 +227,5 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/notification-dispatch', [NotificationDispatchController::class, 'dispatch']);
         Route::get('/notification-dispatch/logs', [NotificationDispatchController::class, 'logs']);
 
-        // Landing template management
-        Route::get('/landing/templates', [LandingTemplateController::class, 'index']);
-        Route::post('/landing/templates', [LandingTemplateController::class, 'store']);
-        Route::put('/landing/templates/reorder', [LandingTemplateController::class, 'reorder']);
-        Route::get('/landing/templates/access-rules', [LandingTemplateController::class, 'accessRules']);
-        Route::put('/landing/templates/access-rules', [LandingTemplateController::class, 'updateAccessRules']);
-        Route::put('/landing/templates/{id}', [LandingTemplateController::class, 'update']);
-        Route::put('/landing/templates/{id}/toggle', [LandingTemplateController::class, 'toggle']);
     });
 });

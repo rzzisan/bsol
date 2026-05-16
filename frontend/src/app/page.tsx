@@ -26,7 +26,7 @@ const content = {
     badge: "Hybrid Commerce SaaS Foundation",
     title: "বাংলাদেশি F-commerce ব্যবসার জন্য স্মার্ট অপারেশন প্ল্যাটফর্ম",
     subtitle:
-      "অর্ডার, কুরিয়ার, ফেইক অর্ডার রিস্ক, ল্যান্ডিং পেজ, CRM এবং প্রফিট ট্র্যাকিং—সব এক প্ল্যাটফর্মে আনার জন্য বেস স্ট্রাকচার তৈরি করা হয়েছে।",
+      "অর্ডার, কুরিয়ার, ফেইক অর্ডার রিস্ক, CRM এবং প্রফিট ট্র্যাকিং—সব এক প্ল্যাটফর্মে আনার জন্য বেস স্ট্রাকচার তৈরি করা হয়েছে।",
     ctaPrimary: "MVP Roadmap দেখুন",
     ctaSecondary: "API Health Check",
     sectionTitle: "Core Product Modules",
@@ -54,8 +54,8 @@ const content = {
       },
       {
         phase: "Phase 3",
-        title: "Landing + ROI Intelligence",
-        detail: "Page builder blocks, custom domain mapping, ad spend sync, net profit and inventory insights.",
+        title: "Analytics + ROI Intelligence",
+        detail: "Ad spend sync, team workflows, net profit visibility, and inventory insights.",
       },
     ],
     footer:
@@ -95,7 +95,7 @@ const content = {
     badge: "Hybrid Commerce SaaS Foundation",
     title: "Smart operations platform for Bangladesh F-commerce businesses",
     subtitle:
-      "A strong base is now in place to unify orders, couriers, fake-order risk checks, landing pages, CRM, and profitability tracking in one SaaS product.",
+      "A strong base is now in place to unify orders, couriers, fake-order risk checks, CRM, and profitability tracking in one SaaS product.",
     ctaPrimary: "View MVP roadmap",
     ctaSecondary: "API health check",
     sectionTitle: "Core Product Modules",
@@ -123,8 +123,8 @@ const content = {
       },
       {
         phase: "Phase 3",
-        title: "Landing + ROI Intelligence",
-        detail: "Page builder blocks, custom domain mapping, ad spend sync, net profit and inventory insights.",
+        title: "Analytics + ROI Intelligence",
+        detail: "Ad spend sync, team workflows, net profit visibility, and inventory insights.",
       },
     ],
     footer: "This screen now acts as your SaaS vision presenter and future dashboard shell.",
@@ -174,9 +174,9 @@ const modules = {
         "ফোন নম্বর history, return behavior, এবং shared customer trust score ভিত্তিক risk indicator।",
     },
     {
-      title: "ল্যান্ডিং পেজ + চেকআউট বিল্ডার",
+      title: "সেলস + ROI ইন্টেলিজেন্স",
       description:
-        "Block-based builder, product highlights, instant order CTA, custom domain প্রস্তুতি।",
+        "Ad spend, conversion insights, operational visibility, এবং profit-driven decision support।",
     },
     {
       title: "ইনভেন্টরি + Ads ROI",
@@ -201,9 +201,9 @@ const modules = {
         "Phone-history, return behavior, and shared customer trust score driven risk indicators.",
     },
     {
-      title: "Landing + Checkout Builder",
+      title: "Sales + ROI Intelligence",
       description:
-        "Block-based page builder with product sections, instant order CTA, and domain-ready setup.",
+        "Ad spend, conversion insights, operational visibility, and profit-driven decision support.",
     },
     {
       title: "Inventory + Ads ROI",
