@@ -90,6 +90,34 @@ export default function LandingPageDraftPreview({
           </section>
         ) : null}
 
+        {faq.some((item) => item.q || item.a) ? (
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">FAQ</h4>
+            <div className="space-y-2">
+              {faq.filter((item) => item.q || item.a).map((item, index) => (
+                <details key={`${item.q}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                  <summary className="cursor-pointer font-semibold text-[var(--foreground)]">{item.q || `FAQ ${index + 1}`}</summary>
+                  {item.a ? <p className="mt-2 text-sm text-[var(--muted)]">{item.a}</p> : null}
+                </details>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {reviews.some((item) => item.name || item.quote) ? (
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "রিভিউ" : "Reviews"}</h4>
+            <div className="grid gap-3 md:grid-cols-2">
+              {reviews.filter((item) => item.name || item.quote).map((review, index) => (
+                <blockquote key={`${review.name}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm text-[var(--foreground)]">
+                  <p>“{review.quote}”</p>
+                  {review.name ? <footer className="mt-2 font-semibold text-[var(--muted)]">— {review.name}</footer> : null}
+                </blockquote>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         {selectedProducts.length > 0 ? (
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
             <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "পছন্দের প্রোডাক্ট" : "Selected Products"}</h4>
@@ -159,34 +187,6 @@ export default function LandingPageDraftPreview({
             </div>
           </div>
         </section>
-
-        {reviews.some((item) => item.name || item.quote) ? (
-          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "রিভিউ" : "Reviews"}</h4>
-            <div className="grid gap-3 md:grid-cols-2">
-              {reviews.filter((item) => item.name || item.quote).map((review, index) => (
-                <blockquote key={`${review.name}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm text-[var(--foreground)]">
-                  <p>“{review.quote}”</p>
-                  {review.name ? <footer className="mt-2 font-semibold text-[var(--muted)]">— {review.name}</footer> : null}
-                </blockquote>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {faq.some((item) => item.q || item.a) ? (
-          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">FAQ</h4>
-            <div className="space-y-2">
-              {faq.filter((item) => item.q || item.a).map((item, index) => (
-                <details key={`${item.q}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                  <summary className="cursor-pointer font-semibold text-[var(--foreground)]">{item.q || `FAQ ${index + 1}`}</summary>
-                  {item.a ? <p className="mt-2 text-sm text-[var(--muted)]">{item.a}</p> : null}
-                </details>
-              ))}
-            </div>
-          </section>
-        ) : null}
 
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
           <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "ডেলিভারি / যোগাযোগ" : "Delivery / Contact"}</h4>

@@ -255,6 +255,34 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
             </div>
           ) : null}
 
+          {faq.length > 0 ? (
+            <div className="lp-card rounded-3xl p-6 sm:p-8">
+              <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>সাধারণ প্রশ্ন</h2>
+              <div className="space-y-3">
+                {faq.map((item, index) => (
+                  <details key={`${item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <summary className="cursor-pointer text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</summary>
+                    {item.a ? <p className="mt-3 text-sm leading-7 text-slate-600">{item.a}</p> : null}
+                  </details>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {reviews.length > 0 ? (
+            <div className="lp-card rounded-3xl p-6 sm:p-8">
+              <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>Customer Reviews</h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                {reviews.map((review, index) => (
+                  <blockquote key={`${review.name ?? "review"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
+                    <p className="text-sm leading-7 text-slate-700">“{review.quote || ""}”</p>
+                    {review.name ? <footer className="mt-3 text-sm font-semibold text-slate-900">— {review.name}</footer> : null}
+                  </blockquote>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div id="products" className="lp-card rounded-3xl p-6 sm:p-8">
             <h2 className="mb-2 text-center text-2xl font-bold" style={{ color: theme.primary }}>আপনার পছন্দ মতো প্রোডাক্ট সিলেক্ট করুন</h2>
             <p className="mb-6 text-center text-sm text-slate-500">পছন্দের product নির্বাচন করুন, quantity ঠিক করুন, তারপর নিচের shipping details পূরণ করে order complete করুন।</p>
@@ -474,34 +502,6 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
               </div>
             </div>
           </form>
-
-          {reviews.length > 0 ? (
-            <div className="lp-card rounded-3xl p-6 sm:p-8">
-              <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>Customer Reviews</h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                {reviews.map((review, index) => (
-                  <blockquote key={`${review.name ?? "review"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
-                    <p className="text-sm leading-7 text-slate-700">“{review.quote || ""}”</p>
-                    {review.name ? <footer className="mt-3 text-sm font-semibold text-slate-900">— {review.name}</footer> : null}
-                  </blockquote>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {faq.length > 0 ? (
-            <div className="lp-card rounded-3xl p-6 sm:p-8">
-              <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>সাধারণ প্রশ্ন</h2>
-              <div className="space-y-3">
-                {faq.map((item, index) => (
-                  <details key={`${item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <summary className="cursor-pointer text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</summary>
-                    {item.a ? <p className="mt-3 text-sm leading-7 text-slate-600">{item.a}</p> : null}
-                  </details>
-                ))}
-              </div>
-            </div>
-          ) : null}
 
           <div className="lp-card rounded-3xl p-6 sm:p-8">
             <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>ডেলিভারি ও যোগাযোগ</h2>
