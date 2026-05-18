@@ -36,7 +36,9 @@ type LandingPageDraftPreviewProps = {
 
 function money(value: string | number | null | undefined) {
   const amount = Number(value ?? 0);
-  return Number.isFinite(amount) ? `৳${amount.toLocaleString()}` : "৳0";
+  return Number.isFinite(amount)
+    ? `৳${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : "৳0.00";
 }
 
 export default function LandingPageDraftPreview({
@@ -90,23 +92,73 @@ export default function LandingPageDraftPreview({
 
         {selectedProducts.length > 0 ? (
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "প্রোডাক্ট" : "Products"}</h4>
-            <div className="grid gap-3 md:grid-cols-2">
+            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "পছন্দের প্রোডাক্ট" : "Selected Products"}</h4>
+            <div className="space-y-3">
               {selectedProducts.map((item) => {
                 const product = item.product;
                 const price = item.price_override || product?.selling_price || product?.regular_price || 0;
                 return (
-                  <div key={item.product_id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                    <div className="font-semibold text-[var(--foreground)]">{item.title_override || product?.name || `#${item.product_id}`}</div>
-                    {item.subtitle ? <div className="mt-1 text-sm text-[var(--muted)]">{item.subtitle}</div> : null}
-                    {item.badge_text ? <div className="mt-2 inline-flex rounded-full bg-orange-500/10 px-2 py-1 text-xs font-semibold text-orange-500">{item.badge_text}</div> : null}
-                    <div className="mt-2 text-base font-bold text-[var(--accent)]">{money(price)}</div>
+                  <div key={item.product_id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-[var(--foreground)]">{item.title_override || product?.name || `#${item.product_id}`}</div>
+                      {item.subtitle ? <div className="mt-1 text-sm text-[var(--muted)]">{item.subtitle}</div> : null}
+                      {item.badge_text ? <div className="mt-2 inline-flex rounded-full bg-orange-500/10 px-2 py-1 text-xs font-semibold text-orange-500">{item.badge_text}</div> : null}
+                    </div>
+                    <div className="text-right">
+                      <div className="inline-flex items-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] text-sm">
+                        <span className="px-2 py-1">−</span>
+                        <span className="border-x border-[var(--border)] px-3 py-1 font-semibold">{item.default_qty}</span>
+                        <span className="px-2 py-1">+</span>
+                      </div>
+                      <div className="mt-2 text-base font-bold text-[var(--accent)]">{money(price)}</div>
+                    </div>
                   </div>
                 );
               })}
             </div>
           </section>
         ) : null}
+
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+          <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "চেকআউট প্রিভিউ" : "Checkout Preview"}</h4>
+          <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+              <div className="mb-3 text-sm font-semibold text-[var(--foreground)]">{locale === "bn" ? "Shipping Details" : "Shipping Details"}</div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)]">{locale === "bn" ? "আপনার নাম" : "Your name"}</div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)]">{locale === "bn" ? "মোবাইল নাম্বার" : "Phone"}</div>
+              </div>
+              <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)]">{locale === "bn" ? "সম্পূর্ণ ঠিকানা" : "Full address"}</div>
+              <div className="mt-3 space-y-2">
+                <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">Inside Dhaka: {money(shippingInside)}</div>
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)]">Outside Dhaka: {money(shippingOutside)}</div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+              <div className="mb-3 text-sm font-semibold text-[var(--foreground)]">{locale === "bn" ? "Your order" : "Your order"}</div>
+              <div className="space-y-3">
+                {selectedProducts.length > 0 ? selectedProducts.map((item) => {
+                  const product = item.product;
+                  const price = Number(item.price_override || product?.selling_price || product?.regular_price || 0);
+                  return (
+                    <div key={`checkout-${item.product_id}`} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm">
+                      <div>
+                        <div className="font-semibold text-[var(--foreground)]">{item.title_override || product?.name || `#${item.product_id}`}</div>
+                        <div className="text-[var(--muted)]">Qty {item.default_qty}</div>
+                      </div>
+                      <div className="font-semibold text-[var(--accent)]">{money(price * item.default_qty)}</div>
+                    </div>
+                  );
+                }) : <div className="rounded-xl border border-dashed border-[var(--border)] p-3 text-sm text-[var(--muted)]">{locale === "bn" ? "অর্ডার summary এখানে দেখা যাবে" : "Order summary will appear here"}</div>}
+              </div>
+              <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--muted)]">
+                <div className="font-semibold text-[var(--foreground)]">Cash on delivery</div>
+                <div className="mt-1">{locale === "bn" ? "ডেলিভারির সময় পেমেন্ট" : "Pay on delivery"}</div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {reviews.some((item) => item.name || item.quote) ? (
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
