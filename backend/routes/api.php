@@ -14,6 +14,8 @@ use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\FraudController;
+use App\Http\Controllers\Api\LandingPageController;
+use App\Http\Controllers\Api\LandingTemplateController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
@@ -50,6 +52,9 @@ Route::post('/password/resend-otp',   [PasswordResetController::class, 'resendOt
 Route::post('/password/verify-otp',   [PasswordResetController::class, 'verifyOtp']);
 Route::post('/password/reset',        [PasswordResetController::class, 'resetPassword']);
 
+Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow']);
+Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder']);
+
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
     Route::post('/email/send-verification', [EmailOtpController::class, 'sendVerificationEmail']);
@@ -69,6 +74,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/sms/automation/rules/{id}', [SmsAutomationController::class, 'update']);
     Route::delete('/sms/automation/rules/{id}', [SmsAutomationController::class, 'destroy']);
     Route::get('/sms/automation/logs', [SmsAutomationController::class, 'logs']);
+
+    // ── Landing Page Builder ────────────────────────────────────────────────
+    Route::get('/landing/templates', [LandingTemplateController::class, 'index']);
+    Route::get('/landing/templates/{id}', [LandingTemplateController::class, 'show'])->where('id', '[0-9]+');
+    Route::get('/landing/pages/import-json/files', [LandingPageController::class, 'importFiles']);
+    Route::get('/landing/pages', [LandingPageController::class, 'index']);
+    Route::post('/landing/pages', [LandingPageController::class, 'store']);
+    Route::get('/landing/pages/{id}', [LandingPageController::class, 'show'])->where('id', '[0-9]+');
+    Route::put('/landing/pages/{id}', [LandingPageController::class, 'update'])->where('id', '[0-9]+');
+    Route::delete('/landing/pages/{id}', [LandingPageController::class, 'destroy'])->where('id', '[0-9]+');
+    Route::post('/landing/pages/{id}/publish', [LandingPageController::class, 'publish'])->where('id', '[0-9]+');
+    Route::post('/landing/pages/import-json', [LandingPageController::class, 'importFromJson']);
 
     // ── Product Management ────────────────────────────────────────────────────
     Route::get('/products/stats', [ProductController::class, 'stats']);

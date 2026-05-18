@@ -69,6 +69,8 @@ const menuText = {
     expenses: "খরচ",
     profit: "মুনাফা",
 
+    landingPages: "ল্যান্ডিং পেজ",
+
     settings: "সেটিংস",
     shopProfile: "শপ প্রোফাইল",
     courierAccounts: "কুরিয়ার একাউন্ট",
@@ -121,6 +123,8 @@ const menuText = {
     expenses: "Expenses",
     profit: "Profit",
 
+    landingPages: "Landing Pages",
+
     settings: "Settings",
     shopProfile: "Shop Profile",
     courierAccounts: "Courier Accounts",
@@ -137,6 +141,12 @@ function buildMenu(t: typeof menuText.bn): ShellMenuItem[] {
       label: t.dashboard,
       href: "/dashboard",
       icon: "🏠",
+    },
+    {
+      key: "landing-pages",
+      label:  (t as any).landingPages ?? "ল্যান্ডিং পেজ",
+      icon: "🌐",
+      href: "/dashboard/landing-pages",
     },
     {
       key: "orders",
@@ -247,10 +257,15 @@ export default function UserShell({
   children,
 }: UserShellProps) {
   const router = useRouter();
-  const [locale, setLocale] = useState<Locale>(getStoredLocale);
-  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
+  const [locale, setLocale] = useState<Locale>("bn");
+  const [theme, setTheme] = useState<ThemeMode>("dark");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
+
+  useEffect(() => {
+    setLocale(getStoredLocale());
+    setTheme(getStoredTheme());
+  }, []);
 
   // theme
   useEffect(() => {

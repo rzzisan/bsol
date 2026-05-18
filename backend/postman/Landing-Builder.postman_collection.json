@@ -1,0 +1,237 @@
+{
+  "info": {
+    "name": "Hybrid Stack - Landing Builder",
+    "description": "Postman collection for landing template/page APIs and public order flow.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mobile\": \"{{mobile}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Landing - List Templates",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/landing/templates",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "landing",
+            "templates"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Landing - Create Page",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"template_id\": {{template_id}},\n  \"title\": \"Flash Cards – Goofi World\",\n  \"slug\": \"flash-cards-goofi-world\",\n  \"status\": \"draft\",\n  \"products\": [\n    {\n      \"product_id\": {{product_id_1}},\n      \"title_override\": \"Flash Cards Set (Ages 3+)\",\n      \"subtitle\": \"Best Seller\",\n      \"badge_text\": \"Top Pick\",\n      \"price_override\": 890,\n      \"default_qty\": 1,\n      \"selected_by_default\": true,\n      \"sort_order\": 1\n    }\n  ],\n  \"theme_settings\": {\n    \"primary_color\": \"#0f766e\",\n    \"accent_color\": \"#f97316\",\n    \"background_color\": \"#f8fafc\",\n    \"text_color\": \"#0f172a\",\n    \"button_text_color\": \"#ffffff\"\n  },\n  \"seo_meta\": {\n    \"meta_title\": \"Flash Cards – Goofi World\",\n    \"meta_description\": \"Bangla flash cards for kids\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/landing/pages",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "landing",
+            "pages"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Landing - List Pages",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/landing/pages?per_page=20",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "landing",
+            "pages"
+          ],
+          "query": [
+            {
+              "key": "per_page",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Landing - Publish Page",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/landing/pages/{{landing_page_id}}/publish",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "landing",
+            "pages",
+            "{{landing_page_id}}",
+            "publish"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Landing - Import JSON",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"file_name\": \"Goofi_Design-2.json\",\n  \"template_id\": {{template_id}},\n  \"status\": \"draft\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/landing/pages/import-json",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "landing",
+            "pages",
+            "import-json"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Public - Open Landing",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/lp/{{landing_slug}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "lp",
+            "{{landing_slug}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Public - Submit Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "customer_name", "value": "Demo Buyer", "type": "text" },
+            { "key": "customer_phone", "value": "01700000000", "type": "text" },
+            { "key": "customer_address", "value": "Dhaka", "type": "text" },
+            { "key": "customer_district", "value": "Dhaka", "type": "text" },
+            { "key": "customer_thana", "value": "Dhanmondi", "type": "text" },
+            { "key": "items[0][enabled]", "value": "1", "type": "text" },
+            { "key": "items[0][product_id]", "value": "{{product_id_1}}", "type": "text" },
+            { "key": "items[0][quantity]", "value": "1", "type": "text" }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/lp/{{landing_slug}}/order",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "lp",
+            "{{landing_slug}}",
+            "order"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000" },
+    { "key": "token", "value": "" },
+    { "key": "mobile", "value": "" },
+    { "key": "password", "value": "" },
+    { "key": "template_id", "value": "1" },
+    { "key": "product_id_1", "value": "1" },
+    { "key": "landing_page_id", "value": "1" },
+    { "key": "landing_slug", "value": "flash-cards-goofi-world" }
+  ]
+}
