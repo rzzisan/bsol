@@ -318,6 +318,11 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
       return;
     }
 
+    if (mode === "edit" && !pageId) {
+      setLoading(true);
+      return;
+    }
+
     const load = async () => {
       try {
         setError(null);
@@ -368,7 +373,7 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
           setShippingInside(String(mergedContent.shipping?.inside_dhaka ?? 80));
           setShippingOutside(String(mergedContent.shipping?.outside_dhaka ?? 120));
           setCustomCss(loadedPage.custom_css ?? "");
-        } else {
+        } else if (mode === "create") {
           const template = nextTemplates[0] as LandingTemplate | undefined;
           if (template) {
             applyTemplate(template, true);

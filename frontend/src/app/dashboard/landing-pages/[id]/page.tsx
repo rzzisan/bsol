@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
@@ -24,13 +24,15 @@ const text: Record<string, Record<string, string>> = {
   },
 };
 
-export default function LandingPageDetails({ params }: { params: { id: string } }) {
+export default function LandingPageDetails() {
   const [page, setPage] = useState<LandingPageRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [locale, setLocale] = useState<Locale>("bn");
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const pageId = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
   useEffect(() => {
     setLocale(getStoredLocale());
@@ -43,6 +45,10 @@ export default function LandingPageDetails({ params }: { params: { id: string } 
 
   useEffect(() => {
     const fetchPage = async () => {
+      if (!pageId) {
+        return;
+      }
+
       try {
         const token = localStorage.getItem("auth_token");
         if (!token) {
@@ -50,7 +56,7 @@ export default function LandingPageDetails({ params }: { params: { id: string } 
           return;
         }
         
-        const res = await fetch(`${LANDING_API_BASE}/landing/pages/${params.id}`, {
+        const res = await fetch(`${LANDING_API_BASE}/landing/pages/${pageId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         
@@ -70,7 +76,7 @@ export default function LandingPageDetails({ params }: { params: { id: string } 
     };
     
     fetchPage();
-  }, [params.id]);
+  }, [pageId]);
 
   const t = text[locale] || text.bn;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import UserShell from "@/components/user-shell";
 import LandingPageStudio from "@/components/landing-page-studio";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
@@ -24,8 +25,10 @@ const text: Record<string, Record<string, string>> = {
   },
 };
 
-export default function EditLandingPage({ params }: { params: { id: string } }) {
+export default function EditLandingPage() {
   const [locale, setLocale] = useState<Locale>("bn");
+  const params = useParams<{ id: string }>();
+  const pageId = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
   useEffect(() => {
     setLocale(getStoredLocale());
@@ -45,7 +48,7 @@ export default function EditLandingPage({ params }: { params: { id: string } }) 
         en: "Update the landing page name and details.",
       }}
     >
-      <LandingPageStudio locale={locale} mode="edit" pageId={params.id} />
+      <LandingPageStudio locale={locale} mode="edit" pageId={pageId} />
     </UserShell>
   );
 }
