@@ -51,6 +51,9 @@ const initialFormData: FormData = {
   from_name: "",
 };
 
+const API_BASE_URL =
+  (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
+
 const text = {
   bn: {
     title: "ইমেইল সেটিংস",
@@ -222,12 +225,11 @@ export default function EmailSettingsPage() {
 
   const t = useMemo(() => text[locale], [locale]);
   const token = getStoredToken();
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://bsol.zyrotechbd.com/api";
 
   const loadConfigurations = async (authToken: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`${baseUrl}/admin/email-configurations`, {
+      const response = await fetch(`${API_BASE_URL}/admin/email-configurations`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       const data = await response.json();
@@ -275,8 +277,8 @@ export default function EmailSettingsPage() {
 
       const method = editingId ? "PUT" : "POST";
       const endpoint = editingId
-        ? `${baseUrl}/admin/email-configurations/${editingId}`
-        : `${baseUrl}/admin/email-configurations`;
+        ? `${API_BASE_URL}/admin/email-configurations/${editingId}`
+        : `${API_BASE_URL}/admin/email-configurations`;
 
       const response = await fetch(endpoint, {
         method,
@@ -329,7 +331,7 @@ export default function EmailSettingsPage() {
 
     try {
       setLoading(true);
-      const response = await fetch(`${baseUrl}/admin/email-configurations/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/email-configurations/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -380,7 +382,7 @@ export default function EmailSettingsPage() {
       });
 
       const response = (await Promise.race([
-        fetch(`${baseUrl}/admin/email-configurations/test-connection`, {
+        fetch(`${API_BASE_URL}/admin/email-configurations/test-connection`, {
           method: "POST",
           signal: controller.signal,
           headers: {
