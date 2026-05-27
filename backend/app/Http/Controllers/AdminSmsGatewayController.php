@@ -6,10 +6,12 @@ use App\Models\PhoneOtpActivityLog;
 use App\Models\SmsGateway;
 use App\Models\SmsHistory;
 use App\Services\SmsCreditService;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 
 class AdminSmsGatewayController extends Controller
 {
@@ -350,11 +352,22 @@ class AdminSmsGatewayController extends Controller
             ], 422);
         }
 
+        try {
+            $endpointUrl = $gateway->endpoint_url;
+            $apiKey = $this->decryptGatewayCredential($gateway, 'api_key');
+            $secretKey = $this->decryptGatewayCredential($gateway, 'secret_key');
+            $senderId = $gateway->sender_id;
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+            ], 500);
+        }
+
         if (
-            blank($gateway->endpoint_url)
-            || blank($gateway->api_key)
-            || blank($gateway->secret_key)
-            || blank($gateway->sender_id)
+            blank($endpointUrl)
+            || blank($apiKey)
+            || blank($secretKey)
+            || blank($senderId)
         ) {
             foreach ($rawRecipients as $rawRecipient) {
                 $this->createHistoryRecord(
@@ -465,10 +478,10 @@ class AdminSmsGatewayController extends Controller
         foreach ($normalizedRecipients as $recipient) {
             $response = Http::asForm()
                 ->timeout(20)
-                ->post($gateway->endpoint_url, [
-                    'apikey' => $gateway->api_key,
-                    'secretkey' => $gateway->secret_key,
-                    'callerID' => $gateway->sender_id,
+                ->post($endpointUrl, [
+                    'apikey' => $apiKey,
+                    'secretkey' => $secretKey,
+                    'callerID' => $senderId,
                     'toUser' => $recipient,
                     'messageContent' => $validated['message'],
                 ]);
@@ -674,6 +687,9 @@ class AdminSmsGatewayController extends Controller
 
     private function transformGateway(SmsGateway $gateway): array
     {
+        $apiKeyMasked = $this->safeMaskSecret($gateway, 'api_key');
+        $secretKeyMasked = $this->safeMaskSecret($gateway, 'secret_key');
+
         return [
             'id' => $gateway->id,
             'name' => $gateway->name,
@@ -682,13 +698,55 @@ class AdminSmsGatewayController extends Controller
             'sender_id' => $gateway->sender_id,
             'is_active' => $gateway->is_active,
             'is_enabled' => $gateway->is_enabled,
-            'has_api_key' => filled($gateway->api_key),
-            'has_secret_key' => filled($gateway->secret_key),
-            'api_key_masked' => $this->maskSecret($gateway->api_key),
-            'secret_key_masked' => $this->maskSecret($gateway->secret_key),
+            'has_api_key' => $this->hasStoredCredential($gateway, 'api_key'),
+            'has_secret_key' => $this->hasStoredCredential($gateway, 'secret_key'),
+            'api_key_masked' => $apiKeyMasked,
+            'secret_key_masked' => $secretKeyMasked,
+            'credentials_decryptable' => $apiKeyMasked !== '[unreadable]' && $secretKeyMasked !== '[unreadable]',
             'updated_at' => optional($gateway->updated_at)?->toIso8601String(),
             'created_at' => optional($gateway->created_at)?->toIso8601String(),
         ];
+    }
+
+    private function hasStoredCredential(SmsGateway $gateway, string $field): bool
+    {
+        return filled($gateway->getRawOriginal($field));
+    }
+
+    private function safeMaskSecret(SmsGateway $gateway, string $field): ?string
+    {
+        if (! $this->hasStoredCredential($gateway, $field)) {
+            return null;
+        }
+
+        try {
+            /** @var ?string $value */
+            $value = $gateway->getAttribute($field);
+
+            return $this->maskSecret($value);
+        } catch (DecryptException) {
+            return '[unreadable]';
+        }
+    }
+
+    private function decryptGatewayCredential(SmsGateway $gateway, string $field): ?string
+    {
+        if (! $this->hasStoredCredential($gateway, $field)) {
+            return null;
+        }
+
+        try {
+            /** @var ?string $value */
+            $value = $gateway->getAttribute($field);
+
+            return $value;
+        } catch (DecryptException $exception) {
+            throw new RuntimeException(
+                'SMS gateway credentials could not be decrypted. Verify Dokploy APP_KEY or re-save the gateway credentials.',
+                0,
+                $exception,
+            );
+        }
     }
 
     private function maskSecret(?string $value): ?string
