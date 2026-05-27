@@ -51,8 +51,7 @@ const initialFormData: FormData = {
   from_name: "",
 };
 
-const API_BASE_URL =
-  (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
+const API_BASE_URL = "/api";
 
 const text = {
   bn: {
