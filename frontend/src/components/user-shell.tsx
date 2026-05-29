@@ -289,7 +289,8 @@ export default function UserShell({
       return;
     }
 
-    if (normalizeRole(storedUser) !== "user") {
+    const role = normalizeRole(storedUser);
+    if (role !== "user" && role !== "admin") {
       setState("forbidden");
       return;
     }
@@ -395,6 +396,7 @@ export default function UserShell({
       sidebarTitle={t.sidebarTitle}
       userName={user?.name}
       userMeta={user?.email}
+      currentUser={user}
       menu={menu}
       activeKey={activeKey}
       defaultExpandedKey={defaultExpandedKey ?? null}

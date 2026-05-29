@@ -32,6 +32,7 @@ type CatvShellProps = {
   searchPlaceholder?: string;
   userName?: string;
   userMeta?: string;
+  currentUser?: AuthUser | null;
   menu: ShellMenuItem[];
   activeKey: string;
   defaultExpandedKey?: string | null;
@@ -63,6 +64,7 @@ export default function CatvShell({
   searchPlaceholder,
   userName,
   userMeta,
+  currentUser,
   menu,
   activeKey,
   defaultExpandedKey = null,
@@ -87,6 +89,22 @@ export default function CatvShell({
   const [savingProfile, setSavingProfile] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(() => getStoredUser());
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      setAuthUser(currentUser);
+    }
+  }, [currentUser]);
+
+  const isAdmin = authUser?.role === "admin";
+  const currentPath = isClient ? window.location.pathname : "";
+  const isCurrentlyAdminPanel = currentPath.startsWith("/admin");
+  const canSwitchDashboards = isAdmin || isCurrentlyAdminPanel;
 
   useEffect(() => {
     try {
@@ -396,6 +414,19 @@ export default function CatvShell({
             {searchPlaceholder ? (
               <input className="catv-search" placeholder={searchPlaceholder} />
             ) : null}
+            {canSwitchDashboards && isClient && (
+              <Link
+                href={isCurrentlyAdminPanel ? "/dashboard" : "/admin"}
+                className="catv-admin-switch"
+              >
+                <span aria-hidden="true">↔</span>
+                <span>
+                  {isCurrentlyAdminPanel
+                    ? (locale === "bn" ? "সেলার ড্যাশবোর্ড" : "Seller Dashboard")
+                    : (locale === "bn" ? "অ্যাডমিন ড্যাশবোর্ড" : "Admin Dashboard")}
+                </span>
+              </Link>
+            )}
             <button type="button" className="catv-chip" onClick={onToggleLocale}>
               {localeLabel}: {locale === "bn" ? "বাংলা" : "English"}
             </button>

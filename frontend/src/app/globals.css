@@ -571,3 +571,40 @@ a {
     min-width: 140px;
   }
 }
+
+.catv-admin-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  border-radius: 999px;
+  height: 34px;
+  padding: 0 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.catv-admin-switch:hover {
+  background: #ffffff;
+  color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.catv-admin-switch:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+  .catv-admin-switch {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
