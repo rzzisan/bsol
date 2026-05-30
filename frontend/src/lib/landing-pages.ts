@@ -53,11 +53,17 @@ export type LandingPageRecord = {
       cta_text?: string | null;
     };
     html_sections?: Array<{ title?: string | null; html?: string | null }>;
+    carousel_images?: Array<{
+      title?: string | null;
+      template?: string | null;
+      images?: Array<{ id?: number | null; url?: string | null; alt?: string | null }>;
+    }>;
     features?: Array<{ title?: string | null; description?: string | null }>;
     reviews?: Array<{ name?: string | null; quote?: string | null }>;
     faq?: Array<{ q?: string | null; a?: string | null }>;
     contact?: { phone?: string | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
+    layout_order?: string[];
     [key: string]: unknown;
   } | null;
   seo_meta?: {
@@ -78,11 +84,17 @@ export type LandingPageContent = {
     cta_text?: string | null;
   };
   html_sections?: Array<{ title?: string | null; html?: string | null }>;
+  carousel_images?: Array<{
+    title?: string | null;
+    template?: string | null;
+    images?: Array<{ id?: number | null; url?: string | null; alt?: string | null }>;
+  }>;
   features?: Array<{ title?: string | null; description?: string | null }>;
   reviews?: Array<{ name?: string | null; quote?: string | null }>;
   faq?: Array<{ q?: string | null; a?: string | null }>;
   contact?: { phone?: string | null };
   shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
+  layout_order?: string[];
   [key: string]: unknown;
 };
 
@@ -116,6 +128,11 @@ export function mergeLandingContent(
       : Array.isArray(templateContent.html_sections)
         ? templateContent.html_sections
         : [],
+    carousel_images: Array.isArray(pageContent.carousel_images)
+      ? pageContent.carousel_images
+      : Array.isArray(templateContent.carousel_images)
+        ? templateContent.carousel_images
+        : [],
     features: Array.isArray(pageContent.features)
       ? pageContent.features
       : Array.isArray(templateContent.features)
@@ -139,5 +156,10 @@ export function mergeLandingContent(
       inside_dhaka: pageContent.shipping?.inside_dhaka ?? templateContent.shipping?.inside_dhaka ?? 80,
       outside_dhaka: pageContent.shipping?.outside_dhaka ?? templateContent.shipping?.outside_dhaka ?? 120,
     },
+    layout_order: Array.isArray(pageContent.layout_order)
+      ? pageContent.layout_order
+      : Array.isArray(templateContent.layout_order)
+        ? templateContent.layout_order
+        : [],
   };
 }

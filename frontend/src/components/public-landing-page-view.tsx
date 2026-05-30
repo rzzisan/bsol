@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { mergeLandingContent, type LandingTemplate } from "@/lib/landing-pages";
 
 type CheckoutDraft = {
@@ -37,6 +37,18 @@ type PublicProduct = {
   } | null;
 };
 
+type CarouselImage = {
+  id?: number | null;
+  url?: string | null;
+  alt?: string | null;
+};
+
+type CarouselBlock = {
+  title?: string | null;
+  template?: string | null;
+  images?: CarouselImage[];
+};
+
 export type PublicLandingPage = {
   id: number;
   title: string;
@@ -57,11 +69,17 @@ export type PublicLandingPage = {
       cta_text?: string | null;
     };
     html_sections?: Array<{ title?: string | null; html?: string | null }>;
+    carousel_images?: Array<{
+      title?: string | null;
+      template?: string | null;
+      images?: Array<{ id?: number | null; url?: string | null; alt?: string | null }>;
+    }>;
     features?: Array<{ title?: string | null; description?: string | null }>;
     reviews?: Array<{ name?: string | null; quote?: string | null }>;
     faq?: Array<{ q?: string | null; a?: string | null }>;
     contact?: { phone?: string | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
+    layout_order?: string[];
   } | null;
   seo_meta?: {
     meta_title?: string | null;
@@ -86,6 +104,215 @@ function getProductPrices(item: PublicProduct) {
     originalPrice,
     currentPrice,
   };
+}
+
+function CarouselBlockView({
+  block,
+  theme,
+}: {
+  block: CarouselBlock;
+  theme: {
+    primary: string;
+  };
+}) {
+  const images = (block.images ?? []).filter((img) => Boolean(img?.url?.trim()));
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [images.length, images.map((img) => img.url).join("|")]);
+
+  useEffect(() => {
+    if (images.length <= 1) return undefined;
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % images.length);
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [images.length]);
+
+  if (images.length === 0) return null;
+
+  const template = block.template === "style-2" ? "style-2" : "style-1";
+  const slideHeight = template === "style-2" ? "aspect-[4/3] sm:aspect-[16/9]" : "aspect-[4/3] sm:aspect-[16/9]";
+
+  function goTo(index: number) {
+    setActiveIndex((index + images.length) % images.length);
+  }
+
+  function getCoverflowStyle(imageIndex: number) {
+    const total = images.length;
+    const rawOffset = imageIndex - activeIndex;
+    const offset = ((rawOffset % total) + total) % total;
+    const signedOffset = offset > total / 2 ? offset - total : offset;
+    const absOffset = Math.abs(signedOffset);
+
+    if (absOffset > 2) {
+      return {
+        opacity: 0,
+        transform: "translate3d(0, 0, -1200px) scale(0.65)",
+        zIndex: 0,
+        pointerEvents: "none" as const,
+      };
+    }
+
+    const translateX = signedOffset * 34;
+    const translateZ = absOffset === 0 ? 0 : -Math.max(120, absOffset * 120);
+    const rotateY = signedOffset * -34;
+    const scale = absOffset === 0 ? 1 : absOffset === 1 ? 0.93 : 0.84;
+    const opacity = absOffset === 0 ? 1 : absOffset === 1 ? 0.95 : 0.75;
+
+    return {
+      opacity,
+      transform: `translate3d(${translateX}%, 0, ${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
+      zIndex: 20 - absOffset,
+      pointerEvents: absOffset === 0 ? "auto" as const : "none" as const,
+    };
+  }
+
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      {block.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{block.title}</h2> : null}
+
+      {template === "style-2" ? (
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-3 py-6 sm:px-6 sm:py-10">
+          <div className="relative mx-auto flex min-h-[15rem] w-full items-center justify-center perspective-[1600px] sm:min-h-[18rem]">
+            {images.map((image, imageIndex) => {
+              const isActive = imageIndex === activeIndex;
+              const style = getCoverflowStyle(imageIndex);
+
+              return (
+                <button
+                  key={`${image.url}-${imageIndex}`}
+                  type="button"
+                  onClick={() => goTo(imageIndex)}
+                  aria-label={`Go to slide ${imageIndex + 1}`}
+                  aria-current={isActive ? "true" : undefined}
+                  className="absolute left-1/2 top-1/2 w-[88%] max-w-[26rem] -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out focus:outline-none sm:w-[72%]"
+                  style={{
+                    ...style,
+                    transformStyle: "preserve-3d",
+                  }}
+                >
+                  <div className="overflow-hidden rounded-2xl bg-slate-50 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.18)] ring-1 ring-black/5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image.url ?? ""}
+                      alt={image.alt || `Carousel image ${imageIndex + 1}`}
+                      className="h-[12rem] w-full object-contain sm:h-[22rem] sm:object-cover"
+                    />
+                  </div>
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-black/10 via-transparent to-transparent" />
+                </button>
+              );
+            })}
+          </div>
+
+          {images.length > 1 ? (
+            <>
+              <button
+                type="button"
+                aria-label="Previous slide"
+                onClick={() => goTo(activeIndex - 1)}
+                className="absolute left-3 top-1/2 z-30 -translate-y-1/2 rounded-full bg-white/90 p-2.5 text-slate-700 shadow-xl transition hover:bg-white"
+              >
+                <span className="block text-xl leading-none">‹</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Next slide"
+                onClick={() => goTo(activeIndex + 1)}
+                className="absolute right-3 top-1/2 z-30 -translate-y-1/2 rounded-full bg-white/90 p-2.5 text-slate-700 shadow-xl transition hover:bg-white"
+              >
+                <span className="block text-xl leading-none">›</span>
+              </button>
+            </>
+          ) : null}
+
+          {images.length > 1 ? (
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              {images.map((image, imageIndex) => (
+                <button
+                  key={`${image.url}-dot-${imageIndex}`}
+                  type="button"
+                  aria-label={`Go to slide ${imageIndex + 1}`}
+                  onClick={() => goTo(imageIndex)}
+                  className={`h-2.5 rounded-full transition-all ${imageIndex === activeIndex ? "w-8 bg-slate-900" : "w-2.5 bg-slate-300 hover:bg-slate-400"}`}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-3 text-center text-xs text-slate-500">
+            {activeIndex + 1} / {images.length}
+          </div>
+        </div>
+      ) : (
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className={`relative w-full ${slideHeight}`}>
+            {images.map((image, imageIndex) => {
+              const isActive = imageIndex === activeIndex;
+              return (
+                <div
+                  key={`${image.url}-${imageIndex}`}
+                  className={`absolute inset-0 transition-all duration-700 ease-out ${isActive ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0"}`}
+                  aria-hidden={!isActive}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image.url ?? ""}
+                    alt={image.alt || `Carousel image ${imageIndex + 1}`}
+                    className="h-full w-full object-contain sm:object-cover"
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {images.length > 1 ? (
+            <>
+              <button
+                type="button"
+                aria-label="Previous slide"
+                onClick={() => goTo(activeIndex - 1)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-slate-700 shadow-lg transition hover:bg-white"
+              >
+                <span className="block text-xl leading-none">‹</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Next slide"
+                onClick={() => goTo(activeIndex + 1)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-2 text-slate-700 shadow-lg transition hover:bg-white"
+              >
+                <span className="block text-xl leading-none">›</span>
+              </button>
+            </>
+          ) : null}
+        </div>
+      )}
+
+      {template === "style-1" && images.length > 1 ? (
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {images.map((image, imageIndex) => (
+            <button
+              key={`${image.url}-dot-${imageIndex}`}
+              type="button"
+              aria-label={`Go to slide ${imageIndex + 1}`}
+              onClick={() => goTo(imageIndex)}
+              className={`h-2.5 rounded-full transition-all ${imageIndex === activeIndex ? "w-6 bg-slate-900" : "w-2.5 bg-slate-300 hover:bg-slate-400"}`}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {template === "style-1" ? (
+        <div className="mt-2 text-center text-xs text-slate-500">
+          {activeIndex + 1} / {images.length}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export default function PublicLandingPageView({ page }: { page: PublicLandingPage }) {
@@ -126,6 +353,7 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
   const content = mergeLandingContent(page.content, page.template);
   const hero = content.hero ?? {};
   const htmlSections = content.html_sections ?? [];
+  const carouselBlocks = content.carousel_images ?? [];
   const features = content.features ?? [];
   const reviews = content.reviews ?? [];
   const faq = content.faq ?? [];
@@ -146,6 +374,10 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
   }, 0);
   const discountTotal = Math.max(0, originalSubtotal - subtotal);
   const total = Math.max(0, subtotal + shippingCharge);
+  const defaultLayoutOrder = ["html_sections", "carousel_images", "features", "faq", "reviews", "products"];
+  const layoutOrder = Array.isArray(content.layout_order) && content.layout_order.length > 0
+    ? content.layout_order
+    : defaultLayoutOrder;
 
   async function submitOrder(event: React.FormEvent) {
     event.preventDefault();
@@ -234,56 +466,77 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
 
       <section className="lp-shell mx-auto max-w-5xl px-4 py-10">
         <div className="space-y-6">
-          {htmlSections.map((section, index) => (
-            <div key={`${section.title ?? "section"}-${index}`} className="lp-card rounded-3xl p-6 sm:p-8">
-              {section.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{section.title}</h2> : null}
-              <div className="lp-html max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: section.html ?? "" }} />
-            </div>
-          ))}
+          {layoutOrder.map((sectionKey) => {
+            if (sectionKey === "html_sections") {
+              return htmlSections.map((section, index) => (
+                <div key={`${section.title ?? "section"}-${index}`} className="lp-card rounded-3xl p-6 sm:p-8">
+                  {section.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{section.title}</h2> : null}
+                  <div className="lp-html max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: section.html ?? "" }} />
+                </div>
+              ));
+            }
 
-          {features.length > 0 ? (
-            <div className="lp-card rounded-3xl p-6 sm:p-8">
-              <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>কেন এই পেজটি বেছে নেবেন?</h2>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {features.map((feature, index) => (
-                  <div key={`${feature.title ?? "feature"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
-                    <h3 className="text-lg font-bold text-slate-900">{feature.title || `Feature ${index + 1}`}</h3>
-                    {feature.description ? <p className="mt-2 text-sm text-slate-600">{feature.description}</p> : null}
+            if (sectionKey === "carousel_images") {
+              if (carouselBlocks.length === 0) return null;
+              return carouselBlocks.map((block, blockIndex) => (
+                <CarouselBlockView key={`carousel-${blockIndex}`} block={block} theme={theme} />
+              ));
+            }
+
+            if (sectionKey === "features") {
+              if (features.length === 0) return null;
+              return (
+                <div key="features" className="lp-card rounded-3xl p-6 sm:p-8">
+                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>কেন এই পেজটি বেছে নেবেন?</h2>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {features.map((feature, index) => (
+                      <div key={`${feature.title ?? "feature"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
+                        <h3 className="text-lg font-bold text-slate-900">{feature.title || `Feature ${index + 1}`}</h3>
+                        {feature.description ? <p className="mt-2 text-sm text-slate-600">{feature.description}</p> : null}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
+                </div>
+              );
+            }
 
-          {faq.length > 0 ? (
-            <div className="lp-card rounded-3xl p-6 sm:p-8">
-              <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>সাধারণ প্রশ্ন</h2>
-              <div className="space-y-3">
-                {faq.map((item, index) => (
-                  <details key={`${item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <summary className="cursor-pointer text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</summary>
-                    {item.a ? <p className="mt-3 text-sm leading-7 text-slate-600">{item.a}</p> : null}
-                  </details>
-                ))}
-              </div>
-            </div>
-          ) : null}
+            if (sectionKey === "faq") {
+              if (faq.length === 0) return null;
+              return (
+                <div key="faq" className="lp-card rounded-3xl p-6 sm:p-8">
+                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>সাধারণ প্রশ্ন</h2>
+                  <div className="space-y-3">
+                    {faq.map((item, index) => (
+                      <details key={`${item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <summary className="cursor-pointer text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</summary>
+                        {item.a ? <p className="mt-3 text-sm leading-7 text-slate-600">{item.a}</p> : null}
+                      </details>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
 
-          {reviews.length > 0 ? (
-            <div className="lp-card rounded-3xl p-6 sm:p-8">
-              <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>Customer Reviews</h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                {reviews.map((review, index) => (
-                  <blockquote key={`${review.name ?? "review"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
-                    <p className="text-sm leading-7 text-slate-700">“{review.quote || ""}”</p>
-                    {review.name ? <footer className="mt-3 text-sm font-semibold text-slate-900">— {review.name}</footer> : null}
-                  </blockquote>
-                ))}
-              </div>
-            </div>
-          ) : null}
+            if (sectionKey === "reviews") {
+              if (reviews.length === 0) return null;
+              return (
+                <div key="reviews" className="lp-card rounded-3xl p-6 sm:p-8">
+                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>Customer Reviews</h2>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {reviews.map((review, index) => (
+                      <blockquote key={`${review.name ?? "review"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
+                        <p className="text-sm leading-7 text-slate-700">“{review.quote || ""}”</p>
+                        {review.name ? <footer className="mt-3 text-sm font-semibold text-slate-900">— {review.name}</footer> : null}
+                      </blockquote>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
 
-          <div id="products" className="lp-card rounded-3xl p-6 sm:p-8">
+            if (sectionKey === "products") {
+              return (
+                <div key="products" id="products" className="lp-card rounded-3xl p-6 sm:p-8">
             <h2 className="mb-2 text-center text-2xl font-bold" style={{ color: theme.primary }}>আপনার পছন্দ মতো প্রোডাক্ট সিলেক্ট করুন</h2>
             <p className="mb-6 text-center text-sm text-slate-500">পছন্দের product নির্বাচন করুন, quantity ঠিক করুন, তারপর নিচের shipping details পূরণ করে order complete করুন।</p>
             {products.length === 0 ? (
@@ -353,7 +606,12 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
                 })}
               </div>
             )}
-          </div>
+                </div>
+              );
+            }
+
+            return null;
+          })}
 
           <form id="checkout" onSubmit={submitOrder} className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="lp-card rounded-3xl p-6 sm:p-8">

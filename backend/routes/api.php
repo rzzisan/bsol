@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\LandingPageController;
+use App\Http\Controllers\Api\LandingMediaLibraryController;
 use App\Http\Controllers\Api\LandingTemplateController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\TransactionController;
@@ -95,6 +96,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{landingPageId}/by-country', [LandingPageAnalyticsController::class, 'getByCountry'])->where('landingPageId', '[0-9]+');
         Route::get('/{landingPageId}/by-referrer', [LandingPageAnalyticsController::class, 'getByReferrer'])->where('landingPageId', '[0-9]+');
         Route::post('/{landingPageId}/link-visit-to-order', [LandingPageAnalyticsController::class, 'linkVisitToOrder'])->where('landingPageId', '[0-9]+');
+    });
+
+    Route::prefix('landing/media-library')->group(function () {
+        Route::get('/', [LandingMediaLibraryController::class, 'index']);
+        Route::get('/policy', [LandingMediaLibraryController::class, 'policy']);
+        Route::post('/upload', [LandingMediaLibraryController::class, 'store']);
     });
 
     // ── Product Management ────────────────────────────────────────────────────

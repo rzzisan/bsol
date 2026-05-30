@@ -3,8 +3,36 @@
 # Hybrid Stack Server Context
 
 Last updated: 2026-04-29
-Domain: `bsol.zyrotechbd.com`
-Server IP: `103.157.253.197`
+Native/local host domain: `bsol.zyrotechbd.com`
+Dokploy-hosted domain: `bsol.zisan.me`
+Native/local host server IP: `103.157.253.197`
+
+## 🚨 Mandatory domain selection rule (added: 2026-05-30)
+
+Project owner directive (strict):
+
+- Development, testing, debugging, UI verification, এবং feature validation-এর **default target সবসময়** `bsol.zyrotechbd.com` (local/native host) হবে।
+- User explicitly না বললে `bsol.zisan.me` (Dokploy/remote) domain-এ navigation, পরীক্ষা, বা verification করা যাবে না।
+- কোনো automation/agent/browser flow শুরু করার আগে domain resolve checklist run করতে হবে:
+	1. User কি local বলেছে? → তাহলে `bsol.zyrotechbd.com` only
+	2. User কি explicit remote/Dokploy বলেছে? → তখনই `bsol.zisan.me`
+	3. Ambiguous হলে safe default = local domain
+
+### Execution guardrail
+
+- Domain mismatch prevent করার জন্য সব task-এ প্রথমে target domain announce/lock করতে হবে (internally):
+	- `TARGET_DOMAIN=bsol.zyrotechbd.com` (default)
+- Remote domain-এ accidental drift হলে সেটি execution error হিসেবে গণ্য হবে এবং সঙ্গে সঙ্গে local domain-এ ফিরে আসতে হবে।
+
+### Practical examples
+
+- Correct (default):
+	- `https://bsol.zyrotechbd.com/dashboard/landing-pages/5/edit`
+	- `https://bsol.zyrotechbd.com/api/health`
+- Use only when explicitly requested for Dokploy validation:
+	- `https://bsol.zisan.me/...`
+
+এই rule future সব development/support session-এ mandatory authority হিসেবে প্রযোজ্য হবে।
 
 ## 1. Objective
 
@@ -221,6 +249,9 @@ Runs Next.js production server automatically:
 Requested domain:
 - `bsol.zyrotechbd.com`
 
+Additional Dokploy deployment domain:
+- `bsol.zisan.me`
+
 ### Domain validation result
 
 Confirmed that:
@@ -258,11 +289,17 @@ Certificate issued using Let's Encrypt for:
 
 ## 11. Current live endpoints
 
-### Main site
+### Native/local host main site
 - `https://bsol.zyrotechbd.com/`
 
-### API health
+### Native/local host API health
 - `https://bsol.zyrotechbd.com/api/health`
+
+### Dokploy-hosted main site
+- `https://bsol.zisan.me/`
+
+### Dokploy-hosted API health
+- `https://bsol.zisan.me/api/health`
 
 ---
 

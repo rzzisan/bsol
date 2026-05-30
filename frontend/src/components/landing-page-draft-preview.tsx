@@ -1,7 +1,12 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import type { Locale } from "@/lib/dashboard-client";
 import type { ProductItem } from "@/lib/landing-pages";
 
 type HtmlSectionDraft = { title: string; html: string };
+type CarouselImageDraft = { id?: number | null; url: string; alt?: string };
+type CarouselBlockDraft = { title: string; template: string; images: CarouselImageDraft[] };
 type FeatureDraft = { title: string; description: string };
 type ReviewDraft = { name: string; quote: string };
 type FaqDraft = { q: string; a: string };
@@ -24,6 +29,8 @@ type LandingPageDraftPreviewProps = {
   heroSubheadline: string;
   heroCtaText: string;
   htmlSections: HtmlSectionDraft[];
+  carouselBlocks: CarouselBlockDraft[];
+  layoutOrder: string[];
   features: FeatureDraft[];
   reviews: ReviewDraft[];
   faq: FaqDraft[];
@@ -41,6 +48,135 @@ function money(value: string | number | null | undefined) {
     : "৳0.00";
 }
 
+function CarouselPreviewBlock({
+  block,
+}: {
+  block: CarouselBlockDraft;
+}) {
+  const images = (block.images ?? []).filter((img) => img.url?.trim());
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [images.length, images.map((img) => img.url).join("|")]);
+
+  if (images.length === 0) return null;
+
+  const template = block.template === "style-2" ? "style-2" : "style-1";
+
+  function goTo(index: number) {
+    setActiveIndex((index + images.length) % images.length);
+  }
+
+  function getCoverflowStyle(imageIndex: number) {
+    const total = images.length;
+    const rawOffset = imageIndex - activeIndex;
+    const offset = ((rawOffset % total) + total) % total;
+    const signedOffset = offset > total / 2 ? offset - total : offset;
+    const absOffset = Math.abs(signedOffset);
+
+    if (absOffset > 2) {
+      return {
+        opacity: 0,
+        transform: "translate3d(0, 0, -1200px) scale(0.65)",
+        zIndex: 0,
+        pointerEvents: "none" as const,
+      };
+    }
+
+    const translateX = signedOffset * 34;
+    const translateZ = absOffset === 0 ? 0 : -Math.max(120, absOffset * 120);
+    const rotateY = signedOffset * -34;
+    const scale = absOffset === 0 ? 1 : absOffset === 1 ? 0.93 : 0.84;
+    const opacity = absOffset === 0 ? 1 : absOffset === 1 ? 0.95 : 0.75;
+
+    return {
+      opacity,
+      transform: `translate3d(${translateX}%, 0, ${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
+      zIndex: 20 - absOffset,
+      pointerEvents: absOffset === 0 ? "auto" as const : "none" as const,
+    };
+  }
+
+  if (template === "style-2") {
+    return (
+      <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+        {block.title ? <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{block.title}</h4> : null}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-3 py-6 sm:px-6 sm:py-10">
+          <div className="relative mx-auto flex min-h-[15rem] w-full items-center justify-center perspective-[1600px] sm:min-h-[18rem]">
+            {images.map((image, imageIndex) => {
+              const isActive = imageIndex === activeIndex;
+              const style = getCoverflowStyle(imageIndex);
+
+              return (
+                <button
+                  key={`${image.url}-${imageIndex}`}
+                  type="button"
+                  onClick={() => goTo(imageIndex)}
+                  aria-label={`Go to slide ${imageIndex + 1}`}
+                  aria-current={isActive ? "true" : undefined}
+                  className="absolute left-1/2 top-1/2 w-[88%] max-w-[26rem] -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out focus:outline-none sm:w-[72%]"
+                  style={{
+                    ...style,
+                    transformStyle: "preserve-3d",
+                  }}
+                >
+                  <div className="overflow-hidden rounded-2xl bg-slate-50 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.18)] ring-1 ring-black/5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={image.url} alt={image.alt || `Carousel ${imageIndex + 1}`} className="h-[12rem] w-full object-contain sm:h-[22rem] sm:object-cover" />
+                  </div>
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-black/10 via-transparent to-transparent" />
+                </button>
+              );
+            })}
+          </div>
+
+          {images.length > 1 ? (
+            <>
+              <button type="button" aria-label="Previous slide" onClick={() => goTo(activeIndex - 1)} className="absolute left-3 top-1/2 z-30 -translate-y-1/2 rounded-full bg-white/90 p-2.5 text-slate-700 shadow-xl transition hover:bg-white">
+                <span className="block text-xl leading-none">‹</span>
+              </button>
+              <button type="button" aria-label="Next slide" onClick={() => goTo(activeIndex + 1)} className="absolute right-3 top-1/2 z-30 -translate-y-1/2 rounded-full bg-white/90 p-2.5 text-slate-700 shadow-xl transition hover:bg-white">
+                <span className="block text-xl leading-none">›</span>
+              </button>
+            </>
+          ) : null}
+        </div>
+
+        {images.length > 1 ? (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {images.map((image, imageIndex) => (
+              <button
+                key={`${image.url}-dot-${imageIndex}`}
+                type="button"
+                aria-label={`Go to slide ${imageIndex + 1}`}
+                onClick={() => goTo(imageIndex)}
+                className={`h-2.5 rounded-full transition-all ${imageIndex === activeIndex ? "w-8 bg-slate-900" : "w-2.5 bg-slate-300 hover:bg-slate-400"}`}
+              />
+            ))}
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+      {block.title ? <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{block.title}</h4> : null}
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {images.map((image, imageIndex) => (
+            <div key={`${image.url}-${imageIndex}`} className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={image.url} alt={image.alt || `Carousel ${imageIndex + 1}`} className="h-44 w-full object-contain sm:object-cover" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function LandingPageDraftPreview({
   locale,
   title,
@@ -48,6 +184,8 @@ export default function LandingPageDraftPreview({
   heroSubheadline,
   heroCtaText,
   htmlSections,
+  carouselBlocks,
+  layoutOrder,
   features,
   reviews,
   faq,
@@ -57,6 +195,9 @@ export default function LandingPageDraftPreview({
   contactPhone,
   customCss,
 }: LandingPageDraftPreviewProps) {
+  const defaultLayoutOrder = ["html_sections", "carousel_images", "features", "faq", "reviews", "products"];
+  const orderedSections = layoutOrder.length > 0 ? layoutOrder : defaultLayoutOrder;
+
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
       <style>{customCss}</style>
@@ -69,60 +210,81 @@ export default function LandingPageDraftPreview({
       </div>
 
       <div className="space-y-5 p-5">
-        {htmlSections.filter((item) => item.title || item.html).map((section, index) => (
-          <section key={`${section.title}-${index}`} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            {section.title ? <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{section.title}</h4> : null}
-            <div className="prose prose-sm max-w-none text-[var(--foreground)]" dangerouslySetInnerHTML={{ __html: section.html || "" }} />
-          </section>
-        ))}
+        {orderedSections.map((sectionKey) => {
+          if (sectionKey === "html_sections") {
+            return htmlSections.filter((item) => item.title || item.html).map((section, index) => (
+              <section key={`${section.title}-${index}`} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                {section.title ? <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{section.title}</h4> : null}
+                <div className="prose prose-sm max-w-none text-[var(--foreground)]" dangerouslySetInnerHTML={{ __html: section.html || "" }} />
+              </section>
+            ));
+          }
 
-        {features.some((item) => item.title || item.description) ? (
-          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "ফিচার" : "Features"}</h4>
-            <div className="grid gap-3 md:grid-cols-2">
-              {features.filter((item) => item.title || item.description).map((feature, index) => (
-                <div key={`${feature.title}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                  <div className="font-semibold text-[var(--foreground)]">{feature.title || `Feature ${index + 1}`}</div>
-                  {feature.description ? <div className="mt-1 text-sm text-[var(--muted)]">{feature.description}</div> : null}
+          if (sectionKey === "carousel_images") {
+            if (carouselBlocks.length === 0) return null;
+            return carouselBlocks.map((block, blockIndex) => <CarouselPreviewBlock key={`preview-carousel-${blockIndex}`} block={block} />);
+          }
+
+          if (sectionKey === "features") {
+            if (!features.some((item) => item.title || item.description)) return null;
+            return (
+              <section key="preview-features" className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "ফিচার" : "Features"}</h4>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {features.filter((item) => item.title || item.description).map((feature, index) => (
+                    <div key={`${feature.title}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                      <div className="font-semibold text-[var(--foreground)]">{feature.title || `Feature ${index + 1}`}</div>
+                      {feature.description ? <div className="mt-1 text-sm text-[var(--muted)]">{feature.description}</div> : null}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+              </section>
+            );
+          }
 
-        {faq.some((item) => item.q || item.a) ? (
-          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">FAQ</h4>
-            <div className="space-y-2">
-              {faq.filter((item) => item.q || item.a).map((item, index) => (
-                <details key={`${item.q}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                  <summary className="cursor-pointer font-semibold text-[var(--foreground)]">{item.q || `FAQ ${index + 1}`}</summary>
-                  {item.a ? <p className="mt-2 text-sm text-[var(--muted)]">{item.a}</p> : null}
-                </details>
-              ))}
-            </div>
-          </section>
-        ) : null}
+          if (sectionKey === "faq") {
+            if (!faq.some((item) => item.q || item.a)) return null;
+            return (
+              <section key="preview-faq" className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">FAQ</h4>
+                <div className="space-y-2">
+                  {faq.filter((item) => item.q || item.a).map((item, index) => (
+                    <details key={`${item.q}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                      <summary className="cursor-pointer font-semibold text-[var(--foreground)]">{item.q || `FAQ ${index + 1}`}</summary>
+                      {item.a ? <p className="mt-2 text-sm text-[var(--muted)]">{item.a}</p> : null}
+                    </details>
+                  ))}
+                </div>
+              </section>
+            );
+          }
 
-        {reviews.some((item) => item.name || item.quote) ? (
-          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "রিভিউ" : "Reviews"}</h4>
-            <div className="grid gap-3 md:grid-cols-2">
-              {reviews.filter((item) => item.name || item.quote).map((review, index) => (
-                <blockquote key={`${review.name}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm text-[var(--foreground)]">
-                  <p>“{review.quote}”</p>
-                  {review.name ? <footer className="mt-2 font-semibold text-[var(--muted)]">— {review.name}</footer> : null}
-                </blockquote>
-              ))}
-            </div>
-          </section>
-        ) : null}
+          if (sectionKey === "reviews") {
+            if (!reviews.some((item) => item.name || item.quote)) return null;
+            return (
+              <section key="preview-reviews" className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "রিভিউ" : "Reviews"}</h4>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {reviews.filter((item) => item.name || item.quote).map((review, index) => (
+                    <blockquote key={`${review.name}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm text-[var(--foreground)]">
+                      <p>“{review.quote}”</p>
+                      {review.name ? <footer className="mt-2 font-semibold text-[var(--muted)]">— {review.name}</footer> : null}
+                    </blockquote>
+                  ))}
+                </div>
+              </section>
+            );
+          }
 
-        {selectedProducts.length > 0 ? (
-          <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "পছন্দের প্রোডাক্ট" : "Selected Products"}</h4>
-            <div className="space-y-3">
-              {selectedProducts.map((item) => {
+          if (sectionKey !== "products") return null;
+
+          if (selectedProducts.length === 0) return null;
+
+          return (
+            <section key="preview-products" className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "পছন্দের প্রোডাক্ট" : "Selected Products"}</h4>
+              <div className="space-y-3">
+                {selectedProducts.map((item) => {
                 const product = item.product;
                 const price = item.price_override || product?.selling_price || product?.regular_price || 0;
                 return (
@@ -144,8 +306,9 @@ export default function LandingPageDraftPreview({
                 );
               })}
             </div>
-          </section>
-        ) : null}
+            </section>
+          );
+        })}
 
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
           <h4 className="mb-3 text-lg font-semibold text-[var(--foreground)]">{locale === "bn" ? "চেকআউট প্রিভিউ" : "Checkout Preview"}</h4>

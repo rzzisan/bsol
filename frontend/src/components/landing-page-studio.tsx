@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredToken, type Locale } from "@/lib/dashboard-client";
 import LandingPageDraftPreview from "@/components/landing-page-draft-preview";
@@ -44,6 +44,30 @@ type FeatureDraft = {
   description: string;
 };
 
+type CarouselImageDraft = {
+  id?: number | null;
+  url: string;
+  alt?: string;
+};
+
+type CarouselBlockDraft = {
+  title: string;
+  template: string;
+  images: CarouselImageDraft[];
+};
+
+type MediaLibraryItem = {
+  id: number;
+  url: string;
+  file_name?: string | null;
+};
+
+type MediaPolicy = {
+  max_gallery_images: number;
+  max_file_size_mb: number;
+  allowed_mime_types: string[];
+};
+
 type ReviewDraft = {
   name: string;
   quote: string;
@@ -65,6 +89,9 @@ type FormState = {
   metaTitle: string;
   metaDescription: string;
 };
+
+const layoutKeys = ["html_sections", "carousel_images", "features", "faq", "reviews", "products"] as const;
+type LayoutKey = (typeof layoutKeys)[number];
 
 const text = {
   bn: {
@@ -120,6 +147,20 @@ const text = {
     dragHint: "ড্রাগ করে order বদলান",
     sections: "Content sections",
     sectionsHint: "Hero ছাড়াও HTML blocks, feature list, review, FAQ, shipping ও contact edit করুন।",
+    insertElement: "Insert option",
+    insertCarousel: "carousel-image যোগ করুন",
+    carouselBlocks: "Carousel image blocks",
+    carouselTitle: "Carousel title",
+    carouselTemplate1: "Style 1",
+    carouselTemplate2: "Style 2",
+    carouselNoImages: "এখনও কোনো ছবি সিলেক্ট করা হয়নি।",
+    pickImages: "Gallery থেকে ছবি সিলেক্ট করুন",
+    uploadImages: "নতুন ছবি আপলোড",
+    mediaPolicyHint: "File type/size product media policy অনুযায়ী।",
+    layoutOrder: "Section layout order",
+    moveUp: "উপরে",
+    moveDown: "নিচে",
+    selectedCount: "Selected",
     htmlSections: "HTML sections",
     sectionTitle: "সেকশন শিরোনাম",
     sectionHtml: "HTML content",
@@ -198,6 +239,20 @@ const text = {
     dragHint: "Drag to reorder",
     sections: "Content sections",
     sectionsHint: "Edit HTML blocks, features, reviews, FAQ, shipping, and contact details.",
+    insertElement: "Insert option",
+    insertCarousel: "Insert carousel-image",
+    carouselBlocks: "Carousel image blocks",
+    carouselTitle: "Carousel title",
+    carouselTemplate1: "Style 1",
+    carouselTemplate2: "Style 2",
+    carouselNoImages: "No images selected yet.",
+    pickImages: "Pick images from gallery",
+    uploadImages: "Upload new images",
+    mediaPolicyHint: "File type/size follows product media policy.",
+    layoutOrder: "Section layout order",
+    moveUp: "Up",
+    moveDown: "Down",
+    selectedCount: "Selected",
     htmlSections: "HTML sections",
     sectionTitle: "Section title",
     sectionHtml: "HTML content",
@@ -236,6 +291,24 @@ function normalizeFeature(feature: { title?: string | null; description?: string
   return {
     title: String(feature?.title ?? ""),
     description: String(feature?.description ?? ""),
+  };
+}
+
+function normalizeCarouselBlock(block: {
+  title?: string | null;
+  template?: string | null;
+  images?: Array<{ id?: number | null; url?: string | null; alt?: string | null }>;
+}): CarouselBlockDraft {
+  return {
+    title: String(block?.title ?? ""),
+    template: block?.template === "style-2" ? "style-2" : "style-1",
+    images: Array.isArray(block?.images)
+      ? block.images.filter((image) => Boolean(image?.url)).map((image) => ({
+        id: image?.id ?? null,
+        url: String(image?.url ?? ""),
+        alt: String(image?.alt ?? ""),
+      }))
+      : [],
   };
 }
 
@@ -304,12 +377,21 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [htmlSections, setHtmlSections] = useState<HtmlSectionDraft[]>([]);
   const [featureItems, setFeatureItems] = useState<FeatureDraft[]>([]);
+  const [carouselBlocks, setCarouselBlocks] = useState<CarouselBlockDraft[]>([]);
+  const [layoutOrder, setLayoutOrder] = useState<LayoutKey[]>([...layoutKeys]);
   const [reviewItems, setReviewItems] = useState<ReviewDraft[]>([]);
   const [faqItems, setFaqItems] = useState<FaqDraft[]>([]);
   const [contactPhone, setContactPhone] = useState("");
   const [shippingInside, setShippingInside] = useState("80");
   const [shippingOutside, setShippingOutside] = useState("120");
   const [customCss, setCustomCss] = useState("");
+  const [mediaPolicy, setMediaPolicy] = useState<MediaPolicy | null>(null);
+  const [mediaLibrary, setMediaLibrary] = useState<MediaLibraryItem[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [activeCarouselPicker, setActiveCarouselPicker] = useState<number | null>(null);
+  const mediaInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -326,27 +408,33 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
     const load = async () => {
       try {
         setError(null);
-        const [templatesRes, productsRes, importFilesRes, pageRes] = await Promise.all([
+        const [templatesRes, productsRes, importFilesRes, mediaPolicyRes, mediaLibraryRes, pageRes] = await Promise.all([
           fetch(`${LANDING_API_BASE}/landing/templates`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${LANDING_API_BASE}/products?per_page=100`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${LANDING_API_BASE}/landing/pages/import-json/files`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${LANDING_API_BASE}/landing/media-library/policy`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${LANDING_API_BASE}/landing/media-library`, { headers: { Authorization: `Bearer ${token}` } }),
           mode === "edit" && pageId
             ? fetch(`${LANDING_API_BASE}/landing/pages/${pageId}`, { headers: { Authorization: `Bearer ${token}` } })
             : Promise.resolve(null),
         ]);
 
-        if (!templatesRes.ok || !productsRes.ok || !importFilesRes.ok || (pageRes && !pageRes.ok)) {
+        if (!templatesRes.ok || !productsRes.ok || !importFilesRes.ok || !mediaPolicyRes.ok || !mediaLibraryRes.ok || (pageRes && !pageRes.ok)) {
           throw new Error(t.loadFailed);
         }
 
         const templatesJson = await templatesRes.json();
         const productsJson = await productsRes.json();
         const importFilesJson = await importFilesRes.json();
+        const mediaPolicyJson = await mediaPolicyRes.json();
+        const mediaLibraryJson = await mediaLibraryRes.json();
         const nextTemplates = templatesJson.data ?? [];
         setTemplates(nextTemplates);
         setProducts((productsJson.data ?? []).filter((item: ProductItem) => item.status !== "archived"));
         setImportFiles(importFilesJson.data ?? []);
         setImportFile(importFilesJson.data?.[0] ?? "");
+        setMediaPolicy(mediaPolicyJson.data ?? null);
+        setMediaLibrary(mediaLibraryJson.data ?? []);
 
         if (pageRes) {
           const pageJson = await pageRes.json();
@@ -367,6 +455,13 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
           setSelectedProducts((loadedPage.products ?? []).map((item, index) => normalizeDraft(item, index)));
           setHtmlSections((mergedContent.html_sections ?? []).map(normalizeHtmlSection));
           setFeatureItems((mergedContent.features ?? []).map(normalizeFeature));
+          setCarouselBlocks((mergedContent.carousel_images ?? []).map(normalizeCarouselBlock));
+          const incomingLayout = Array.isArray(mergedContent.layout_order)
+            ? mergedContent.layout_order.filter((key): key is LayoutKey => layoutKeys.includes(key as LayoutKey))
+            : [];
+          setLayoutOrder(incomingLayout.length > 0
+            ? ([...incomingLayout, ...layoutKeys.filter((key) => !incomingLayout.includes(key))] as LayoutKey[])
+            : [...layoutKeys]);
           setReviewItems((mergedContent.reviews ?? []).map(normalizeReview));
           setFaqItems((mergedContent.faq ?? []).map(normalizeFaq));
           setContactPhone(String(mergedContent.contact?.phone ?? ""));
@@ -426,6 +521,17 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
     }
     if (force || featureItems.length === 0) {
       setFeatureItems((mergedContent.features ?? []).map(normalizeFeature));
+    }
+    if (force || carouselBlocks.length === 0) {
+      setCarouselBlocks((mergedContent.carousel_images ?? []).map(normalizeCarouselBlock));
+    }
+    if (force || layoutOrder.length === 0) {
+      const incomingLayout = Array.isArray(mergedContent.layout_order)
+        ? mergedContent.layout_order.filter((key): key is LayoutKey => layoutKeys.includes(key as LayoutKey))
+        : [];
+      setLayoutOrder(incomingLayout.length > 0
+        ? ([...incomingLayout, ...layoutKeys.filter((key) => !incomingLayout.includes(key))] as LayoutKey[])
+        : [...layoutKeys]);
     }
     if (force || reviewItems.length === 0) {
       setReviewItems((mergedContent.reviews ?? []).map(normalizeReview));
@@ -508,6 +614,15 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
           features: featureItems
             .filter((item) => item.title.trim() || item.description.trim())
             .map((item) => ({ title: item.title.trim() || null, description: item.description.trim() || null })),
+          carousel_images: carouselBlocks
+            .map((block) => ({
+              title: block.title.trim() || null,
+              template: block.template || "style-1",
+              images: block.images
+                .filter((image) => image.url?.trim())
+                .map((image) => ({ id: image.id ?? null, url: image.url, alt: image.alt?.trim() || null })),
+            }))
+            .filter((block) => (block.images?.length ?? 0) > 0),
           reviews: reviewItems
             .filter((item) => item.name.trim() || item.quote.trim())
             .map((item) => ({ name: item.name.trim() || null, quote: item.quote.trim() || null })),
@@ -521,6 +636,7 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
             inside_dhaka: toNumberOrNull(shippingInside) ?? 80,
             outside_dhaka: toNumberOrNull(shippingOutside) ?? 120,
           },
+          layout_order: layoutOrder,
         },
         seo_meta: {
           meta_title: form.metaTitle || form.title,
@@ -619,6 +735,97 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
 
   function removeListItem<T>(setter: React.Dispatch<React.SetStateAction<T[]>>, index: number) {
     setter((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function moveLayoutItem(key: LayoutKey, dir: -1 | 1) {
+    setLayoutOrder((prev) => {
+      const idx = prev.indexOf(key);
+      if (idx < 0) return prev;
+      const target = idx + dir;
+      if (target < 0 || target >= prev.length) return prev;
+      return moveItem(prev, idx, target);
+    });
+  }
+
+  function addCarouselBlock() {
+    setCarouselBlocks((prev) => [...prev, { title: "", template: "style-1", images: [] }]);
+    if (!layoutOrder.includes("carousel_images")) {
+      setLayoutOrder((prev) => [...prev, "carousel_images"]);
+    }
+  }
+
+  function patchCarouselBlock(index: number, changes: Partial<CarouselBlockDraft>) {
+    setCarouselBlocks((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, ...changes } : item));
+  }
+
+  function toggleCarouselImage(blockIndex: number, image: MediaLibraryItem) {
+    setCarouselBlocks((prev) => prev.map((block, index) => {
+      if (index !== blockIndex) return block;
+      const exists = block.images.some((item) => item.id === image.id || item.url === image.url);
+      return {
+        ...block,
+        images: exists
+          ? block.images.filter((item) => item.id !== image.id && item.url !== image.url)
+          : [...block.images, { id: image.id, url: image.url, alt: image.file_name ?? "" }],
+      };
+    }));
+  }
+
+  async function reloadMediaLibrary() {
+    if (!token) return;
+    setMediaLoading(true);
+    setMediaError(null);
+    try {
+      const res = await fetch(`${LANDING_API_BASE}/landing/media-library`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.message || t.loadFailed);
+      setMediaLibrary(json.data ?? []);
+    } catch (err) {
+      setMediaError(err instanceof Error ? err.message : t.loadFailed);
+    } finally {
+      setMediaLoading(false);
+    }
+  }
+
+  async function uploadMediaFiles(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!token) return;
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length) return;
+
+    setMediaError(null);
+    if (mediaPolicy) {
+      const maxBytes = mediaPolicy.max_file_size_mb * 1024 * 1024;
+      for (const file of files) {
+        if (!mediaPolicy.allowed_mime_types.includes(file.type)) {
+          setMediaError(`Unsupported file type: ${file.type}`);
+          return;
+        }
+        if (file.size > maxBytes) {
+          setMediaError(`File too large: ${file.name}`);
+          return;
+        }
+      }
+    }
+
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files[]", file));
+
+    setMediaUploading(true);
+    try {
+      const res = await fetch(`${LANDING_API_BASE}/landing/media-library/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.message || "Upload failed");
+      await reloadMediaLibrary();
+    } catch (err) {
+      setMediaError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setMediaUploading(false);
+      if (mediaInputRef.current) mediaInputRef.current.value = "";
+    }
   }
 
   return (
@@ -756,6 +963,96 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
                 </div>
 
                 <div className="mt-4 space-y-5">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                    <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.insertElement}</h4>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" onClick={addCarouselBlock} className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--accent)]">
+                        {t.insertCarousel}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                    <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.layoutOrder}</h4>
+                    <div className="mt-3 space-y-2">
+                      {layoutOrder.map((key, index) => (
+                        <div key={`layout-${key}`} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2">
+                          <span className="text-sm text-[var(--foreground)]">{key}</span>
+                          <div className="flex items-center gap-1">
+                            <button type="button" onClick={() => moveLayoutItem(key, -1)} disabled={index === 0} className="rounded-md border border-[var(--border)] px-2 py-1 text-xs disabled:opacity-40">{t.moveUp}</button>
+                            <button type="button" onClick={() => moveLayoutItem(key, 1)} disabled={index === layoutOrder.length - 1} className="rounded-md border border-[var(--border)] px-2 py-1 text-xs disabled:opacity-40">{t.moveDown}</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.carouselBlocks}</h4>
+                      <button type="button" onClick={addCarouselBlock} className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--accent)]">
+                        {t.insertCarousel}
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {carouselBlocks.length === 0 ? <div className="text-sm text-[var(--muted)]">{t.carouselNoImages}</div> : null}
+                      {carouselBlocks.map((block, index) => (
+                        <div key={`carousel-${index}`} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
+                          <div className="mb-2 flex justify-end">
+                            <button type="button" onClick={() => removeListItem(setCarouselBlocks, index)} className="rounded-lg border border-red-400/30 px-2.5 py-1 text-xs font-semibold text-red-400">{t.remove}</button>
+                          </div>
+                          <div className="space-y-3">
+                            <input value={block.title} onChange={(e) => patchCarouselBlock(index, { title: e.target.value })} placeholder={t.carouselTitle} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm" />
+                            <select value={block.template} onChange={(e) => patchCarouselBlock(index, { template: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
+                              <option value="style-1">{t.carouselTemplate1}</option>
+                              <option value="style-2">{t.carouselTemplate2}</option>
+                            </select>
+                            <div className="flex items-center justify-between gap-2">
+                              <button type="button" onClick={() => setActiveCarouselPicker((prev) => prev === index ? null : index)} className="rounded-xl border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]">
+                                {t.pickImages}
+                              </button>
+                              <span className="text-xs text-[var(--muted)]">{t.selectedCount}: {block.images.length}</span>
+                            </div>
+
+                            {block.images.length > 0 ? (
+                              <div className="grid grid-cols-3 gap-2">
+                                {block.images.map((image, imageIndex) => (
+                                  <div key={`${image.url}-${imageIndex}`} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={image.url} alt={image.alt || `carousel-${imageIndex}`} className="h-20 w-full object-cover" />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            {activeCarouselPicker === index ? (
+                              <div className="space-y-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <input ref={mediaInputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => void uploadMediaFiles(e)} />
+                                  <button type="button" onClick={() => mediaInputRef.current?.click()} disabled={mediaUploading} className="rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">{mediaUploading ? "..." : t.uploadImages}</button>
+                                  <button type="button" onClick={() => void reloadMediaLibrary()} disabled={mediaLoading} className="rounded-lg border border-[var(--border)] px-3 py-2 text-xs">{mediaLoading ? "..." : "Reload"}</button>
+                                </div>
+                                <p className="text-xs text-[var(--muted)]">{t.mediaPolicyHint}{mediaPolicy ? ` · Max ${mediaPolicy.max_gallery_images}, ${mediaPolicy.max_file_size_mb}MB, ${mediaPolicy.allowed_mime_types.join(", ")}` : ""}</p>
+                                {mediaError ? <p className="text-xs text-red-500">{mediaError}</p> : null}
+                                <div className="grid grid-cols-3 gap-2">
+                                  {mediaLibrary.map((asset) => {
+                                    const selected = block.images.some((image) => image.id === asset.id || image.url === asset.url);
+                                    return (
+                                      <button key={`media-${asset.id}`} type="button" onClick={() => toggleCarouselImage(index, asset)} className={`overflow-hidden rounded-lg border ${selected ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--border)]"}`}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={asset.url} alt={asset.file_name || `asset-${asset.id}`} className="h-20 w-full object-cover" />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.htmlSections}</h4>
@@ -953,6 +1250,8 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
                     heroSubheadline={form.heroSubheadline}
                     heroCtaText={form.heroCtaText}
                     htmlSections={htmlSections}
+                    carouselBlocks={carouselBlocks}
+                    layoutOrder={layoutOrder}
                     features={featureItems}
                     reviews={reviewItems}
                     faq={faqItems}
