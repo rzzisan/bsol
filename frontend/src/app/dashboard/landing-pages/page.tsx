@@ -18,6 +18,7 @@ const text: Record<string, Record<string, string>> = {
     actions: "Actions",
     view: "দেখুন",
     edit: "এডিট",
+    statistics: "স্ট্যাটিস্টিক্স",
   },
   en: {
     title: "Landing Pages",
@@ -29,6 +30,7 @@ const text: Record<string, Record<string, string>> = {
     actions: "Actions",
     view: "View",
     edit: "Edit",
+    statistics: "Statistics",
   },
 };
 
@@ -246,6 +248,9 @@ export default function LandingPages() {
                       <div className="flex flex-wrap gap-3 text-sm">
                         <Link href={`/dashboard/landing-pages/${page.id}`} className="font-medium text-[var(--accent)] hover:underline">
                           {t.view}
+                        </Link>
+                        <Link href={`/admin/landing-page-analytics/${page.id}`} className="font-medium text-[var(--accent)] hover:underline">
+                          {t.statistics}
                         </Link>
                         <Link href={`/dashboard/landing-pages/${page.id}/edit`} className="font-medium text-[var(--accent)] hover:underline">
                           {t.edit}
