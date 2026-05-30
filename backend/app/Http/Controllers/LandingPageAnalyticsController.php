@@ -22,7 +22,11 @@ class LandingPageAnalyticsController extends Controller
     public function getStatistics(Request $request, int $landingPageId): JsonResponse
     {
         $landingPage = LandingPage::findOrFail($landingPageId);
-        $this->authorize('view', $landingPage);
+        
+        // Check authorization: user must own this landing page
+        if ($landingPage->user_id !== auth()->id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $request->validate([
             'start_date' => 'nullable|date_format:Y-m-d',
@@ -44,7 +48,11 @@ class LandingPageAnalyticsController extends Controller
     public function getVisitors(Request $request, int $landingPageId): JsonResponse
     {
         $landingPage = LandingPage::findOrFail($landingPageId);
-        $this->authorize('view', $landingPage);
+        
+        // Check authorization: user must own this landing page
+        if ($landingPage->user_id !== auth()->id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $request->validate([
             'start_date' => 'nullable|date_format:Y-m-d',
@@ -70,7 +78,11 @@ class LandingPageAnalyticsController extends Controller
     public function getByCountry(Request $request, int $landingPageId): JsonResponse
     {
         $landingPage = LandingPage::findOrFail($landingPageId);
-        $this->authorize('view', $landingPage);
+        
+        // Check authorization: user must own this landing page
+        if ($landingPage->user_id !== auth()->id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $request->validate([
             'start_date' => 'nullable|date_format:Y-m-d',
@@ -92,7 +104,11 @@ class LandingPageAnalyticsController extends Controller
     public function getByReferrer(Request $request, int $landingPageId): JsonResponse
     {
         $landingPage = LandingPage::findOrFail($landingPageId);
-        $this->authorize('view', $landingPage);
+        
+        // Check authorization: user must own this landing page
+        if ($landingPage->user_id !== auth()->id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $request->validate([
             'start_date' => 'nullable|date_format:Y-m-d',
@@ -114,7 +130,11 @@ class LandingPageAnalyticsController extends Controller
     public function linkVisitToOrder(Request $request, int $landingPageId): JsonResponse
     {
         $landingPage = LandingPage::findOrFail($landingPageId);
-        $this->authorize('update', $landingPage);
+        
+        // Check authorization: user must own this landing page
+        if ($landingPage->user_id !== auth()->id()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
 
         $request->validate([
             'visit_id' => 'required|exists:landing_page_visits,id',

@@ -92,7 +92,9 @@ export default function LandingPageAnalyticsDashboard() {
         ]);
 
         if (!statsRes.ok || !visitorsRes.ok || !countriesRes.ok || !referrersRes.ok) {
-          throw new Error('Failed to fetch analytics data');
+          const errorData = await statsRes.json().catch(() => ({}));
+          const errorMsg = errorData.error || errorData.message || `API error: ${statsRes.status}`;
+          throw new Error(errorMsg);
         }
 
         const [statsData, visitorsData, countriesData, referrersData] = await Promise.all([
