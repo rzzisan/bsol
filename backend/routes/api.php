@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
+use App\Http\Controllers\LandingPageAnalyticsController;
 
 Route::get('/health', function () {
     return response()->json([
@@ -52,8 +53,8 @@ Route::post('/password/resend-otp',   [PasswordResetController::class, 'resendOt
 Route::post('/password/verify-otp',   [PasswordResetController::class, 'verifyOtp']);
 Route::post('/password/reset',        [PasswordResetController::class, 'resetPassword']);
 
-Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow']);
-Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder']);
+Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow'])->middleware('track_landing_page_visit');
+Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder'])->middleware('track_landing_page_visit');
 
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
@@ -86,6 +87,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/landing/pages/{id}', [LandingPageController::class, 'destroy'])->where('id', '[0-9]+');
     Route::post('/landing/pages/{id}/publish', [LandingPageController::class, 'publish'])->where('id', '[0-9]+');
     Route::post('/landing/pages/import-json', [LandingPageController::class, 'importFromJson']);
+    
+    // ── Landing Page Analytics ──────────────────────────────────────────────────
+    Route::prefix('landing/analytics')->group(function () {
+        Route::get('/{landingPageId}/statistics', [LandingPageAnalyticsController::class, 'getStatistics']);
+        Route::get('/{landingPageId}/visitors', [LandingPageAnalyticsController::class, 'getVisitors']);
+        Route::get('/{landingPageId}/by-country', [LandingPageAnalyticsController::class, 'getByCountry']);
+        Route::get('/{landingPageId}/by-referrer', [LandingPageAnalyticsController::class, 'getByReferrer']);
+        Route::post('/{landingPageId}/link-visit-to-order', [LandingPageAnalyticsController::class, 'linkVisitToOrder']);
+    });
 
     // ── Product Management ────────────────────────────────────────────────────
     Route::get('/products/stats', [ProductController::class, 'stats']);

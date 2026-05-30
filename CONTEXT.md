@@ -954,3 +954,145 @@ npm run deploy:prod:safe
 ```
 
 এই command pass না করলে deployment complete হিসেবে ধরা যাবে না।
+
+---
+
+## 27. Exact Git workflow for Dokploy deployment branch (2026-05-28)
+
+### Mandatory branch policy
+
+বর্তমান repository-তে deployment workflow এখন **two-branch model** follow করবে:
+
+- `main` → primary development/source-of-truth branch
+- `dokploy` → Dokploy deployment branch
+
+### Critical rule
+
+Dokploy-hosted production/staging app **`main` থেকে deploy করবে না**.
+
+Dokploy app settings-এ git branch হিসেবে **`dokploy`** set থাকতে হবে.
+
+### Current expected repository state
+
+- remote branch `origin/dokploy` exists
+- local branch `dokploy` exists
+- `dokploy` branch is intended to mirror the deploy-ready state of `main`
+
+### Day-to-day development rule
+
+সাধারণ development flow:
+
+1. নতুন feature / bug fix `main` branch-এ develop করতে হবে
+2. `main` branch fully review/test/build-ready হলে `dokploy` branch update করতে হবে
+3. Dokploy only `dokploy` branch-এর latest commit deploy করবে
+
+### Exact standard workflow
+
+`main`-এর latest code `dokploy`-এ publish করার exact command sequence:
+
+```bash
+cd /var/www/hybrid-stack
+git checkout main
+git pull origin main
+git checkout dokploy
+git merge --ff-only main
+git push origin dokploy
+```
+
+### Why `--ff-only` is mandatory here
+
+- `dokploy` branch ideally `main`-এর clean deployment mirror থাকবে
+- unnecessary merge commit avoid করতে হবে
+- যদি fast-forward possible না হয়, তার মানে `dokploy` branch-এ extra commit আছে এবং সেটা manually inspect করতে হবে
+
+### If `dokploy` branch does not exist in a fresh clone
+
+```bash
+cd /var/www/hybrid-stack
+git checkout main
+git pull origin main
+git checkout -b dokploy
+git push -u origin dokploy
+```
+
+এর পরে standard workflow-এ ফিরে যেতে হবে.
+
+### Rule for production deployment cut
+
+যখন বলা হবে “Dokploy-এ deploy-ready branch update করো”, default interpretation হবে:
+
+```bash
+cd /var/www/hybrid-stack
+git checkout main
+git pull origin main
+git checkout dokploy
+git merge --ff-only main
+git push origin dokploy
+```
+
+### Hotfix rule
+
+Possible হলে hotfix-ও `main` branch-এ করতে হবে, তারপর `dokploy` update করতে হবে.
+
+Preferred hotfix flow:
+
+```bash
+cd /var/www/hybrid-stack
+git checkout main
+# fix কাজ + commit
+git push origin main
+git checkout dokploy
+git merge --ff-only main
+git push origin dokploy
+```
+
+### If an emergency fix is committed directly on `dokploy`
+
+এটা avoid করা উচিত. কিন্তু forced emergency হলে immediately `main`-এ back-merge করতে হবে, নাহলে দুই branch diverge করবে.
+
+Recovery flow:
+
+```bash
+cd /var/www/hybrid-stack
+git checkout main
+git merge dokploy
+git push origin main
+git checkout dokploy
+git push origin dokploy
+```
+
+তারপর future releases-এর আগে ensure করতে হবে যে `git merge --ff-only main` আবার cleanly কাজ করে.
+
+### Pre-deploy verification checklist
+
+`dokploy` branch push করার আগে minimum verify করতে হবে:
+
+1. intended commit `main`-এ আছে
+2. working tree clean (`git status`)
+3. branch target correct (`git branch --show-current`)
+4. `dokploy` push complete হয়েছে
+
+Useful verification commands:
+
+```bash
+cd /var/www/hybrid-stack
+git status --short --branch
+git log --oneline --decorate -n 5 --all --simplify-by-decoration
+```
+
+### Frontend change reminder
+
+যদি deployment local native stack-এ করা হয়, branch push যথেষ্ট না. Frontend runtime deploy-এর জন্য existing safe deploy flow follow করতে হবে:
+
+```bash
+cd /var/www/hybrid-stack/frontend
+npm run deploy:prod:safe
+```
+
+### Final authority note
+
+Future conversation/task-এ যদি branch workflow explicitly না-ও বলা হয়, default git/deployment assumption হবে:
+
+- code work happens on `main`
+- deploy branch is `dokploy`
+- Dokploy deploys from `dokploy`

@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'ip_location' => [
+        'provider' => env('IP_LOCATION_PROVIDER', 'ipapi'),
+        'ipstack_key' => env('IPSTACK_API_KEY'),
+    ],
+
 ];

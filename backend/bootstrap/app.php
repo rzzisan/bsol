@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\TrackLandingPageVisit;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'is_admin' => EnsureUserIsAdmin::class,
+            'track_landing_page_visit' => TrackLandingPageVisit::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {
