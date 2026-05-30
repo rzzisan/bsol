@@ -20,6 +20,22 @@ class TrackLandingPageVisit
     {
         // Extract landing page ID from route parameter
         $landingPageId = $request->route('landingPageId') ?? $request->route('id');
+        $slug = $request->route('slug');
+        
+        // If slug is provided but not ID, look up the landing page by slug
+        if (!$landingPageId && $slug) {
+            try {
+                $landingPage = \App\Models\LandingPage::where('slug', $slug)->first();
+                if ($landingPage) {
+                    $landingPageId = $landingPage->id;
+                }
+            } catch (\Exception $e) {
+                \Log::error('Failed to lookup landing page by slug', [
+                    'slug' => $slug,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
         
         if ($landingPageId) {
             try {
