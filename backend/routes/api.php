@@ -90,11 +90,11 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // ── Landing Page Analytics ──────────────────────────────────────────────────
     Route::prefix('landing/analytics')->group(function () {
-        Route::get('/{landingPageId}/statistics', [LandingPageAnalyticsController::class, 'getStatistics']);
-        Route::get('/{landingPageId}/visitors', [LandingPageAnalyticsController::class, 'getVisitors']);
-        Route::get('/{landingPageId}/by-country', [LandingPageAnalyticsController::class, 'getByCountry']);
-        Route::get('/{landingPageId}/by-referrer', [LandingPageAnalyticsController::class, 'getByReferrer']);
-        Route::post('/{landingPageId}/link-visit-to-order', [LandingPageAnalyticsController::class, 'linkVisitToOrder']);
+        Route::get('/{landingPageId}/statistics', [LandingPageAnalyticsController::class, 'getStatistics'])->where('landingPageId', '[0-9]+');
+        Route::get('/{landingPageId}/visitors', [LandingPageAnalyticsController::class, 'getVisitors'])->where('landingPageId', '[0-9]+');
+        Route::get('/{landingPageId}/by-country', [LandingPageAnalyticsController::class, 'getByCountry'])->where('landingPageId', '[0-9]+');
+        Route::get('/{landingPageId}/by-referrer', [LandingPageAnalyticsController::class, 'getByReferrer'])->where('landingPageId', '[0-9]+');
+        Route::post('/{landingPageId}/link-visit-to-order', [LandingPageAnalyticsController::class, 'linkVisitToOrder'])->where('landingPageId', '[0-9]+');
     });
 
     // ── Product Management ────────────────────────────────────────────────────

@@ -72,22 +72,33 @@ export default function LandingPageAnalyticsDashboard() {
         if (startDate) queryParams.append('start_date', startDate);
         if (endDate) queryParams.append('end_date', endDate);
 
+        const authToken = localStorage.getItem('auth_token');
+        if (!authToken) {
+          setError('Authentication required. Please log in.');
+          setLoading(false);
+          return;
+        }
+
+        const headers = {
+          Authorization: `Bearer ${authToken}`,
+        };
+
         const [statsRes, visitorsRes, countriesRes, referrersRes] = await Promise.all([
           fetch(
             `/api/landing/analytics/${landingPageId}/statistics?${queryParams}`,
-            { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+            { headers }
           ),
           fetch(
             `/api/landing/analytics/${landingPageId}/visitors?limit=20&offset=${visitorPage * 20}&${queryParams}`,
-            { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+            { headers }
           ),
           fetch(
             `/api/landing/analytics/${landingPageId}/by-country?${queryParams}`,
-            { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+            { headers }
           ),
           fetch(
             `/api/landing/analytics/${landingPageId}/by-referrer?${queryParams}`,
-            { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+            { headers }
           ),
         ]);
 
