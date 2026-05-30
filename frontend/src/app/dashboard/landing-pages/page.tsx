@@ -249,7 +249,7 @@ export default function LandingPages() {
                         <Link href={`/dashboard/landing-pages/${page.id}`} className="font-medium text-[var(--accent)] hover:underline">
                           {t.view}
                         </Link>
-                        <Link href={`/admin/landing-page-analytics/${page.id}`} className="font-medium text-[var(--accent)] hover:underline">
+                        <Link href={`/dashboard/landing-page-analytics/${page.id}`} className="font-medium text-[var(--accent)] hover:underline">
                           {t.statistics}
                         </Link>
                         <Link href={`/dashboard/landing-pages/${page.id}/edit`} className="font-medium text-[var(--accent)] hover:underline">
