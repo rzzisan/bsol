@@ -101,6 +101,9 @@ class LandingPageOrderService
                 'changed_by' => null,
             ]);
 
+            // Link recent visits to this order for conversion tracking
+            $this->linkVisitsToOrder($order, $page);
+
             Customer::syncFromOrder($order);
             PhoneIntelCache::bump($order->customer_phone);
 
@@ -111,4 +114,40 @@ class LandingPageOrderService
             return $order->fresh(['items']);
         });
     }
-}
+
+    /**
+     * Link recent visits to order for conversion tracking
+     */
+    private function linkVisitsToOrder(Order $order, LandingPage $page): void
+    {
+        try {
+            // Get recent visits from this session (within last 30 minutes)
+            $recentVisits = DB::table('landing_page_visits')
+                ->where('landing_page_id', $page->id)
+                ->where('created_at', '>=', now()->subMinutes(30))
+                // If user is authenticated, match by user_id; otherwise match by IP
+                ->when(
+                    auth()->check(),
+                    fn ($q) => $q->where('user_id', auth()->id()),
+                    fn ($q) => $q->where('ip_address', request()->ip())
+                )
+                ->pluck('id');
+
+            // Link all recent visits to this order
+            foreach ($recentVisits as $visitId) {
+                DB::table('landing_page_visit_orders')->insertOrIgnore([
+                    'landing_page_visit_id' => $visitId,
+                    'order_id' => $order->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Log error but don't fail order creation
+            \Log::error('Failed to link visits to order', [
+                'order_id' => $order->id,
+                'landing_page_id' => $page->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
