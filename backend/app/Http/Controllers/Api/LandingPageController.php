@@ -16,6 +16,13 @@ use Illuminate\Validation\Rule;
 
 class LandingPageController extends Controller
 {
+    private function publicUrlFor(LandingPage $page): string
+    {
+        $baseUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+
+        return $baseUrl . '/lp/' . $page->slug;
+    }
+
     public function publicShow(string $slug): JsonResponse
     {
         $page = LandingPage::query()
@@ -27,7 +34,7 @@ class LandingPageController extends Controller
         return response()->json([
             'success' => true,
             'data' => array_merge($page->toArray(), [
-                'public_url' => route('landing-pages.show', ['slug' => $page->slug]),
+                'public_url' => $this->publicUrlFor($page),
             ]),
         ]);
     }
@@ -185,7 +192,7 @@ class LandingPageController extends Controller
         return response()->json([
             'success' => true,
             'data' => array_merge($page->toArray(), [
-                'public_url' => route('landing-pages.show', ['slug' => $page->slug]),
+                'public_url' => $this->publicUrlFor($page),
             ]),
         ]);
     }
