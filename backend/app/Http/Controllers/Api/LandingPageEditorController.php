@@ -23,7 +23,14 @@ class LandingPageEditorController extends Controller
     public function getDraft(int $pageId): JsonResponse
     {
         $page = LandingPage::findOrFail($pageId);
-        $this->authorize('update', $page);
+        
+        // Check if user owns this page
+        if ($page->user_id !== auth()->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
 
         $draft = $this->editorService->getDraft($pageId, auth()->id());
 
@@ -40,7 +47,14 @@ class LandingPageEditorController extends Controller
     public function saveDraft(Request $request, int $pageId): JsonResponse
     {
         $page = LandingPage::findOrFail($pageId);
-        $this->authorize('update', $page);
+        
+        // Check if user owns this page
+        if ($page->user_id !== auth()->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
 
         $validated = $request->validate([
             'components_json' => 'nullable|string',
@@ -66,7 +80,14 @@ class LandingPageEditorController extends Controller
     public function publishPage(int $pageId): JsonResponse
     {
         $page = LandingPage::findOrFail($pageId);
-        $this->authorize('update', $page);
+        
+        // Check if user owns this page
+        if ($page->user_id !== auth()->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
 
         $publishedPage = $this->editorService->publishDraft($pageId, auth()->id());
 
@@ -84,7 +105,14 @@ class LandingPageEditorController extends Controller
     public function getVersions(int $pageId): JsonResponse
     {
         $page = LandingPage::findOrFail($pageId);
-        $this->authorize('view', $page);
+        
+        // Check if user owns this page
+        if ($page->user_id !== auth()->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
 
         $versions = $this->editorService->getVersions($pageId);
 
@@ -101,7 +129,14 @@ class LandingPageEditorController extends Controller
     public function rollbackToVersion(int $pageId, int $versionNumber): JsonResponse
     {
         $page = LandingPage::findOrFail($pageId);
-        $this->authorize('update', $page);
+        
+        // Check if user owns this page
+        if ($page->user_id !== auth()->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
 
         $draft = $this->editorService->rollbackToVersion($pageId, auth()->id(), $versionNumber);
 
