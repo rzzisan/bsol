@@ -25,10 +25,25 @@ class LandingPageEditorService
         }
         
         // Fall back to database
-        return LandingPageEditorDraft::where([
+        $draft = LandingPageEditorDraft::where([
             'landing_page_id' => $pageId,
             'user_id' => $userId,
         ])->first();
+
+        // If no draft exists, create an empty one
+        if (!$draft) {
+            $draft = LandingPageEditorDraft::create([
+                'landing_page_id' => $pageId,
+                'user_id' => $userId,
+                'components_json' => '[]',
+                'styles_json' => '{}',
+                'html_output' => null,
+                'css_output' => null,
+                'metadata' => [],
+            ]);
+        }
+
+        return $draft;
     }
 
     /**
