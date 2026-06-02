@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import grapesjs from "grapesjs";
 import grapesjsTailwind from "grapesjs-tailwind";
 import GjsPluginCkeditor from "grapesjs-plugin-ckeditor";
+import "grapesjs/dist/css/grapes.min.css";
 import { registerCustomElements } from "./grapesjs-elements/register-elements";
 
 interface LandingPageEditorProps {
