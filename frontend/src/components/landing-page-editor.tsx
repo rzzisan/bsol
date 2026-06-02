@@ -38,7 +38,7 @@ export function LandingPageEditor({
       const styles = editorRef.current.getStyles();
 
       const response = await fetch(
-        `${apiBaseUrl}/api/landing/editor/${pageId}/save`,
+        `${apiBaseUrl}/landing/editor/${pageId}/save`,
         {
           method: "POST",
           headers: {
@@ -72,7 +72,7 @@ export function LandingPageEditor({
       try {
         // Load existing page data
         const response = await fetch(
-          `${apiBaseUrl}/api/landing/editor/${pageId}`,
+          `${apiBaseUrl}/landing/editor/${pageId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -192,7 +192,7 @@ export function LandingPageEditor({
 
       // Then publish
       const response = await fetch(
-        `${apiBaseUrl}/api/landing/editor/${pageId}/publish`,
+        `${apiBaseUrl}/landing/editor/${pageId}/publish`,
         {
           method: "POST",
           headers: {
