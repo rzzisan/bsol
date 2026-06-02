@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\LandingPageController;
 use App\Http\Controllers\Api\LandingMediaLibraryController;
 use App\Http\Controllers\Api\LandingTemplateController;
+use App\Http\Controllers\Api\LandingPageEditorController;
+use App\Http\Controllers\Api\LandingPageElementController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
@@ -56,6 +58,12 @@ Route::post('/password/reset',        [PasswordResetController::class, 'resetPas
 
 Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow'])->middleware('track_landing_page_visit');
 Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder'])->middleware('track_landing_page_visit');
+
+// Public element registry (no auth required)
+Route::get('/landing/elements', 
+    [LandingPageElementController::class, 'index']);
+Route::get('/landing/elements/{key}', 
+    [LandingPageElementController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
@@ -97,6 +105,21 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{landingPageId}/by-referrer', [LandingPageAnalyticsController::class, 'getByReferrer'])->where('landingPageId', '[0-9]+');
         Route::post('/{landingPageId}/link-visit-to-order', [LandingPageAnalyticsController::class, 'linkVisitToOrder'])->where('landingPageId', '[0-9]+');
     });
+
+    // ── Landing Page Editor (GrapesJS) ──────────────────────────────────────────
+    // Editor draft management
+    Route::get('/landing/editor/{pageId}', 
+        [LandingPageEditorController::class, 'getDraft'])->where('pageId', '[0-9]+');
+    Route::post('/landing/editor/{pageId}/save', 
+        [LandingPageEditorController::class, 'saveDraft'])->where('pageId', '[0-9]+');
+    Route::post('/landing/editor/{pageId}/publish', 
+        [LandingPageEditorController::class, 'publishPage'])->where('pageId', '[0-9]+');
+    
+    // Version management
+    Route::get('/landing/editor/{pageId}/versions', 
+        [LandingPageEditorController::class, 'getVersions'])->where('pageId', '[0-9]+');
+    Route::post('/landing/editor/{pageId}/rollback/{versionNumber}', 
+        [LandingPageEditorController::class, 'rollbackToVersion'])->where(['pageId' => '[0-9]+', 'versionNumber' => '[0-9]+']);
 
     Route::prefix('landing/media-library')->group(function () {
         Route::get('/', [LandingMediaLibraryController::class, 'index']);
