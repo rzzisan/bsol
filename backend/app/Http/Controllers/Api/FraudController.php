@@ -136,7 +136,7 @@ class FraudController extends Controller
         $match10 = PhoneIntelCache::phone10($phone);
 
         $sharedStats = PhoneIntelCache::remember('fraud-shared-stats', $match10, 180, function () use ($match10) {
-            return Order::query()
+            $row = Order::query()
                 ->whereRaw("right(regexp_replace(customer_phone, '\\D', '', 'g'), 10) = ?", [$match10])
                 ->selectRaw("COUNT(*) as total,
                     COUNT(*) FILTER (WHERE status = 'delivered') as delivered,
@@ -144,6 +144,16 @@ class FraudController extends Controller
                     COUNT(*) FILTER (WHERE status = 'returned') as returned,
                     COUNT(DISTINCT user_id) as seller_count")
                 ->first();
+
+            // Cast to a plain array — an Eloquent model instance does not
+            // survive PHP serialize/unserialize through Redis reliably.
+            return [
+                'total'        => (int) ($row->total ?? 0),
+                'delivered'    => (int) ($row->delivered ?? 0),
+                'cancelled'    => (int) ($row->cancelled ?? 0),
+                'returned'     => (int) ($row->returned ?? 0),
+                'seller_count' => (int) ($row->seller_count ?? 0),
+            ];
         });
 
         $globalBlacklistCount = (int) PhoneIntelCache::remember('fraud-global-blacklist', $match10, 180, function () use ($match10) {
@@ -157,27 +167,30 @@ class FraudController extends Controller
             return Order::query()
                 ->where('user_id', $userId)
                 ->whereRaw("right(regexp_replace(customer_phone, '\\D', '', 'g'), 10) = ?", [$match10])
-                ->get(['id', 'status', 'risk_level', 'fraud_score', 'created_at', 'order_number', 'total']);
+                ->get(['id', 'status', 'risk_level', 'fraud_score', 'created_at', 'order_number', 'total'])
+                ->map(fn ($o) => [
+                    'id'           => $o->id,
+                    'status'       => $o->status,
+                    'risk_level'   => $o->risk_level,
+                    'fraud_score'  => $o->fraud_score,
+                    'created_at'   => optional($o->created_at)->toISOString(),
+                    'order_number' => $o->order_number,
+                    'total'        => $o->total,
+                ])
+                ->values()
+                ->all();
         }, $userId);
 
-        // Only this user's order details are returned in list view
-        $orders = collect($userOrders)
-            ->values()
-            ->map(fn ($o) => [
-                'id'           => $o->id,
-                'status'       => $o->status,
-                'risk_level'   => $o->risk_level,
-                'fraud_score'  => $o->fraud_score,
-                'created_at'   => $o->created_at,
-                'order_number' => $o->order_number,
-                'total'        => $o->total,
-            ]);
+        // $userOrders is cached as plain scalar arrays (no Eloquent models or
+        // Carbon instances) — those unserialize unreliably from Redis on a
+        // cache hit and were the cause of intermittent 500s on repeat checks.
+        $orders = collect($userOrders);
 
-        $total       = (int) ($sharedStats->total ?? 0);
-        $delivered   = (int) ($sharedStats->delivered ?? 0);
-        $cancelled   = (int) ($sharedStats->cancelled ?? 0);
-        $returned    = (int) ($sharedStats->returned ?? 0);
-        $sellerCount = (int) ($sharedStats->seller_count ?? 0);
+        $total       = (int) ($sharedStats['total'] ?? 0);
+        $delivered   = (int) ($sharedStats['delivered'] ?? 0);
+        $cancelled   = (int) ($sharedStats['cancelled'] ?? 0);
+        $returned    = (int) ($sharedStats['returned'] ?? 0);
+        $sellerCount = (int) ($sharedStats['seller_count'] ?? 0);
 
         $myTotal     = $orders->count();
         $myDelivered = $orders->where('status', 'delivered')->count();
