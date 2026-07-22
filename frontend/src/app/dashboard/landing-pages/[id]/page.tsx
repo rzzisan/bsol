@@ -11,14 +11,16 @@ const text: Record<string, Record<string, string>> = {
   bn: {
     title: "ল্যান্ডিং পেজ বিস্তারিত",
     back: "ফিরে যান",
-    edit: "এডিট",
+    edit: "কুইক এডিট",
+    visualEditor: "ভিজ্যুয়াল এডিটর",
     loading: "লোড হচ্ছে...",
     notFound: "ল্যান্ডিং পেজ পাওয়া যায়নি।",
   },
   en: {
     title: "Landing Page Details",
     back: "Go Back",
-    edit: "Edit",
+    edit: "Quick Edit",
+    visualEditor: "Visual Editor",
     loading: "Loading...",
     notFound: "Landing page not found.",
   },
@@ -211,8 +213,14 @@ export default function LandingPageDetails() {
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link
-            href={`/dashboard/landing-pages/${page.id}/edit`}
+            href={`/dashboard/landing-pages/${page.id}/editor`}
             className="inline-flex rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
+          >
+            {t.visualEditor}
+          </Link>
+          <Link
+            href={`/dashboard/landing-pages/${page.id}/edit`}
+            className="inline-flex rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
           >
             {t.edit}
           </Link>

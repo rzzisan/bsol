@@ -17,7 +17,8 @@ const text: Record<string, Record<string, string>> = {
     draft: "Draft",
     actions: "Actions",
     view: "দেখুন",
-    edit: "এডিট",
+    edit: "কুইক এডিট",
+    visualEditor: "ভিজ্যুয়াল এডিটর",
     statistics: "স্ট্যাটিস্টিক্স",
   },
   en: {
@@ -29,7 +30,8 @@ const text: Record<string, Record<string, string>> = {
     draft: "Draft",
     actions: "Actions",
     view: "View",
-    edit: "Edit",
+    edit: "Quick Edit",
+    visualEditor: "Visual Editor",
     statistics: "Statistics",
   },
 };
@@ -254,6 +256,9 @@ export default function LandingPages() {
                         </Link>
                         <Link href={`/dashboard/landing-pages/${page.id}/edit`} className="font-medium text-[var(--accent)] hover:underline">
                           {t.edit}
+                        </Link>
+                        <Link href={`/dashboard/landing-pages/${page.id}/editor`} className="font-medium text-emerald-400 hover:underline">
+                          {t.visualEditor}
                         </Link>
                         {page.public_url ? (
                           <a href={page.public_url} target="_blank" rel="noreferrer" className="font-medium text-[var(--accent)] hover:underline">
