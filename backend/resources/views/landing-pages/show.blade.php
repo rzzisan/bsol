@@ -76,15 +76,23 @@
     @if($page->custom_css)
         <style>{!! $page->custom_css !!}</style>
     @endif
+    @if(!empty(data_get($page->editor_state, 'css')))
+        <style>{!! $page->editor_state['css'] !!}</style>
+    @endif
 </head>
 <body>
-    <header class="hero">
-        <div class="container">
-            <h1>{{ data_get($page->content, 'hero.headline', $page->title) }}</h1>
-            <p>{{ data_get($page->content, 'hero.subheadline', '') }}</p>
-            <a href="#checkout" class="btn">{{ data_get($page->content, 'hero.cta_text', 'অর্ডার করতে চাই') }}</a>
-        </div>
-    </header>
+    @php($editorHtml = trim((string) data_get($page->editor_state, 'html')))
+    @if($editorHtml !== '')
+        {!! $editorHtml !!}
+    @else
+        <header class="hero">
+            <div class="container">
+                <h1>{{ data_get($page->content, 'hero.headline', $page->title) }}</h1>
+                <p>{{ data_get($page->content, 'hero.subheadline', '') }}</p>
+                <a href="#checkout" class="btn">{{ data_get($page->content, 'hero.cta_text', 'অর্ডার করতে চাই') }}</a>
+            </div>
+        </header>
+    @endif
 
     <main class="container" style="padding:20px 16px 40px;">
         @if(session('order_success'))
@@ -100,12 +108,14 @@
             </div>
         @endif
 
-        @foreach((array) data_get($page->content, 'html_sections', []) as $section)
-            <section class="card">
-                @if(!empty($section['title']))<h2 class="section-title">{{ $section['title'] }}</h2>@endif
-                <div>{!! $section['html'] ?? '' !!}</div>
-            </section>
-        @endforeach
+        @if($editorHtml === '')
+            @foreach((array) data_get($page->content, 'html_sections', []) as $section)
+                <section class="card">
+                    @if(!empty($section['title']))<h2 class="section-title">{{ $section['title'] }}</h2>@endif
+                    <div>{!! $section['html'] ?? '' !!}</div>
+                </section>
+            @endforeach
+        @endif
 
         <section class="card">
             <h2 class="section-title">প্রোডাক্ট সিলেক্ট করুন</h2>
@@ -179,7 +189,7 @@
             </form>
         </section>
 
-        @if(!empty(data_get($page->content, 'faq', [])))
+        @if($editorHtml === '' && !empty(data_get($page->content, 'faq', [])))
             <section class="card">
                 <h2 class="section-title">সাধারণ প্রশ্ন</h2>
                 @foreach((array) data_get($page->content, 'faq', []) as $faq)

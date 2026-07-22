@@ -23,6 +23,8 @@ class LandingPage extends Model
         'seo_meta',
         'custom_css',
         'published_at',
+        'editor_state',
+        'last_editor_save',
     ];
 
     protected $casts = [
@@ -30,6 +32,8 @@ class LandingPage extends Model
         'content' => 'array',
         'seo_meta' => 'array',
         'published_at' => 'datetime',
+        'editor_state' => 'array',
+        'last_editor_save' => 'datetime',
     ];
 
     public function user(): BelongsTo

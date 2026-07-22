@@ -142,13 +142,20 @@ export function LandingPageEditor({
         // Register custom elements
         registerCustomElements(editor);
 
-        // Load saved content if exists
-        if (data?.components_json) {
+        // Load saved content if exists; fall back to the seeded/saved
+        // HTML+CSS snapshot when there's no real GrapesJS component tree yet
+        // (e.g. a page that was created outside the visual editor).
+        if (data?.components_json && data.components_json !== "[]") {
           try {
             const components = JSON.parse(data.components_json);
             editor.setComponents(components);
           } catch (e) {
             console.warn("Could not parse saved components");
+          }
+        } else if (data?.html_output) {
+          editor.setComponents(data.html_output);
+          if (data.css_output) {
+            editor.setStyle(data.css_output);
           }
         }
 
