@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\TrackLandingPageVisit;
 
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'is_admin' => EnsureUserIsAdmin::class,
             'track_landing_page_visit' => TrackLandingPageVisit::class,
+            'active_subscription' => EnsureActiveSubscription::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {

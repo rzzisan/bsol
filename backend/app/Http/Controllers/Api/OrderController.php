@@ -170,9 +170,25 @@ class OrderController extends Controller
     public function store(StoreOrderRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $userId = auth()->id();
 
-        return DB::transaction(function () use ($data) {
-            $userId = auth()->id();
+        $maxOrders = auth()->user()->subscriptionPackage?->max_orders;
+        if ($maxOrders !== null) {
+            $ordersThisMonth = Order::where('user_id', $userId)
+                ->whereYear('created_at', now()->year)
+                ->whereMonth('created_at', now()->month)
+                ->count();
+
+            if ($ordersThisMonth >= $maxOrders) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Monthly order limit reached for your current plan. Please upgrade to create more orders.',
+                    'error_code' => 'order_limit_reached',
+                ], 402);
+            }
+        }
+
+        return DB::transaction(function () use ($data, $userId) {
 
             // Compute totals
             $subtotal = collect($data['items'])->sum(

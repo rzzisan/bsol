@@ -2,7 +2,7 @@
 আংশিক পড়ে কাজ শুরু করা হলে সেটি invalid execution হিসেবে গণ্য হবে।
 # Hybrid Stack Server Context
 
-Last updated: 2026-04-29
+Last updated: 2026-07-23 (see "🚨 Frontend process manager পরিবর্তন" note below — frontend is now systemd-managed, not Supervisor)
 Native/local host domain: `bsol.zyrotechbd.com`
 Dokploy-hosted domain: `bsol.zisan.me`
 Native/local host server IP: `103.157.253.197`
@@ -34,6 +34,26 @@ Project owner directive (strict):
 
 এই rule future সব development/support session-এ mandatory authority হিসেবে প্রযোজ্য হবে।
 
+## 🚨 Frontend process manager পরিবর্তন (added: 2026-07-23)
+
+**গুরুত্বপূর্ণ:** এই ডকুমেন্টের পরবর্তী অংশে (এবং Section 9-এ) Next.js frontend-এর জন্য যেখানেই `supervisorctl restart hybrid-stack-frontend` / `supervisorctl status hybrid-stack-frontend`-জাতীয় কমান্ড উল্লেখ আছে, সেগুলো **আর সঠিক নয়** — নিচের বাস্তবতা এখন কার্যকর:
+
+- Frontend (`127.0.0.1:3001`) এখন **systemd** দিয়ে ম্যানেজ হয়: `hybrid-frontend.service` (`Restart=always`, `User=root`, `ExecStart=/usr/bin/npm run start`)
+- একটা `hybrid-healthcheck.timer` প্রতি মিনিটে `bsol.zyrotechbd.com`-এ frontend/backend health চেক করে এবং প্রয়োজনে `systemctl restart hybrid-frontend.service` (এবং backend অস্বাভাবিক হলে `php8.3-fpm`/`nginx`) চালায় — স্ক্রিপ্ট: `/usr/local/bin/hybrid-healthcheck.sh`
+- Supervisor-এর `hybrid-stack-frontend` প্রোগ্রাম ডেফিনিশন **disable করা হয়েছে** (`/etc/supervisor/conf.d/hybrid-stack-frontend.conf.disabled` হিসেবে backup রাখা আছে, active conf.d-এ নেই) — কারণ সেটা systemd-এর সাথে port 3001-এর জন্য conflict করছিল এবং কখনোই সফলভাবে সার্ভ করছিল না (সবসময় FATAL দেখাত, যদিও সাইট আসলে systemd দিয়ে সচল ছিল)
+
+### সঠিক কমান্ড (এখন থেকে ব্যবহার করুন)
+
+```bash
+systemctl status hybrid-frontend.service
+systemctl restart hybrid-frontend.service
+journalctl -u hybrid-frontend.service -n 50 --no-pager
+```
+
+Port `3001` conflict verify করতে: `ss -ltnp | grep 3001` এবং `systemctl status hybrid-frontend.service` — Supervisor আর এই প্রসেসের অংশ না।
+
+Section 9 এবং এই ডকুমেন্টের troubleshooting sections-এ থাকা `supervisorctl ...` রেফারেন্সগুলো historical/deprecated হিসেবে বিবেচনা করুন, উপরের নতুন কমান্ডগুলো দিয়ে প্রতিস্থাপন করে পড়ুন।
+
 ## 1. Objective
 
 এই সার্ভারকে একটি production-ready Hybrid Stack environment হিসেবে প্রস্তুত করা হয়েছে যাতে নিচের stack ব্যবহার করে SaaS project develop ও deploy করা যায়:
@@ -43,7 +63,7 @@ Project owner directive (strict):
 - Database: PostgreSQL
 - Cache / Queue: Redis
 - Web server / Reverse proxy: Nginx
-- Process manager: Supervisor
+- Process manager: systemd (`hybrid-frontend.service` for Next.js) + `hybrid-healthcheck.timer` for auto-recovery — see "🚨 Frontend process manager পরিবর্তন" note above (Supervisor was originally used, now deprecated for this purpose)
 - SSL: Let's Encrypt (Certbot)
 
 ---
@@ -221,26 +241,61 @@ Main active site config:
 
 ---
 
-## 9. Supervisor configuration
+## 9. Frontend process management (systemd — updated 2026-07-23)
 
-Supervisor config file:
+**পূর্বে এই সেকশন Supervisor বর্ণনা করত। বাস্তবে Supervisor এবং একটা systemd সার্ভিস দুটোই একসাথে port `3001`-এর জন্য প্রতিযোগিতা করছিল, এবং systemd-ই সবসময় জিতে সাইট সার্ভ করছিল — তাই Supervisor-এর ভাগ disable করে systemd-কে একমাত্র manager হিসেবে রাখা হয়েছে।**
 
-`/etc/supervisor/conf.d/hybrid-stack-frontend.conf`
+### Systemd unit
 
-### What it does
+`/etc/systemd/system/hybrid-frontend.service`
 
-Runs Next.js production server automatically:
+```ini
+[Unit]
+Description=Hybrid Stack Frontend (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/hybrid-stack/frontend
+Environment=NODE_ENV=production
+Environment=PORT=3001
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+User=root
+Group=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
 
 - Working directory: `/var/www/hybrid-stack/frontend`
-- Command: `npm run start -- --hostname 127.0.0.1 --port 3001`
-- User: `www-data`
-- Auto restart enabled
+- Bind: `127.0.0.1:3001` (via `next start`, `PORT=3001` env)
+- User: `root` (not `www-data` — this differs from other native services; kept as-is since it's already working and changing it is out of scope for a routine fix)
+- `Restart=always` handles crash recovery
 
-### Why Supervisor was used
+### Health check timer (second layer of auto-recovery)
 
-- Next.js app auto-restart after reboot/crash
-- Easier than keeping manual terminal session alive
-- Production-friendly process supervision
+- Timer: `hybrid-healthcheck.timer` (প্রতি মিনিটে চলে)
+- Service: `hybrid-healthcheck.service` → script `/usr/local/bin/hybrid-healthcheck.sh`
+- Script `https://bsol.zyrotechbd.com/` (frontend) এবং `/api/orders/create/bootstrap` (backend, `401` expected) চেক করে; frontend down থাকলে `systemctl restart hybrid-frontend.service`, backend down থাকলে `php8.3-fpm`/`nginx` restart করে
+
+### Common commands
+
+```bash
+systemctl status hybrid-frontend.service
+systemctl restart hybrid-frontend.service
+journalctl -u hybrid-frontend.service -n 50 --no-pager
+systemctl status hybrid-healthcheck.timer
+```
+
+### Supervisor (deprecated for frontend)
+
+- `/etc/supervisor/conf.d/hybrid-stack-frontend.conf` disabled হিসেবে রাখা আছে: `hybrid-stack-frontend.conf.disabled` (একই ডিরেক্টরিতে, `.conf` extension না থাকায় Supervisor আর load করে না)
+- `supervisorctl status` এখন এই প্রোগ্রামটা আর দেখাবে না — এটা প্রত্যাশিত, error না
+- Supervisor অন্য কোনো hybrid-stack প্রসেস (backend ইত্যাদি) ম্যানেজ করে না — backend `php8.3-fpm.service` (systemd, স্ট্যান্ডার্ড) দিয়ে চলে, যেটা এই পরিবর্তনে প্রভাবিত হয়নি
 
 ---
 

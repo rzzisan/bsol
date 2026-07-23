@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import CatvShell, { type ShellMenuItem } from "@/components/catv-shell";
 import EmailVerificationBanner from "@/components/email-verification-banner";
+import SubscriptionBanner from "@/components/subscription-banner";
 import {
   getStoredLocale,
   getStoredTheme,
@@ -261,6 +262,7 @@ export default function UserShell({
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
+  const [subscription, setSubscription] = useState<{ status: string; days_left: number | null; is_expired: boolean } | null>(null);
 
   useEffect(() => {
     setLocale(getStoredLocale());
@@ -321,6 +323,32 @@ export default function UserShell({
     };
 
     void syncUser();
+  }, []);
+
+  // subscription status for renewal/trial banner
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token) return;
+
+    const loadSubscription = async () => {
+      try {
+        const res = await fetch("/api/subscription/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data?.data) return;
+        setSubscription({
+          status: data.data.status,
+          days_left: data.data.days_left,
+          is_expired: data.data.is_expired,
+        });
+      } catch {
+        // silent — banner just won't show
+      }
+    };
+
+    void loadSubscription();
   }, []);
 
   const t = useMemo(() => menuText[locale], [locale]);
@@ -408,6 +436,16 @@ export default function UserShell({
           <EmailVerificationBanner
             userEmail={user?.email || ""}
             onInitiateVerification={handleInitiateEmailVerification}
+            locale={locale}
+          />
+        </div>
+      )}
+      {subscription && (
+        <div className="p-4 sm:p-5">
+          <SubscriptionBanner
+            status={subscription.status}
+            daysLeft={subscription.days_left}
+            isExpired={subscription.is_expired}
             locale={locale}
           />
         </div>

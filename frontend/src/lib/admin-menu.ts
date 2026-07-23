@@ -75,7 +75,7 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
       ],
     },
     { key: "packages", label: labels.packages, icon: "📦", href: "/admin/packages" },
-    { key: "billing", label: labels.billing, icon: "💳" },
+    { key: "billing", label: labels.billing, icon: "💳", href: "/admin/billing" },
     { key: "reports", label: labels.reports, icon: "📊" },
     {
       key: "settings",

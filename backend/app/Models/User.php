@@ -16,7 +16,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'mobile', 'mobile_verified_at', 'email', 'email_verified_at', 'password', 'role', 'user_status', 'subscription_package_id', 'sms_gateway_id'])]
+#[Fillable(['name', 'mobile', 'mobile_verified_at', 'email', 'email_verified_at', 'password', 'role', 'user_status', 'subscription_package_id', 'sms_gateway_id', 'subscription_status', 'subscription_started_at', 'subscription_ends_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -31,15 +31,28 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at'  => 'datetime',
-            'mobile_verified_at' => 'datetime',
-            'password'           => 'hashed',
+            'email_verified_at'      => 'datetime',
+            'mobile_verified_at'     => 'datetime',
+            'password'               => 'hashed',
+            'subscription_started_at' => 'datetime',
+            'subscription_ends_at'    => 'datetime',
         ];
     }
 
     public function subscriptionPackage()
     {
         return $this->belongsTo(SubscriptionPackage::class, 'subscription_package_id');
+    }
+
+    public function subscriptionPayments()
+    {
+        return $this->hasMany(SubscriptionPayment::class);
+    }
+
+    public function isSubscriptionExpired(): bool
+    {
+        return $this->subscription_status === 'expired'
+            || ($this->subscription_ends_at !== null && $this->subscription_ends_at->isPast());
     }
 
     public function assignedGateway()

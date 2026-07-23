@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PhoneOtpActivityLog;
 use App\Models\PhoneOtpVerification;
 use App\Models\RegistrationSetting;
+use App\Models\SubscriptionPackage;
 use App\Models\User;
 use App\Services\NotificationDispatchService;
 use Illuminate\Http\JsonResponse;
@@ -187,6 +188,9 @@ class OtpController extends Controller
         }
 
         $registrationDefaults = RegistrationSetting::getSetting();
+        $defaultPackage = $registrationDefaults->default_subscription_package_id
+            ? SubscriptionPackage::find($registrationDefaults->default_subscription_package_id)
+            : null;
 
         $user = User::create([
             'name'               => $pendingData['name'],
@@ -196,6 +200,9 @@ class OtpController extends Controller
             'role'               => 'user',
             'user_status'        => $registrationDefaults->default_user_status,
             'subscription_package_id' => $registrationDefaults->default_subscription_package_id,
+            'subscription_status' => $defaultPackage ? 'trial' : 'active',
+            'subscription_started_at' => $defaultPackage ? now() : null,
+            'subscription_ends_at' => $defaultPackage ? now()->addDays($defaultPackage->duration_days) : null,
             'mobile_verified_at' => now(),
         ]);
 

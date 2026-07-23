@@ -3,6 +3,8 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminSmsCreditController;
 use App\Http\Controllers\AdminSmsGatewayController;
+use App\Http\Controllers\AdminSubscriptionController;
+use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EmailOtpController;
 use App\Http\Controllers\OtpController;
@@ -85,6 +87,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/sms/automation/rules/{id}', [SmsAutomationController::class, 'destroy']);
     Route::get('/sms/automation/logs', [SmsAutomationController::class, 'logs']);
 
+    // ── Subscription (self-service — must stay reachable even when expired) ───
+    Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
+    Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
+    Route::post('/subscription/payments', [SubscriptionController::class, 'submitPayment']);
+
+Route::middleware('active_subscription')->group(function () {
     // ── Landing Page Builder ────────────────────────────────────────────────
     Route::get('/landing/templates', [LandingTemplateController::class, 'index']);
     Route::get('/landing/templates/{id}', [LandingTemplateController::class, 'show'])->where('id', '[0-9]+');
@@ -223,6 +231,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/blacklist', [FraudController::class, 'addBlacklist']);
         Route::delete('/blacklist/{id}', [FraudController::class, 'removeBlacklist']);
     });
+}); // end active_subscription group
 
     Route::middleware('is_admin')->prefix('admin')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);
@@ -239,6 +248,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/registration-defaults', [AdminController::class, 'getRegistrationDefaults']);
         Route::put('/registration-defaults', [AdminController::class, 'updateRegistrationDefaults']);
+
+        Route::get('/billing-settings', [AdminSubscriptionController::class, 'getBillingSettings']);
+        Route::put('/billing-settings', [AdminSubscriptionController::class, 'updateBillingSettings']);
+
+        Route::get('/subscription-payments', [AdminSubscriptionController::class, 'listPayments']);
+        Route::post('/subscription-payments/{payment}/approve', [AdminSubscriptionController::class, 'approvePayment']);
+        Route::post('/subscription-payments/{payment}/reject', [AdminSubscriptionController::class, 'rejectPayment']);
 
         Route::get('/sms/gateways', [AdminSmsGatewayController::class, 'index']);
         Route::post('/sms/gateways', [AdminSmsGatewayController::class, 'store']);
