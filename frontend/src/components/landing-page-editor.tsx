@@ -6,6 +6,7 @@ import grapesjsTailwind from "grapesjs-tailwind";
 import GjsPluginCkeditor from "grapesjs-plugin-ckeditor";
 import "grapesjs/dist/css/grapes.min.css";
 import { registerCustomElements } from "./grapesjs-elements/register-elements";
+import LandingPageProductPanel from "./landing-page-product-panel";
 
 interface LandingPageEditorProps {
   pageId: string;
@@ -24,6 +25,7 @@ export function LandingPageEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [showProductPanel, setShowProductPanel] = useState(false);
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-save mechanism
@@ -252,6 +254,12 @@ export function LandingPageEditor({
             >
               Publish
             </button>
+            <button
+              onClick={() => setShowProductPanel((prev) => !prev)}
+              className={`px-4 py-2 rounded ${showProductPanel ? "bg-indigo-700 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+            >
+              📦 Products & Checkout
+            </button>
           </div>
         </div>
 
@@ -269,7 +277,14 @@ export function LandingPageEditor({
       </div>
 
       {/* Editor */}
-      <div id="gjs-editor" className="flex-1" />
+      <div className="flex flex-1 overflow-hidden">
+        <div id="gjs-editor" className="flex-1" />
+        {showProductPanel ? (
+          <div className="w-80 shrink-0 overflow-y-auto border-l border-gray-200 bg-white">
+            <LandingPageProductPanel pageId={Number(pageId)} locale="bn" />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

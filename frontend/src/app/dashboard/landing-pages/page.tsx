@@ -6,6 +6,11 @@ import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE, getLandingTemplateName } from "@/lib/landing-pages";
 
+// GrapesJS Visual Editor is now the primary editor (Part B4). Quick Edit's
+// route/component/controller logic is left intact — flip this back to true
+// to restore the nav entry point instead of re-implementing it.
+const QUICK_EDIT_ENABLED = false;
+
 // TODO: Replace with actual i18n import
 const text: Record<string, Record<string, string>> = {
   bn: {
@@ -254,9 +259,11 @@ export default function LandingPages() {
                         <Link href={`/dashboard/landing-page-analytics/${page.id}`} className="font-medium text-[var(--accent)] hover:underline">
                           {t.statistics}
                         </Link>
-                        <Link href={`/dashboard/landing-pages/${page.id}/edit`} className="font-medium text-[var(--accent)] hover:underline">
-                          {t.edit}
-                        </Link>
+                        {QUICK_EDIT_ENABLED ? (
+                          <Link href={`/dashboard/landing-pages/${page.id}/edit`} className="font-medium text-[var(--accent)] hover:underline">
+                            {t.edit}
+                          </Link>
+                        ) : null}
                         <Link href={`/dashboard/landing-pages/${page.id}/editor`} className="font-medium text-emerald-400 hover:underline">
                           {t.visualEditor}
                         </Link>

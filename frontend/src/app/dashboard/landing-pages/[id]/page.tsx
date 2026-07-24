@@ -7,6 +7,11 @@ import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE, getLandingTemplateName, type LandingPageRecord } from "@/lib/landing-pages";
 
+// GrapesJS Visual Editor is now the primary editor (Part B4). Quick Edit's
+// route/component/controller logic is left intact — flip this back to true
+// to restore the nav entry point instead of re-implementing it.
+const QUICK_EDIT_ENABLED = false;
+
 const text: Record<string, Record<string, string>> = {
   bn: {
     title: "ল্যান্ডিং পেজ বিস্তারিত",
@@ -218,12 +223,14 @@ export default function LandingPageDetails() {
           >
             {t.visualEditor}
           </Link>
-          <Link
-            href={`/dashboard/landing-pages/${page.id}/edit`}
-            className="inline-flex rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
-          >
-            {t.edit}
-          </Link>
+          {QUICK_EDIT_ENABLED ? (
+            <Link
+              href={`/dashboard/landing-pages/${page.id}/edit`}
+              className="inline-flex rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
+            >
+              {t.edit}
+            </Link>
+          ) : null}
           {page.public_url ? (
             <a href={page.public_url} target="_blank" rel="noreferrer" className="inline-flex rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]">
               {locale === "bn" ? "Preview" : "Preview"}

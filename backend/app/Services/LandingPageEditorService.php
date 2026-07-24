@@ -11,6 +11,8 @@ class LandingPageEditorService
     private const REDIS_DRAFT_KEY = 'landing_editor:draft:%d';
     private const REDIS_DRAFT_TTL = 86400; // 24 hours
 
+    public function __construct(private readonly GrapesJsContentSerializer $contentSerializer) {}
+
     /**
      * Get editor draft (from Redis or database)
      */
@@ -62,9 +64,15 @@ class LandingPageEditorService
 
     /**
      * Render the page's existing structured content (hero, html sections,
-     * FAQ) into a plain HTML/CSS fragment the editor can seed itself with.
-     * Mirrors resources/views/landing-pages/show.blade.php but excludes the
-     * checkout form, which stays server-rendered and isn't user-editable.
+     * carousels, features, FAQ, reviews) into a plain HTML/CSS fragment the
+     * editor can seed itself with. Feature/review/carousel blocks are marked
+     * up with the same data-content-* attributes their GrapesJS component
+     * types use (grapesjs-elements/content-blocks.ts), so a save round-trips
+     * back into structured `content` arrays via GrapesJsContentSerializer
+     * instead of being flattened into opaque HTML the first time a
+     * Quick-Edit-authored page is opened in the visual editor. Excludes the
+     * checkout form and product list, which stay server-rendered and aren't
+     * user-editable here.
      */
     private function renderContentHtml(LandingPage $page): array
     {
@@ -100,6 +108,26 @@ class LandingPageEditorService
             $html .= '</section>';
         }
 
+        $carousels = (array) data_get($content, 'carousel_images', []);
+        foreach ($carousels as $carousel) {
+            $title = e($carousel['title'] ?? '');
+            $html .= '<div data-content-carousel="true" data-carousel-title="' . $title . '" style="padding:16px;background:#f8fafc;border-radius:8px;margin-bottom:12px;">';
+            $html .= '<p style="font-weight:600;margin:0 0 8px;">🖼️ ' . $title . '</p>';
+            $html .= '<div data-carousel-images="true" style="display:flex;gap:8px;flex-wrap:wrap;min-height:80px;border:1px dashed #94a3b8;padding:8px;">';
+            foreach ((array) ($carousel['images'] ?? []) as $image) {
+                $html .= '<img src="' . e($image['url'] ?? '') . '" alt="' . e($image['alt'] ?? '') . '" style="max-width:100%;height:auto;width:120px;" />';
+            }
+            $html .= '</div></div>';
+        }
+
+        $features = (array) data_get($content, 'features', []);
+        foreach ($features as $feature) {
+            $html .= '<div data-content-feature="true" style="padding:20px;background:#fff;border-radius:8px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:12px;">'
+                . '<h3 data-field="title" style="font-size:18px;font-weight:600;margin:0 0 8px;">' . e($feature['title'] ?? '') . '</h3>'
+                . '<p data-field="description" style="color:#6b7280;margin:0;">' . e($feature['description'] ?? '') . '</p>'
+                . '</div>';
+        }
+
         $faqs = (array) data_get($content, 'faq', []);
         if (!empty($faqs)) {
             $html .= '<section class="card"><h2 class="section-title">সাধারণ প্রশ্ন</h2>';
@@ -110,6 +138,14 @@ class LandingPageEditorService
                     . '</details>';
             }
             $html .= '</section>';
+        }
+
+        $reviews = (array) data_get($content, 'reviews', []);
+        foreach ($reviews as $review) {
+            $html .= '<div data-content-review="true" style="padding:20px;background:#f9fafb;border-left:4px solid #3B82F6;border-radius:8px;margin-bottom:12px;">'
+                . '<p data-field="quote" style="margin:0 0 8px;color:#374151;">' . e($review['quote'] ?? '') . '</p>'
+                . '<p data-field="name" style="margin:0;font-weight:600;">' . e($review['name'] ?? '') . '</p>'
+                . '</div>';
         }
 
         $html .= '</div>';
@@ -163,7 +199,20 @@ class LandingPageEditorService
         // Update Redis cache
         $cacheKey = sprintf(self::REDIS_DRAFT_KEY, $pageId);
         Redis::setex($cacheKey, self::REDIS_DRAFT_TTL, json_encode($draft));
-        
+
+        // Keep the public page's `content` in sync with every autosave, not
+        // just on publish, so a mid-edit preview reflects the latest canvas.
+        $page = LandingPage::find($pageId);
+        if ($page && !empty($data['html_output'])) {
+            $page->update([
+                'content' => $this->contentSerializer->toContent(
+                    $data['html_output'] ?? null,
+                    $data['css_output'] ?? null,
+                    $page->content ?? []
+                ),
+            ]);
+        }
+
         return $draft;
     }
 
@@ -195,7 +244,10 @@ class LandingPageEditorService
             'version_name' => "Version " . ($latestVersion + 1),
         ]);
 
-        // Update page
+        // Update page — also translate the draft into `content`, which is
+        // what the public page actually renders. Previously only
+        // `editor_state` was written here, so Publish silently had no
+        // effect on the live page.
         $page->update([
             'status' => 'published',
             'published_at' => now(),
@@ -205,6 +257,11 @@ class LandingPageEditorService
                 'html' => $draft->html_output,
                 'css' => $draft->css_output,
             ],
+            'content' => $this->contentSerializer->toContent(
+                $draft->html_output,
+                $draft->css_output,
+                $page->content ?? []
+            ),
         ]);
 
         // Clear cache

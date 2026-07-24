@@ -258,7 +258,7 @@ class LandingPageController extends Controller
         ]);
     }
 
-    public function importFromJson(Request $request): JsonResponse
+    public function importFromJson(Request $request, \App\Services\CartFlowsImportService $importService): JsonResponse
     {
         $data = $request->validate([
             'file_name' => ['required', 'string', 'max:190'],
@@ -282,20 +282,19 @@ class LandingPageController extends Controller
             ], 404);
         }
 
-        $payload = json_decode((string) file_get_contents($jsonPath), true);
-        if (!is_array($payload) || empty($payload)) {
+        $templateCode = Str::slug(Str::of($safeFile)->beforeLast('.')->toString());
+
+        try {
+            $parsed = $importService->parseFile($jsonPath, $templateCode);
+        } catch (\RuntimeException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid JSON format.',
+                'message' => $e->getMessage(),
             ], 422);
         }
 
-        $first = $payload[0] ?? [];
-        $title = $first['title'] ?? Str::of($safeFile)->beforeLast('.')->replace(['-', '_'], ' ')->title()->toString();
-
-        $steps = collect($first['steps'] ?? []);
-        $checkoutStep = $steps->firstWhere('type', 'checkout') ?? $steps->first();
-        $html = is_array($checkoutStep) ? ($checkoutStep['post_content'] ?? null) : null;
+        $title = $parsed['title'];
+        $html = $parsed['html'];
 
         $status = $data['status'] ?? 'draft';
         $template = null;
@@ -311,11 +310,7 @@ class LandingPageController extends Controller
             'status' => $status,
             'theme_settings' => $this->defaultTheme(),
             'content' => [
-                'hero' => [
-                    'headline' => $title,
-                    'subheadline' => 'এই পেজটি JSON থেকে ইমপোর্ট করা হয়েছে।',
-                    'cta_text' => 'অর্ডার করতে চাই',
-                ],
+                'hero' => $parsed['hero'],
                 'html_sections' => $html ? [['title' => 'Imported Section', 'html' => $html]] : [],
                 'features' => [],
                 'reviews' => [],

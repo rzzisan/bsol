@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\LandingPageElementController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
+use App\Http\Controllers\Api\Admin\LandingTemplateImportController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
@@ -295,6 +296,14 @@ Route::middleware('active_subscription')->group(function () {
         // Product media settings (shared admin config)
         Route::get('/settings/product-media', [ProductMediaSettingsController::class, 'show']);
         Route::put('/settings/product-media', [ProductMediaSettingsController::class, 'update']);
+
+        // Landing page template importer (CartFlows/Elementor JSON exports)
+        Route::prefix('landing/templates')->group(function () {
+            Route::get('/', [LandingTemplateImportController::class, 'index']);
+            Route::post('/import/preview', [LandingTemplateImportController::class, 'preview']);
+            Route::post('/import', [LandingTemplateImportController::class, 'store']);
+            Route::put('/{id}', [LandingTemplateImportController::class, 'toggleActive'])->where('id', '[0-9]+');
+        });
 
         // Notification Dispatch Routes
         Route::post('/notification-dispatch', [NotificationDispatchController::class, 'dispatch']);
