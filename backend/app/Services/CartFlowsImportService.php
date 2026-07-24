@@ -62,6 +62,8 @@ class CartFlowsImportService
         [$html, $imageWarnings] = $this->rehostImages($html, $templateCode);
         $warnings = array_merge($warnings, $imageWarnings);
 
+        $html = $this->prependElementorBaseCss($html);
+
         return [
             'title' => $title,
             'hero' => [
@@ -77,6 +79,38 @@ class CartFlowsImportService
     public function parseFile(string $absolutePath, string $templateCode): array
     {
         return $this->parse((string) file_get_contents($absolutePath), $templateCode);
+    }
+
+    /**
+     * The exported post_content only ever carries a handful of per-widget
+     * inline <style> blocks (if any at all — many sites have none). All of
+     * Elementor's actual layout/spacing/typography rules (.elementor-column,
+     * .elementor-button, .elementor-heading-title, flex/grid layout,
+     * responsive breakpoints, etc.) live in a compiled CSS file cached on
+     * the original WordPress server, which isn't part of this export format
+     * at all — so without this, imported content is readable text with
+     * (since the earlier fixes) correctly-sized images/icons, but no real
+     * layout. This bundles Elementor's actual open-source base stylesheet
+     * (resources/elementor/frontend-base.min.css, pulled from the official
+     * WordPress.org plugin release — not site-specific, so safe to reuse
+     * for any Elementor export) to restore that structure. Site-specific
+     * colors/fonts from the original site's "Site Settings" are still not
+     * recoverable, since those are compiled into that same missing
+     * server-side CSS file.
+     */
+    private function prependElementorBaseCss(string $html): string
+    {
+        static $css = null;
+        if ($css === null) {
+            $path = resource_path('elementor/frontend-base.min.css');
+            $css = is_file($path) ? (string) file_get_contents($path) : '';
+        }
+
+        if ($css === '') {
+            return $html;
+        }
+
+        return '<style>' . $css . '</style>' . "\n" . $html;
     }
 
     private function extractHeroHeadline(string $html): ?string
