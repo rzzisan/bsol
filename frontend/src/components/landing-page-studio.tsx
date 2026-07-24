@@ -898,7 +898,10 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
                   const value = e.target.value;
                   updateForm("templateId", value);
                   const selected = templateMap.get(value);
-                  if (selected) applyTemplate(selected);
+                  // Force-overwrite on explicit selection in create mode only —
+                  // in edit mode this would silently wipe a merchant's existing
+                  // custom content just for clicking a different template card.
+                  if (selected) applyTemplate(selected, mode === "create");
                 }} className="mt-3 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--foreground)]">
                   <option value="">{t.customTemplate}</option>
                   {templates.map((template) => (
@@ -912,7 +915,7 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
                       <button
                         key={template.id}
                         type="button"
-                        onClick={() => applyTemplate(template)}
+                        onClick={() => applyTemplate(template, mode === "create")}
                         className={`overflow-hidden rounded-2xl border p-0 text-left transition ${active ? "border-[var(--accent)] bg-[var(--surface)] shadow-lg" : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--accent)]/40"}`}
                       >
                         <div className="aspect-[16/9] bg-gradient-to-br from-[var(--accent)]/20 to-orange-400/10">

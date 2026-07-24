@@ -134,7 +134,10 @@ class CartFlowsImportService
             $html = str_replace($url, $localUrl, $html);
         }
 
-        return [$this->normalizeImageTags($html), $warnings];
+        $html = $this->normalizeImageTags($html);
+        $html = $this->normalizeSvgIcons($html);
+
+        return [$html, $warnings];
     }
 
     /**
@@ -160,6 +163,36 @@ class CartFlowsImportService
             }
 
             return $tag;
+        }, $html);
+    }
+
+    /**
+     * Elementor/Font Awesome icons are inline <svg> with a viewBox but no
+     * width/height and no accompanying stylesheet (Elementor normally sizes
+     * these via its own site-wide CSS, which isn't part of post_content) —
+     * so they render at an oversized default instead of icon-sized. Force a
+     * small fixed size the same way normalizeImageTags forces responsive
+     * image sizing.
+     */
+    private function normalizeSvgIcons(string $html): string
+    {
+        return (string) preg_replace_callback('/<svg\b[^>]*>.*?<\/svg>/is', function (array $match): string {
+            $tag = $match[0];
+            $openTag = null;
+            if (!preg_match('/<svg\b[^>]*>/i', $tag, $openMatch)) {
+                return $tag;
+            }
+            $openTag = $openMatch[0];
+            $newOpenTag = preg_replace('/\s(width|height)=["\'][^"\']*["\']/i', '', $openTag) ?? $openTag;
+
+            if (preg_match('/\sstyle=["\']([^"\']*)["\']/i', $newOpenTag, $styleMatch)) {
+                $newStyle = rtrim($styleMatch[1], '; ') . '; width:24px; height:24px; max-width:24px;';
+                $newOpenTag = str_replace($styleMatch[0], ' style="' . $newStyle . '"', $newOpenTag);
+            } else {
+                $newOpenTag = preg_replace('/<svg\b/i', '<svg style="width:24px; height:24px; max-width:24px;"', $newOpenTag, 1) ?? $newOpenTag;
+            }
+
+            return str_replace($openTag, $newOpenTag, $tag);
         }, $html);
     }
 
