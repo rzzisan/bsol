@@ -12,12 +12,17 @@ import { LANDING_API_BASE, getLandingTemplateName, type LandingPageRecord } from
 // but is being phased out; flip to false to hide Quick Edit again.
 const QUICK_EDIT_ENABLED = true;
 
+// New block-based no-code builder (Phase 2) — offered alongside Quick Edit
+// for now; becomes primary at Phase 4 cutover.
+const BLOCK_BUILDER_ENABLED = true;
+
 const text: Record<string, Record<string, string>> = {
   bn: {
     title: "ল্যান্ডিং পেজ বিস্তারিত",
     back: "ফিরে যান",
     edit: "কুইক এডিট",
     visualEditor: "ভিজ্যুয়াল এডিটর",
+    builder: "বিল্ডার (নতুন)",
     loading: "লোড হচ্ছে...",
     notFound: "ল্যান্ডিং পেজ পাওয়া যায়নি।",
   },
@@ -26,6 +31,7 @@ const text: Record<string, Record<string, string>> = {
     back: "Go Back",
     edit: "Quick Edit",
     visualEditor: "Visual Editor",
+    builder: "Builder (New)",
     loading: "Loading...",
     notFound: "Landing page not found.",
   },
@@ -229,6 +235,14 @@ export default function LandingPageDetails() {
               className="inline-flex rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
             >
               {t.edit}
+            </Link>
+          ) : null}
+          {BLOCK_BUILDER_ENABLED ? (
+            <Link
+              href={`/dashboard/landing-pages/${page.id}/builder`}
+              className="inline-flex rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
+            >
+              {t.builder}
             </Link>
           ) : null}
           {page.public_url ? (

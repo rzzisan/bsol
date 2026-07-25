@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class LandingPageController extends Controller
 {
@@ -335,7 +336,7 @@ class LandingPageController extends Controller
     {
         $pageId = $page?->id;
 
-        return $request->validate([
+        $validated = $request->validate([
             'template_id' => ['nullable', 'integer', Rule::exists('landing_templates', 'id')->where(fn ($query) => $query->where('is_active', true))],
             'title' => ['required_without:id', 'string', 'max:180'],
             'slug' => [
@@ -364,6 +365,35 @@ class LandingPageController extends Controller
             'products.*.selected_by_default' => ['nullable', 'boolean'],
             'products.*.sort_order' => ['nullable', 'integer', 'min:0', 'max:999'],
         ]);
+
+        $this->assertVideoEmbedUrlsAllowed($validated['content']['video_embeds'] ?? []);
+
+        return $validated;
+    }
+
+    /**
+     * The no-code builder lets a merchant paste a plain video URL, which is
+     * turned into an <iframe src> on the public page — validate the domain
+     * server-side too (not just in the frontend) since that's the actual
+     * XSS/injection boundary.
+     */
+    private function assertVideoEmbedUrlsAllowed(array $videoEmbeds): void
+    {
+        $allowedHostPattern = '/^(www\.)?(youtube\.com|youtu\.be|vimeo\.com|facebook\.com|fb\.watch)$/i';
+
+        foreach ($videoEmbeds as $embed) {
+            $url = $embed['url'] ?? null;
+            if (!$url) {
+                continue;
+            }
+
+            $host = parse_url($url, PHP_URL_HOST);
+            if (!$host || !preg_match($allowedHostPattern, $host)) {
+                throw ValidationException::withMessages([
+                    'content.video_embeds' => 'Video URL must be a YouTube, Facebook, or Vimeo link.',
+                ]);
+            }
+        }
     }
 
     private function resolveSlug(?string $requestedSlug, string $title, ?int $ignoreId = null): string

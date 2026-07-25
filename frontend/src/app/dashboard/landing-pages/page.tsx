@@ -11,6 +11,10 @@ import { LANDING_API_BASE, getLandingTemplateName } from "@/lib/landing-pages";
 // but is being phased out; flip to false to hide Quick Edit again.
 const QUICK_EDIT_ENABLED = true;
 
+// New block-based no-code builder (Phase 2) — offered alongside Quick Edit
+// for now; becomes primary at Phase 4 cutover.
+const BLOCK_BUILDER_ENABLED = true;
+
 // TODO: Replace with actual i18n import
 const text: Record<string, Record<string, string>> = {
   bn: {
@@ -25,6 +29,8 @@ const text: Record<string, Record<string, string>> = {
     edit: "কুইক এডিট",
     visualEditor: "ভিজ্যুয়াল এডিটর",
     statistics: "স্ট্যাটিস্টিক্স",
+    builder: "বিল্ডার",
+    createBuilder: "নতুন ল্যান্ডিং পেজ (বিল্ডার)",
   },
   en: {
     title: "Landing Pages",
@@ -38,6 +44,8 @@ const text: Record<string, Record<string, string>> = {
     edit: "Quick Edit",
     visualEditor: "Visual Editor",
     statistics: "Statistics",
+    builder: "Builder",
+    createBuilder: "New Landing Page (Builder)",
   },
 };
 
@@ -211,12 +219,22 @@ export default function LandingPages() {
                 : "Create new pages, review draft/published status, and edit quickly."}
             </p>
           </div>
-          <Link
-            href="/dashboard/landing-pages/create"
-            className="inline-flex items-center justify-center rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
-          >
-            {t.create}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {BLOCK_BUILDER_ENABLED ? (
+              <Link
+                href="/dashboard/landing-pages/builder/create"
+                className="inline-flex items-center justify-center rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
+              >
+                {t.createBuilder}
+              </Link>
+            ) : null}
+            <Link
+              href="/dashboard/landing-pages/create"
+              className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
+            >
+              {t.create}
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -262,6 +280,11 @@ export default function LandingPages() {
                         {QUICK_EDIT_ENABLED ? (
                           <Link href={`/dashboard/landing-pages/${page.id}/edit`} className="font-medium text-[var(--accent)] hover:underline">
                             {t.edit}
+                          </Link>
+                        ) : null}
+                        {BLOCK_BUILDER_ENABLED ? (
+                          <Link href={`/dashboard/landing-pages/${page.id}/builder`} className="font-medium text-[var(--accent)] hover:underline">
+                            {t.builder}
                           </Link>
                         ) : null}
                         <Link href={`/dashboard/landing-pages/${page.id}/editor`} className="font-medium text-emerald-400 hover:underline">

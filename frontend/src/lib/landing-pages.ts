@@ -59,19 +59,36 @@ export type LandingPageRecord = {
       headline?: string | null;
       subheadline?: string | null;
       cta_text?: string | null;
+      background_image_url?: string | null;
+      layout?: "center" | "image-right" | null;
     };
-    html_sections?: Array<{ title?: string | null; html?: string | null }>;
+    html_sections?: Array<{ id?: string; title?: string | null; html?: string | null }>;
     carousel_images?: Array<{
+      id?: string;
       title?: string | null;
       template?: string | null;
       images?: Array<{ id?: number | null; url?: string | null; alt?: string | null }>;
     }>;
-    features?: Array<{ title?: string | null; description?: string | null }>;
-    reviews?: Array<{ name?: string | null; quote?: string | null }>;
-    faq?: Array<{ q?: string | null; a?: string | null }>;
+    features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
+    reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
+    faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
+    rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: unknown }>;
+    image_text_blocks?: Array<{
+      id?: string;
+      image_url?: string | null;
+      image_position?: "left" | "right" | null;
+      heading?: string | null;
+      body?: string | null;
+      cta_text?: string | null;
+      cta_url?: string | null;
+    }>;
+    trust_badges?: Array<{ id?: string; icon?: string | null; label?: string | null; sublabel?: string | null }>;
+    countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
+    video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
+    spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
     contact?: { phone?: string | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
-    layout_order?: string[];
+    layout_order?: Array<string | { type: string; id: string }>;
     [key: string]: unknown;
   } | null;
   seo_meta?: {
@@ -90,19 +107,36 @@ export type LandingPageContent = {
     headline?: string | null;
     subheadline?: string | null;
     cta_text?: string | null;
+    background_image_url?: string | null;
+    layout?: "center" | "image-right" | null;
   };
-  html_sections?: Array<{ title?: string | null; html?: string | null }>;
+  html_sections?: Array<{ id?: string; title?: string | null; html?: string | null }>;
   carousel_images?: Array<{
+    id?: string;
     title?: string | null;
     template?: string | null;
     images?: Array<{ id?: number | null; url?: string | null; alt?: string | null }>;
   }>;
-  features?: Array<{ title?: string | null; description?: string | null }>;
-  reviews?: Array<{ name?: string | null; quote?: string | null }>;
-  faq?: Array<{ q?: string | null; a?: string | null }>;
+  features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
+  reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
+  faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
+  rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: unknown }>;
+  image_text_blocks?: Array<{
+    id?: string;
+    image_url?: string | null;
+    image_position?: "left" | "right" | null;
+    heading?: string | null;
+    body?: string | null;
+    cta_text?: string | null;
+    cta_url?: string | null;
+  }>;
+  trust_badges?: Array<{ id?: string; icon?: string | null; label?: string | null; sublabel?: string | null }>;
+  countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
+  video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
+  spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
   contact?: { phone?: string | null };
   shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
-  layout_order?: string[];
+  layout_order?: Array<string | { type: string; id: string }>;
   [key: string]: unknown;
 };
 
@@ -115,6 +149,12 @@ export function toNumberOrNull(value: string): number | null {
   if (!value.trim()) return null;
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
+}
+
+function pickArray<T>(pageValue: unknown, templateValue: unknown): T[] {
+  if (Array.isArray(pageValue)) return pageValue as T[];
+  if (Array.isArray(templateValue)) return templateValue as T[];
+  return [];
 }
 
 export function mergeLandingContent(
@@ -131,31 +171,17 @@ export function mergeLandingContent(
       ...(templateContent.hero ?? {}),
       ...(pageContent.hero ?? {}),
     },
-    html_sections: Array.isArray(pageContent.html_sections)
-      ? pageContent.html_sections
-      : Array.isArray(templateContent.html_sections)
-        ? templateContent.html_sections
-        : [],
-    carousel_images: Array.isArray(pageContent.carousel_images)
-      ? pageContent.carousel_images
-      : Array.isArray(templateContent.carousel_images)
-        ? templateContent.carousel_images
-        : [],
-    features: Array.isArray(pageContent.features)
-      ? pageContent.features
-      : Array.isArray(templateContent.features)
-        ? templateContent.features
-        : [],
-    reviews: Array.isArray(pageContent.reviews)
-      ? pageContent.reviews
-      : Array.isArray(templateContent.reviews)
-        ? templateContent.reviews
-        : [],
-    faq: Array.isArray(pageContent.faq)
-      ? pageContent.faq
-      : Array.isArray(templateContent.faq)
-        ? templateContent.faq
-        : [],
+    html_sections: pickArray(pageContent.html_sections, templateContent.html_sections),
+    carousel_images: pickArray(pageContent.carousel_images, templateContent.carousel_images),
+    features: pickArray(pageContent.features, templateContent.features),
+    reviews: pickArray(pageContent.reviews, templateContent.reviews),
+    faq: pickArray(pageContent.faq, templateContent.faq),
+    rich_text_blocks: pickArray(pageContent.rich_text_blocks, templateContent.rich_text_blocks),
+    image_text_blocks: pickArray(pageContent.image_text_blocks, templateContent.image_text_blocks),
+    trust_badges: pickArray(pageContent.trust_badges, templateContent.trust_badges),
+    countdown_blocks: pickArray(pageContent.countdown_blocks, templateContent.countdown_blocks),
+    video_embeds: pickArray(pageContent.video_embeds, templateContent.video_embeds),
+    spacers: pickArray(pageContent.spacers, templateContent.spacers),
     contact: {
       ...(templateContent.contact ?? {}),
       ...(pageContent.contact ?? {}),

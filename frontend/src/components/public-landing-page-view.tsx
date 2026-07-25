@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { generateHTML, type JSONContent } from "@tiptap/core";
 import { mergeLandingContent, type LandingTemplate } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
+import { resolveBlockIcon } from "@/lib/block-icons";
+import { RICH_TEXT_EXTENSIONS } from "@/lib/rich-text-extensions";
+import type { LayoutEntry } from "@/lib/landing-layout";
 
 type CheckoutDraft = {
   enabled: boolean;
@@ -69,19 +73,35 @@ export type PublicLandingPage = {
       headline?: string | null;
       subheadline?: string | null;
       cta_text?: string | null;
+      background_image_url?: string | null;
     };
-    html_sections?: Array<{ title?: string | null; html?: string | null }>;
+    html_sections?: Array<{ id?: string; title?: string | null; html?: string | null }>;
     carousel_images?: Array<{
+      id?: string;
       title?: string | null;
       template?: string | null;
       images?: Array<{ id?: number | null; url?: string | null; alt?: string | null }>;
     }>;
-    features?: Array<{ title?: string | null; description?: string | null }>;
-    reviews?: Array<{ name?: string | null; quote?: string | null }>;
-    faq?: Array<{ q?: string | null; a?: string | null }>;
+    features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
+    reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
+    faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
+    rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: JSONContent }>;
+    image_text_blocks?: Array<{
+      id?: string;
+      image_url?: string | null;
+      image_position?: "left" | "right" | null;
+      heading?: string | null;
+      body?: string | null;
+      cta_text?: string | null;
+      cta_url?: string | null;
+    }>;
+    trust_badges?: Array<{ id?: string; icon?: string | null; label?: string | null; sublabel?: string | null }>;
+    countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
+    video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
+    spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
     contact?: { phone?: string | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
-    layout_order?: string[];
+    layout_order?: Array<string | LayoutEntry>;
   } | null;
   seo_meta?: {
     meta_title?: string | null;
@@ -317,6 +337,189 @@ function CarouselBlockView({
   );
 }
 
+function RichTextBlockView({ block, theme }: { block: { title?: string | null; body?: unknown }; theme: { primary: string } }) {
+  const html = useMemo(() => {
+    if (!block.body) return "";
+    try {
+      return generateHTML(block.body as JSONContent, RICH_TEXT_EXTENSIONS);
+    } catch {
+      return "";
+    }
+  }, [block.body]);
+
+  if (!block.title && !html) return null;
+
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      {block.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{block.title}</h2> : null}
+      <div className="lp-html lp-rich-text max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: html }} />
+    </div>
+  );
+}
+
+function ImageTextBlockView({
+  block,
+  theme,
+}: {
+  block: { image_url?: string | null; image_position?: string | null; heading?: string | null; body?: string | null; cta_text?: string | null; cta_url?: string | null };
+  theme: { primary: string; accent: string; buttonText: string };
+}) {
+  if (!block.image_url && !block.heading && !block.body) return null;
+  const imageRight = block.image_position === "right";
+
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      <div className={`grid items-center gap-6 md:grid-cols-2 ${imageRight ? "" : "md:[&>*:first-child]:order-2"}`}>
+        <div>
+          {block.heading ? <h2 className="text-2xl font-bold" style={{ color: theme.primary }}>{block.heading}</h2> : null}
+          {block.body ? <p className="mt-3 text-sm leading-7 text-slate-600">{block.body}</p> : null}
+          {block.cta_text ? (
+            <a href={block.cta_url || "#checkout"} className="mt-5 inline-flex rounded-2xl px-5 py-2.5 text-sm font-semibold shadow" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
+              {block.cta_text}
+            </a>
+          ) : null}
+        </div>
+        {block.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={block.image_url} alt={block.heading || ""} className="w-full rounded-2xl object-cover" />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function TrustBadgeRow({ badges }: { badges: Array<{ icon?: string | null; label?: string | null; sublabel?: string | null }> }) {
+  if (badges.length === 0) return null;
+  return (
+    <div className="lp-card grid gap-3 rounded-3xl p-6 sm:grid-cols-2 sm:p-8 lg:grid-cols-3">
+      {badges.map((badge, index) => {
+        const Icon = resolveBlockIcon(badge.icon);
+        return (
+          <div key={`trust-${index}`} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <Icon size={22} className="shrink-0 text-slate-700" />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-slate-900">{badge.label}</div>
+              {badge.sublabel ? <div className="truncate text-xs text-slate-500">{badge.sublabel}</div> : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FeatureGrid({ features, theme }: { features: Array<{ title?: string | null; description?: string | null; icon?: string | null }>; theme: { primary: string } }) {
+  if (features.length === 0) return null;
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>কেন এই পেজটি বেছে নেবেন?</h2>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {features.map((feature, index) => {
+          const Icon = resolveBlockIcon(feature.icon);
+          return (
+            <div key={`${feature.title ?? "feature"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
+              {feature.icon ? <Icon size={22} className="mb-3 text-slate-700" /> : null}
+              <h3 className="text-lg font-bold text-slate-900">{feature.title || `Feature ${index + 1}`}</h3>
+              {feature.description ? <p className="mt-2 text-sm text-slate-600">{feature.description}</p> : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function parseVideoEmbedSrc(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "");
+
+    if (host === "youtu.be") {
+      const id = parsed.pathname.slice(1);
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    if (host === "youtube.com") {
+      const id = parsed.searchParams.get("v");
+      if (id) return `https://www.youtube.com/embed/${id}`;
+      const match = parsed.pathname.match(/\/(embed|shorts)\/([^/?]+)/);
+      return match ? `https://www.youtube.com/embed/${match[2]}` : null;
+    }
+    if (host === "vimeo.com") {
+      const id = parsed.pathname.split("/").filter(Boolean)[0];
+      return id ? `https://player.vimeo.com/video/${id}` : null;
+    }
+    if (host === "facebook.com" || host === "fb.watch") {
+      return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function VideoEmbedView({ block, theme }: { block: { title?: string | null; url?: string | null }; theme: { primary: string } }) {
+  const src = block.url ? parseVideoEmbedSrc(block.url) : null;
+  if (!src) return null;
+
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      {block.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{block.title}</h2> : null}
+      <div className="aspect-video w-full overflow-hidden rounded-2xl">
+        <iframe src={src} className="h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={block.title || "Video"} />
+      </div>
+    </div>
+  );
+}
+
+function CountdownView({ block, theme }: { block: { message?: string | null; end_datetime?: string | null }; theme: { accent: string; buttonText: string } }) {
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (!block.end_datetime || now === null) return null;
+  const end = new Date(block.end_datetime).getTime();
+  const remaining = Math.max(0, end - now);
+  if (remaining <= 0) return null;
+
+  const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((remaining / (1000 * 60 * 60)) % 24);
+  const minutes = Math.floor((remaining / (1000 * 60)) % 60);
+  const seconds = Math.floor((remaining / 1000) % 60);
+
+  return (
+    <div className="rounded-3xl p-5 text-center text-white sm:p-6" style={{ backgroundColor: theme.accent }}>
+      {block.message ? <p className="mb-3 text-sm font-semibold sm:text-base">{block.message}</p> : null}
+      <div className="flex items-center justify-center gap-3 text-white" style={{ color: theme.buttonText }}>
+        {[["Days", days], ["Hours", hours], ["Min", minutes], ["Sec", seconds]].map(([label, value]) => (
+          <div key={label as string} className="rounded-xl bg-black/15 px-3 py-2">
+            <div className="text-xl font-bold tabular-nums sm:text-2xl">{String(value).padStart(2, "0")}</div>
+            <div className="text-[10px] uppercase tracking-wide opacity-80">{label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SpacerView({ block }: { block: { style?: string | null; size?: string | null } }) {
+  const sizeClass = block.size === "sm" ? "h-6" : block.size === "lg" ? "h-20" : "h-12";
+  if (block.style === "line") {
+    return <div className={`flex items-center ${sizeClass}`}><div className="w-full border-t border-slate-200" /></div>;
+  }
+  if (block.style === "dots") {
+    return (
+      <div className={`flex items-center justify-center gap-2 ${sizeClass}`}>
+        {[0, 1, 2].map((i) => <span key={i} className="h-1.5 w-1.5 rounded-full bg-slate-300" />)}
+      </div>
+    );
+  }
+  return <div className={sizeClass} />;
+}
+
 export default function PublicLandingPageView({ page }: { page: PublicLandingPage }) {
   const [checkout, setCheckout] = useState<Record<number, CheckoutDraft>>(
     Object.fromEntries(
@@ -360,6 +563,12 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
   const features = content.features ?? [];
   const reviews = content.reviews ?? [];
   const faq = content.faq ?? [];
+  const richTextBlocks = content.rich_text_blocks ?? [];
+  const imageTextBlocks = content.image_text_blocks ?? [];
+  const trustBadges = content.trust_badges ?? [];
+  const countdownBlocks = content.countdown_blocks ?? [];
+  const videoEmbeds = content.video_embeds ?? [];
+  const spacers = content.spacers ?? [];
   const products = (page.products ?? []).filter((item) => item.product);
   const shipping = content.shipping ?? {};
   const shippingCharge = shippingZone === "inside"
@@ -381,6 +590,34 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
   const layoutOrder = Array.isArray(content.layout_order) && content.layout_order.length > 0
     ? content.layout_order
     : defaultLayoutOrder;
+
+  // The new block builder writes one layout_order entry PER ITEM (so any
+  // block can be dragged relative to any other), while the old Quick Edit
+  // still writes one GROUP-KEY string per section type. Normalize both into
+  // runs of {type, ids}: a run of consecutive same-type item entries is
+  // grouped together (so features/FAQ/reviews still render as one shared
+  // grid/box when the merchant keeps them adjacent), a legacy group-key
+  // string becomes a run covering every item of that type.
+  type RenderRun = { blockType: string; ids: string[] | "all" };
+  const renderRuns: RenderRun[] = [];
+  for (const entry of layoutOrder) {
+    if (typeof entry === "string") {
+      renderRuns.push({ blockType: entry, ids: "all" });
+      continue;
+    }
+    const last = renderRuns[renderRuns.length - 1];
+    if (last && last.blockType === entry.type && last.ids !== "all") {
+      last.ids.push(entry.id);
+    } else {
+      renderRuns.push({ blockType: entry.type, ids: [entry.id] });
+    }
+  }
+
+  function pickRun<T extends { id?: string }>(items: T[], run: RenderRun): T[] {
+    if (run.ids === "all") return items;
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return run.ids.map((id) => byId.get(id)).filter((item): item is T => Boolean(item));
+  }
 
   async function submitOrder(event: React.FormEvent) {
     event.preventDefault();
@@ -454,10 +691,20 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
         .lp-html ol { padding-left: 1.25rem; list-style: decimal; }
         .lp-html p + p { margin-top: .75rem; }
         .lp-html li + li { margin-top: .35rem; }
+        .lp-rich-text h2 { font-size: 1.25rem; font-weight: 700; color: #0f172a; margin-bottom: .5rem; }
+        .lp-rich-text a { color: ${theme.primary}; text-decoration: underline; }
+        .lp-rich-text strong { font-weight: 700; }
         ${page.custom_css ?? ""}
       `}</style>
 
-      <section className="lp-shell px-4 py-16 text-white" style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, #0b3b36 100%)` }}>
+      <section
+        className="lp-shell px-4 py-16 text-white"
+        style={{
+          background: hero.background_image_url
+            ? `linear-gradient(135deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.75) 100%), url(${hero.background_image_url}) center/cover no-repeat`
+            : `linear-gradient(135deg, ${theme.primary} 0%, #0b3b36 100%)`,
+        }}
+      >
         <div className="mx-auto max-w-5xl text-center">
           <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
           {hero.subheadline ? <p className="mx-auto mt-4 max-w-3xl text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
@@ -469,10 +716,12 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
 
       <section className="lp-shell mx-auto max-w-5xl px-4 py-10">
         <div className="space-y-6">
-          {layoutOrder.map((sectionKey) => {
+          {renderRuns.map((run, runIndex) => {
+            const sectionKey = run.blockType;
+
             if (sectionKey === "html_sections") {
-              return htmlSections.map((section, index) => (
-                <div key={`${section.title ?? "section"}-${index}`} className="lp-card rounded-3xl p-6 sm:p-8">
+              return pickRun(htmlSections, run).map((section, index) => (
+                <div key={`${section.id ?? section.title ?? "section"}-${index}`} className="lp-card rounded-3xl p-6 sm:p-8">
                   {section.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{section.title}</h2> : null}
                   <div className="lp-html max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: section.html ?? "" }} />
                 </div>
@@ -480,37 +729,60 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
             }
 
             if (sectionKey === "carousel_images") {
-              if (carouselBlocks.length === 0) return null;
-              return carouselBlocks.map((block, blockIndex) => (
-                <CarouselBlockView key={`carousel-${blockIndex}`} block={block} theme={theme} />
+              const blocks = pickRun(carouselBlocks, run);
+              if (blocks.length === 0) return null;
+              return blocks.map((block, blockIndex) => (
+                <CarouselBlockView key={`carousel-${block.id ?? blockIndex}`} block={block} theme={theme} />
               ));
             }
 
             if (sectionKey === "features") {
-              if (features.length === 0) return null;
-              return (
-                <div key="features" className="lp-card rounded-3xl p-6 sm:p-8">
-                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>কেন এই পেজটি বেছে নেবেন?</h2>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {features.map((feature, index) => (
-                      <div key={`${feature.title ?? "feature"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
-                        <h3 className="text-lg font-bold text-slate-900">{feature.title || `Feature ${index + 1}`}</h3>
-                        {feature.description ? <p className="mt-2 text-sm text-slate-600">{feature.description}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
+              return <FeatureGrid key={`features-${runIndex}`} features={pickRun(features, run)} theme={theme} />;
+            }
+
+            if (sectionKey === "trust_badges") {
+              return <TrustBadgeRow key={`trust-${runIndex}`} badges={pickRun(trustBadges, run)} />;
+            }
+
+            if (sectionKey === "rich_text_blocks") {
+              return pickRun(richTextBlocks, run).map((block, index) => (
+                <RichTextBlockView key={`richtext-${block.id ?? index}`} block={block} theme={theme} />
+              ));
+            }
+
+            if (sectionKey === "image_text_blocks") {
+              return pickRun(imageTextBlocks, run).map((block, index) => (
+                <ImageTextBlockView key={`imagetext-${block.id ?? index}`} block={block} theme={theme} />
+              ));
+            }
+
+            if (sectionKey === "video_embeds") {
+              return pickRun(videoEmbeds, run).map((block, index) => (
+                <VideoEmbedView key={`video-${block.id ?? index}`} block={block} theme={theme} />
+              ));
+            }
+
+            if (sectionKey === "countdown_blocks") {
+              return pickRun(countdownBlocks, run).map((block, index) => (
+                <CountdownView key={`countdown-${block.id ?? index}`} block={block} theme={theme} />
+              ));
+            }
+
+            if (sectionKey === "spacers") {
+              return pickRun(spacers, run).map((block, index) => (
+                <SpacerView key={`spacer-${block.id ?? index}`} block={block} />
+              ));
             }
 
             if (sectionKey === "faq") {
-              if (faq.length === 0) return null;
+              const items = pickRun(faq, run);
+              if (items.length === 0) return null;
               return (
-                <div key="faq" className="lp-card rounded-3xl p-6 sm:p-8">
+                <div key={`faq-${runIndex}`} className="lp-card rounded-3xl p-6 sm:p-8">
                   <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>সাধারণ প্রশ্ন</h2>
                   <div className="space-y-3">
-                    {faq.map((item, index) => (
-                      <details key={`${item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                    {items.map((item, index) => (
+                      <details key={`${item.id ?? item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
                         <summary className="cursor-pointer text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</summary>
                         {item.a ? <p className="mt-3 text-sm leading-7 text-slate-600">{item.a}</p> : null}
                       </details>
@@ -521,15 +793,23 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
             }
 
             if (sectionKey === "reviews") {
-              if (reviews.length === 0) return null;
+              const items = pickRun(reviews, run);
+              if (items.length === 0) return null;
               return (
-                <div key="reviews" className="lp-card rounded-3xl p-6 sm:p-8">
+                <div key={`reviews-${runIndex}`} className="lp-card rounded-3xl p-6 sm:p-8">
                   <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>Customer Reviews</h2>
                   <div className="grid gap-4 md:grid-cols-2">
-                    {reviews.map((review, index) => (
-                      <blockquote key={`${review.name ?? "review"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
+                    {items.map((review, index) => (
+                      <blockquote key={`${review.id ?? review.name ?? "review"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
+                        {review.rating ? <div className="mb-2 text-amber-400">{"★".repeat(Math.max(0, Math.min(5, review.rating)))}<span className="text-slate-200">{"★".repeat(5 - Math.max(0, Math.min(5, review.rating)))}</span></div> : null}
                         <p className="text-sm leading-7 text-slate-700">“{review.quote || ""}”</p>
-                        {review.name ? <footer className="mt-3 text-sm font-semibold text-slate-900">— {review.name}</footer> : null}
+                        <footer className="mt-3 flex items-center gap-2">
+                          {review.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={review.avatar_url} alt={review.name ?? ""} className="h-8 w-8 rounded-full object-cover" />
+                          ) : null}
+                          {review.name ? <span className="text-sm font-semibold text-slate-900">— {review.name}</span> : null}
+                        </footer>
                       </blockquote>
                     ))}
                   </div>
