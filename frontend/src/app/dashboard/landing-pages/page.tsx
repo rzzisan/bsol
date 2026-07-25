@@ -6,13 +6,15 @@ import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE, getLandingTemplateName } from "@/lib/landing-pages";
 
-// Quick Edit is the primary editor again (no-code builder plan, Phase 1) —
-// it now has a Design panel for colors/fonts. GrapesJS remains available
-// but is being phased out; flip to false to hide Quick Edit again.
-const QUICK_EDIT_ENABLED = true;
+// Quick Edit and the GrapesJS Visual Editor are dormant as of the Phase 4
+// cutover — the block builder is now the primary (only) editor. Neither
+// editor's code/routes/controllers were deleted; flip these back to true
+// to restore them to the nav if ever needed.
+const QUICK_EDIT_ENABLED = false;
+const VISUAL_EDITOR_ENABLED = false;
 
-// New block-based no-code builder (Phase 2) — offered alongside Quick Edit
-// for now; becomes primary at Phase 4 cutover.
+// New block-based no-code builder (Phase 2-3) — primary editor as of
+// Phase 4.
 const BLOCK_BUILDER_ENABLED = true;
 
 // TODO: Replace with actual i18n import
@@ -228,12 +230,14 @@ export default function LandingPages() {
                 {t.createBuilder}
               </Link>
             ) : null}
-            <Link
-              href="/dashboard/landing-pages/create"
-              className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
-            >
-              {t.create}
-            </Link>
+            {QUICK_EDIT_ENABLED ? (
+              <Link
+                href="/dashboard/landing-pages/create"
+                className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
+              >
+                {t.create}
+              </Link>
+            ) : null}
           </div>
         </div>
       </section>
@@ -287,9 +291,11 @@ export default function LandingPages() {
                             {t.builder}
                           </Link>
                         ) : null}
-                        <Link href={`/dashboard/landing-pages/${page.id}/editor`} className="font-medium text-emerald-400 hover:underline">
-                          {t.visualEditor}
-                        </Link>
+                        {VISUAL_EDITOR_ENABLED ? (
+                          <Link href={`/dashboard/landing-pages/${page.id}/editor`} className="font-medium text-emerald-400 hover:underline">
+                            {t.visualEditor}
+                          </Link>
+                        ) : null}
                         {page.public_url ? (
                           <a href={page.public_url} target="_blank" rel="noreferrer" className="font-medium text-[var(--accent)] hover:underline">
                             {locale === "bn" ? "Preview" : "Preview"}

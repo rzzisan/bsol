@@ -7,13 +7,15 @@ import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE, getLandingTemplateName, type LandingPageRecord } from "@/lib/landing-pages";
 
-// Quick Edit is the primary editor again (no-code builder plan, Phase 1) —
-// it now has a Design panel for colors/fonts. GrapesJS remains available
-// but is being phased out; flip to false to hide Quick Edit again.
-const QUICK_EDIT_ENABLED = true;
+// Quick Edit and the GrapesJS Visual Editor are dormant as of the Phase 4
+// cutover — the block builder is now the primary (only) editor. Neither
+// editor's code/routes/controllers were deleted; flip these back to true
+// to restore them to the nav if ever needed.
+const QUICK_EDIT_ENABLED = false;
+const VISUAL_EDITOR_ENABLED = false;
 
-// New block-based no-code builder (Phase 2) — offered alongside Quick Edit
-// for now; becomes primary at Phase 4 cutover.
+// New block-based no-code builder (Phase 2-3) — primary editor as of
+// Phase 4.
 const BLOCK_BUILDER_ENABLED = true;
 
 const text: Record<string, Record<string, string>> = {
@@ -22,7 +24,7 @@ const text: Record<string, Record<string, string>> = {
     back: "ফিরে যান",
     edit: "কুইক এডিট",
     visualEditor: "ভিজ্যুয়াল এডিটর",
-    builder: "বিল্ডার (নতুন)",
+    builder: "এডিট করুন",
     loading: "লোড হচ্ছে...",
     notFound: "ল্যান্ডিং পেজ পাওয়া যায়নি।",
   },
@@ -31,7 +33,7 @@ const text: Record<string, Record<string, string>> = {
     back: "Go Back",
     edit: "Quick Edit",
     visualEditor: "Visual Editor",
-    builder: "Builder (New)",
+    builder: "Edit",
     loading: "Loading...",
     notFound: "Landing page not found.",
   },
@@ -223,12 +225,14 @@ export default function LandingPageDetails() {
           <div><span className="font-semibold">Updated:</span> {page.updated_at}</div>
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
-          <Link
-            href={`/dashboard/landing-pages/${page.id}/editor`}
-            className="inline-flex rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
-          >
-            {t.visualEditor}
-          </Link>
+          {BLOCK_BUILDER_ENABLED ? (
+            <Link
+              href={`/dashboard/landing-pages/${page.id}/builder`}
+              className="inline-flex rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
+            >
+              {t.builder}
+            </Link>
+          ) : null}
           {QUICK_EDIT_ENABLED ? (
             <Link
               href={`/dashboard/landing-pages/${page.id}/edit`}
@@ -237,12 +241,12 @@ export default function LandingPageDetails() {
               {t.edit}
             </Link>
           ) : null}
-          {BLOCK_BUILDER_ENABLED ? (
+          {VISUAL_EDITOR_ENABLED ? (
             <Link
-              href={`/dashboard/landing-pages/${page.id}/builder`}
+              href={`/dashboard/landing-pages/${page.id}/editor`}
               className="inline-flex rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
             >
-              {t.builder}
+              {t.visualEditor}
             </Link>
           ) : null}
           {page.public_url ? (
