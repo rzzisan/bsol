@@ -31,6 +31,7 @@ import {
   isAllowedVideoUrl,
 } from "@/components/landing-builder/block-fields";
 import type { JSONContent } from "@tiptap/react";
+import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
 
 type LandingPageBuilderProps = {
   locale: Locale;
@@ -165,6 +166,8 @@ const text = {
     seo: "SEO",
     metaTitle: "Meta title",
     metaDescription: "Meta description",
+    livePreview: "লাইভ প্রিভিউ",
+    livePreviewHint: "মার্চেন্ট ঠিক এই ভিউ-টাই লাইভ পেজে দেখবে — একই কম্পোনেন্ট ব্যবহার করা হয়েছে।",
   },
   en: {
     loading: "Loading...",
@@ -194,6 +197,8 @@ const text = {
     seo: "SEO",
     metaTitle: "Meta title",
     metaDescription: "Meta description",
+    livePreview: "Live preview",
+    livePreviewHint: "This is exactly what a merchant will see on the live page — same component.",
   },
 };
 
@@ -382,6 +387,36 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     setMediaTarget(null);
   }
 
+  function buildContent(): LandingPageContent {
+    const content: LandingPageContent = {
+      hero: {
+        headline: heroHeadline || title,
+        subheadline: heroSubheadline || null,
+        cta_text: heroCtaText || null,
+        background_image_url: heroImage || null,
+      },
+      layout_order: layoutEntries,
+    };
+    for (const type of BLOCK_TYPES) {
+      if (SINGLETON_BLOCK_TYPES.includes(type)) continue;
+      (content as Record<string, unknown>)[type] = contentState[type];
+    }
+    return content;
+  }
+
+  const draftPage: PublicLandingPage = useMemo(() => ({
+    id: page?.id ?? 0,
+    title: title || (locale === "bn" ? "শিরোনামহীন পেজ" : "Untitled page"),
+    slug: slug || "preview",
+    template: page?.template ?? null,
+    theme_settings: theme,
+    content: buildContent() as PublicLandingPage["content"],
+    seo_meta: { meta_title: metaTitle || title, meta_description: metaDescription || null },
+    custom_css: page?.custom_css ?? null,
+    products: page?.products ?? [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, metaTitle, metaDescription, locale]);
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!token) return;
@@ -391,19 +426,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     setSuccess(null);
 
     try {
-      const content: LandingPageContent = {
-        hero: {
-          headline: heroHeadline || title,
-          subheadline: heroSubheadline || null,
-          cta_text: heroCtaText || null,
-          background_image_url: heroImage || null,
-        },
-        layout_order: layoutEntries,
-      };
-      for (const type of BLOCK_TYPES) {
-        if (SINGLETON_BLOCK_TYPES.includes(type)) continue;
-        (content as Record<string, unknown>)[type] = contentState[type];
-      }
+      const content = buildContent();
 
       const invalidVideo = (contentState.video_embeds ?? []).some((item) => !isAllowedVideoUrl(String(item.url ?? "")));
       if (invalidVideo) {
@@ -601,10 +624,11 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   }
 
   return (
-    <section className="mx-auto max-w-6xl catv-panel p-4 sm:p-5">
+    <section className="mx-auto max-w-[1600px] catv-panel p-4 sm:p-5">
       {loading ? (
         <div className="text-sm text-[var(--muted)]">{t.loading}</div>
       ) : (
+        <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <form onSubmit={handleSubmit} className="space-y-5">
           {(error || success) ? (
             <div className={`rounded-xl px-4 py-3 text-sm ${error ? "bg-red-500/10 text-red-400" : "bg-emerald-500/10 text-emerald-400"}`}>{error || success}</div>
@@ -685,6 +709,17 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
             </button>
           </div>
         </form>
+
+        <aside className="xl:sticky xl:top-4 xl:self-start">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+            <h3 className="text-base font-semibold text-[var(--foreground)]">{t.livePreview}</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">{t.livePreviewHint}</p>
+            <div className="mt-4 max-h-[80vh] overflow-y-auto overflow-x-hidden rounded-2xl border border-[var(--border)]">
+              <PublicLandingPageView page={draftPage} previewMode />
+            </div>
+          </div>
+        </aside>
+        </div>
       )}
 
       {mediaTarget ? (

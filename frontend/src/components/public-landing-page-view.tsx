@@ -520,7 +520,7 @@ function SpacerView({ block }: { block: { style?: string | null; size?: string |
   return <div className={sizeClass} />;
 }
 
-export default function PublicLandingPageView({ page }: { page: PublicLandingPage }) {
+export default function PublicLandingPageView({ page, previewMode = false }: { page: PublicLandingPage; previewMode?: boolean }) {
   const [checkout, setCheckout] = useState<Record<number, CheckoutDraft>>(
     Object.fromEntries(
       (page.products ?? []).map((item) => [
@@ -621,6 +621,14 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
 
   async function submitOrder(event: React.FormEvent) {
     event.preventDefault();
+
+    if (previewMode) {
+      setSubmitError(null);
+      setSubmitSuccess("এটি একটি প্রিভিউ — অর্ডার আসলে সাবমিট হয়নি।");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(null);
