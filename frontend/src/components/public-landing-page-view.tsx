@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { mergeLandingContent, type LandingTemplate } from "@/lib/landing-pages";
+import { resolveFontCssVar } from "@/lib/theme-presets";
 
 type CheckoutDraft = {
   enabled: boolean;
@@ -61,6 +62,7 @@ export type PublicLandingPage = {
     background_color?: string | null;
     text_color?: string | null;
     button_text_color?: string | null;
+    font_family?: string | null;
   } | null;
   content?: {
     hero?: {
@@ -348,6 +350,7 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
     background: page?.theme_settings?.background_color ?? "#f8fafc",
     text: page?.theme_settings?.text_color ?? "#0f172a",
     buttonText: page?.theme_settings?.button_text_color ?? "#ffffff",
+    fontFamily: page?.theme_settings?.font_family ?? "Hind Siliguri",
   }), [page]);
 
   const content = mergeLandingContent(page.content, page.template);
@@ -445,7 +448,7 @@ export default function PublicLandingPageView({ page }: { page: PublicLandingPag
   return (
     <main className="min-h-screen" style={{ backgroundColor: theme.background, color: theme.text }}>
       <style>{`
-        .lp-shell { font-family: Hind Siliguri, system-ui, -apple-system, sans-serif; }
+        .lp-shell { font-family: var(${resolveFontCssVar(theme.fontFamily)}), system-ui, -apple-system, sans-serif; }
         .lp-card { background: rgba(255,255,255,0.92); border: 1px solid rgba(148,163,184,0.18); box-shadow: 0 20px 50px rgba(15,23,42,0.08); }
         .lp-html ul { padding-left: 1.25rem; list-style: disc; }
         .lp-html ol { padding-left: 1.25rem; list-style: decimal; }

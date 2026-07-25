@@ -436,6 +436,7 @@ class LandingPageController extends Controller
             'background_color' => '#f8fafc',
             'text_color' => '#0f172a',
             'button_text_color' => '#ffffff',
+            'font_family' => 'Hind Siliguri',
         ];
     }
 

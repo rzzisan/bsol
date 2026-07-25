@@ -46,6 +46,14 @@ export type LandingPageRecord = {
   product_count?: number;
   template?: LandingTemplate | null;
   template_id?: number | null;
+  theme_settings?: {
+    primary_color?: string | null;
+    accent_color?: string | null;
+    background_color?: string | null;
+    text_color?: string | null;
+    button_text_color?: string | null;
+    font_family?: string | null;
+  } | null;
   content?: {
     hero?: {
       headline?: string | null;

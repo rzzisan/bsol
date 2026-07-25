@@ -16,6 +16,8 @@ import {
   mergeLandingContent,
   toNumberOrNull,
 } from "@/lib/landing-pages";
+import { DEFAULT_THEME, type ThemeSettings } from "@/lib/theme-presets";
+import LandingDesignPanel from "@/components/landing-design-panel";
 
 type LandingPageStudioProps = {
   locale: Locale;
@@ -385,6 +387,7 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
   const [shippingInside, setShippingInside] = useState("80");
   const [shippingOutside, setShippingOutside] = useState("120");
   const [customCss, setCustomCss] = useState("");
+  const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
   const [mediaPolicy, setMediaPolicy] = useState<MediaPolicy | null>(null);
   const [mediaLibrary, setMediaLibrary] = useState<MediaLibraryItem[]>([]);
   const [mediaLoading, setMediaLoading] = useState(false);
@@ -468,6 +471,14 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
           setShippingInside(String(mergedContent.shipping?.inside_dhaka ?? 80));
           setShippingOutside(String(mergedContent.shipping?.outside_dhaka ?? 120));
           setCustomCss(loadedPage.custom_css ?? "");
+          setTheme({
+            primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
+            accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
+            background_color: loadedPage.theme_settings?.background_color ?? DEFAULT_THEME.background_color,
+            text_color: loadedPage.theme_settings?.text_color ?? DEFAULT_THEME.text_color,
+            button_text_color: loadedPage.theme_settings?.button_text_color ?? DEFAULT_THEME.button_text_color,
+            font_family: loadedPage.theme_settings?.font_family ?? DEFAULT_THEME.font_family,
+          });
         } else if (mode === "create") {
           const template = nextTemplates[0] as LandingTemplate | undefined;
           if (template) {
@@ -643,6 +654,7 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
           meta_description: form.metaDescription || null,
         },
         custom_css: customCss || null,
+        theme_settings: theme,
         products: selectedProducts.map((item, index) => ({
           product_id: item.product_id,
           title_override: item.title_override || null,
@@ -1138,6 +1150,8 @@ export default function LandingPageStudio({ locale, mode, pageId }: LandingPageS
                       ))}
                     </div>
                   </div>
+
+                  <LandingDesignPanel locale={locale} theme={theme} onChange={setTheme} />
 
                   <div className="grid gap-5 lg:grid-cols-2">
                     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">

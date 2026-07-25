@@ -7,10 +7,10 @@ import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE, getLandingTemplateName, type LandingPageRecord } from "@/lib/landing-pages";
 
-// GrapesJS Visual Editor is now the primary editor (Part B4). Quick Edit's
-// route/component/controller logic is left intact — flip this back to true
-// to restore the nav entry point instead of re-implementing it.
-const QUICK_EDIT_ENABLED = false;
+// Quick Edit is the primary editor again (no-code builder plan, Phase 1) —
+// it now has a Design panel for colors/fonts. GrapesJS remains available
+// but is being phased out; flip to false to hide Quick Edit again.
+const QUICK_EDIT_ENABLED = true;
 
 const text: Record<string, Record<string, string>> = {
   bn: {
