@@ -2,14 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Image as ImageIcon, Type, Video, ShieldCheck, Timer, Star, HelpCircle, Images, Rows3, LayoutGrid } from "lucide-react";
+import { Plus, Trash2, Copy, Image as ImageIcon, Type, Video, ShieldCheck, Timer, Star, HelpCircle, Images, Rows3, LayoutGrid } from "lucide-react";
 import { getStoredToken, type Locale } from "@/lib/dashboard-client";
 import {
   LANDING_API_BASE,
   type LandingPageContent,
+  type LandingPageProductInput,
   type LandingPageRecord,
   type LandingTemplate,
+  type ProductItem,
   mergeLandingContent,
+  toNumberOrNull,
 } from "@/lib/landing-pages";
 import { DEFAULT_THEME, type ThemeSettings } from "@/lib/theme-presets";
 import LandingDesignPanel from "@/components/landing-design-panel";
@@ -44,6 +47,37 @@ type MediaPolicy = { max_gallery_images: number; max_file_size_mb: number; allow
 
 type Item = { id: string; [key: string]: unknown };
 type ContentState = Record<BlockType, Item[]>;
+
+type ProductDraft = {
+  product_id: number;
+  title_override: string;
+  subtitle: string;
+  badge_text: string;
+  price_override: string;
+  default_qty: number;
+  selected_by_default: boolean;
+  sort_order: number;
+};
+
+function normalizeProductDraft(input: LandingPageProductInput & { product?: ProductItem | null }, index: number): ProductDraft {
+  return {
+    product_id: input.product_id,
+    title_override: input.title_override ?? "",
+    subtitle: input.subtitle ?? "",
+    badge_text: input.badge_text ?? "",
+    price_override: input.price_override == null ? "" : String(input.price_override),
+    default_qty: input.default_qty ?? 1,
+    selected_by_default: input.selected_by_default ?? true,
+    sort_order: input.sort_order ?? index + 1,
+  };
+}
+
+function moveItem<T>(items: T[], from: number, to: number) {
+  const next = [...items];
+  const [picked] = next.splice(from, 1);
+  next.splice(to, 0, picked);
+  return next;
+}
 
 function emptyContentState(): ContentState {
   const state = {} as ContentState;
@@ -154,6 +188,7 @@ const text = {
     heroSubheadline: "Hero subheadline",
     heroCtaText: "CTA বাটন টেক্সট",
     heroImage: "Hero ব্যাকগ্রাউন্ড ছবি (ঐচ্ছিক)",
+    featuresTitle: "ফিচার গ্রিড সেকশনের টাইটেল",
     save: "সংরক্ষণ করুন",
     saving: "সংরক্ষণ হচ্ছে...",
     blocksTitle: "পেজ ব্লক (ড্র্যাগ করে সাজান)",
@@ -168,6 +203,23 @@ const text = {
     metaDescription: "Meta description",
     livePreview: "লাইভ প্রিভিউ",
     livePreviewHint: "মার্চেন্ট ঠিক এই ভিউ-টাই লাইভ পেজে দেখবে — একই কম্পোনেন্ট ব্যবহার করা হয়েছে।",
+    duplicate: "কপি করুন",
+    products: "পণ্য ও চেকআউট",
+    productsHint: "ডান পাশ থেকে পণ্য attach করুন, ড্র্যাগ করে order বদলান।",
+    selectedProducts: "সংযুক্ত পণ্য",
+    emptyProducts: "এখনও কোনো পণ্য attach করা হয়নি।",
+    searchProducts: "পণ্য খুঁজুন...",
+    noProducts: "কোনো পণ্য পাওয়া যায়নি।",
+    attach: "যুক্ত করুন",
+    overrideTitle: "টাইটেল ওভাররাইড",
+    overrideSubtitle: "সাবটাইটেল",
+    badge: "ব্যাজ",
+    overridePrice: "দাম ওভাররাইড",
+    defaultQty: "ডিফল্ট Qty",
+    selectedByDefault: "ডিফল্ট সিলেক্টেড",
+    dragHint: "ড্রাগ করে order বদলান",
+    pickImages: "Gallery থেকে ছবি সিলেক্ট করুন",
+    selectedCount: "Selected",
   },
   en: {
     loading: "Loading...",
@@ -185,6 +237,7 @@ const text = {
     heroSubheadline: "Hero subheadline",
     heroCtaText: "CTA button text",
     heroImage: "Hero background image (optional)",
+    featuresTitle: "Feature Grid section title",
     save: "Save",
     saving: "Saving...",
     blocksTitle: "Page blocks (drag to reorder)",
@@ -199,6 +252,23 @@ const text = {
     metaDescription: "Meta description",
     livePreview: "Live preview",
     livePreviewHint: "This is exactly what a merchant will see on the live page — same component.",
+    duplicate: "Duplicate",
+    products: "Products & Checkout",
+    productsHint: "Attach products from the right, then drag to reorder them.",
+    selectedProducts: "Attached products",
+    emptyProducts: "No products attached yet.",
+    searchProducts: "Search products...",
+    noProducts: "No products found.",
+    attach: "Attach",
+    overrideTitle: "Title override",
+    overrideSubtitle: "Subtitle",
+    badge: "Badge",
+    overridePrice: "Price override",
+    defaultQty: "Default Qty",
+    selectedByDefault: "Selected by default",
+    dragHint: "Drag to reorder",
+    pickImages: "Pick images from gallery",
+    selectedCount: "Selected",
   },
 };
 
@@ -224,11 +294,17 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [heroSubheadline, setHeroSubheadline] = useState("");
   const [heroCtaText, setHeroCtaText] = useState("");
   const [heroImage, setHeroImage] = useState("");
+  const [featuresTitle, setFeaturesTitle] = useState("");
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   const [contentState, setContentState] = useState<ContentState>(emptyContentState());
   const [layoutEntries, setLayoutEntries] = useState<LayoutEntry[]>([]);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<ProductDraft[]>([]);
+  const [productQuery, setProductQuery] = useState("");
+  const [draggingProductId, setDraggingProductId] = useState<number | null>(null);
 
   const [mediaPolicy, setMediaPolicy] = useState<MediaPolicy | null>(null);
   const [mediaLibrary, setMediaLibrary] = useState<MediaLibraryItem[]>([]);
@@ -250,8 +326,9 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     const load = async () => {
       try {
         setError(null);
-        const [templatesRes, mediaPolicyRes, mediaLibraryRes, pageRes] = await Promise.all([
+        const [templatesRes, productsRes, mediaPolicyRes, mediaLibraryRes, pageRes] = await Promise.all([
           fetch(`${LANDING_API_BASE}/landing/templates`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${LANDING_API_BASE}/products?per_page=100`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${LANDING_API_BASE}/landing/media-library/policy`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${LANDING_API_BASE}/landing/media-library`, { headers: { Authorization: `Bearer ${token}` } }),
           mode === "edit" && pageId
@@ -259,11 +336,13 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
             : Promise.resolve(null),
         ]);
 
-        if (!templatesRes.ok || !mediaPolicyRes.ok || !mediaLibraryRes.ok || (pageRes && !pageRes.ok)) {
+        if (!templatesRes.ok || !productsRes.ok || !mediaPolicyRes.ok || !mediaLibraryRes.ok || (pageRes && !pageRes.ok)) {
           throw new Error(t.loadFailed);
         }
 
         setTemplates((await templatesRes.json()).data ?? []);
+        const productsJson = await productsRes.json();
+        setProducts((productsJson.data ?? []).filter((item: ProductItem) => item.status !== "archived"));
         setMediaPolicy((await mediaPolicyRes.json()).data ?? null);
         setMediaLibrary((await mediaLibraryRes.json()).data ?? []);
 
@@ -279,6 +358,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           }
           setContentState(nextContent);
           setLayoutEntries(expandLegacyLayoutOrder(merged.layout_order, nextContent));
+          setSelectedProducts((loadedPage.products ?? []).map((item, index) => normalizeProductDraft(item, index)));
 
           setPage(loadedPage);
           setTitle(loadedPage.title ?? "");
@@ -290,6 +370,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           setHeroSubheadline(merged.hero?.subheadline ?? "");
           setHeroCtaText(merged.hero?.cta_text ?? "");
           setHeroImage(merged.hero?.background_image_url ?? "");
+          setFeaturesTitle(merged.features_title ?? "");
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
             accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
@@ -332,6 +413,55 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   function removeBlock(type: BlockType, id: string) {
     setContentState((prev) => ({ ...prev, [type]: prev[type].filter((item) => item.id !== id) }));
     setLayoutEntries((prev) => prev.filter((entry) => !(entry.type === type && entry.id === id)));
+  }
+
+  function duplicateBlock(type: BlockType, id: string) {
+    const source = contentState[type].find((item) => item.id === id);
+    if (!source) return;
+    const newId = `${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const clone: Item = { ...source, id: newId };
+    setContentState((prev) => ({ ...prev, [type]: [...prev[type], clone] }));
+    setLayoutEntries((prev) => {
+      const index = prev.findIndex((entry) => entry.type === type && entry.id === id);
+      if (index < 0) return [...prev, { type, id: newId }];
+      const next = [...prev];
+      next.splice(index + 1, 0, { type, id: newId });
+      return next;
+    });
+  }
+
+  function addProduct(product: ProductItem) {
+    setSelectedProducts((prev) => [
+      ...prev,
+      {
+        product_id: product.id,
+        title_override: "",
+        subtitle: "",
+        badge_text: "",
+        price_override: "",
+        default_qty: 1,
+        selected_by_default: true,
+        sort_order: prev.length + 1,
+      },
+    ]);
+  }
+
+  function removeProduct(productId: number) {
+    setSelectedProducts((prev) => prev.filter((item) => item.product_id !== productId).map((item, index) => ({ ...item, sort_order: index + 1 })));
+  }
+
+  function patchProduct(productId: number, changes: Partial<ProductDraft>) {
+    setSelectedProducts((prev) => prev.map((item) => (item.product_id === productId ? { ...item, ...changes } : item)));
+  }
+
+  function reorderProductsByIds(sourceId: number, targetId: number) {
+    if (sourceId === targetId) return;
+    setSelectedProducts((prev) => {
+      const from = prev.findIndex((item) => item.product_id === sourceId);
+      const to = prev.findIndex((item) => item.product_id === targetId);
+      if (from < 0 || to < 0) return prev;
+      return moveItem(prev, from, to).map((item, index) => ({ ...item, sort_order: index + 1 }));
+    });
   }
 
   async function reloadMediaLibrary() {
@@ -387,6 +517,42 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     setMediaTarget(null);
   }
 
+  function toggleCarouselImage(blockId: string, image: MediaLibraryItem) {
+    setContentState((prev) => ({
+      ...prev,
+      carousel_images: prev.carousel_images.map((block) => {
+        if (block.id !== blockId) return block;
+        const images = (block.images as Array<{ id?: number | null; url?: string | null; alt?: string | null }> | undefined) ?? [];
+        const exists = images.some((img) => img.url === image.url);
+        return {
+          ...block,
+          images: exists
+            ? images.filter((img) => img.url !== image.url)
+            : [...images, { id: image.id, url: image.url, alt: image.file_name ?? "" }],
+        };
+      }),
+    }));
+  }
+
+  const filteredProducts = useMemo(() => {
+    const attached = new Set(selectedProducts.map((item) => item.product_id));
+    const needle = productQuery.trim().toLowerCase();
+    return products.filter((item) => {
+      if (attached.has(item.id)) return false;
+      if (!needle) return true;
+      return [item.name, item.sku ?? ""].join(" ").toLowerCase().includes(needle);
+    });
+  }, [products, productQuery, selectedProducts]);
+
+  const selectedProductDetails = useMemo(() => {
+    const map = new Map(products.map((item) => [item.id, item]));
+    return selectedProducts.map((item, index) => ({
+      ...item,
+      sort_order: index + 1,
+      product: map.get(item.product_id) ?? null,
+    }));
+  }, [products, selectedProducts]);
+
   function buildContent(): LandingPageContent {
     const content: LandingPageContent = {
       hero: {
@@ -395,6 +561,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
         cta_text: heroCtaText || null,
         background_image_url: heroImage || null,
       },
+      features_title: featuresTitle || null,
       layout_order: layoutEntries,
     };
     for (const type of BLOCK_TYPES) {
@@ -413,9 +580,9 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     content: buildContent() as PublicLandingPage["content"],
     seo_meta: { meta_title: metaTitle || title, meta_description: metaDescription || null },
     custom_css: page?.custom_css ?? null,
-    products: page?.products ?? [],
+    products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, metaTitle, metaDescription, locale]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -440,6 +607,16 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
         content,
         seo_meta: { meta_title: metaTitle || title, meta_description: metaDescription || null },
         theme_settings: theme,
+        products: selectedProducts.map((item, index) => ({
+          product_id: item.product_id,
+          title_override: item.title_override || null,
+          subtitle: item.subtitle || null,
+          badge_text: item.badge_text || null,
+          price_override: toNumberOrNull(item.price_override),
+          default_qty: item.default_qty,
+          selected_by_default: item.selected_by_default,
+          sort_order: index + 1,
+        })),
       };
 
       const url = mode === "edit" && pageId ? `${LANDING_API_BASE}/landing/pages/${pageId}` : `${LANDING_API_BASE}/landing/pages`;
@@ -478,9 +655,14 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             <Icon size={14} /> {blockLabels[entry.type]}
           </span>
-          <button type="button" onClick={() => removeBlock(entry.type, entry.id)} className="flex items-center gap-1 rounded-lg border border-red-400/30 px-2 py-1 text-xs font-semibold text-red-400">
-            <Trash2 size={12} /> {t.remove}
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => duplicateBlock(entry.type, entry.id)} className="flex items-center gap-1 rounded-lg border border-[var(--border)] px-2 py-1 text-xs font-semibold text-[var(--foreground)]">
+              <Copy size={12} /> {t.duplicate}
+            </button>
+            <button type="button" onClick={() => removeBlock(entry.type, entry.id)} className="flex items-center gap-1 rounded-lg border border-red-400/30 px-2 py-1 text-xs font-semibold text-red-400">
+              <Trash2 size={12} /> {t.remove}
+            </button>
+          </div>
         </div>
         <div className="space-y-2">{renderBlockFields(entry.type, item)}</div>
       </div>
@@ -611,13 +793,37 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
             <p className="text-xs text-[var(--muted)]">{locale === "bn" ? "এই সেকশনটি পুরনো এডিটরে তৈরি — নতুন বিল্ডারে কোড এডিট করা যায় না।" : "Created in the old editor — code can't be edited from this builder."}</p>
           </>
         );
-      case "carousel_images":
+      case "carousel_images": {
+        const images = (item.images as Array<{ id?: number | null; url?: string | null; alt?: string | null }> | undefined) ?? [];
         return (
           <>
             <TextField label={locale === "bn" ? "শিরোনাম" : "Title"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <p className="text-xs text-[var(--muted)]">{locale === "bn" ? `${(item.images as unknown[] | undefined)?.length ?? 0} টি ছবি সিলেক্ট করা আছে (Quick Edit থেকে পরিচালনা করুন)।` : `${(item.images as unknown[] | undefined)?.length ?? 0} image(s) selected (manage from Quick Edit for now).`}</p>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "স্টাইল" : "Style"}</span>
+              <select value={String(item.template ?? "style-1")} onChange={(e) => patch({ template: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
+                <option value="style-1">Style 1</option>
+                <option value="style-2">Style 2</option>
+              </select>
+            </label>
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" onClick={() => setMediaTarget({ type: "carousel_images", id: item.id, field: "images" })} className="rounded-xl border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]">
+                {t.pickImages}
+              </button>
+              <span className="text-xs text-[var(--muted)]">{t.selectedCount}: {images.length}</span>
+            </div>
+            {images.length > 0 ? (
+              <div className="grid grid-cols-4 gap-2">
+                {images.map((image, imageIndex) => (
+                  <div key={`${image.url}-${imageIndex}`} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={image.url ?? ""} alt={image.alt ?? ""} className="aspect-square w-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </>
         );
+      }
       default:
         return null;
     }
@@ -696,10 +902,91 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
               </div>
             </div>
 
+            {contentState.features.length > 0 ? (
+              <div className="mb-3">
+                <TextField label={t.featuresTitle} value={featuresTitle} onChange={setFeaturesTitle} />
+              </div>
+            ) : null}
+
             <BlockList entries={draggableEntries} onReorder={(next) => setLayoutEntries((prev) => [...next, ...prev.filter((entry) => SINGLETON_BLOCK_TYPES.includes(entry.type))])} renderItem={renderBlockItem} />
 
             <div className="mt-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-3 text-center text-xs text-[var(--muted)]">
-              {locale === "bn" ? "পণ্য ও চেকআউট সেকশন সবসময় পেজে যুক্ত থাকে — Quick Edit থেকে পণ্য attach করুন।" : "The Products & Checkout section is always present — attach products from Quick Edit."}
+              {locale === "bn" ? "পণ্য ও চেকআউট সেকশন সবসময় পেজে যুক্ত থাকে (নিচে ম্যানেজ করুন)।" : "The Products & Checkout section is always present — manage it below."}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-[var(--foreground)]">{t.selectedProducts}</h3>
+                <p className="text-sm text-[var(--muted)]">{t.productsHint}</p>
+              </div>
+              <span className="text-xs text-[var(--muted)]">{t.dragHint}</span>
+            </div>
+            {selectedProductDetails.length === 0 ? (
+              <div className="mt-3 rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">{t.emptyProducts}</div>
+            ) : (
+              <div className="mt-3 space-y-4">
+                {selectedProductDetails.map((item, index) => (
+                  <div
+                    key={item.product_id}
+                    draggable
+                    onDragStart={() => setDraggingProductId(item.product_id)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (draggingProductId != null) reorderProductsByIds(draggingProductId, item.product_id);
+                      setDraggingProductId(null);
+                    }}
+                    onDragEnd={() => setDraggingProductId(null)}
+                    className={`rounded-2xl border bg-[var(--surface)] p-4 ${draggingProductId === item.product_id ? "border-[var(--accent)] shadow-lg" : "border-[var(--border)]"}`}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="cursor-grab text-lg text-[var(--muted)]">⋮⋮</span>
+                          <h4 className="text-sm font-semibold text-[var(--foreground)]">{item.product?.name ?? `#${item.product_id}`}</h4>
+                        </div>
+                        <p className="mt-1 text-xs text-[var(--muted)]">SKU: {item.product?.sku || "—"} · ৳{Number(item.product?.selling_price ?? item.product?.regular_price ?? 0).toLocaleString()} · #{index + 1}</p>
+                      </div>
+                      <button type="button" onClick={() => removeProduct(item.product_id)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-400">{t.remove}</button>
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <input value={item.title_override} onChange={(e) => patchProduct(item.product_id, { title_override: e.target.value })} placeholder={t.overrideTitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                      <input value={item.subtitle} onChange={(e) => patchProduct(item.product_id, { subtitle: e.target.value })} placeholder={t.overrideSubtitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                      <input value={item.badge_text} onChange={(e) => patchProduct(item.product_id, { badge_text: e.target.value })} placeholder={t.badge} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                      <input value={item.price_override} onChange={(e) => patchProduct(item.product_id, { price_override: e.target.value })} placeholder={t.overridePrice} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                      <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]">
+                        <span>{t.defaultQty}</span>
+                        <input type="number" min={1} max={100} value={item.default_qty} onChange={(e) => patchProduct(item.product_id, { default_qty: Math.max(1, Number(e.target.value) || 1) })} className="w-20 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm" />
+                      </label>
+                      <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]">
+                        <input type="checkbox" checked={item.selected_by_default} onChange={(e) => patchProduct(item.product_id, { selected_by_default: e.target.checked })} className="accent-[var(--accent)]" />
+                        <span>{t.selectedByDefault}</span>
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-5 border-t border-[var(--border)] pt-4">
+              <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.products}</h4>
+              <input value={productQuery} onChange={(e) => setProductQuery(e.target.value)} placeholder={t.searchProducts} className="mt-3 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]" />
+              <div className="mt-3 space-y-3">
+                {filteredProducts.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">{t.noProducts}</div>
+                ) : (
+                  filteredProducts.slice(0, 30).map((product) => (
+                    <div key={product.id} className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                      <div className="min-w-0">
+                        <h4 className="truncate text-sm font-semibold text-[var(--foreground)]">{product.name}</h4>
+                        <p className="mt-1 text-xs text-[var(--muted)]">SKU: {product.sku || "—"} · ৳{Number(product.selling_price ?? product.regular_price ?? 0).toLocaleString()} · Stock {product.stock ?? 0}</p>
+                      </div>
+                      <button type="button" onClick={() => addProduct(product)} className="shrink-0 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--accent)]">{t.attach}</button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
@@ -738,12 +1025,27 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
               </div>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {mediaLibrary.map((item) => (
-                <button key={item.id} type="button" onClick={() => applyMediaPick(item.url)} className="overflow-hidden rounded-lg border border-[var(--border)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={item.url} alt={item.file_name ?? ""} className="aspect-square w-full object-cover" />
-                </button>
-              ))}
+              {mediaLibrary.map((item) => {
+                const isCarousel = mediaTarget?.type === "carousel_images";
+                const carouselImages = isCarousel
+                  ? ((contentState.carousel_images.find((block) => block.id === mediaTarget?.id)?.images as Array<{ url?: string | null }> | undefined) ?? [])
+                  : [];
+                const selected = isCarousel && carouselImages.some((img) => img.url === item.url);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => (isCarousel ? toggleCarouselImage(mediaTarget!.id, item) : applyMediaPick(item.url))}
+                    className={`relative overflow-hidden rounded-lg border ${selected ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : "border-[var(--border)]"}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.url} alt={item.file_name ?? ""} className="aspect-square w-full object-cover" />
+                    {selected ? (
+                      <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white">✓</span>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

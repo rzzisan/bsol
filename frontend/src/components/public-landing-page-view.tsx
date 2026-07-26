@@ -83,6 +83,7 @@ export type PublicLandingPage = {
       images?: Array<{ id?: number | null; url?: string | null; alt?: string | null }>;
     }>;
     features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
+    features_title?: string | null;
     reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
     faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
     rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: JSONContent }>;
@@ -408,11 +409,11 @@ function TrustBadgeRow({ badges }: { badges: Array<{ icon?: string | null; label
   );
 }
 
-function FeatureGrid({ features, theme }: { features: Array<{ title?: string | null; description?: string | null; icon?: string | null }>; theme: { primary: string } }) {
+function FeatureGrid({ features, title, theme }: { features: Array<{ title?: string | null; description?: string | null; icon?: string | null }>; title?: string | null; theme: { primary: string } }) {
   if (features.length === 0) return null;
   return (
     <div className="lp-card rounded-3xl p-6 sm:p-8">
-      <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>কেন এই পেজটি বেছে নেবেন?</h2>
+      <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{title || "কেন এই পেজটি বেছে নেবেন?"}</h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {features.map((feature, index) => {
           const Icon = resolveBlockIcon(feature.icon);
@@ -745,7 +746,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             }
 
             if (sectionKey === "features") {
-              return <FeatureGrid key={`features-${runIndex}`} features={pickRun(features, run)} theme={theme} />;
+              return <FeatureGrid key={`features-${runIndex}`} features={pickRun(features, run)} title={content.features_title} theme={theme} />;
             }
 
             if (sectionKey === "trust_badges") {

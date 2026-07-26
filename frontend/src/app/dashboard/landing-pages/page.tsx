@@ -6,11 +6,10 @@ import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE, getLandingTemplateName } from "@/lib/landing-pages";
 
-// Quick Edit and the GrapesJS Visual Editor are dormant as of the Phase 4
-// cutover — the block builder is now the primary (only) editor. Neither
-// editor's code/routes/controllers were deleted; flip these back to true
-// to restore them to the nav if ever needed.
-const QUICK_EDIT_ENABLED = false;
+// Quick Edit is temporarily re-enabled: the block builder doesn't yet
+// support product attachment, so merchants need Quick Edit for that until
+// it's added to the builder. GrapesJS Visual Editor stays dormant.
+const QUICK_EDIT_ENABLED = true;
 const VISUAL_EDITOR_ENABLED = false;
 
 // New block-based no-code builder (Phase 2-3) — primary editor as of
