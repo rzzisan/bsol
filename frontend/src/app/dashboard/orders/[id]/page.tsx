@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import UserShell from "@/components/user-shell";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
@@ -66,7 +66,7 @@ type Order = {
   source: string | null; source_ref: string | null;
   payment_method: string | null; payment_status: string;
   subtotal: string; shipping_charge: string; discount: string; total: string;
-  notes: string | null; fraud_score: number; risk_level: string;
+  notes: string | null; custom_fields: Array<{ key: string; label: string; value: string }> | null; fraud_score: number; risk_level: string;
   courier_name: string | null; courier_tracking_id: string | null;
   courier_status: string | null; courier_charge: string | null;
   created_at: string; updated_at: string;
@@ -88,6 +88,7 @@ const t = {
     confirmDelete: "এই অর্ডার মুছে ফেলবেন?",
     orderInfo: "অর্ডার তথ্য",
     customerInfo: "গ্রাহক তথ্য",
+    customFields: "অতিরিক্ত তথ্য",
     items: "পণ্য তালিকা",
     paymentSummary: "পেমেন্ট সারসংক্ষেপ",
     courierInfo: "কুরিয়ার তথ্য",
@@ -148,6 +149,7 @@ const t = {
     confirmDelete: "Delete this order?",
     orderInfo: "Order Info",
     customerInfo: "Customer Info",
+    customFields: "Additional Info",
     items: "Items",
     paymentSummary: "Payment Summary",
     courierInfo: "Courier Info",
@@ -477,6 +479,21 @@ export default function OrderDetailPage() {
             )}
           </dl>
         </div>
+
+        {/* Custom Fields */}
+        {order.custom_fields && order.custom_fields.length > 0 ? (
+          <div className="catv-panel p-4">
+            <h3 className="mb-3 text-sm font-semibold">{txt.customFields}</h3>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+              {order.custom_fields.map((field) => (
+                <Fragment key={field.key}>
+                  <dt className="text-[var(--muted)]">{field.label}</dt>
+                  <dd>{field.value || "—"}</dd>
+                </Fragment>
+              ))}
+            </dl>
+          </div>
+        ) : null}
 
         {/* Items */}
         <div className="catv-panel p-4 md:col-span-2">

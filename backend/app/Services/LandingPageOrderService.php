@@ -8,15 +8,16 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderStatusLog;
 use App\Models\ProductVariant;
+use App\Support\CheckoutFieldResolver;
 use App\Support\PhoneIntelCache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class LandingPageOrderService
 {
-    public function create(LandingPage $page, array $validated, Collection $lineItems): Order
+    public function create(LandingPage $page, array $validated, Collection $lineItems, array $resolvedFields = []): Order
     {
-        return DB::transaction(function () use ($page, $validated, $lineItems) {
+        return DB::transaction(function () use ($page, $validated, $lineItems, $resolvedFields) {
             $userId = $page->user_id;
             $subtotal = 0;
             $landingProducts = $page->products->keyBy('product_id');
@@ -40,6 +41,7 @@ class LandingPageOrderService
                 'subtotal' => 0,
                 'total' => 0,
                 'notes' => $validated['notes'] ?? null,
+                'custom_fields' => CheckoutFieldResolver::snapshotCustomFields($resolvedFields, $validated) ?: null,
                 'fraud_score' => 0,
                 'risk_level' => 'low',
             ]);

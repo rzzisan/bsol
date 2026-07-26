@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { generateHTML, type JSONContent } from "@tiptap/core";
-import { mergeLandingContent, type LandingTemplate } from "@/lib/landing-pages";
+import type { JSONContent } from "@tiptap/core";
+import { mergeLandingContent, DEFAULT_CHECKOUT_FIELDS, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
 import { resolveBlockIcon } from "@/lib/block-icons";
-import { RICH_TEXT_EXTENSIONS } from "@/lib/rich-text-extensions";
+import { renderTiptapJSON } from "@/lib/rich-text-render";
 import type { LayoutEntry } from "@/lib/landing-layout";
 
 type CheckoutDraft = {
@@ -86,6 +86,7 @@ export type PublicLandingPage = {
     features_title?: string | null;
     products_section_title?: string | null;
     products_section_subtitle?: string | null;
+    checkout_fields?: CheckoutFieldConfig[];
     reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
     faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
     rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: JSONContent }>;
@@ -341,14 +342,7 @@ function CarouselBlockView({
 }
 
 function RichTextBlockView({ block, theme }: { block: { title?: string | null; body?: unknown }; theme: { primary: string } }) {
-  const html = useMemo(() => {
-    if (!block.body) return "";
-    try {
-      return generateHTML(block.body as JSONContent, RICH_TEXT_EXTENSIONS);
-    } catch {
-      return "";
-    }
-  }, [block.body]);
+  const html = useMemo(() => renderTiptapJSON(block.body as JSONContent | null | undefined), [block.body]);
 
   if (!block.title && !html) return null;
 
@@ -545,6 +539,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     customer_area: "",
     notes: "",
   });
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -574,6 +569,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const spacers = content.spacers ?? [];
   const products = (page.products ?? []).filter((item) => item.product);
   const shipping = content.shipping ?? {};
+  const checkoutFields = (content.checkout_fields && content.checkout_fields.length > 0 ? content.checkout_fields : DEFAULT_CHECKOUT_FIELDS).filter((field) => field.enabled);
   const shippingCharge = shippingZone === "inside"
     ? Number(shipping.inside_dhaka ?? 80)
     : Number(shipping.outside_dhaka ?? shipping.inside_dhaka ?? 120);
@@ -639,6 +635,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     try {
       const payload = {
         ...customer,
+        custom_fields: customFieldValues,
         shipping_charge: shippingCharge,
         items: products.map((item) => ({
           enabled: checkout[item.product_id]?.enabled ?? false,
@@ -669,6 +666,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         customer_area: "",
         notes: "",
       });
+      setCustomFieldValues({});
       setCheckout((prev) => Object.fromEntries(Object.entries(prev).map(([productId, item]) => [productId, { ...item, quantity: 1 }])));
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -680,6 +678,50 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
 
   function updateCustomer<K extends keyof CustomerForm>(key: K, value: CustomerForm[K]) {
     setCustomer((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateCustomField(key: string, value: string) {
+    setCustomFieldValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function renderCheckoutField(field: CheckoutFieldConfig) {
+    const labelText = field.required ? `${field.label} *` : field.label;
+    const fieldClassName = "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900";
+
+    if (field.kind === "builtin") {
+      const key = field.key as keyof CustomerForm;
+      const value = customer[key] ?? "";
+      const isLong = key === "customer_address" || key === "notes";
+      return (
+        <label key={field.key} className="block">
+          <span className="mb-1 block text-sm font-semibold text-slate-700">{labelText}</span>
+          {isLong ? (
+            <textarea required={field.required} rows={3} value={value} onChange={(e) => updateCustomer(key, e.target.value)} className={fieldClassName} />
+          ) : (
+            <input required={field.required} value={value} onChange={(e) => updateCustomer(key, e.target.value)} className={fieldClassName} />
+          )}
+        </label>
+      );
+    }
+
+    const value = customFieldValues[field.key] ?? "";
+    return (
+      <label key={field.key} className="block">
+        <span className="mb-1 block text-sm font-semibold text-slate-700">{labelText}</span>
+        {field.type === "textarea" ? (
+          <textarea required={field.required} rows={3} value={value} onChange={(e) => updateCustomField(field.key, e.target.value)} className={fieldClassName} />
+        ) : field.type === "select" ? (
+          <select required={field.required} value={value} onChange={(e) => updateCustomField(field.key, e.target.value)} className={fieldClassName}>
+            <option value="">নির্বাচন করুন</option>
+            {(field.options ?? []).map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        ) : (
+          <input required={field.required} value={value} onChange={(e) => updateCustomField(field.key, e.target.value)} className={fieldClassName} />
+        )}
+      </label>
+    );
   }
 
   function patchCheckout(productId: number, changes: Partial<CheckoutDraft>) {
@@ -916,37 +958,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               {submitSuccess ? <div className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{submitSuccess}</div> : null}
 
               <div className="mt-6 space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-semibold text-slate-700">আপনার নাম *</span>
-                    <input required value={customer.customer_name} onChange={(e) => updateCustomer("customer_name", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-semibold text-slate-700">মোবাইল নাম্বার *</span>
-                    <input required value={customer.customer_phone} onChange={(e) => updateCustomer("customer_phone", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
-                  </label>
-                </div>
-
-                <label className="block">
-                  <span className="mb-1 block text-sm font-semibold text-slate-700">বিস্তারিত ঠিকানা *</span>
-                  <textarea required rows={3} value={customer.customer_address} onChange={(e) => updateCustomer("customer_address", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
-                </label>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-semibold text-slate-700">জেলা</span>
-                    <input value={customer.customer_district} onChange={(e) => updateCustomer("customer_district", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-semibold text-slate-700">থানা</span>
-                    <input value={customer.customer_thana} onChange={(e) => updateCustomer("customer_thana", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
-                  </label>
-                </div>
-
-                <label className="block">
-                  <span className="mb-1 block text-sm font-semibold text-slate-700">এরিয়া / এলাকা</span>
-                  <input value={customer.customer_area} onChange={(e) => updateCustomer("customer_area", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
-                </label>
+                {checkoutFields.filter((field) => field.key !== "notes").map(renderCheckoutField)}
 
                 <div>
                   <span className="mb-2 block text-sm font-semibold text-slate-700">Shipping</span>
@@ -968,10 +980,10 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                   </div>
                 </div>
 
-                <label className="block">
-                  <span className="mb-1 block text-sm font-semibold text-slate-700">নোট (ঐচ্ছিক)</span>
-                  <textarea rows={3} value={customer.notes} onChange={(e) => updateCustomer("notes", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900" />
-                </label>
+                {(() => {
+                  const notesField = checkoutFields.find((field) => field.key === "notes");
+                  return notesField ? renderCheckoutField(notesField) : null;
+                })()}
               </div>
             </div>
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\LandingPageOrderService;
+use App\Support\CheckoutFieldResolver;
 use App\Models\LandingPage;
 use App\Models\LandingPageProduct;
 use App\Models\LandingTemplate;
@@ -48,21 +49,19 @@ class LandingPageController extends Controller
             ->with(['products.product'])
             ->firstOrFail();
 
-        $validated = $request->validate([
-            'customer_name' => ['required', 'string', 'max:150'],
-            'customer_phone' => ['required', 'string', 'max:20'],
-            'customer_address' => ['required', 'string', 'max:500'],
-            'customer_district' => ['nullable', 'string', 'max:100'],
-            'customer_thana' => ['nullable', 'string', 'max:100'],
-            'customer_area' => ['nullable', 'string', 'max:120'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-            'shipping_charge' => ['nullable', 'numeric', 'min:0'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.enabled' => ['nullable', 'boolean'],
-            'items.*.product_id' => ['required', 'integer'],
-            'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
-            'items.*.product_variant_id' => ['nullable', 'integer'],
-        ]);
+        $resolvedFields = CheckoutFieldResolver::resolve($page->content['checkout_fields'] ?? null);
+
+        $validated = $request->validate(array_merge(
+            CheckoutFieldResolver::buildRules($resolvedFields),
+            [
+                'shipping_charge' => ['nullable', 'numeric', 'min:0'],
+                'items' => ['required', 'array', 'min:1'],
+                'items.*.enabled' => ['nullable', 'boolean'],
+                'items.*.product_id' => ['required', 'integer'],
+                'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
+                'items.*.product_variant_id' => ['nullable', 'integer'],
+            ]
+        ));
 
         $landingProducts = $page->products->keyBy('product_id');
         $lineItems = collect($validated['items'])
@@ -80,7 +79,7 @@ class LandingPageController extends Controller
             ], 422);
         }
 
-        $order = app(LandingPageOrderService::class)->create($page, $validated, $lineItems);
+        $order = app(LandingPageOrderService::class)->create($page, $validated, $lineItems, $resolvedFields);
 
         return response()->json([
             'success' => true,

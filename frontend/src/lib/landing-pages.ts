@@ -73,6 +73,7 @@ export type LandingPageRecord = {
     features_title?: string | null;
     products_section_title?: string | null;
     products_section_subtitle?: string | null;
+    checkout_fields?: CheckoutFieldConfig[];
     reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
     faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
     rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: unknown }>;
@@ -105,6 +106,28 @@ export type LandingPageRecord = {
 
 export type LandingImportFile = string;
 
+// Mirrors App\Support\CheckoutFieldResolver on the backend — keep both in sync.
+export type CheckoutFieldConfig = {
+  id?: string;
+  key: string;
+  kind: "builtin" | "custom";
+  label: string;
+  type?: "text" | "textarea" | "select";
+  required: boolean;
+  enabled: boolean;
+  options?: string[];
+};
+
+export const DEFAULT_CHECKOUT_FIELDS: CheckoutFieldConfig[] = [
+  { key: "customer_name", kind: "builtin", label: "নাম", required: true, enabled: true },
+  { key: "customer_phone", kind: "builtin", label: "ফোন নম্বর", required: true, enabled: true },
+  { key: "customer_address", kind: "builtin", label: "ঠিকানা", required: true, enabled: true },
+  { key: "customer_district", kind: "builtin", label: "জেলা", required: false, enabled: true },
+  { key: "customer_thana", kind: "builtin", label: "থানা", required: false, enabled: true },
+  { key: "customer_area", kind: "builtin", label: "এলাকা", required: false, enabled: true },
+  { key: "notes", kind: "builtin", label: "অতিরিক্ত নোট", required: false, enabled: true },
+];
+
 export type LandingPageContent = {
   hero?: {
     headline?: string | null;
@@ -124,6 +147,7 @@ export type LandingPageContent = {
   features_title?: string | null;
   products_section_title?: string | null;
   products_section_subtitle?: string | null;
+  checkout_fields?: CheckoutFieldConfig[];
   reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
   faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
   rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: unknown }>;
@@ -169,6 +193,7 @@ export function mergeLandingContent(
 ): LandingPageContent {
   const templateContent = (template?.default_content ?? {}) as LandingPageContent;
   const pageContent = (content ?? {}) as LandingPageContent;
+  const checkoutFields = pickArray<CheckoutFieldConfig>(pageContent.checkout_fields, templateContent.checkout_fields);
 
   return {
     ...templateContent,
@@ -183,6 +208,7 @@ export function mergeLandingContent(
     features_title: pageContent.features_title ?? templateContent.features_title ?? null,
     products_section_title: pageContent.products_section_title ?? templateContent.products_section_title ?? null,
     products_section_subtitle: pageContent.products_section_subtitle ?? templateContent.products_section_subtitle ?? null,
+    checkout_fields: checkoutFields.length > 0 ? checkoutFields : DEFAULT_CHECKOUT_FIELDS,
     reviews: pickArray(pageContent.reviews, templateContent.reviews),
     faq: pickArray(pageContent.faq, templateContent.faq),
     rich_text_blocks: pickArray(pageContent.rich_text_blocks, templateContent.rich_text_blocks),

@@ -6,11 +6,13 @@ import { Plus, Trash2, Copy, Image as ImageIcon, Type, Video, ShieldCheck, Timer
 import { getStoredToken, type Locale } from "@/lib/dashboard-client";
 import {
   LANDING_API_BASE,
+  type CheckoutFieldConfig,
   type LandingPageContent,
   type LandingPageProductInput,
   type LandingPageRecord,
   type LandingTemplate,
   type ProductItem,
+  DEFAULT_CHECKOUT_FIELDS,
   mergeLandingContent,
   toNumberOrNull,
 } from "@/lib/landing-pages";
@@ -191,6 +193,15 @@ const text = {
     featuresTitle: "ফিচার গ্রিড সেকশনের টাইটেল",
     productsTitle: "প্রোডাক্ট সেকশনের টাইটেল",
     productsSubtitle: "প্রোডাক্ট সেকশনের সাবটাইটেল",
+    checkoutFields: "চেকআউট ফর্ম ফিল্ড",
+    checkoutFieldsHint: "কাস্টমারের কাছ থেকে কী কী তথ্য নেবেন তা ঠিক করুন — ড্র্যাগ করে সাজান।",
+    addCustomField: "+ কাস্টম ফিল্ড",
+    fieldTypeText: "টেক্সট",
+    fieldTypeTextarea: "বড় টেক্সট",
+    fieldTypeSelect: "ড্রপডাউন",
+    fieldShown: "দেখাবে",
+    fieldRequired: "বাধ্যতামূলক",
+    fieldOptionsPlaceholder: "অপশন, কমা দিয়ে আলাদা করুন (যেমন: S, M, L)",
     save: "সংরক্ষণ করুন",
     saving: "সংরক্ষণ হচ্ছে...",
     blocksTitle: "পেজ ব্লক (ড্র্যাগ করে সাজান)",
@@ -242,6 +253,15 @@ const text = {
     featuresTitle: "Feature Grid section title",
     productsTitle: "Products section title",
     productsSubtitle: "Products section subtitle",
+    checkoutFields: "Checkout form fields",
+    checkoutFieldsHint: "Decide what info you collect from customers — drag to reorder.",
+    addCustomField: "+ Custom field",
+    fieldTypeText: "Text",
+    fieldTypeTextarea: "Long text",
+    fieldTypeSelect: "Dropdown",
+    fieldShown: "Shown",
+    fieldRequired: "Required",
+    fieldOptionsPlaceholder: "Comma-separated options (e.g. S, M, L)",
     save: "Save",
     saving: "Saving...",
     blocksTitle: "Page blocks (drag to reorder)",
@@ -301,6 +321,8 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [featuresTitle, setFeaturesTitle] = useState("");
   const [productsTitle, setProductsTitle] = useState("");
   const [productsSubtitle, setProductsSubtitle] = useState("");
+  const [checkoutFields, setCheckoutFields] = useState<CheckoutFieldConfig[]>(DEFAULT_CHECKOUT_FIELDS);
+  const [draggingFieldKey, setDraggingFieldKey] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   const [contentState, setContentState] = useState<ContentState>(emptyContentState());
@@ -379,6 +401,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           setFeaturesTitle(merged.features_title ?? "");
           setProductsTitle(merged.products_section_title ?? "");
           setProductsSubtitle(merged.products_section_subtitle ?? "");
+          setCheckoutFields(merged.checkout_fields ?? DEFAULT_CHECKOUT_FIELDS);
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
             accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
@@ -469,6 +492,32 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
       const to = prev.findIndex((item) => item.product_id === targetId);
       if (from < 0 || to < 0) return prev;
       return moveItem(prev, from, to).map((item, index) => ({ ...item, sort_order: index + 1 }));
+    });
+  }
+
+  function patchCheckoutField(key: string, changes: Partial<CheckoutFieldConfig>) {
+    setCheckoutFields((prev) => prev.map((field) => (field.key === key ? { ...field, ...changes } : field)));
+  }
+
+  function removeCheckoutField(key: string) {
+    setCheckoutFields((prev) => prev.filter((field) => field.key !== key));
+  }
+
+  function addCustomCheckoutField() {
+    const key = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    setCheckoutFields((prev) => [
+      ...prev,
+      { key, kind: "custom", label: locale === "bn" ? "নতুন ফিল্ড" : "New field", type: "text", required: false, enabled: true },
+    ]);
+  }
+
+  function reorderCheckoutFieldsByKey(sourceKey: string, targetKey: string) {
+    if (sourceKey === targetKey) return;
+    setCheckoutFields((prev) => {
+      const from = prev.findIndex((field) => field.key === sourceKey);
+      const to = prev.findIndex((field) => field.key === targetKey);
+      if (from < 0 || to < 0) return prev;
+      return moveItem(prev, from, to);
     });
   }
 
@@ -572,6 +621,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
       features_title: featuresTitle || null,
       products_section_title: productsTitle || null,
       products_section_subtitle: productsSubtitle || null,
+      checkout_fields: checkoutFields,
       layout_order: layoutEntries,
     };
     for (const type of BLOCK_TYPES) {
@@ -592,7 +642,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -1009,6 +1059,87 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
                   ))
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-[var(--foreground)]">{t.checkoutFields}</h3>
+                <p className="text-sm text-[var(--muted)]">{t.checkoutFieldsHint}</p>
+              </div>
+              <button type="button" onClick={addCustomCheckoutField} className="flex items-center gap-1 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--accent)]">
+                <Plus size={14} /> {t.addCustomField}
+              </button>
+            </div>
+            <div className="mt-3 space-y-3">
+              {checkoutFields.map((field) => (
+                <div
+                  key={field.key}
+                  draggable
+                  onDragStart={() => setDraggingFieldKey(field.key)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (draggingFieldKey) reorderCheckoutFieldsByKey(draggingFieldKey, field.key);
+                    setDraggingFieldKey(null);
+                  }}
+                  onDragEnd={() => setDraggingFieldKey(null)}
+                  className={`rounded-2xl border bg-[var(--surface)] p-3 ${draggingFieldKey === field.key ? "border-[var(--accent)] shadow-lg" : "border-[var(--border)]"}`}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="cursor-grab text-lg text-[var(--muted)]">⋮⋮</span>
+                    <input
+                      value={field.label}
+                      onChange={(e) => patchCheckoutField(field.key, { label: e.target.value })}
+                      className="min-w-[10rem] flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]"
+                    />
+                    {field.kind === "custom" ? (
+                      <select
+                        value={field.type ?? "text"}
+                        onChange={(e) => patchCheckoutField(field.key, { type: e.target.value as CheckoutFieldConfig["type"] })}
+                        className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-2 text-xs text-[var(--foreground)]"
+                      >
+                        <option value="text">{t.fieldTypeText}</option>
+                        <option value="textarea">{t.fieldTypeTextarea}</option>
+                        <option value="select">{t.fieldTypeSelect}</option>
+                      </select>
+                    ) : null}
+                    <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-2.5 py-2 text-xs text-[var(--foreground)]">
+                      <input
+                        type="checkbox"
+                        checked={field.enabled}
+                        disabled={field.key === "customer_phone"}
+                        onChange={(e) => patchCheckoutField(field.key, { enabled: e.target.checked })}
+                        className="accent-[var(--accent)]"
+                      />
+                      {t.fieldShown}
+                    </label>
+                    <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-2.5 py-2 text-xs text-[var(--foreground)]">
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        disabled={field.key === "customer_phone"}
+                        onChange={(e) => patchCheckoutField(field.key, { required: e.target.checked })}
+                        className="accent-[var(--accent)]"
+                      />
+                      {t.fieldRequired}
+                    </label>
+                    {field.kind === "custom" ? (
+                      <button type="button" onClick={() => removeCheckoutField(field.key)} className="rounded-xl border border-red-400/30 px-2.5 py-2 text-xs font-semibold text-red-400">
+                        <Trash2 size={12} />
+                      </button>
+                    ) : null}
+                  </div>
+                  {field.kind === "custom" && field.type === "select" ? (
+                    <input
+                      defaultValue={(field.options ?? []).join(", ")}
+                      onBlur={(e) => patchCheckoutField(field.key, { options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+                      placeholder={t.fieldOptionsPlaceholder}
+                      className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]"
+                    />
+                  ) : null}
+                </div>
+              ))}
             </div>
           </div>
 

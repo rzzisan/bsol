@@ -16,7 +16,7 @@ class Order extends Model
         'customer_address', 'customer_district', 'customer_thana', 'customer_area',
         'pathao_city_id', 'pathao_zone_id', 'pathao_area_id',
         'source', 'source_ref', 'status', 'payment_method', 'payment_status',
-        'subtotal', 'shipping_charge', 'discount', 'total', 'notes',
+        'subtotal', 'shipping_charge', 'discount', 'total', 'notes', 'custom_fields',
         'fraud_score', 'risk_level',
         'courier_name', 'courier_tracking_id', 'courier_status', 'courier_charge',
         'assigned_to',
@@ -29,6 +29,7 @@ class Order extends Model
         'total'          => 'decimal:2',
         'courier_charge' => 'decimal:2',
         'fraud_score'    => 'integer',
+        'custom_fields'  => 'array',
     ];
 
     public function user(): BelongsTo
