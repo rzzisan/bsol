@@ -84,6 +84,8 @@ export type PublicLandingPage = {
     }>;
     features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
     features_title?: string | null;
+    products_section_title?: string | null;
+    products_section_subtitle?: string | null;
     reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
     faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
     rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: JSONContent }>;
@@ -829,8 +831,8 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             if (sectionKey === "products") {
               return (
                 <div key="products" id="products" className="lp-card rounded-3xl p-6 sm:p-8">
-            <h2 className="mb-2 text-center text-2xl font-bold" style={{ color: theme.primary }}>আপনার পছন্দ মতো প্রোডাক্ট সিলেক্ট করুন</h2>
-            <p className="mb-6 text-center text-sm text-slate-500">পছন্দের product নির্বাচন করুন, quantity ঠিক করুন, তারপর নিচের shipping details পূরণ করে order complete করুন।</p>
+            <h2 className="mb-2 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.products_section_title || "আপনার পছন্দ মতো প্রোডাক্ট সিলেক্ট করুন"}</h2>
+            <p className="mb-6 text-center text-sm text-slate-500">{content.products_section_subtitle || "পছন্দের product নির্বাচন করুন, quantity ঠিক করুন, তারপর নিচের shipping details পূরণ করে order complete করুন।"}</p>
             {products.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">কোনো product attach করা হয়নি।</div>
             ) : (

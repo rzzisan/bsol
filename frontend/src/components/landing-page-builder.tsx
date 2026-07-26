@@ -189,6 +189,8 @@ const text = {
     heroCtaText: "CTA বাটন টেক্সট",
     heroImage: "Hero ব্যাকগ্রাউন্ড ছবি (ঐচ্ছিক)",
     featuresTitle: "ফিচার গ্রিড সেকশনের টাইটেল",
+    productsTitle: "প্রোডাক্ট সেকশনের টাইটেল",
+    productsSubtitle: "প্রোডাক্ট সেকশনের সাবটাইটেল",
     save: "সংরক্ষণ করুন",
     saving: "সংরক্ষণ হচ্ছে...",
     blocksTitle: "পেজ ব্লক (ড্র্যাগ করে সাজান)",
@@ -238,6 +240,8 @@ const text = {
     heroCtaText: "CTA button text",
     heroImage: "Hero background image (optional)",
     featuresTitle: "Feature Grid section title",
+    productsTitle: "Products section title",
+    productsSubtitle: "Products section subtitle",
     save: "Save",
     saving: "Saving...",
     blocksTitle: "Page blocks (drag to reorder)",
@@ -295,6 +299,8 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [heroCtaText, setHeroCtaText] = useState("");
   const [heroImage, setHeroImage] = useState("");
   const [featuresTitle, setFeaturesTitle] = useState("");
+  const [productsTitle, setProductsTitle] = useState("");
+  const [productsSubtitle, setProductsSubtitle] = useState("");
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   const [contentState, setContentState] = useState<ContentState>(emptyContentState());
@@ -371,6 +377,8 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           setHeroCtaText(merged.hero?.cta_text ?? "");
           setHeroImage(merged.hero?.background_image_url ?? "");
           setFeaturesTitle(merged.features_title ?? "");
+          setProductsTitle(merged.products_section_title ?? "");
+          setProductsSubtitle(merged.products_section_subtitle ?? "");
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
             accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
@@ -562,6 +570,8 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
         background_image_url: heroImage || null,
       },
       features_title: featuresTitle || null,
+      products_section_title: productsTitle || null,
+      products_section_subtitle: productsSubtitle || null,
       layout_order: layoutEntries,
     };
     for (const type of BLOCK_TYPES) {
@@ -582,7 +592,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -642,12 +652,24 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     }
   }
 
-  const draggableEntries = useMemo(() => layoutEntries.filter((entry) => !SINGLETON_BLOCK_TYPES.includes(entry.type)), [layoutEntries]);
-
   function renderBlockItem(entry: LayoutEntry) {
+    const Icon = BLOCK_ICONS[entry.type];
+
+    if (SINGLETON_BLOCK_TYPES.includes(entry.type)) {
+      return (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
+          <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <Icon size={14} /> {blockLabels[entry.type]}
+          </span>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            {locale === "bn" ? "সবসময় পেজে যুক্ত থাকে — নিচে ম্যানেজ করুন।" : "Always present on the page — manage it below."}
+          </p>
+        </div>
+      );
+    }
+
     const item = contentState[entry.type]?.find((candidate) => candidate.id === entry.id);
     if (!item) return null;
-    const Icon = BLOCK_ICONS[entry.type];
 
     return (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
@@ -908,11 +930,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
               </div>
             ) : null}
 
-            <BlockList entries={draggableEntries} onReorder={(next) => setLayoutEntries((prev) => [...next, ...prev.filter((entry) => SINGLETON_BLOCK_TYPES.includes(entry.type))])} renderItem={renderBlockItem} />
-
-            <div className="mt-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] p-3 text-center text-xs text-[var(--muted)]">
-              {locale === "bn" ? "পণ্য ও চেকআউট সেকশন সবসময় পেজে যুক্ত থাকে (নিচে ম্যানেজ করুন)।" : "The Products & Checkout section is always present — manage it below."}
-            </div>
+            <BlockList entries={layoutEntries} onReorder={setLayoutEntries} renderItem={renderBlockItem} />
           </div>
 
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
@@ -922,6 +940,10 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
                 <p className="text-sm text-[var(--muted)]">{t.productsHint}</p>
               </div>
               <span className="text-xs text-[var(--muted)]">{t.dragHint}</span>
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <TextField label={t.productsTitle} value={productsTitle} onChange={setProductsTitle} />
+              <TextField label={t.productsSubtitle} value={productsSubtitle} onChange={setProductsSubtitle} />
             </div>
             {selectedProductDetails.length === 0 ? (
               <div className="mt-3 rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">{t.emptyProducts}</div>

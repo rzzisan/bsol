@@ -71,6 +71,8 @@ export type LandingPageRecord = {
     }>;
     features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
     features_title?: string | null;
+    products_section_title?: string | null;
+    products_section_subtitle?: string | null;
     reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
     faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
     rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: unknown }>;
@@ -120,6 +122,8 @@ export type LandingPageContent = {
   }>;
   features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
   features_title?: string | null;
+  products_section_title?: string | null;
+  products_section_subtitle?: string | null;
   reviews?: Array<{ id?: string; name?: string | null; quote?: string | null; rating?: number | null; avatar_url?: string | null }>;
   faq?: Array<{ id?: string; q?: string | null; a?: string | null }>;
   rich_text_blocks?: Array<{ id?: string; title?: string | null; body?: unknown }>;
@@ -177,6 +181,8 @@ export function mergeLandingContent(
     carousel_images: pickArray(pageContent.carousel_images, templateContent.carousel_images),
     features: pickArray(pageContent.features, templateContent.features),
     features_title: pageContent.features_title ?? templateContent.features_title ?? null,
+    products_section_title: pageContent.products_section_title ?? templateContent.products_section_title ?? null,
+    products_section_subtitle: pageContent.products_section_subtitle ?? templateContent.products_section_subtitle ?? null,
     reviews: pickArray(pageContent.reviews, templateContent.reviews),
     faq: pickArray(pageContent.faq, templateContent.faq),
     rich_text_blocks: pickArray(pageContent.rich_text_blocks, templateContent.rich_text_blocks),
