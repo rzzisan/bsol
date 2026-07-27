@@ -7,9 +7,6 @@ import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE, getLandingTemplateName, type LandingPageRecord } from "@/lib/landing-pages";
 
-// GrapesJS Visual Editor stays dormant.
-const VISUAL_EDITOR_ENABLED = false;
-
 // New block-based no-code builder (Phase 2-3) — primary editor as of
 // Phase 4.
 const BLOCK_BUILDER_ENABLED = true;
@@ -18,7 +15,6 @@ const text: Record<string, Record<string, string>> = {
   bn: {
     title: "ল্যান্ডিং পেজ বিস্তারিত",
     back: "ফিরে যান",
-    visualEditor: "ভিজ্যুয়াল এডিটর",
     builder: "এডিট করুন",
     loading: "লোড হচ্ছে...",
     notFound: "ল্যান্ডিং পেজ পাওয়া যায়নি।",
@@ -26,7 +22,6 @@ const text: Record<string, Record<string, string>> = {
   en: {
     title: "Landing Page Details",
     back: "Go Back",
-    visualEditor: "Visual Editor",
     builder: "Edit",
     loading: "Loading...",
     notFound: "Landing page not found.",
@@ -225,14 +220,6 @@ export default function LandingPageDetails() {
               className="inline-flex rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
             >
               {t.builder}
-            </Link>
-          ) : null}
-          {VISUAL_EDITOR_ENABLED ? (
-            <Link
-              href={`/dashboard/landing-pages/${page.id}/editor`}
-              className="inline-flex rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
-            >
-              {t.visualEditor}
             </Link>
           ) : null}
           {page.public_url ? (
