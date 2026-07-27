@@ -6,10 +6,7 @@ import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE, getLandingTemplateName } from "@/lib/landing-pages";
 
-// Quick Edit is temporarily re-enabled: the block builder doesn't yet
-// support product attachment, so merchants need Quick Edit for that until
-// it's added to the builder. GrapesJS Visual Editor stays dormant.
-const QUICK_EDIT_ENABLED = true;
+// GrapesJS Visual Editor stays dormant.
 const VISUAL_EDITOR_ENABLED = false;
 
 // New block-based no-code builder (Phase 2-3) — primary editor as of
@@ -27,7 +24,6 @@ const text: Record<string, Record<string, string>> = {
     draft: "Draft",
     actions: "Actions",
     view: "দেখুন",
-    edit: "কুইক এডিট",
     visualEditor: "ভিজ্যুয়াল এডিটর",
     statistics: "স্ট্যাটিস্টিক্স",
     builder: "বিল্ডার",
@@ -42,7 +38,6 @@ const text: Record<string, Record<string, string>> = {
     draft: "Draft",
     actions: "Actions",
     view: "View",
-    edit: "Quick Edit",
     visualEditor: "Visual Editor",
     statistics: "Statistics",
     builder: "Builder",
@@ -229,14 +224,6 @@ export default function LandingPages() {
                 {t.createBuilder}
               </Link>
             ) : null}
-            {QUICK_EDIT_ENABLED ? (
-              <Link
-                href="/dashboard/landing-pages/create"
-                className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
-              >
-                {t.create}
-              </Link>
-            ) : null}
           </div>
         </div>
       </section>
@@ -280,11 +267,6 @@ export default function LandingPages() {
                         <Link href={`/dashboard/landing-page-analytics/${page.id}`} className="font-medium text-[var(--accent)] hover:underline">
                           {t.statistics}
                         </Link>
-                        {QUICK_EDIT_ENABLED ? (
-                          <Link href={`/dashboard/landing-pages/${page.id}/edit`} className="font-medium text-[var(--accent)] hover:underline">
-                            {t.edit}
-                          </Link>
-                        ) : null}
                         {BLOCK_BUILDER_ENABLED ? (
                           <Link href={`/dashboard/landing-pages/${page.id}/builder`} className="font-medium text-[var(--accent)] hover:underline">
                             {t.builder}

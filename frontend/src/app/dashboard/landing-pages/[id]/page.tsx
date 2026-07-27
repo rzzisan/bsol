@@ -7,10 +7,7 @@ import UserShell from "@/components/user-shell";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE, getLandingTemplateName, type LandingPageRecord } from "@/lib/landing-pages";
 
-// Quick Edit is temporarily re-enabled: the block builder doesn't yet
-// support product attachment, so merchants need Quick Edit for that until
-// it's added to the builder. GrapesJS Visual Editor stays dormant.
-const QUICK_EDIT_ENABLED = true;
+// GrapesJS Visual Editor stays dormant.
 const VISUAL_EDITOR_ENABLED = false;
 
 // New block-based no-code builder (Phase 2-3) — primary editor as of
@@ -21,7 +18,6 @@ const text: Record<string, Record<string, string>> = {
   bn: {
     title: "ল্যান্ডিং পেজ বিস্তারিত",
     back: "ফিরে যান",
-    edit: "কুইক এডিট",
     visualEditor: "ভিজ্যুয়াল এডিটর",
     builder: "এডিট করুন",
     loading: "লোড হচ্ছে...",
@@ -30,7 +26,6 @@ const text: Record<string, Record<string, string>> = {
   en: {
     title: "Landing Page Details",
     back: "Go Back",
-    edit: "Quick Edit",
     visualEditor: "Visual Editor",
     builder: "Edit",
     loading: "Loading...",
@@ -230,14 +225,6 @@ export default function LandingPageDetails() {
               className="inline-flex rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
             >
               {t.builder}
-            </Link>
-          ) : null}
-          {QUICK_EDIT_ENABLED ? (
-            <Link
-              href={`/dashboard/landing-pages/${page.id}/edit`}
-              className="inline-flex rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)]"
-            >
-              {t.edit}
             </Link>
           ) : null}
           {VISUAL_EDITOR_ENABLED ? (

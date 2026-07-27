@@ -97,15 +97,13 @@ Route::middleware('active_subscription')->group(function () {
     // ── Landing Page Builder ────────────────────────────────────────────────
     Route::get('/landing/templates', [LandingTemplateController::class, 'index']);
     Route::get('/landing/templates/{id}', [LandingTemplateController::class, 'show'])->where('id', '[0-9]+');
-    Route::get('/landing/pages/import-json/files', [LandingPageController::class, 'importFiles']);
     Route::get('/landing/pages', [LandingPageController::class, 'index']);
     Route::post('/landing/pages', [LandingPageController::class, 'store']);
     Route::get('/landing/pages/{id}', [LandingPageController::class, 'show'])->where('id', '[0-9]+');
     Route::put('/landing/pages/{id}', [LandingPageController::class, 'update'])->where('id', '[0-9]+');
     Route::delete('/landing/pages/{id}', [LandingPageController::class, 'destroy'])->where('id', '[0-9]+');
     Route::post('/landing/pages/{id}/publish', [LandingPageController::class, 'publish'])->where('id', '[0-9]+');
-    Route::post('/landing/pages/import-json', [LandingPageController::class, 'importFromJson']);
-    
+
     // ── Landing Page Analytics ──────────────────────────────────────────────────
     Route::prefix('landing/analytics')->group(function () {
         Route::get('/{landingPageId}/statistics', [LandingPageAnalyticsController::class, 'getStatistics'])->where('landingPageId', '[0-9]+');

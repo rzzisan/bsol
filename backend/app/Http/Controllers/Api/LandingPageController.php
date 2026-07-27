@@ -94,27 +94,6 @@ class LandingPageController extends Controller
         ], 201);
     }
 
-    public function importFiles(): JsonResponse
-    {
-        $jsonDir = dirname(base_path()) . '/landing_page_json';
-
-        if (!is_dir($jsonDir)) {
-            return response()->json([
-                'success' => true,
-                'data' => [],
-            ]);
-        }
-
-        $files = collect(glob($jsonDir . '/*.json') ?: [])
-            ->map(fn (string $path) => basename($path))
-            ->values();
-
-        return response()->json([
-            'success' => true,
-            'data' => $files,
-        ]);
-    }
-
     public function index(Request $request): JsonResponse
     {
         $userId = auth()->id();
@@ -256,79 +235,6 @@ class LandingPageController extends Controller
             'success' => true,
             'data' => $page->fresh(['template', 'products.product']),
         ]);
-    }
-
-    public function importFromJson(Request $request, \App\Services\CartFlowsImportService $importService): JsonResponse
-    {
-        $data = $request->validate([
-            'file_name' => ['required', 'string', 'max:190'],
-            'template_id' => ['nullable', 'integer', Rule::exists('landing_templates', 'id')->where(fn ($query) => $query->where('is_active', true))],
-            'status' => ['nullable', Rule::in(['draft', 'published'])],
-        ]);
-
-        $safeFile = basename($data['file_name']);
-        if (!str_ends_with(strtolower($safeFile), '.json')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only .json file is allowed.',
-            ], 422);
-        }
-
-        $jsonPath = dirname(base_path()) . '/landing_page_json/' . $safeFile;
-        if (!is_file($jsonPath)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'JSON file not found.',
-            ], 404);
-        }
-
-        $templateCode = Str::slug(Str::of($safeFile)->beforeLast('.')->toString());
-
-        try {
-            $parsed = $importService->parseFile($jsonPath, $templateCode);
-        } catch (\RuntimeException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        }
-
-        $title = $parsed['title'];
-        $html = $parsed['html'];
-
-        $status = $data['status'] ?? 'draft';
-        $template = null;
-        if (!empty($data['template_id'])) {
-            $template = LandingTemplate::query()->where('is_active', true)->find($data['template_id']);
-        }
-
-        $page = LandingPage::create([
-            'user_id' => auth()->id(),
-            'template_id' => $template?->id,
-            'title' => $title,
-            'slug' => $this->resolveSlug(null, $title),
-            'status' => $status,
-            'theme_settings' => $this->defaultTheme(),
-            'content' => [
-                'hero' => $parsed['hero'],
-                'html_sections' => $html ? [['title' => 'Imported Section', 'html' => $html]] : [],
-                'features' => [],
-                'reviews' => [],
-                'faq' => [],
-                'contact' => ['phone' => null],
-                'shipping' => ['inside_dhaka' => 80, 'outside_dhaka' => 120],
-            ],
-            'seo_meta' => [
-                'meta_title' => $title,
-            ],
-            'published_at' => $status === 'published' ? now() : null,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'JSON imported successfully.',
-            'data' => $page->load(['template', 'products.product']),
-        ], 201);
     }
 
     private function validatePayload(Request $request, int $userId, ?LandingPage $page = null): array

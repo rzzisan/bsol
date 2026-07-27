@@ -104,8 +104,6 @@ export type LandingPageRecord = {
   products?: Array<LandingPageProductInput & { id?: number; product?: ProductItem | null }>;
 };
 
-export type LandingImportFile = string;
-
 // Mirrors App\Support\CheckoutFieldResolver on the backend — keep both in sync.
 export type CheckoutFieldConfig = {
   id?: string;
