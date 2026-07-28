@@ -93,6 +93,7 @@ export type LandingPageRecord = {
     contact?: { phone?: string | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
     thank_you?: ThankYouConfig | null;
+    settings?: LandingPageSettings | null;
     layout_order?: Array<string | { type: string; id: string }>;
     [key: string]: unknown;
   } | null;
@@ -166,9 +167,25 @@ export type LandingPageContent = {
   contact?: { phone?: string | null };
   shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
   thank_you?: ThankYouConfig | null;
+  settings?: LandingPageSettings | null;
   layout_order?: Array<string | { type: string; id: string }>;
   [key: string]: unknown;
 };
+
+// Per-page toggles for optional landing-page behavior. Starts with phone
+// validation; future toggles become sibling fields here.
+export type LandingPageSettings = {
+  phone_validation_enabled?: boolean | null;
+  phone_validation_message?: string | null;
+};
+
+export const DEFAULT_SETTINGS: { phone_validation_enabled: boolean; phone_validation_message: string } = {
+  phone_validation_enabled: true,
+  phone_validation_message: "সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)",
+};
+
+// Mirrors CheckoutFieldResolver::BD_PHONE_REGEX on the backend — keep both in sync.
+export const BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
 
 export type ThankYouConfig = {
   title?: string | null;
@@ -244,6 +261,10 @@ export function mergeLandingContent(
       message: pageContent.thank_you?.message ?? templateContent.thank_you?.message ?? DEFAULT_THANK_YOU.message,
       show_order_summary: pageContent.thank_you?.show_order_summary ?? templateContent.thank_you?.show_order_summary ?? DEFAULT_THANK_YOU.show_order_summary,
       show_shipping_address: pageContent.thank_you?.show_shipping_address ?? templateContent.thank_you?.show_shipping_address ?? DEFAULT_THANK_YOU.show_shipping_address,
+    },
+    settings: {
+      phone_validation_enabled: pageContent.settings?.phone_validation_enabled ?? templateContent.settings?.phone_validation_enabled ?? DEFAULT_SETTINGS.phone_validation_enabled,
+      phone_validation_message: pageContent.settings?.phone_validation_message ?? templateContent.settings?.phone_validation_message ?? DEFAULT_SETTINGS.phone_validation_message,
     },
     layout_order: Array.isArray(pageContent.layout_order)
       ? pageContent.layout_order

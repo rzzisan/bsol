@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { JSONContent } from "@tiptap/core";
-import { mergeLandingContent, DEFAULT_CHECKOUT_FIELDS, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
+import { mergeLandingContent, DEFAULT_CHECKOUT_FIELDS, DEFAULT_SETTINGS, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
 import { resolveBlockIcon } from "@/lib/block-icons";
 import { renderTiptapJSON } from "@/lib/rich-text-render";
@@ -106,6 +106,7 @@ export type PublicLandingPage = {
     spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
     contact?: { phone?: string | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
+    settings?: { phone_validation_enabled?: boolean | null; phone_validation_message?: string | null } | null;
     layout_order?: Array<string | LayoutEntry>;
   } | null;
   seo_meta?: {
@@ -572,6 +573,8 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const products = (page.products ?? []).filter((item) => item.product);
   const shipping = content.shipping ?? {};
   const checkoutFields = (content.checkout_fields && content.checkout_fields.length > 0 ? content.checkout_fields : DEFAULT_CHECKOUT_FIELDS).filter((field) => field.enabled);
+  const phoneValidationEnabled = content.settings?.phone_validation_enabled ?? DEFAULT_SETTINGS.phone_validation_enabled;
+  const phoneValidationMessage = content.settings?.phone_validation_message || DEFAULT_SETTINGS.phone_validation_message;
   const shippingCharge = shippingZone === "inside"
     ? Number(shipping.inside_dhaka ?? 80)
     : Number(shipping.outside_dhaka ?? shipping.inside_dhaka ?? 120);
@@ -630,9 +633,16 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       return;
     }
 
-    setSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(null);
+
+    if (phoneValidationEnabled && !BD_PHONE_REGEX.test(customer.customer_phone.trim())) {
+      setSubmitError(phoneValidationMessage);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const payload = {
@@ -706,7 +716,13 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           {isLong ? (
             <textarea required={field.required} rows={3} value={value} onChange={(e) => updateCustomer(key, e.target.value)} className={fieldClassName} />
           ) : (
-            <input required={field.required} value={value} onChange={(e) => updateCustomer(key, e.target.value)} className={fieldClassName} />
+            <input
+              required={field.required}
+              value={value}
+              onChange={(e) => updateCustomer(key, e.target.value)}
+              className={fieldClassName}
+              {...(key === "customer_phone" ? { type: "tel", inputMode: "numeric" as const, maxLength: 11 } : {})}
+            />
           )}
         </label>
       );

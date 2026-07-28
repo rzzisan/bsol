@@ -14,6 +14,7 @@ import {
   type ProductItem,
   DEFAULT_CHECKOUT_FIELDS,
   DEFAULT_THANK_YOU,
+  DEFAULT_SETTINGS,
   mergeLandingContent,
   toNumberOrNull,
 } from "@/lib/landing-pages";
@@ -203,6 +204,10 @@ const text = {
     fieldShown: "দেখাবে",
     fieldRequired: "বাধ্যতামূলক",
     fieldOptionsPlaceholder: "অপশন, কমা দিয়ে আলাদা করুন (যেমন: S, M, L)",
+    settingsTitle: "সেটিংস",
+    phoneValidation: "ফোন নাম্বার ভ্যালিডেশন",
+    phoneValidationHint: "চালু থাকলে সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর ছাড়া অর্ডার করা যাবে না।",
+    phoneValidationMessage: "ভুল নম্বরে দেখানোর মেসেজ",
     save: "সংরক্ষণ করুন",
     saving: "সংরক্ষণ হচ্ছে...",
     blocksTitle: "পেজ ব্লক (ড্র্যাগ করে সাজান)",
@@ -269,6 +274,10 @@ const text = {
     fieldShown: "Shown",
     fieldRequired: "Required",
     fieldOptionsPlaceholder: "Comma-separated options (e.g. S, M, L)",
+    settingsTitle: "Settings",
+    phoneValidation: "Phone number validation",
+    phoneValidationHint: "When on, orders require a valid 11-digit Bangladeshi mobile number.",
+    phoneValidationMessage: "Message shown for an invalid number",
     save: "Save",
     saving: "Saving...",
     blocksTitle: "Page blocks (drag to reorder)",
@@ -340,6 +349,8 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [thankYouMessage, setThankYouMessage] = useState(DEFAULT_THANK_YOU.message);
   const [thankYouShowSummary, setThankYouShowSummary] = useState(true);
   const [thankYouShowAddress, setThankYouShowAddress] = useState(true);
+  const [phoneValidationEnabled, setPhoneValidationEnabled] = useState<boolean>(DEFAULT_SETTINGS.phone_validation_enabled);
+  const [phoneValidationMessage, setPhoneValidationMessage] = useState<string>(DEFAULT_SETTINGS.phone_validation_message);
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   const [contentState, setContentState] = useState<ContentState>(emptyContentState());
@@ -423,6 +434,8 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           setThankYouMessage(merged.thank_you?.message ?? DEFAULT_THANK_YOU.message);
           setThankYouShowSummary(merged.thank_you?.show_order_summary ?? true);
           setThankYouShowAddress(merged.thank_you?.show_shipping_address ?? true);
+          setPhoneValidationEnabled(merged.settings?.phone_validation_enabled ?? DEFAULT_SETTINGS.phone_validation_enabled);
+          setPhoneValidationMessage(merged.settings?.phone_validation_message ?? DEFAULT_SETTINGS.phone_validation_message);
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
             accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
@@ -649,6 +662,10 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
         show_order_summary: thankYouShowSummary,
         show_shipping_address: thankYouShowAddress,
       },
+      settings: {
+        phone_validation_enabled: phoneValidationEnabled,
+        phone_validation_message: phoneValidationMessage || null,
+      },
       layout_order: layoutEntries,
     };
     for (const type of BLOCK_TYPES) {
@@ -669,7 +686,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, phoneValidationEnabled, phoneValidationMessage, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -1187,6 +1204,20 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+            <h3 className="text-base font-semibold text-[var(--foreground)]">{t.settingsTitle}</h3>
+            <label className="mt-3 flex items-center gap-2 text-sm text-[var(--foreground)]">
+              <input type="checkbox" checked={phoneValidationEnabled} onChange={(e) => setPhoneValidationEnabled(e.target.checked)} className="accent-[var(--accent)]" />
+              {t.phoneValidation}
+            </label>
+            <p className="mt-1 text-xs text-[var(--muted)]">{t.phoneValidationHint}</p>
+            {phoneValidationEnabled ? (
+              <div className="mt-3">
+                <TextField label={t.phoneValidationMessage} value={phoneValidationMessage} onChange={setPhoneValidationMessage} />
+              </div>
+            ) : null}
           </div>
 
           <div className="flex justify-end">

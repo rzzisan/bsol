@@ -35,6 +35,9 @@ class CheckoutFieldResolver
 
     private const REQUIRED_BY_DEFAULT = ['customer_name', 'customer_phone', 'customer_address'];
 
+    /** 11-digit BD mobile number: 01 + operator digit 3-9 + 8 digits. */
+    public const BD_PHONE_REGEX = '/^01[3-9]\d{8}$/';
+
     public static function defaultFields(): array
     {
         return collect(array_keys(self::BUILTIN_RULES))->map(fn (string $key) => [
@@ -103,7 +106,7 @@ class CheckoutFieldResolver
     }
 
     /** Build Laravel validation rules for the incoming request from resolved fields. */
-    public static function buildRules(array $resolvedFields): array
+    public static function buildRules(array $resolvedFields, bool $phoneValidationEnabled = false): array
     {
         $rules = [];
 
@@ -114,6 +117,9 @@ class CheckoutFieldResolver
 
             if ($field['kind'] === 'builtin') {
                 $base = self::BUILTIN_RULES[$field['key']] ?? ['string', 'max:255'];
+                if ($field['key'] === 'customer_phone' && $phoneValidationEnabled) {
+                    $base = array_merge($base, ['regex:' . self::BD_PHONE_REGEX]);
+                }
                 $rules[$field['key']] = array_merge([$field['required'] ? 'required' : 'nullable'], $base);
                 continue;
             }
