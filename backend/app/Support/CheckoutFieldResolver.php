@@ -24,13 +24,24 @@ class CheckoutFieldResolver
     ];
 
     private const BUILTIN_LABELS = [
-        'customer_name' => 'নাম',
-        'customer_phone' => 'ফোন নম্বর',
-        'customer_address' => 'ঠিকানা',
-        'customer_district' => 'জেলা',
-        'customer_thana' => 'থানা',
-        'customer_area' => 'এলাকা',
-        'notes' => 'অতিরিক্ত নোট',
+        'bn' => [
+            'customer_name' => 'নাম',
+            'customer_phone' => 'ফোন নম্বর',
+            'customer_address' => 'ঠিকানা',
+            'customer_district' => 'জেলা',
+            'customer_thana' => 'থানা',
+            'customer_area' => 'এলাকা',
+            'notes' => 'অতিরিক্ত নোট',
+        ],
+        'en' => [
+            'customer_name' => 'Name',
+            'customer_phone' => 'Phone number',
+            'customer_address' => 'Address',
+            'customer_district' => 'District',
+            'customer_thana' => 'Thana',
+            'customer_area' => 'Area',
+            'notes' => 'Additional notes',
+        ],
     ];
 
     private const REQUIRED_BY_DEFAULT = ['customer_name', 'customer_phone', 'customer_address'];
@@ -38,12 +49,14 @@ class CheckoutFieldResolver
     /** 11-digit BD mobile number: 01 + operator digit 3-9 + 8 digits. */
     public const BD_PHONE_REGEX = '/^01[3-9]\d{8}$/';
 
-    public static function defaultFields(): array
+    public static function defaultFields(string $language = 'bn'): array
     {
+        $labels = self::BUILTIN_LABELS[$language] ?? self::BUILTIN_LABELS['bn'];
+
         return collect(array_keys(self::BUILTIN_RULES))->map(fn (string $key) => [
             'key' => $key,
             'kind' => 'builtin',
-            'label' => self::BUILTIN_LABELS[$key],
+            'label' => $labels[$key],
             'required' => in_array($key, self::REQUIRED_BY_DEFAULT, true),
             'enabled' => true,
         ])->values()->all();
@@ -54,12 +67,13 @@ class CheckoutFieldResolver
      * defaults when absent. customer_phone is always forced
      * enabled+required regardless of what was stored — too much
      * downstream logic (customer sync, fraud scoring, courier contact)
-     * depends on it.
+     * depends on it. $language only affects the fallback label used when
+     * customer_phone is missing from $rawFields entirely.
      */
-    public static function resolve(?array $rawFields): array
+    public static function resolve(?array $rawFields, string $language = 'bn'): array
     {
         $fields = empty($rawFields)
-            ? collect(self::defaultFields())
+            ? collect(self::defaultFields($language))
             : collect($rawFields)
                 ->filter(fn ($f) => is_array($f) && !empty($f['key']))
                 ->map(function (array $f): array {
@@ -91,7 +105,7 @@ class CheckoutFieldResolver
             $fields->push([
                 'key' => 'customer_phone',
                 'kind' => 'builtin',
-                'label' => self::BUILTIN_LABELS['customer_phone'],
+                'label' => (self::BUILTIN_LABELS[$language] ?? self::BUILTIN_LABELS['bn'])['customer_phone'],
                 'required' => true,
                 'enabled' => true,
             ]);

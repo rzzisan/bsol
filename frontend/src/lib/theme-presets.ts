@@ -54,14 +54,18 @@ export const COLOR_PRESETS: Array<{ label: string; theme: Omit<ThemeSettings, "f
 // Every entry must exist in Next.js's bundled Google Fonts list
 // (verified against next/font/google's font-data.json) and be imported by
 // name in frontend/src/app/lp/[slug]/page.tsx.
-export const FONT_OPTIONS: Array<{ label: string; value: string }> = [
-  { label: "Hind Siliguri (ডিফল্ট)", value: "Hind Siliguri" },
-  { label: "Noto Sans Bengali", value: "Noto Sans Bengali" },
-  { label: "Tiro Bangla", value: "Tiro Bangla" },
-  { label: "Anek Bangla", value: "Anek Bangla" },
-  { label: "Poppins (Latin)", value: "Poppins" },
-  { label: "Inter (Latin)", value: "Inter" },
-];
+export function getFontOptions(locale: "bn" | "en" = "bn"): Array<{ label: string; value: string }> {
+  return [
+    { label: locale === "bn" ? "Hind Siliguri (ডিফল্ট)" : "Hind Siliguri (Default)", value: "Hind Siliguri" },
+    { label: "Noto Sans Bengali", value: "Noto Sans Bengali" },
+    { label: "Tiro Bangla", value: "Tiro Bangla" },
+    { label: "Anek Bangla", value: "Anek Bangla" },
+    { label: "Poppins (Latin)", value: "Poppins" },
+    { label: "Inter (Latin)", value: "Inter" },
+  ];
+}
+
+export const FONT_OPTIONS = getFontOptions("bn");
 
 // Maps a theme_settings.font_family value to the CSS custom property that
 // frontend/src/app/lp/[slug]/page.tsx defines via next/font/google's

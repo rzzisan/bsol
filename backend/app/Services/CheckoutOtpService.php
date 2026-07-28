@@ -12,8 +12,33 @@ use Illuminate\Support\Facades\Http;
 
 class CheckoutOtpService
 {
-    // Mirrors DEFAULT_SETTINGS.otp_sms_template in frontend/src/lib/landing-pages.ts.
-    private const DEFAULT_SMS_TEMPLATE = 'আপনার অর্ডার #{order_number} কনফার্ম করতে {otp} কোডটি লিখুন। কোডটি ৫ মিনিটের জন্য বৈধ।';
+    // Mirrors getDefaultSettings().otp_sms_template in frontend/src/lib/landing-pages.ts.
+    private const DEFAULT_SMS_TEMPLATE = [
+        'bn' => 'আপনার অর্ডার #{order_number} কনফার্ম করতে {otp} কোডটি লিখুন। কোডটি ৫ মিনিটের জন্য বৈধ।',
+        'en' => 'Enter code {otp} to confirm your order #{order_number}. This code is valid for 5 minutes.',
+    ];
+
+    // Resend-flow messages returned to the public thank-you page; picked by the page's content.settings.language.
+    private const RESEND_MESSAGES = [
+        'bn' => [
+            'blocked' => 'এই নম্বরটি অতিরিক্ত রিসেন্ড অনুরোধের কারণে ১ ঘণ্টার জন্য ব্লক করা হয়েছে।',
+            'expired' => 'OTP-এর মেয়াদ শেষ হয়ে গেছে।',
+            'limit_reached' => 'সর্বোচ্চ রিসেন্ড সীমা শেষ। এই নম্বরটি ১ ঘণ্টার জন্য ব্লক করা হয়েছে।',
+            'cooldown' => 'পরবর্তী OTP পাঠানোর আগে একটু অপেক্ষা করুন।',
+            'gateway_unusable' => 'SMS পাঠানো সম্ভব হচ্ছে না। অনুগ্রহ করে বিক্রেতার সাথে যোগাযোগ করুন।',
+            'no_balance' => 'SMS ব্যালেন্স নেই। অনুগ্রহ করে বিক্রেতার সাথে যোগাযোগ করুন।',
+            'send_failed' => 'OTP পাঠানো ব্যর্থ হয়েছে। আবার চেষ্টা করুন।',
+        ],
+        'en' => [
+            'blocked' => 'This number was blocked for 1 hour due to too many resend requests.',
+            'expired' => 'The OTP has expired.',
+            'limit_reached' => 'Maximum resend limit reached. This number has been blocked for 1 hour.',
+            'cooldown' => 'Please wait a moment before requesting another OTP.',
+            'gateway_unusable' => 'Unable to send SMS right now. Please contact the seller.',
+            'no_balance' => 'No SMS balance available. Please contact the seller.',
+            'send_failed' => 'Failed to send OTP. Please try again.',
+        ],
+    ];
 
     public function __construct(private readonly SmsCreditService $creditService) {}
 
@@ -47,7 +72,7 @@ class CheckoutOtpService
         }
 
         $otp = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        $message = $this->renderOtpMessage($settings['otp_sms_template'] ?? null, $order, $otp);
+        $message = $this->renderOtpMessage($settings['otp_sms_template'] ?? null, $order, $otp, $settings['language'] ?? 'bn');
 
         $creditsRequired = $this->creditService->calculateCreditsRequired($message);
         $balance = $this->creditService->getBalance($user->id);
@@ -90,23 +115,26 @@ class CheckoutOtpService
      */
     public function resend(LandingPage $page, Order $order, PhoneOtpVerification $record): array
     {
+        $language = ($page->content['settings'] ?? [])['language'] ?? 'bn';
+        $messages = self::RESEND_MESSAGES[$language] ?? self::RESEND_MESSAGES['bn'];
+
         if ($record->blocked_until && now()->lt($record->blocked_until)) {
             return [
                 'ok' => false,
-                'message' => 'এই নম্বরটি অতিরিক্ত রিসেন্ড অনুরোধের কারণে ১ ঘণ্টার জন্য ব্লক করা হয়েছে।',
+                'message' => $messages['blocked'],
                 'retry_after_seconds' => now()->diffInSeconds($record->blocked_until),
             ];
         }
 
         if ($record->isExpired()) {
-            return ['ok' => false, 'message' => 'OTP-এর মেয়াদ শেষ হয়ে গেছে।'];
+            return ['ok' => false, 'message' => $messages['expired']];
         }
 
         if ($record->resend_count >= 2) {
             $record->update(['blocked_until' => now()->addHour()]);
             return [
                 'ok' => false,
-                'message' => 'সর্বোচ্চ রিসেন্ড সীমা শেষ। এই নম্বরটি ১ ঘণ্টার জন্য ব্লক করা হয়েছে।',
+                'message' => $messages['limit_reached'],
                 'retry_after_seconds' => 3600,
             ];
         }
@@ -114,7 +142,7 @@ class CheckoutOtpService
         if ($record->next_resend_at && now()->lt($record->next_resend_at)) {
             return [
                 'ok' => false,
-                'message' => 'পরবর্তী OTP পাঠানোর আগে একটু অপেক্ষা করুন।',
+                'message' => $messages['cooldown'],
                 'retry_after_seconds' => now()->diffInSeconds($record->next_resend_at),
             ];
         }
@@ -122,22 +150,22 @@ class CheckoutOtpService
         $user = User::find($order->user_id);
         $gateway = $user?->sms_gateway_id ? SmsGateway::find($user->sms_gateway_id) : null;
         if (!$user || !$this->gatewayIsUsable($gateway)) {
-            return ['ok' => false, 'message' => 'SMS পাঠানো সম্ভব হচ্ছে না। অনুগ্রহ করে বিক্রেতার সাথে যোগাযোগ করুন।'];
+            return ['ok' => false, 'message' => $messages['gateway_unusable']];
         }
 
         $otp = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
         $settings = $page->content['settings'] ?? [];
-        $message = $this->renderOtpMessage($settings['otp_sms_template'] ?? null, $order, $otp);
+        $message = $this->renderOtpMessage($settings['otp_sms_template'] ?? null, $order, $otp, $language);
 
         $creditsRequired = $this->creditService->calculateCreditsRequired($message);
         $balance = $this->creditService->getBalance($user->id);
         if ($balance < $creditsRequired) {
-            return ['ok' => false, 'message' => 'SMS ব্যালেন্স নেই। অনুগ্রহ করে বিক্রেতার সাথে যোগাযোগ করুন।'];
+            return ['ok' => false, 'message' => $messages['no_balance']];
         }
 
         $sent = $this->send($gateway, $user, (string) $record->mobile, $message);
         if (!$sent) {
-            return ['ok' => false, 'message' => 'OTP পাঠানো ব্যর্থ হয়েছে। আবার চেষ্টা করুন।'];
+            return ['ok' => false, 'message' => $messages['send_failed']];
         }
 
         $this->creditService->deduct(
@@ -159,9 +187,9 @@ class CheckoutOtpService
         return ['ok' => true];
     }
 
-    private function renderOtpMessage(?string $template, Order $order, string $otp): string
+    private function renderOtpMessage(?string $template, Order $order, string $otp, string $language = 'bn'): string
     {
-        $template = trim((string) $template) ?: self::DEFAULT_SMS_TEMPLATE;
+        $template = trim((string) $template) ?: (self::DEFAULT_SMS_TEMPLATE[$language] ?? self::DEFAULT_SMS_TEMPLATE['bn']);
 
         $map = [
             '{customer_name}' => (string) ($order->customer_name ?: 'Customer'),

@@ -13,10 +13,36 @@ use Illuminate\Http\Request;
 
 class CheckoutOtpController extends Controller
 {
+    // Customer-facing messages for the public thank-you page's OTP card — picked by content.settings.language.
+    private const MESSAGES = [
+        'bn' => [
+            'session_not_found' => 'OTP সেশন খুঁজে পাওয়া যায়নি।',
+            'expired' => 'OTP-এর মেয়াদ শেষ হয়ে গেছে। আবার পাঠান।',
+            'max_attempts' => 'সর্বোচ্চ চেষ্টার সীমা শেষ। আবার পাঠান।',
+            'wrong_code' => 'ভুল OTP। আবার চেষ্টা করুন।',
+            'resend_failed' => 'OTP পাঠানো যায়নি।',
+            'resent' => 'OTP আবার পাঠানো হয়েছে।',
+        ],
+        'en' => [
+            'session_not_found' => 'OTP session not found.',
+            'expired' => 'The OTP has expired. Please resend.',
+            'max_attempts' => 'Maximum attempts reached. Please resend.',
+            'wrong_code' => 'Incorrect OTP. Please try again.',
+            'resend_failed' => 'OTP could not be sent.',
+            'resent' => 'OTP has been resent.',
+        ],
+    ];
+
     public function __construct(
         private readonly CheckoutOtpService $checkoutOtpService,
         private readonly OrderStatusService $orderStatusService,
     ) {}
+
+    private function messages(LandingPage $page): array
+    {
+        $language = ($page->content['settings'] ?? [])['language'] ?? 'bn';
+        return self::MESSAGES[$language] ?? self::MESSAGES['bn'];
+    }
 
     public function verify(Request $request, string $slug, int $orderId): JsonResponse
     {
@@ -27,6 +53,7 @@ class CheckoutOtpController extends Controller
 
         $page = $this->resolvePage($slug);
         $order = $this->resolveOrder($page, $orderId, $validated['token']);
+        $messages = $this->messages($page);
 
         if ($order->otp_verified_at) {
             return response()->json([
@@ -43,15 +70,15 @@ class CheckoutOtpController extends Controller
             ->first();
 
         if (!$record) {
-            return response()->json(['success' => false, 'message' => 'OTP সেশন খুঁজে পাওয়া যায়নি।'], 422);
+            return response()->json(['success' => false, 'message' => $messages['session_not_found']], 422);
         }
 
         if ($record->isExpired()) {
-            return response()->json(['success' => false, 'message' => 'OTP-এর মেয়াদ শেষ হয়ে গেছে। আবার পাঠান।'], 422);
+            return response()->json(['success' => false, 'message' => $messages['expired']], 422);
         }
 
         if ($record->attempts >= 5) {
-            return response()->json(['success' => false, 'message' => 'সর্বোচ্চ চেষ্টার সীমা শেষ। আবার পাঠান।'], 422);
+            return response()->json(['success' => false, 'message' => $messages['max_attempts']], 422);
         }
 
         $record->increment('attempts');
@@ -59,7 +86,7 @@ class CheckoutOtpController extends Controller
         if ($record->otp_code !== $validated['otp_code']) {
             return response()->json([
                 'success' => false,
-                'message' => 'ভুল OTP। আবার চেষ্টা করুন।',
+                'message' => $messages['wrong_code'],
                 'remaining_attempts' => max(0, 5 - $record->attempts),
             ], 422);
         }
@@ -82,6 +109,7 @@ class CheckoutOtpController extends Controller
 
         $page = $this->resolvePage($slug);
         $order = $this->resolveOrder($page, $orderId, $validated['token']);
+        $messages = $this->messages($page);
 
         if ($order->otp_verified_at) {
             return response()->json(['success' => true, 'data' => ['otp_verified' => true]]);
@@ -95,7 +123,7 @@ class CheckoutOtpController extends Controller
             ->first();
 
         if (!$record) {
-            return response()->json(['success' => false, 'message' => 'OTP সেশন খুঁজে পাওয়া যায়নি।'], 422);
+            return response()->json(['success' => false, 'message' => $messages['session_not_found']], 422);
         }
 
         $result = $this->checkoutOtpService->resend($page, $order, $record);
@@ -103,12 +131,12 @@ class CheckoutOtpController extends Controller
         if (!$result['ok']) {
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? 'OTP পাঠানো যায়নি।',
+                'message' => $result['message'] ?? $messages['resend_failed'],
                 'retry_after_seconds' => $result['retry_after_seconds'] ?? null,
             ], 429);
         }
 
-        return response()->json(['success' => true, 'message' => 'OTP আবার পাঠানো হয়েছে।']);
+        return response()->json(['success' => true, 'message' => $messages['resent']]);
     }
 
     private function resolvePage(string $slug): LandingPage

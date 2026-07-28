@@ -2,7 +2,9 @@
 আংশিক পড়ে কাজ শুরু করা হলে সেটি invalid execution হিসেবে গণ্য হবে।
 # Hybrid Stack Server Context
 
-Last updated: 2026-07-23 (see "🚨 Frontend process manager পরিবর্তন" note below — frontend is now systemd-managed, not Supervisor)
+Last updated: 2026-07-28 (see "🚨 Frontend process manager পরিবর্তন" note below — frontend is systemd-managed; Supervisor's frontend config file has now been **fully deleted**, not just disabled — see §28)
+
+📄 **সহ-ডকুমেন্ট**: ল্যান্ডিং পেজ বিল্ডার ফিচার (backend + frontend, সব ফাইল/লাইন নম্বরসহ)-এর জন্য আলাদা deep-reference ফাইল আছে — `/var/www/hybrid-stack/landing_page_context.md`। এই `CONTEXT.md` server/ops/deployment-level master context; landing-page-builder-related কাজের আগে ওই ফাইলটাও পড়ে নাও, এখানে সেটার বিষয়বস্তু ডুপ্লিকেট করা হয়নি।
 Native/local host domain: `bsol.zyrotechbd.com`
 Dokploy-hosted domain: `bsol.zisan.me`
 Native/local host server IP: `103.157.253.197`
@@ -40,7 +42,7 @@ Project owner directive (strict):
 
 - Frontend (`127.0.0.1:3001`) এখন **systemd** দিয়ে ম্যানেজ হয়: `hybrid-frontend.service` (`Restart=always`, `User=root`, `ExecStart=/usr/bin/npm run start`)
 - একটা `hybrid-healthcheck.timer` প্রতি মিনিটে `bsol.zyrotechbd.com`-এ frontend/backend health চেক করে এবং প্রয়োজনে `systemctl restart hybrid-frontend.service` (এবং backend অস্বাভাবিক হলে `php8.3-fpm`/`nginx`) চালায় — স্ক্রিপ্ট: `/usr/local/bin/hybrid-healthcheck.sh`
-- Supervisor-এর `hybrid-stack-frontend` প্রোগ্রাম ডেফিনিশন **disable করা হয়েছে** (`/etc/supervisor/conf.d/hybrid-stack-frontend.conf.disabled` হিসেবে backup রাখা আছে, active conf.d-এ নেই) — কারণ সেটা systemd-এর সাথে port 3001-এর জন্য conflict করছিল এবং কখনোই সফলভাবে সার্ভ করছিল না (সবসময় FATAL দেখাত, যদিও সাইট আসলে systemd দিয়ে সচল ছিল)
+- Supervisor-এর `hybrid-stack-frontend` প্রোগ্রাম ডেফিনিশন **(2026-07-28 আপডেট) সম্পূর্ণ ডিলিট করা হয়েছে** — `/etc/supervisor/conf.d/` এখন সম্পূর্ণ খালি, কোনো `.conf` বা `.conf.disabled` backup ফাইল নেই। কারণ: সেটা systemd-এর সাথে port 3001-এর জন্য conflict করছিল এবং কখনোই সফলভাবে সার্ভ করছিল না (সবসময় FATAL দেখাত, যদিও সাইট আসলে systemd দিয়ে সচল ছিল)। একবার (2026-07-28) কেউ ভুলবশত ওই `.disabled` backup ফাইলকে `.conf`-এ rename করে `supervisorctl reread/update` চালালে সাথে সাথে systemd vs supervisor port-3001 conflict আবার reproduce হয় (দেখো §28) — তাই backup ফাইলটা রাখাই বিপজ্জনক প্রমাণিত হয়েছে, সম্পূর্ণ delete করে দেওয়া হয়েছে। `supervisor` systemd service নিজে এখনো installed/enabled/active আছে কিন্তু **কোনো program manage করে না** (`conf.d` খালি) — ভবিষ্যতে অন্য কোনো non-frontend প্রসেসের জন্য দরকার হলে ব্যবহার করা যাবে, কিন্তু frontend-এর জন্য আর কখনো `.conf` file পুনরায় তৈরি করা যাবে না।
 
 ### সঠিক কমান্ড (এখন থেকে ব্যবহার করুন)
 
@@ -102,7 +104,7 @@ Section 9 এবং এই ডকুমেন্টের troubleshooting sectio
 - `nodejs` (Node 22 via NodeSource repo)
 - `postgresql`
 - `redis-server`
-- `supervisor`
+- `supervisor` — installed, service enabled/active, কিন্তু (2026-07-28 থেকে) `/etc/supervisor/conf.d/` সম্পূর্ণ খালি — বর্তমানে কিছুই manage করে না (frontend systemd দিয়ে চলে, backend `php8.3-fpm` দিয়ে চলে); দেখো §9, §28
 - `certbot`
 - `python3-certbot-nginx`
 
@@ -291,10 +293,12 @@ journalctl -u hybrid-frontend.service -n 50 --no-pager
 systemctl status hybrid-healthcheck.timer
 ```
 
-### Supervisor (deprecated for frontend)
+### Supervisor (frontend থেকে সম্পূর্ণ সরিয়ে ফেলা হয়েছে — 2026-07-28)
 
-- `/etc/supervisor/conf.d/hybrid-stack-frontend.conf` disabled হিসেবে রাখা আছে: `hybrid-stack-frontend.conf.disabled` (একই ডিরেক্টরিতে, `.conf` extension না থাকায় Supervisor আর load করে না)
-- `supervisorctl status` এখন এই প্রোগ্রামটা আর দেখাবে না — এটা প্রত্যাশিত, error না
+- `/etc/supervisor/conf.d/hybrid-stack-frontend.conf` **ডিলিট করা হয়েছে সম্পূর্ণভাবে** (আগে `.conf.disabled` backup হিসেবে রাখা ছিল, সেটাও এখন নেই) — `/etc/supervisor/conf.d/` directory খালি
+- `supervisorctl status` এখন কিছুই দেখাবে না (empty output) — এটা প্রত্যাশিত, error না
+- **⚠️ কখনো এই config আবার তৈরি/enable করার চেষ্টা কোরো না** — systemd-এর `hybrid-frontend.service` একই port (3001) bind করে, দুটো একসাথে চললে conflict হবে (incident details: §28)
+- Supervisor daemon নিজে চলছে (enabled/active) কিন্তু `conf.d` খালি থাকায় কিছুই manage করে না
 - Supervisor অন্য কোনো hybrid-stack প্রসেস (backend ইত্যাদি) ম্যানেজ করে না — backend `php8.3-fpm.service` (systemd, স্ট্যান্ডার্ড) দিয়ে চলে, যেটা এই পরিবর্তনে প্রভাবিত হয়নি
 
 ---
@@ -366,12 +370,14 @@ These services were enabled and started:
 - `php8.3-fpm`
 - `postgresql`
 - `redis-server`
-- `supervisor`
+- `supervisor` (running, but manages nothing — see §9/§28)
 - `certbot.timer`
+- `hybrid-frontend.service` (systemd — actual frontend process manager)
+- `hybrid-healthcheck.timer` (systemd — per-minute auto-recovery)
 
 ### App runtime
 
-- Next.js frontend runs under Supervisor on `127.0.0.1:3001`
+- Next.js frontend runs under **systemd** (`hybrid-frontend.service`) on `127.0.0.1:3001` — **not** Supervisor (see §9/§28)
 - Laravel API runs through `php-fpm` behind Nginx
 
 ---
@@ -380,7 +386,10 @@ These services were enabled and started:
 
 ### Server / runtime
 - `/etc/nginx/sites-available/default`
-- `/etc/supervisor/conf.d/hybrid-stack-frontend.conf`
+- `/etc/systemd/system/hybrid-frontend.service` (actual frontend process manager — **not** Supervisor, see §9/§28)
+- `/etc/systemd/system/hybrid-healthcheck.service` + `hybrid-healthcheck.timer`
+- `/usr/local/bin/hybrid-healthcheck.sh`
+- `/var/www/hybrid-stack/frontend/scripts/deploy-safe.sh` (uses `systemctl restart hybrid-frontend.service`, not supervisorctl — see §28)
 - `/etc/letsencrypt/live/bsol.zyrotechbd.com/`
 
 ### Backend
@@ -1021,11 +1030,10 @@ Problem backend/Laravel issue না; এটি frontend runtime/build artifact 
 1. `.next` clean করে
 2. build output ownership align করে (`www-data`)
 3. frontend build run করে
-4. supervisor stop/start flow use করে
-5. port `3001`-এ stale/orphan `next` process থাকলে terminate করে
-6. supervisor status verify করে
-7. live smoke check করে (`/dashboard`, `/api/health`)
-8. active CSS chunk detect করে HTTP `200` validate করে
+4. **(2026-07-28 আপডেট)** `systemctl restart hybrid-frontend.service` চালায় (আগে supervisor stop/start ব্যবহার হতো, এখন আর না — §28 দেখো)
+5. `systemctl is-active` দিয়ে service status verify করে; বুট সম্পূর্ণ হতে সময় লাগতে পারে বলে smoke check-এ ১০ সেকেন্ড পর্যন্ত retry loop আছে
+6. live smoke check করে (`/dashboard`, `/api/health`)
+7. active CSS chunk detect করে HTTP `200` validate করে
 
 ### Mandatory future prevention rules
 
@@ -1188,3 +1196,48 @@ Future conversation/task-এ যদি branch workflow explicitly না-ও ব
 - code work happens on `main`
 - deploy branch is `dokploy`
 - Dokploy deploys from `dokploy`
+
+
+### বর্তমান branch drift status (checked: 2026-07-28)
+
+`dokploy` branch এই মুহূর্তে `main` থেকে **৩২ commit পিছিয়ে আছে** (`git rev-list --count main ^dokploy` = 32)। `dokploy`-তে extra/unmerged কোনো commit নেই (`dokploy ^main` = 0), তাই fast-forward safe — `git merge --ff-only main` সমস্যা ছাড়াই কাজ করবে। এটা শুধু তথ্য হিসেবে নোট করা হলো; explicitly না বলা পর্যন্ত `dokploy` push কোরো না (§27-এর "Critical rule" অনুযায়ী)।
+
+---
+
+## 28. Supervisor সম্পূর্ণ অপসারণ + `deploy-safe.sh` systemd migration (incident + fix, 2026-07-28)
+
+### যা ঘটেছিল
+
+`npm run deploy:prod:safe` চালানোর সময় deploy script-এর `supervisorctl stop/start hybrid-stack-frontend` ধাপ ব্যর্থ হয় (`ERROR (no such process)`), কারণ frontend আসলে ততদিনে systemd (`hybrid-frontend.service`) দিয়ে চলছিল আর supervisor-এর config `.conf.disabled` অবস্থায় ছিল (§9-এ আগে থেকেই নোট করা ছিল)। Build নিজে সফল হয়েছিল এবং site healthy ছিল (dashboard/api/health/CSS chunk সব `200`), শুধু script-টা পুরনো supervisor assumption নিয়ে লেখা ছিল বলে exit code non-zero দিচ্ছিল।
+
+এরপর "supervisor config ঠিক করে দাও" অনুরোধে ভুলবশত `.conf.disabled` ফাইলটাকে `.conf`-এ rename করে `supervisorctl reread && update` চালানো হয় — যেটা সাথে সাথে **port 3001-এ systemd বনাম supervisor conflict reproduce করে** (`EADDRINUSE`, supervisor প্রোগ্রাম `FATAL`/`BACKOFF` অবস্থায় আটকে যায়)। Root cause investigation করে নিশ্চিত হওয়া যায়:
+
+- আসল, কার্যকর process manager হলো **systemd** (`hybrid-frontend.service`, enabled, `Restart=always`) + `hybrid-healthcheck.timer` (প্রতি মিনিটে auto-recovery)
+- Supervisor config একেবারেই leftover/অব্যবহৃত ছিল, এবং সচল করলে systemd-এর সাথে port নিয়ে fight করে
+
+### প্রয়োগ করা fix (স্থায়ী)
+
+1. `/etc/supervisor/conf.d/hybrid-stack-frontend.conf(.disabled)` **সম্পূর্ণ ডিলিট করা হয়েছে** (আর কোনো backup রাখা হয়নি — কারণ backup ফাইলটাই বিপজ্জনক প্রমাণিত হয়েছে)
+2. `/var/www/hybrid-stack/frontend/scripts/deploy-safe.sh` আপডেট করা হয়েছে:
+   - `supervisorctl stop/start "$SUPERVISOR_PROGRAM"` → `systemctl restart hybrid-frontend.service`
+   - manual port-3001 PID-hunt/kill ধাপ সরানো হয়েছে (systemd নিজেই cgroup-based clean restart করে)
+   - `systemctl is-active --quiet` দিয়ে status verify; ব্যর্থ হলে `systemctl status --no-pager -l` দেখিয়ে exit 1
+   - **নতুন**: live smoke check-এর আগে ১০ সেকেন্ড পর্যন্ত retry loop যোগ করা হয়েছে — কারণ `systemctl restart` কমান্ড রিটার্ন করে সাথে সাথেই "active" দেখায় (process spawn matched হলেই), কিন্তু Next.js আসলে port 3001-এ listen শুরু করতে আরও কয়েকশ মিলিসেকেন্ড থেকে ১-২ সেকেন্ড সময় নেয় — আগে এই race condition-এর কারণে প্রথম smoke-check curl `502` পেয়েছিল যদিও deploy আসলে ঠিকই ছিল
+3. Script-এর step count/numbering পুরনো buggy `[4/7]`/`[5/8]` মিশ্রণ থেকে consistent `[N/8]`-এ ঠিক করা হয়েছে
+
+### ভবিষ্যতের জন্য mandatory rule
+
+- **কখনো** `/etc/supervisor/conf.d/`-এ frontend-এর জন্য কোনো `.conf` file তৈরি/rename/enable কোরো না — systemd-ই একমাত্র frontend process manager, এটা permanent সিদ্ধান্ত
+- Frontend deploy সবসময় `npm run deploy:prod:safe` দিয়ে করো (script এখন `systemctl` ব্যবহার করে, correct)
+- কেউ যদি ভবিষ্যতে "supervisor দিয়ে frontend restart করো" বলে, সেটা এই ডকুমেন্টের ভিত্তিতে ভুল assumption ধরে নিয়ে বরং `systemctl restart hybrid-frontend.service` চালাতে হবে এবং user-কে জানাতে হবে যে supervisor আর ব্যবহৃত হয় না
+
+---
+
+## 29. Landing page builder — bilingual (bn/en) public page language (2026-07-28)
+
+Landing-page-builder ফিচারের সম্পূর্ণ, বিস্তারিত reference এখন আলাদা ফাইলে আছে: **`/var/www/hybrid-stack/landing_page_context.md`** (§১৬ নতুন feature সেকশন)। এখানে শুধু সংক্ষিপ্ত pointer রাখা হলো যাতে ডুপ্লিকেশন না হয়:
+
+- নতুন per-page setting: `content.settings.language: "bn" | "en"` (ডিফল্ট `"bn"`, পুরনো পেজে backward-compatible) — পাবলিক checkout/thank-you পেজের ফিক্সড UI চ্রোম (labels, বাটন, error message) এই ভাষায় দেখায়। এটা builder-এর নিজের dashboard-UI `locale` prop থেকে সম্পূর্ণ আলাদা জিনিস — গুলিয়ে ফেলা যাবে না।
+- Frontend: `frontend/src/lib/landing-pages.ts` (`getDefaultCheckoutFields/getDefaultThankYou/getDefaultSettings(language)` factories), `public-landing-page-view.tsx` (`PUBLIC_UI_TEXT`), `thank-you-view.tsx` (`THANK_YOU_UI_TEXT`), `landing-page-builder.tsx` (Settings ট্যাবে ভাষা toggle + auto-translate-unedited-defaults লজিক)
+- Backend: `CheckoutFieldResolver.php`, `CheckoutOtpService.php`, `CheckoutOtpController.php`, `LandingPageController.php` — সব bn/en message picker page-এর `content.settings.language` অনুযায়ী
+- Deploy করা হয়েছে `npm run deploy:prod:safe` দিয়ে (§28-এর updated script), live verify করা হয়েছে

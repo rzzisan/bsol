@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_DIR="/var/www/hybrid-stack/frontend"
-SUPERVISOR_PROGRAM="hybrid-stack-frontend"
+SYSTEMD_SERVICE="hybrid-frontend.service"
 LIVE_URL="https://bsol.zyrotechbd.com/dashboard"
 API_HEALTH_URL="https://bsol.zyrotechbd.com/api/health"
 
@@ -13,48 +13,49 @@ fi
 
 cd "$APP_DIR"
 
-echo "[1/10] Cleaning previous .next build artifacts"
+echo "[1/8] Cleaning previous .next build artifacts"
 rm -rf .next
 mkdir -p .next
 
 if id -u www-data >/dev/null 2>&1; then
-  echo "[2/10] Ensuring build output ownership is www-data"
+  echo "[2/8] Ensuring build output ownership is www-data"
   chown -R www-data:www-data .next
 
-  echo "[3/10] Building frontend as www-data"
+  echo "[3/8] Building frontend as www-data"
   sudo -u www-data npm run build
 else
-  echo "[2/10] www-data user not found; building with current user"
+  echo "[2/8] www-data user not found; building with current user"
   npm run build
 fi
 
-  echo "[4/7] Stopping supervisor program: $SUPERVISOR_PROGRAM"
-  supervisorctl stop "$SUPERVISOR_PROGRAM" || true
+echo "[4/8] Restarting systemd service: $SYSTEMD_SERVICE"
+systemctl restart "$SYSTEMD_SERVICE"
 
-  echo "[5/8] Ensuring port 3001 is free (no stale next process)"
-  stale_pids="$(ss -ltnp '( sport = :3001 )' 2>/dev/null | awk 'NR>1 {print $NF}' | sed -E 's/.*pid=([0-9]+).*/\1/' | sort -u | tr '\n' ' ')"
-  if [[ -n "$stale_pids" ]]; then
-    echo "[INFO] Terminating stale PIDs on :3001 => ${stale_pids}"
-    kill -TERM ${stale_pids} || true
+echo "[5/8] Verifying systemd runtime status"
+if ! systemctl is-active --quiet "$SYSTEMD_SERVICE"; then
+  echo "[ERROR] $SYSTEMD_SERVICE failed to become active after restart"
+  systemctl status "$SYSTEMD_SERVICE" --no-pager -l || true
+  exit 1
+fi
+systemctl status "$SYSTEMD_SERVICE" --no-pager -l
 
-    stale_pids_after_term="$(ss -ltnp '( sport = :3001 )' 2>/dev/null | awk 'NR>1 {print $NF}' | sed -E 's/.*pid=([0-9]+).*/\1/' | sort -u | tr '\n' ' ')"
-    if [[ -n "$stale_pids_after_term" ]]; then
-      echo "[WARN] Force killing stubborn PIDs on :3001 => ${stale_pids_after_term}"
-      kill -KILL ${stale_pids_after_term} || true
-    fi
+echo "[6/8] Live smoke checks (waiting for Next.js to finish booting)"
+ready=0
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  if curl -fsS "$LIVE_URL" >/dev/null 2>&1; then
+    ready=1
+    break
   fi
-
-  echo "[6/8] Starting supervisor program: $SUPERVISOR_PROGRAM"
-  supervisorctl start "$SUPERVISOR_PROGRAM"
-
-  echo "[7/8] Verifying supervisor runtime status"
-supervisorctl status "$SUPERVISOR_PROGRAM"
-
-  echo "[8/10] Live smoke checks"
-curl -fsS "$LIVE_URL" >/dev/null
+  sleep 1
+done
+if [[ "$ready" -ne 1 ]]; then
+  echo "[ERROR] $LIVE_URL did not become ready in time"
+  systemctl status "$SYSTEMD_SERVICE" --no-pager -l || true
+  exit 1
+fi
 curl -fsS "$API_HEALTH_URL" >/dev/null
 
-  echo "[9/10] Verifying active CSS chunk responds 200"
+echo "[7/8] Verifying active CSS chunk responds 200"
 css_path="$(curl -fsS "$LIVE_URL" | tr '"' '\n' | grep -E '^/_next/static/chunks/.*\.css$' | head -n 1)"
 if [[ -z "$css_path" ]]; then
   echo "[ERROR] Could not detect CSS chunk path from live HTML"
@@ -67,5 +68,5 @@ if [[ "$status_code" != "200" ]]; then
   exit 1
 fi
 
-echo "[10/10] Deploy integrity checks passed"
+echo "[8/8] Deploy integrity checks passed"
 echo "[OK] Safe deploy completed. Active CSS chunk: ${css_path}"

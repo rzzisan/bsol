@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { mergeLandingContent, DEFAULT_THANK_YOU, DEFAULT_SETTINGS } from "@/lib/landing-pages";
+import { mergeLandingContent, getDefaultThankYou, getDefaultSettings } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
 import type { PublicLandingPage } from "@/components/public-landing-page-view";
 
@@ -32,6 +32,47 @@ export type ThankYouOrder = {
   }>;
 };
 
+const THANK_YOU_UI_TEXT = {
+  bn: {
+    otpWrongCode: "ভুল OTP। আবার চেষ্টা করুন।",
+    contactFailed: "যোগাযোগ করা যায়নি। আবার চেষ্টা করুন।",
+    otpSendFailed: "OTP পাঠানো যায়নি।",
+    verifying: "যাচাই হচ্ছে...",
+    orderNumberLabel: "অর্ডার নম্বর",
+    orderInfoMissing: "অর্ডারের তথ্য পাওয়া যায়নি।",
+    backToLandingPage: "ল্যান্ডিং পেজে ফিরে যান",
+    orderSummary: "অর্ডার সামারী",
+    subtotal: "সাবটোটাল",
+    discount: "ডিসকাউন্ট",
+    deliveryCharge: "ডেলিভারি চার্জ",
+    grandTotal: "সর্বমোট",
+    paymentLabel: "পেমেন্ট",
+    cashOnDelivery: "ক্যাশ অন ডেলিভারি",
+    shippingAddress: "শিপিং ঠিকানা",
+    callForHelp: "যেকোনো প্রয়োজনে কল করুন",
+    orderAgain: "← আবার অর্ডার করুন",
+  },
+  en: {
+    otpWrongCode: "Incorrect OTP. Please try again.",
+    contactFailed: "Could not reach the server. Please try again.",
+    otpSendFailed: "OTP could not be sent.",
+    verifying: "Verifying...",
+    orderNumberLabel: "Order number",
+    orderInfoMissing: "Order information not found.",
+    backToLandingPage: "Back to landing page",
+    orderSummary: "Order Summary",
+    subtotal: "Subtotal",
+    discount: "Discount",
+    deliveryCharge: "Delivery charge",
+    grandTotal: "Grand total",
+    paymentLabel: "Payment",
+    cashOnDelivery: "Cash on delivery",
+    shippingAddress: "Shipping Address",
+    callForHelp: "Call us for any assistance",
+    orderAgain: "← Order again",
+  },
+} as const;
+
 function OtpVerificationCard({
   slug,
   orderId,
@@ -42,6 +83,7 @@ function OtpVerificationCard({
   description,
   buttonText,
   resendText,
+  language,
 }: {
   slug: string;
   orderId: string;
@@ -52,7 +94,9 @@ function OtpVerificationCard({
   description: string;
   buttonText: string;
   resendText: string;
+  language: "bn" | "en";
 }) {
+  const t = THANK_YOU_UI_TEXT[language] ?? THANK_YOU_UI_TEXT.bn;
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,12 +126,12 @@ function OtpVerificationCard({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.success) {
-        setError(json?.message || "ভুল OTP। আবার চেষ্টা করুন।");
+        setError(json?.message || t.otpWrongCode);
         return;
       }
       onVerified();
     } catch {
-      setError("যোগাযোগ করা যায়নি। আবার চেষ্টা করুন।");
+      setError(t.contactFailed);
     } finally {
       setSubmitting(false);
     }
@@ -103,13 +147,13 @@ function OtpVerificationCard({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.success) {
-        setError(json?.message || "OTP পাঠানো যায়নি।");
+        setError(json?.message || t.otpSendFailed);
         setResendCooldown(Number(json?.retry_after_seconds) || 60);
         return;
       }
       setResendCooldown(60);
     } catch {
-      setError("যোগাযোগ করা যায়নি। আবার চেষ্টা করুন।");
+      setError(t.contactFailed);
     }
   }
 
@@ -131,7 +175,7 @@ function OtpVerificationCard({
           disabled={submitting || code.trim().length !== 4}
           className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
         >
-          {submitting ? "যাচাই হচ্ছে..." : buttonText}
+          {submitting ? t.verifying : buttonText}
         </button>
       </form>
       {error ? <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div> : null}
@@ -177,11 +221,15 @@ export default function ThankYouView({
   };
 
   const content = mergeLandingContent(page.content, page.template);
-  const thankYou = content.thank_you ?? DEFAULT_THANK_YOU;
+  const language = content.settings?.language ?? "bn";
+  const t = THANK_YOU_UI_TEXT[language] ?? THANK_YOU_UI_TEXT.bn;
+  const defaultThankYou = getDefaultThankYou(language);
+  const defaultSettings = getDefaultSettings(language);
+  const thankYou = content.thank_you ?? defaultThankYou;
   const showSummary = thankYou.show_order_summary ?? true;
   const showAddress = thankYou.show_shipping_address ?? true;
   const contactPhone = content.contact?.phone ?? null;
-  const otpVerifiedMessage = content.settings?.otp_verified_message || DEFAULT_SETTINGS.otp_verified_message;
+  const otpVerifiedMessage = content.settings?.otp_verified_message || defaultSettings.otp_verified_message;
   const showOtpGate = Boolean(order?.otp_required) && !otpVerified && Boolean(orderId) && Boolean(token);
 
   const areaLine = order
@@ -207,11 +255,11 @@ export default function ThankYouView({
               <path d="M20 6 9 17l-5-5" />
             </svg>
           </div>
-          <h1 className="mt-5 text-3xl font-extrabold sm:text-4xl">{thankYou.title || DEFAULT_THANK_YOU.title}</h1>
-          <p className="mx-auto mt-3 max-w-xl text-base text-white/90 sm:text-lg">{thankYou.message || DEFAULT_THANK_YOU.message}</p>
+          <h1 className="mt-5 text-3xl font-extrabold sm:text-4xl">{thankYou.title || defaultThankYou.title}</h1>
+          <p className="mx-auto mt-3 max-w-xl text-base text-white/90 sm:text-lg">{thankYou.message || defaultThankYou.message}</p>
           {order ? (
             <div className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-2 text-sm font-semibold">
-              অর্ডার নম্বর: <span className="tracking-wide">{order.order_number}</span>
+              {t.orderNumberLabel}: <span className="tracking-wide">{order.order_number}</span>
             </div>
           ) : null}
         </div>
@@ -221,13 +269,13 @@ export default function ThankYouView({
         <div className="space-y-6">
           {!order ? (
             <div className="lp-card rounded-3xl p-6 text-center sm:p-8">
-              <p className="text-sm text-slate-600">অর্ডারের তথ্য পাওয়া যায়নি।</p>
+              <p className="text-sm text-slate-600">{t.orderInfoMissing}</p>
               <a
                 href={`/lp/${page.slug}`}
                 className="mt-4 inline-flex rounded-2xl px-5 py-2.5 text-sm font-semibold"
                 style={{ backgroundColor: theme.accent, color: theme.buttonText }}
               >
-                ল্যান্ডিং পেজে ফিরে যান
+                {t.backToLandingPage}
               </a>
             </div>
           ) : (
@@ -239,10 +287,11 @@ export default function ThankYouView({
                   token={token!}
                   createdAt={order.created_at}
                   onVerified={() => setOtpVerified(true)}
-                  title={content.settings?.otp_form_title || DEFAULT_SETTINGS.otp_form_title}
-                  description={content.settings?.otp_form_description || DEFAULT_SETTINGS.otp_form_description}
-                  buttonText={content.settings?.otp_form_button_text || DEFAULT_SETTINGS.otp_form_button_text}
-                  resendText={content.settings?.otp_form_resend_text || DEFAULT_SETTINGS.otp_form_resend_text}
+                  title={content.settings?.otp_form_title || defaultSettings.otp_form_title}
+                  description={content.settings?.otp_form_description || defaultSettings.otp_form_description}
+                  buttonText={content.settings?.otp_form_button_text || defaultSettings.otp_form_button_text}
+                  resendText={content.settings?.otp_form_resend_text || defaultSettings.otp_form_resend_text}
+                  language={language}
                 />
               ) : null}
 
@@ -254,7 +303,7 @@ export default function ThankYouView({
 
               {showSummary ? (
                 <div className="lp-card rounded-3xl p-6 sm:p-8">
-                  <h2 className="text-xl font-bold" style={{ color: theme.primary }}>অর্ডার সামারী</h2>
+                  <h2 className="text-xl font-bold" style={{ color: theme.primary }}>{t.orderSummary}</h2>
                   <div className="mt-4 space-y-3">
                     {(order.items ?? []).map((item, index) => (
                       <div key={`${item.product_name}-${index}`} className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3 text-sm last:border-b-0 last:pb-0">
@@ -268,33 +317,33 @@ export default function ThankYouView({
                   </div>
                   <div className="mt-5 space-y-2 border-t border-slate-200 pt-4 text-sm">
                     <div className="flex items-center justify-between text-slate-600">
-                      <span>সাবটোটাল</span>
+                      <span>{t.subtotal}</span>
                       <span>{money(order.subtotal)}</span>
                     </div>
                     {discount > 0 ? (
                       <div className="flex items-center justify-between text-slate-600">
-                        <span>ডিসকাউন্ট</span>
+                        <span>{t.discount}</span>
                         <span>-{money(discount)}</span>
                       </div>
                     ) : null}
                     <div className="flex items-center justify-between text-slate-600">
-                      <span>ডেলিভারি চার্জ</span>
+                      <span>{t.deliveryCharge}</span>
                       <span>{money(order.shipping_charge)}</span>
                     </div>
                     <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-base font-bold" style={{ color: theme.primary }}>
-                      <span>সর্বমোট</span>
+                      <span>{t.grandTotal}</span>
                       <span>{money(order.total)}</span>
                     </div>
                   </div>
                   <div className="mt-4 text-xs text-slate-500">
-                    পেমেন্ট: {order.payment_method === "cod" ? "ক্যাশ অন ডেলিভারি" : order.payment_method ?? "—"}
+                    {t.paymentLabel}: {order.payment_method === "cod" ? t.cashOnDelivery : order.payment_method ?? "—"}
                   </div>
                 </div>
               ) : null}
 
               {showAddress ? (
                 <div className="lp-card rounded-3xl p-6 sm:p-8">
-                  <h2 className="text-xl font-bold" style={{ color: theme.primary }}>শিপিং ঠিকানা</h2>
+                  <h2 className="text-xl font-bold" style={{ color: theme.primary }}>{t.shippingAddress}</h2>
                   <div className="mt-4 space-y-1.5 text-sm text-slate-700">
                     {order.customer_name ? <div className="font-semibold text-slate-800">{order.customer_name}</div> : null}
                     {order.customer_phone ? <div>{order.customer_phone}</div> : null}
@@ -316,9 +365,9 @@ export default function ThankYouView({
           )}
 
           <div className="text-center text-sm text-slate-500">
-            {contactPhone ? <p>যেকোনো প্রয়োজনে কল করুন: <a href={`tel:${contactPhone}`} className="font-semibold" style={{ color: theme.primary }}>{contactPhone}</a></p> : null}
+            {contactPhone ? <p>{t.callForHelp}: <a href={`tel:${contactPhone}`} className="font-semibold" style={{ color: theme.primary }}>{contactPhone}</a></p> : null}
             <a href={`/lp/${page.slug}`} className="mt-2 inline-block font-medium hover:underline" style={{ color: theme.primary }}>
-              ← আবার অর্ডার করুন
+              {t.orderAgain}
             </a>
           </div>
         </div>

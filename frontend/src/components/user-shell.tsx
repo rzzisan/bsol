@@ -18,6 +18,7 @@ import {
   type Locale,
   type ThemeMode,
 } from "@/lib/dashboard-client";
+import { LocaleContext } from "@/lib/locale-context";
 
 // ─── Bilingual menu labels ────────────────────────────────────────────────────
 
@@ -450,7 +451,7 @@ export default function UserShell({
           />
         </div>
       )}
-      {children}
+      <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>
     </CatvShell>
   );
 }

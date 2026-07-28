@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Copy, Image as ImageIcon, Type, Video, ShieldCheck, Timer, Star, HelpCircle, Images, Rows3, LayoutGrid, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
 import { getStoredToken, type Locale } from "@/lib/dashboard-client";
+import { useLocale } from "@/lib/locale-context";
 import {
   LANDING_API_BASE,
   type CheckoutFieldConfig,
@@ -12,9 +13,9 @@ import {
   type LandingPageRecord,
   type LandingTemplate,
   type ProductItem,
-  DEFAULT_CHECKOUT_FIELDS,
-  DEFAULT_THANK_YOU,
-  DEFAULT_SETTINGS,
+  getDefaultCheckoutFields,
+  getDefaultThankYou,
+  getDefaultSettings,
   OTP_SMS_TEMPLATE_PLACEHOLDERS,
   mergeLandingContent,
   toNumberOrNull,
@@ -42,7 +43,7 @@ import type { JSONContent } from "@tiptap/react";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
 
 type LandingPageBuilderProps = {
-  locale: Locale;
+  locale?: Locale;
   mode: "create" | "edit";
   pageId?: string;
 };
@@ -223,6 +224,10 @@ const text = {
     tabProducts: "প্রোডাক্ট ও চেকআউট",
     tabSettings: "সেটিংস",
     settingsTitle: "সেটিংস",
+    pageLanguage: "পাবলিক পেজের ভাষা",
+    pageLanguageHint: "কাস্টমার-facing checkout ও থ্যাংক ইউ পেজের ফিক্সড টেক্সট (যেমন লেবেল, বাটন) এই ভাষায় দেখাবে। বিদ্যমান কন্টেন্ট/টেক্সট (হিরো, ফিচার ইত্যাদি) বদলাবে না — শুধু ডিফল্ট প্লেসহোল্ডার (এখনো এডিট না করা থাকলে) নতুন ভাষায় বদলে যাবে।",
+    pageLanguageBn: "বাংলা",
+    pageLanguageEn: "English",
     phoneValidation: "ফোন নাম্বার ভ্যালিডেশন",
     phoneValidationHint: "চালু থাকলে সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর ছাড়া অর্ডার করা যাবে না।",
     phoneValidationMessage: "ভুল নম্বরে দেখানোর মেসেজ",
@@ -313,6 +318,10 @@ const text = {
     tabProducts: "Products & Checkout",
     tabSettings: "Settings",
     settingsTitle: "Settings",
+    pageLanguage: "Public page language",
+    pageLanguageHint: "Fixed text on the customer-facing checkout and thank-you pages (labels, buttons, etc.) will show in this language. Existing content (hero, features, etc.) is unaffected — only default placeholders you haven't edited yet switch to the new language.",
+    pageLanguageBn: "Bengali",
+    pageLanguageEn: "English",
     phoneValidation: "Phone number validation",
     phoneValidationHint: "When on, orders require a valid 11-digit Bangladeshi mobile number.",
     phoneValidationMessage: "Message shown for an invalid number",
@@ -371,8 +380,10 @@ const text = {
   },
 };
 
-export default function LandingPageBuilder({ locale, mode, pageId }: LandingPageBuilderProps) {
+export default function LandingPageBuilder({ locale: localeProp, mode, pageId }: LandingPageBuilderProps) {
   const router = useRouter();
+  const contextLocale = useLocale();
+  const locale = localeProp ?? contextLocale;
   const t = text[locale] ?? text.en;
   const blockLabels = BLOCK_LABELS[locale] ?? BLOCK_LABELS.en;
   const tabLabels: Record<TabKey, string> = {
@@ -404,24 +415,25 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [featuresTitle, setFeaturesTitle] = useState("");
   const [productsTitle, setProductsTitle] = useState("");
   const [productsSubtitle, setProductsSubtitle] = useState("");
-  const [checkoutFields, setCheckoutFields] = useState<CheckoutFieldConfig[]>(DEFAULT_CHECKOUT_FIELDS);
+  const [pageLanguage, setPageLanguageState] = useState<"bn" | "en">("bn");
+  const [checkoutFields, setCheckoutFields] = useState<CheckoutFieldConfig[]>(getDefaultCheckoutFields("bn"));
   const [draggingFieldKey, setDraggingFieldKey] = useState<string | null>(null);
   const [shippingInsideDhaka, setShippingInsideDhaka] = useState("80");
   const [shippingOutsideDhaka, setShippingOutsideDhaka] = useState("120");
   const [contactPhone, setContactPhone] = useState("");
-  const [thankYouTitle, setThankYouTitle] = useState(DEFAULT_THANK_YOU.title);
-  const [thankYouMessage, setThankYouMessage] = useState(DEFAULT_THANK_YOU.message);
+  const [thankYouTitle, setThankYouTitle] = useState(getDefaultThankYou("bn").title ?? "");
+  const [thankYouMessage, setThankYouMessage] = useState(getDefaultThankYou("bn").message ?? "");
   const [thankYouShowSummary, setThankYouShowSummary] = useState(true);
   const [thankYouShowAddress, setThankYouShowAddress] = useState(true);
-  const [phoneValidationEnabled, setPhoneValidationEnabled] = useState<boolean>(DEFAULT_SETTINGS.phone_validation_enabled);
-  const [phoneValidationMessage, setPhoneValidationMessage] = useState<string>(DEFAULT_SETTINGS.phone_validation_message);
-  const [otpVerificationEnabled, setOtpVerificationEnabled] = useState<boolean>(DEFAULT_SETTINGS.otp_verification_enabled);
-  const [otpVerifiedMessage, setOtpVerifiedMessage] = useState<string>(DEFAULT_SETTINGS.otp_verified_message);
-  const [otpSmsTemplate, setOtpSmsTemplate] = useState<string>(DEFAULT_SETTINGS.otp_sms_template);
-  const [otpFormTitle, setOtpFormTitle] = useState<string>(DEFAULT_SETTINGS.otp_form_title);
-  const [otpFormDescription, setOtpFormDescription] = useState<string>(DEFAULT_SETTINGS.otp_form_description);
-  const [otpFormButtonText, setOtpFormButtonText] = useState<string>(DEFAULT_SETTINGS.otp_form_button_text);
-  const [otpFormResendText, setOtpFormResendText] = useState<string>(DEFAULT_SETTINGS.otp_form_resend_text);
+  const [phoneValidationEnabled, setPhoneValidationEnabled] = useState<boolean>(getDefaultSettings("bn").phone_validation_enabled);
+  const [phoneValidationMessage, setPhoneValidationMessage] = useState<string>(getDefaultSettings("bn").phone_validation_message);
+  const [otpVerificationEnabled, setOtpVerificationEnabled] = useState<boolean>(getDefaultSettings("bn").otp_verification_enabled);
+  const [otpVerifiedMessage, setOtpVerifiedMessage] = useState<string>(getDefaultSettings("bn").otp_verified_message);
+  const [otpSmsTemplate, setOtpSmsTemplate] = useState<string>(getDefaultSettings("bn").otp_sms_template);
+  const [otpFormTitle, setOtpFormTitle] = useState<string>(getDefaultSettings("bn").otp_form_title);
+  const [otpFormDescription, setOtpFormDescription] = useState<string>(getDefaultSettings("bn").otp_form_description);
+  const [otpFormButtonText, setOtpFormButtonText] = useState<string>(getDefaultSettings("bn").otp_form_button_text);
+  const [otpFormResendText, setOtpFormResendText] = useState<string>(getDefaultSettings("bn").otp_form_resend_text);
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   const [contentState, setContentState] = useState<ContentState>(emptyContentState());
@@ -439,6 +451,32 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaTarget, setMediaTarget] = useState<{ type: BlockType | "hero"; id: string; field: string } | null>(null);
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Switching page language auto-translates fields the merchant hasn't
+  // customized yet (still equal to the previous language's default), and
+  // leaves anything they've already edited untouched.
+  function setPageLanguage(next: "bn" | "en") {
+    const prevDefaults = getDefaultSettings(pageLanguage);
+    const nextDefaults = getDefaultSettings(next);
+    const prevThankYou = getDefaultThankYou(pageLanguage);
+    const nextThankYou = getDefaultThankYou(next);
+
+    setCheckoutFields((prev) =>
+      JSON.stringify(prev) === JSON.stringify(getDefaultCheckoutFields(pageLanguage))
+        ? getDefaultCheckoutFields(next)
+        : prev
+    );
+    setThankYouTitle((prev) => (prev === (prevThankYou.title ?? "") ? nextThankYou.title ?? "" : prev));
+    setThankYouMessage((prev) => (prev === (prevThankYou.message ?? "") ? nextThankYou.message ?? "" : prev));
+    setPhoneValidationMessage((prev) => (prev === prevDefaults.phone_validation_message ? nextDefaults.phone_validation_message : prev));
+    setOtpVerifiedMessage((prev) => (prev === prevDefaults.otp_verified_message ? nextDefaults.otp_verified_message : prev));
+    setOtpSmsTemplate((prev) => (prev === prevDefaults.otp_sms_template ? nextDefaults.otp_sms_template : prev));
+    setOtpFormTitle((prev) => (prev === prevDefaults.otp_form_title ? nextDefaults.otp_form_title : prev));
+    setOtpFormDescription((prev) => (prev === prevDefaults.otp_form_description ? nextDefaults.otp_form_description : prev));
+    setOtpFormButtonText((prev) => (prev === prevDefaults.otp_form_button_text ? nextDefaults.otp_form_button_text : prev));
+    setOtpFormResendText((prev) => (prev === prevDefaults.otp_form_resend_text ? nextDefaults.otp_form_resend_text : prev));
+    setPageLanguageState(next);
+  }
 
   useEffect(() => {
     if (!token) {
@@ -488,7 +526,12 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           setLayoutEntries(expandLegacyLayoutOrder(merged.layout_order, nextContent));
           setSelectedProducts((loadedPage.products ?? []).map((item, index) => normalizeProductDraft(item, index)));
 
+          const loadedLanguage = merged.settings?.language ?? "bn";
+          const loadedDefaults = getDefaultSettings(loadedLanguage);
+          const loadedThankYou = getDefaultThankYou(loadedLanguage);
+
           setPage(loadedPage);
+          setPageLanguageState(loadedLanguage);
           setTitle(loadedPage.title ?? "");
           setSlug(loadedPage.slug ?? "");
           setStatus(loadedPage.status === "published" ? "published" : "draft");
@@ -501,23 +544,23 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           setFeaturesTitle(merged.features_title ?? "");
           setProductsTitle(merged.products_section_title ?? "");
           setProductsSubtitle(merged.products_section_subtitle ?? "");
-          setCheckoutFields(merged.checkout_fields ?? DEFAULT_CHECKOUT_FIELDS);
+          setCheckoutFields(merged.checkout_fields ?? getDefaultCheckoutFields(loadedLanguage));
           setShippingInsideDhaka(String(merged.shipping?.inside_dhaka ?? 80));
           setShippingOutsideDhaka(String(merged.shipping?.outside_dhaka ?? 120));
           setContactPhone(merged.contact?.phone ?? "");
-          setThankYouTitle(merged.thank_you?.title ?? DEFAULT_THANK_YOU.title);
-          setThankYouMessage(merged.thank_you?.message ?? DEFAULT_THANK_YOU.message);
+          setThankYouTitle(merged.thank_you?.title ?? loadedThankYou.title ?? "");
+          setThankYouMessage(merged.thank_you?.message ?? loadedThankYou.message ?? "");
           setThankYouShowSummary(merged.thank_you?.show_order_summary ?? true);
           setThankYouShowAddress(merged.thank_you?.show_shipping_address ?? true);
-          setPhoneValidationEnabled(merged.settings?.phone_validation_enabled ?? DEFAULT_SETTINGS.phone_validation_enabled);
-          setPhoneValidationMessage(merged.settings?.phone_validation_message ?? DEFAULT_SETTINGS.phone_validation_message);
-          setOtpVerificationEnabled(merged.settings?.otp_verification_enabled ?? DEFAULT_SETTINGS.otp_verification_enabled);
-          setOtpVerifiedMessage(merged.settings?.otp_verified_message ?? DEFAULT_SETTINGS.otp_verified_message);
-          setOtpSmsTemplate(merged.settings?.otp_sms_template ?? DEFAULT_SETTINGS.otp_sms_template);
-          setOtpFormTitle(merged.settings?.otp_form_title ?? DEFAULT_SETTINGS.otp_form_title);
-          setOtpFormDescription(merged.settings?.otp_form_description ?? DEFAULT_SETTINGS.otp_form_description);
-          setOtpFormButtonText(merged.settings?.otp_form_button_text ?? DEFAULT_SETTINGS.otp_form_button_text);
-          setOtpFormResendText(merged.settings?.otp_form_resend_text ?? DEFAULT_SETTINGS.otp_form_resend_text);
+          setPhoneValidationEnabled(merged.settings?.phone_validation_enabled ?? loadedDefaults.phone_validation_enabled);
+          setPhoneValidationMessage(merged.settings?.phone_validation_message ?? loadedDefaults.phone_validation_message);
+          setOtpVerificationEnabled(merged.settings?.otp_verification_enabled ?? loadedDefaults.otp_verification_enabled);
+          setOtpVerifiedMessage(merged.settings?.otp_verified_message ?? loadedDefaults.otp_verified_message);
+          setOtpSmsTemplate(merged.settings?.otp_sms_template ?? loadedDefaults.otp_sms_template);
+          setOtpFormTitle(merged.settings?.otp_form_title ?? loadedDefaults.otp_form_title);
+          setOtpFormDescription(merged.settings?.otp_form_description ?? loadedDefaults.otp_form_description);
+          setOtpFormButtonText(merged.settings?.otp_form_button_text ?? loadedDefaults.otp_form_button_text);
+          setOtpFormResendText(merged.settings?.otp_form_resend_text ?? loadedDefaults.otp_form_resend_text);
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
             accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
@@ -631,7 +674,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     const key = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
     setCheckoutFields((prev) => [
       ...prev,
-      { key, kind: "custom", label: locale === "bn" ? "নতুন ফিল্ড" : "New field", type: "text", required: false, enabled: true },
+      { key, kind: "custom", label: pageLanguage === "bn" ? "নতুন ফিল্ড" : "New field", type: "text", required: false, enabled: true },
     ]);
   }
 
@@ -758,6 +801,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
         show_shipping_address: thankYouShowAddress,
       },
       settings: {
+        language: pageLanguage,
         phone_validation_enabled: phoneValidationEnabled,
         phone_validation_message: phoneValidationMessage || null,
         otp_verification_enabled: otpVerificationEnabled,
@@ -788,7 +832,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -1378,6 +1422,27 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           </div>
 
           <div className={activeTab === "settings" ? "space-y-5" : "hidden"}>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <span className="block text-sm font-semibold text-[var(--foreground)]">{t.pageLanguage}</span>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t.pageLanguageHint}</p>
+              <div className="mt-3 inline-flex rounded-xl border border-[var(--border)] p-1">
+                <button
+                  type="button"
+                  onClick={() => setPageLanguage("bn")}
+                  className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${pageLanguage === "bn" ? "bg-[var(--accent)] text-white" : "text-[var(--foreground)]"}`}
+                >
+                  {t.pageLanguageBn}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPageLanguage("en")}
+                  className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${pageLanguage === "en" ? "bg-[var(--accent)] text-white" : "text-[var(--foreground)]"}`}
+                >
+                  {t.pageLanguageEn}
+                </button>
+              </div>
+            </div>
+
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
               <label className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
                 <input type="checkbox" checked={phoneValidationEnabled} onChange={(e) => setPhoneValidationEnabled(e.target.checked)} className="accent-[var(--accent)]" />

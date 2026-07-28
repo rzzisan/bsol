@@ -118,15 +118,41 @@ export type CheckoutFieldConfig = {
   options?: string[];
 };
 
-export const DEFAULT_CHECKOUT_FIELDS: CheckoutFieldConfig[] = [
-  { key: "customer_name", kind: "builtin", label: "নাম", required: true, enabled: true },
-  { key: "customer_phone", kind: "builtin", label: "ফোন নম্বর", required: true, enabled: true },
-  { key: "customer_address", kind: "builtin", label: "ঠিকানা", required: true, enabled: true },
-  { key: "customer_district", kind: "builtin", label: "জেলা", required: false, enabled: true },
-  { key: "customer_thana", kind: "builtin", label: "থানা", required: false, enabled: true },
-  { key: "customer_area", kind: "builtin", label: "এলাকা", required: false, enabled: true },
-  { key: "notes", kind: "builtin", label: "অতিরিক্ত নোট", required: false, enabled: true },
-];
+const CHECKOUT_FIELD_LABELS: Record<"bn" | "en", Record<string, string>> = {
+  bn: {
+    customer_name: "নাম",
+    customer_phone: "ফোন নম্বর",
+    customer_address: "ঠিকানা",
+    customer_district: "জেলা",
+    customer_thana: "থানা",
+    customer_area: "এলাকা",
+    notes: "অতিরিক্ত নোট",
+  },
+  en: {
+    customer_name: "Name",
+    customer_phone: "Phone number",
+    customer_address: "Address",
+    customer_district: "District",
+    customer_thana: "Thana",
+    customer_area: "Area",
+    notes: "Additional notes",
+  },
+};
+
+export function getDefaultCheckoutFields(language: "bn" | "en" = "bn"): CheckoutFieldConfig[] {
+  const labels = CHECKOUT_FIELD_LABELS[language] ?? CHECKOUT_FIELD_LABELS.bn;
+  return [
+    { key: "customer_name", kind: "builtin", label: labels.customer_name, required: true, enabled: true },
+    { key: "customer_phone", kind: "builtin", label: labels.customer_phone, required: true, enabled: true },
+    { key: "customer_address", kind: "builtin", label: labels.customer_address, required: true, enabled: true },
+    { key: "customer_district", kind: "builtin", label: labels.customer_district, required: false, enabled: true },
+    { key: "customer_thana", kind: "builtin", label: labels.customer_thana, required: false, enabled: true },
+    { key: "customer_area", kind: "builtin", label: labels.customer_area, required: false, enabled: true },
+    { key: "notes", kind: "builtin", label: labels.notes, required: false, enabled: true },
+  ];
+}
+
+export const DEFAULT_CHECKOUT_FIELDS: CheckoutFieldConfig[] = getDefaultCheckoutFields("bn");
 
 export type LandingPageContent = {
   hero?: {
@@ -175,6 +201,7 @@ export type LandingPageContent = {
 // Per-page toggles for optional landing-page behavior. Starts with phone
 // validation; future toggles become sibling fields here.
 export type LandingPageSettings = {
+  language?: "bn" | "en" | null;
   phone_validation_enabled?: boolean | null;
   phone_validation_message?: string | null;
   otp_verification_enabled?: boolean | null;
@@ -186,7 +213,7 @@ export type LandingPageSettings = {
   otp_form_resend_text?: string | null;
 };
 
-export const DEFAULT_SETTINGS: {
+type DefaultSettingsShape = {
   phone_validation_enabled: boolean;
   phone_validation_message: string;
   otp_verification_enabled: boolean;
@@ -196,17 +223,38 @@ export const DEFAULT_SETTINGS: {
   otp_form_description: string;
   otp_form_button_text: string;
   otp_form_resend_text: string;
-} = {
-  phone_validation_enabled: true,
-  phone_validation_message: "সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)",
-  otp_verification_enabled: false,
-  otp_verified_message: "আপনার অর্ডারটি কনফার্ম করা হয়েছে!",
-  otp_sms_template: "আপনার অর্ডার #{order_number} কনফার্ম করতে {otp} কোডটি লিখুন। কোডটি ৫ মিনিটের জন্য বৈধ।",
-  otp_form_title: "ফোন নাম্বার ভেরিফাই করুন",
-  otp_form_description: "আপনার ফোনে পাঠানো ৪ সংখ্যার কোডটি লিখে অর্ডার কনফার্ম করুন।",
-  otp_form_button_text: "কনফার্ম করুন",
-  otp_form_resend_text: "OTP পুনরায় পাঠান",
 };
+
+const SETTINGS_DEFAULTS_BY_LANGUAGE: Record<"bn" | "en", DefaultSettingsShape> = {
+  bn: {
+    phone_validation_enabled: true,
+    phone_validation_message: "সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)",
+    otp_verification_enabled: false,
+    otp_verified_message: "আপনার অর্ডারটি কনফার্ম করা হয়েছে!",
+    otp_sms_template: "আপনার অর্ডার #{order_number} কনফার্ম করতে {otp} কোডটি লিখুন। কোডটি ৫ মিনিটের জন্য বৈধ।",
+    otp_form_title: "ফোন নাম্বার ভেরিফাই করুন",
+    otp_form_description: "আপনার ফোনে পাঠানো ৪ সংখ্যার কোডটি লিখে অর্ডার কনফার্ম করুন।",
+    otp_form_button_text: "কনফার্ম করুন",
+    otp_form_resend_text: "OTP পুনরায় পাঠান",
+  },
+  en: {
+    phone_validation_enabled: true,
+    phone_validation_message: "Enter a valid 11-digit Bangladeshi mobile number (e.g. 017XXXXXXXX)",
+    otp_verification_enabled: false,
+    otp_verified_message: "Your order has been confirmed!",
+    otp_sms_template: "Enter code {otp} to confirm your order #{order_number}. This code is valid for 5 minutes.",
+    otp_form_title: "Verify your phone number",
+    otp_form_description: "Enter the 4-digit code sent to your phone to confirm your order.",
+    otp_form_button_text: "Confirm",
+    otp_form_resend_text: "Resend OTP",
+  },
+};
+
+export function getDefaultSettings(language: "bn" | "en" = "bn"): DefaultSettingsShape {
+  return SETTINGS_DEFAULTS_BY_LANGUAGE[language] ?? SETTINGS_DEFAULTS_BY_LANGUAGE.bn;
+}
+
+export const DEFAULT_SETTINGS: DefaultSettingsShape = getDefaultSettings("bn");
 
 // Placeholders available in otp_sms_template — mirrors CheckoutOtpService::renderOtpMessage on the backend.
 export const OTP_SMS_TEMPLATE_PLACEHOLDERS = ["{customer_name}", "{order_number}", "{order_total}", "{order_items}", "{otp}"] as const;
@@ -221,12 +269,26 @@ export type ThankYouConfig = {
   show_shipping_address?: boolean | null;
 };
 
-export const DEFAULT_THANK_YOU = {
-  title: "ধন্যবাদ!",
-  message: "আপনার অর্ডারটি প্লেস হয়েছে, শীঘ্রই কনফার্ম করা হবে।",
-  show_order_summary: true,
-  show_shipping_address: true,
-} satisfies ThankYouConfig;
+const THANK_YOU_DEFAULTS_BY_LANGUAGE: Record<"bn" | "en", ThankYouConfig> = {
+  bn: {
+    title: "ধন্যবাদ!",
+    message: "আপনার অর্ডারটি প্লেস হয়েছে, শীঘ্রই কনফার্ম করা হবে।",
+    show_order_summary: true,
+    show_shipping_address: true,
+  },
+  en: {
+    title: "Thank you!",
+    message: "Your order has been placed and will be confirmed shortly.",
+    show_order_summary: true,
+    show_shipping_address: true,
+  },
+};
+
+export function getDefaultThankYou(language: "bn" | "en" = "bn"): ThankYouConfig {
+  return THANK_YOU_DEFAULTS_BY_LANGUAGE[language] ?? THANK_YOU_DEFAULTS_BY_LANGUAGE.bn;
+}
+
+export const DEFAULT_THANK_YOU = getDefaultThankYou("bn") satisfies ThankYouConfig;
 
 export function getLandingTemplateName(template: LandingTemplate | null | undefined, locale: "bn" | "en") {
   if (!template) return locale === "bn" ? "কাস্টম" : "Custom";
@@ -252,6 +314,10 @@ export function mergeLandingContent(
   const templateContent = (template?.default_content ?? {}) as LandingPageContent;
   const pageContent = (content ?? {}) as LandingPageContent;
   const checkoutFields = pickArray<CheckoutFieldConfig>(pageContent.checkout_fields, templateContent.checkout_fields);
+  const language: "bn" | "en" = pageContent.settings?.language ?? templateContent.settings?.language ?? "bn";
+  const defaultCheckoutFields = getDefaultCheckoutFields(language);
+  const defaultThankYou = getDefaultThankYou(language);
+  const defaultSettings = getDefaultSettings(language);
 
   return {
     ...templateContent,
@@ -266,7 +332,7 @@ export function mergeLandingContent(
     features_title: pageContent.features_title ?? templateContent.features_title ?? null,
     products_section_title: pageContent.products_section_title ?? templateContent.products_section_title ?? null,
     products_section_subtitle: pageContent.products_section_subtitle ?? templateContent.products_section_subtitle ?? null,
-    checkout_fields: checkoutFields.length > 0 ? checkoutFields : DEFAULT_CHECKOUT_FIELDS,
+    checkout_fields: checkoutFields.length > 0 ? checkoutFields : defaultCheckoutFields,
     reviews: pickArray(pageContent.reviews, templateContent.reviews),
     faq: pickArray(pageContent.faq, templateContent.faq),
     rich_text_blocks: pickArray(pageContent.rich_text_blocks, templateContent.rich_text_blocks),
@@ -284,21 +350,22 @@ export function mergeLandingContent(
       outside_dhaka: pageContent.shipping?.outside_dhaka ?? templateContent.shipping?.outside_dhaka ?? 120,
     },
     thank_you: {
-      title: pageContent.thank_you?.title ?? templateContent.thank_you?.title ?? DEFAULT_THANK_YOU.title,
-      message: pageContent.thank_you?.message ?? templateContent.thank_you?.message ?? DEFAULT_THANK_YOU.message,
-      show_order_summary: pageContent.thank_you?.show_order_summary ?? templateContent.thank_you?.show_order_summary ?? DEFAULT_THANK_YOU.show_order_summary,
-      show_shipping_address: pageContent.thank_you?.show_shipping_address ?? templateContent.thank_you?.show_shipping_address ?? DEFAULT_THANK_YOU.show_shipping_address,
+      title: pageContent.thank_you?.title ?? templateContent.thank_you?.title ?? defaultThankYou.title,
+      message: pageContent.thank_you?.message ?? templateContent.thank_you?.message ?? defaultThankYou.message,
+      show_order_summary: pageContent.thank_you?.show_order_summary ?? templateContent.thank_you?.show_order_summary ?? defaultThankYou.show_order_summary,
+      show_shipping_address: pageContent.thank_you?.show_shipping_address ?? templateContent.thank_you?.show_shipping_address ?? defaultThankYou.show_shipping_address,
     },
     settings: {
-      phone_validation_enabled: pageContent.settings?.phone_validation_enabled ?? templateContent.settings?.phone_validation_enabled ?? DEFAULT_SETTINGS.phone_validation_enabled,
-      phone_validation_message: pageContent.settings?.phone_validation_message ?? templateContent.settings?.phone_validation_message ?? DEFAULT_SETTINGS.phone_validation_message,
-      otp_verification_enabled: pageContent.settings?.otp_verification_enabled ?? templateContent.settings?.otp_verification_enabled ?? DEFAULT_SETTINGS.otp_verification_enabled,
-      otp_verified_message: pageContent.settings?.otp_verified_message ?? templateContent.settings?.otp_verified_message ?? DEFAULT_SETTINGS.otp_verified_message,
-      otp_sms_template: pageContent.settings?.otp_sms_template ?? templateContent.settings?.otp_sms_template ?? DEFAULT_SETTINGS.otp_sms_template,
-      otp_form_title: pageContent.settings?.otp_form_title ?? templateContent.settings?.otp_form_title ?? DEFAULT_SETTINGS.otp_form_title,
-      otp_form_description: pageContent.settings?.otp_form_description ?? templateContent.settings?.otp_form_description ?? DEFAULT_SETTINGS.otp_form_description,
-      otp_form_button_text: pageContent.settings?.otp_form_button_text ?? templateContent.settings?.otp_form_button_text ?? DEFAULT_SETTINGS.otp_form_button_text,
-      otp_form_resend_text: pageContent.settings?.otp_form_resend_text ?? templateContent.settings?.otp_form_resend_text ?? DEFAULT_SETTINGS.otp_form_resend_text,
+      language,
+      phone_validation_enabled: pageContent.settings?.phone_validation_enabled ?? templateContent.settings?.phone_validation_enabled ?? defaultSettings.phone_validation_enabled,
+      phone_validation_message: pageContent.settings?.phone_validation_message ?? templateContent.settings?.phone_validation_message ?? defaultSettings.phone_validation_message,
+      otp_verification_enabled: pageContent.settings?.otp_verification_enabled ?? templateContent.settings?.otp_verification_enabled ?? defaultSettings.otp_verification_enabled,
+      otp_verified_message: pageContent.settings?.otp_verified_message ?? templateContent.settings?.otp_verified_message ?? defaultSettings.otp_verified_message,
+      otp_sms_template: pageContent.settings?.otp_sms_template ?? templateContent.settings?.otp_sms_template ?? defaultSettings.otp_sms_template,
+      otp_form_title: pageContent.settings?.otp_form_title ?? templateContent.settings?.otp_form_title ?? defaultSettings.otp_form_title,
+      otp_form_description: pageContent.settings?.otp_form_description ?? templateContent.settings?.otp_form_description ?? defaultSettings.otp_form_description,
+      otp_form_button_text: pageContent.settings?.otp_form_button_text ?? templateContent.settings?.otp_form_button_text ?? defaultSettings.otp_form_button_text,
+      otp_form_resend_text: pageContent.settings?.otp_form_resend_text ?? templateContent.settings?.otp_form_resend_text ?? defaultSettings.otp_form_resend_text,
     },
     layout_order: Array.isArray(pageContent.layout_order)
       ? pageContent.layout_order

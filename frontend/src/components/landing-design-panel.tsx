@@ -1,6 +1,6 @@
 "use client";
 
-import { COLOR_PRESETS, FONT_OPTIONS, type ThemeSettings } from "@/lib/theme-presets";
+import { COLOR_PRESETS, getFontOptions, type ThemeSettings } from "@/lib/theme-presets";
 import type { Locale } from "@/lib/dashboard-client";
 
 type ColorFieldKey = "primary_color" | "accent_color" | "background_color" | "text_color" | "button_text_color";
@@ -63,6 +63,7 @@ function ColorField({
 
 export default function LandingDesignPanel({ locale, theme, onChange }: LandingDesignPanelProps) {
   const t = text[locale] ?? text.en;
+  const fontOptions = getFontOptions(locale);
 
   function patch(changes: Partial<ThemeSettings>) {
     onChange({ ...theme, ...changes });
@@ -108,7 +109,7 @@ export default function LandingDesignPanel({ locale, theme, onChange }: LandingD
             onChange={(e) => patch({ font_family: e.target.value })}
             className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
           >
-            {FONT_OPTIONS.map((opt) => (
+            {fontOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>

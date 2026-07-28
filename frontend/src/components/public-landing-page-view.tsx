@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { JSONContent } from "@tiptap/core";
-import { mergeLandingContent, DEFAULT_CHECKOUT_FIELDS, DEFAULT_SETTINGS, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
+import { mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
 import { resolveBlockIcon } from "@/lib/block-icons";
 import { renderTiptapJSON } from "@/lib/rich-text-render";
@@ -106,7 +106,7 @@ export type PublicLandingPage = {
     spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
     contact?: { phone?: string | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
-    settings?: { phone_validation_enabled?: boolean | null; phone_validation_message?: string | null } | null;
+    settings?: { language?: "bn" | "en" | null; phone_validation_enabled?: boolean | null; phone_validation_message?: string | null } | null;
     layout_order?: Array<string | LayoutEntry>;
   } | null;
   seo_meta?: {
@@ -133,6 +133,51 @@ function getProductPrices(item: PublicProduct) {
     currentPrice,
   };
 }
+
+// Fixed UI chrome for the public checkout page — driven by the per-page
+// content.settings.language toggle, not the visitor's browser locale.
+const PUBLIC_UI_TEXT = {
+  bn: {
+    whyChoose: "কেন এই পেজটি বেছে নেবেন?",
+    faqTitle: "সাধারণ প্রশ্ন",
+    selectOption: "নির্বাচন করুন",
+    previewNotice: "এটি একটি প্রিভিউ — অর্ডার সাবমিট হয়নি। আসল অর্ডারে কাস্টমার Thank You পেজে যাবে।",
+    orderSubmitFailed: "অর্ডার সাবমিট করা যায়নি।",
+    orderSuccess: (orderNumber: string) => `অর্ডার সফল হয়েছে। অর্ডার নম্বর: ${orderNumber}`,
+    defaultCtaText: "অর্ডার করতে চাই",
+    defaultProductsTitle: "আপনার পছন্দ মতো প্রোডাক্ট সিলেক্ট করুন",
+    defaultProductsSubtitle: "পছন্দের product নির্বাচন করুন, quantity ঠিক করুন, তারপর নিচের shipping details পূরণ করে order complete করুন।",
+    noProductsAttached: "কোনো product attach করা হয়নি।",
+    shippingDetailsHint: "আপনার shipping address ও contact details দিন।",
+    insideDhaka: "ঢাকার ভিতরে",
+    outsideDhaka: "ঢাকার বাইরে",
+    orderSummaryHint: "Order summary দেখতে অন্তত একটি product select করুন।",
+    sendingOrder: "অর্ডার পাঠানো হচ্ছে...",
+    selectProductToOrder: "অর্ডারের জন্য product select করুন",
+    deliveryContact: "ডেলিভারি ও যোগাযোগ",
+    contactLabel: "যোগাযোগ",
+  },
+  en: {
+    whyChoose: "Why choose this page?",
+    faqTitle: "Frequently Asked Questions",
+    selectOption: "Select an option",
+    previewNotice: "This is a preview — no order was submitted. On the live page, customers land on the Thank You page.",
+    orderSubmitFailed: "Order could not be submitted.",
+    orderSuccess: (orderNumber: string) => `Order placed successfully. Order number: ${orderNumber}`,
+    defaultCtaText: "I want to order",
+    defaultProductsTitle: "Select your preferred products",
+    defaultProductsSubtitle: "Choose your products, set the quantity, then fill in the shipping details below to complete your order.",
+    noProductsAttached: "No product attached.",
+    shippingDetailsHint: "Enter your shipping address and contact details.",
+    insideDhaka: "Inside Dhaka",
+    outsideDhaka: "Outside Dhaka",
+    orderSummaryHint: "Select at least one product to see the order summary.",
+    sendingOrder: "Sending order...",
+    selectProductToOrder: "Select a product to order",
+    deliveryContact: "Delivery & Contact",
+    contactLabel: "Contact",
+  },
+} as const;
 
 function CarouselBlockView({
   block,
@@ -407,11 +452,11 @@ function TrustBadgeRow({ badges }: { badges: Array<{ icon?: string | null; label
   );
 }
 
-function FeatureGrid({ features, title, theme }: { features: Array<{ title?: string | null; description?: string | null; icon?: string | null }>; title?: string | null; theme: { primary: string } }) {
+function FeatureGrid({ features, title, fallbackTitle, theme }: { features: Array<{ title?: string | null; description?: string | null; icon?: string | null }>; title?: string | null; fallbackTitle: string; theme: { primary: string } }) {
   if (features.length === 0) return null;
   return (
     <div className="lp-card rounded-3xl p-6 sm:p-8">
-      <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{title || "কেন এই পেজটি বেছে নেবেন?"}</h2>
+      <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{title || fallbackTitle}</h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {features.map((feature, index) => {
           const Icon = resolveBlockIcon(feature.icon);
@@ -572,9 +617,12 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const spacers = content.spacers ?? [];
   const products = (page.products ?? []).filter((item) => item.product);
   const shipping = content.shipping ?? {};
-  const checkoutFields = (content.checkout_fields && content.checkout_fields.length > 0 ? content.checkout_fields : DEFAULT_CHECKOUT_FIELDS).filter((field) => field.enabled);
-  const phoneValidationEnabled = content.settings?.phone_validation_enabled ?? DEFAULT_SETTINGS.phone_validation_enabled;
-  const phoneValidationMessage = content.settings?.phone_validation_message || DEFAULT_SETTINGS.phone_validation_message;
+  const language = content.settings?.language ?? "bn";
+  const t = PUBLIC_UI_TEXT[language] ?? PUBLIC_UI_TEXT.bn;
+  const defaultSettings = getDefaultSettings(language);
+  const checkoutFields = (content.checkout_fields && content.checkout_fields.length > 0 ? content.checkout_fields : getDefaultCheckoutFields(language)).filter((field) => field.enabled);
+  const phoneValidationEnabled = content.settings?.phone_validation_enabled ?? defaultSettings.phone_validation_enabled;
+  const phoneValidationMessage = content.settings?.phone_validation_message || defaultSettings.phone_validation_message;
   const shippingCharge = shippingZone === "inside"
     ? Number(shipping.inside_dhaka ?? 80)
     : Number(shipping.outside_dhaka ?? shipping.inside_dhaka ?? 120);
@@ -628,7 +676,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
 
     if (previewMode) {
       setSubmitError(null);
-      setSubmitSuccess("এটি একটি প্রিভিউ — অর্ডার সাবমিট হয়নি। আসল অর্ডারে কাস্টমার Thank You পেজে যাবে।");
+      setSubmitSuccess(t.previewNotice);
       document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
@@ -664,7 +712,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const message = json.message || Object.values(json.errors ?? {}).flat().join(" ") || "অর্ডার সাবমিট করা যায়নি।";
+        const message = json.message || Object.values(json.errors ?? {}).flat().join(" ") || t.orderSubmitFailed;
         throw new Error(message);
       }
 
@@ -674,7 +722,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       }
 
       // Fallback (e.g. backend not yet returning public_token): inline banner.
-      setSubmitSuccess(json.message || `অর্ডার সফল হয়েছে। অর্ডার নম্বর: ${json.data?.order_number ?? "—"}`);
+      setSubmitSuccess(json.message || t.orderSuccess(String(json.data?.order_number ?? "—")));
       setCustomer({
         customer_name: "",
         customer_phone: "",
@@ -688,7 +736,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       setCheckout((prev) => Object.fromEntries(Object.entries(prev).map(([productId, item]) => [productId, { ...item, quantity: 1 }])));
       document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "অর্ডার সাবমিট করা যায়নি।");
+      setSubmitError(err instanceof Error ? err.message : t.orderSubmitFailed);
     } finally {
       setSubmitting(false);
     }
@@ -736,7 +784,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           <textarea required={field.required} rows={3} value={value} onChange={(e) => updateCustomField(field.key, e.target.value)} className={fieldClassName} />
         ) : field.type === "select" ? (
           <select required={field.required} value={value} onChange={(e) => updateCustomField(field.key, e.target.value)} className={fieldClassName}>
-            <option value="">নির্বাচন করুন</option>
+            <option value="">{t.selectOption}</option>
             {(field.options ?? []).map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
@@ -786,7 +834,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
           {hero.subheadline ? <p className="mx-auto mt-4 max-w-3xl text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
           <a href="#checkout" className="mt-8 inline-flex rounded-2xl px-6 py-3 text-base font-semibold shadow-lg transition hover:translate-y-[-1px]" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
-            {hero.cta_text || "অর্ডার করতে চাই"}
+            {hero.cta_text || t.defaultCtaText}
           </a>
         </div>
       </section>
@@ -814,7 +862,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             }
 
             if (sectionKey === "features") {
-              return <FeatureGrid key={`features-${runIndex}`} features={pickRun(features, run)} title={content.features_title} theme={theme} />;
+              return <FeatureGrid key={`features-${runIndex}`} features={pickRun(features, run)} title={content.features_title} fallbackTitle={t.whyChoose} theme={theme} />;
             }
 
             if (sectionKey === "trust_badges") {
@@ -856,7 +904,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               if (items.length === 0) return null;
               return (
                 <div key={`faq-${runIndex}`} className="lp-card rounded-3xl p-6 sm:p-8">
-                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>সাধারণ প্রশ্ন</h2>
+                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{t.faqTitle}</h2>
                   <div className="space-y-3">
                     {items.map((item, index) => (
                       <details key={`${item.id ?? item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -897,10 +945,10 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             if (sectionKey === "products") {
               return (
                 <div key="products" id="products" className="lp-card rounded-3xl p-6 sm:p-8">
-            <h2 className="mb-2 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.products_section_title || "আপনার পছন্দ মতো প্রোডাক্ট সিলেক্ট করুন"}</h2>
-            <p className="mb-6 text-center text-sm text-slate-500">{content.products_section_subtitle || "পছন্দের product নির্বাচন করুন, quantity ঠিক করুন, তারপর নিচের shipping details পূরণ করে order complete করুন।"}</p>
+            <h2 className="mb-2 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.products_section_title || t.defaultProductsTitle}</h2>
+            <p className="mb-6 text-center text-sm text-slate-500">{content.products_section_subtitle || t.defaultProductsSubtitle}</p>
             {products.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">কোনো product attach করা হয়নি।</div>
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">{t.noProductsAttached}</div>
             ) : (
               <div className="space-y-4">
                 {products.map((item) => {
@@ -976,7 +1024,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           <form id="checkout" onSubmit={submitOrder} className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="lp-card rounded-3xl p-6 sm:p-8">
               <h2 className="text-2xl font-bold" style={{ color: theme.primary }}>Shipping Details</h2>
-              <p className="mt-2 text-sm text-slate-500">আপনার shipping address ও contact details দিন।</p>
+              <p className="mt-2 text-sm text-slate-500">{t.shippingDetailsHint}</p>
 
               {submitError ? <div className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">{submitError}</div> : null}
               {submitSuccess ? <div className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{submitSuccess}</div> : null}
@@ -990,14 +1038,14 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                     <label className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm transition ${shippingZone === "inside" ? "border-orange-300 bg-orange-50 text-orange-700" : "border-slate-200 bg-white text-slate-700"}`}>
                       <span className="flex items-center gap-2">
                         <input type="radio" checked={shippingZone === "inside"} onChange={() => setShippingZone("inside")} />
-                        ঢাকার ভিতরে
+                        {t.insideDhaka}
                       </span>
                       <strong>{money(shipping.inside_dhaka)}</strong>
                     </label>
                     <label className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm transition ${shippingZone === "outside" ? "border-orange-300 bg-orange-50 text-orange-700" : "border-slate-200 bg-white text-slate-700"}`}>
                       <span className="flex items-center gap-2">
                         <input type="radio" checked={shippingZone === "outside"} onChange={() => setShippingZone("outside")} />
-                        ঢাকার বাইরে
+                        {t.outsideDhaka}
                       </span>
                       <strong>{money(shipping.outside_dhaka)}</strong>
                     </label>
@@ -1017,7 +1065,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                 <div className="mt-5 space-y-4">
                   {selectedProducts.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">
-                      Order summary দেখতে অন্তত একটি product select করুন।
+                      {t.orderSummaryHint}
                     </div>
                   ) : (
                     selectedProducts.map((item) => {
@@ -1085,19 +1133,19 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                 <p className="mt-4 text-xs leading-6 text-slate-500">Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our privacy policy.</p>
 
                 <button type="submit" disabled={submitting || selectedProducts.length === 0} className="mt-6 inline-flex w-full items-center justify-center rounded-2xl px-6 py-3.5 text-base font-semibold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
-                  {submitting ? "অর্ডার পাঠানো হচ্ছে..." : selectedProducts.length === 0 ? "অর্ডারের জন্য product select করুন" : `Place Order ${money(total)}`}
+                  {submitting ? t.sendingOrder : selectedProducts.length === 0 ? t.selectProductToOrder : `Place Order ${money(total)}`}
                 </button>
               </div>
             </div>
           </form>
 
           <div className="lp-card rounded-3xl p-6 sm:p-8">
-            <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>ডেলিভারি ও যোগাযোগ</h2>
+            <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{t.deliveryContact}</h2>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="text-sm text-slate-500">Inside Dhaka</div><div className="mt-2 text-2xl font-bold text-slate-900">{money(shipping.inside_dhaka)}</div></div>
               <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="text-sm text-slate-500">Outside Dhaka</div><div className="mt-2 text-2xl font-bold text-slate-900">{money(shipping.outside_dhaka)}</div></div>
             </div>
-            {content.contact?.phone ? <p className="mt-5 text-sm text-slate-600">যোগাযোগ: <a className="font-semibold" href={`tel:${content.contact.phone}`}>{content.contact.phone}</a></p> : null}
+            {content.contact?.phone ? <p className="mt-5 text-sm text-slate-600">{t.contactLabel}: <a className="font-semibold" href={`tel:${content.contact.phone}`}>{content.contact.phone}</a></p> : null}
           </div>
         </div>
       </section>

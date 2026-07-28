@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import UserShell from "@/components/user-shell";
 import LandingPageBuilder from "@/components/landing-page-builder";
-import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 
 const text: Record<string, Record<string, string>> = {
   bn: {
@@ -17,22 +15,13 @@ const text: Record<string, Record<string, string>> = {
 };
 
 export default function CreateLandingPageBuilder() {
-  const [locale, setLocale] = useState<Locale>("bn");
-
-  useEffect(() => {
-    setLocale(getStoredLocale());
-    const handleStorage = () => setLocale(getStoredLocale());
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
   return (
     <UserShell
       activeKey="landing-pages"
       pageTitle={{ bn: text.bn.title, en: text.en.title }}
       pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
-      <LandingPageBuilder locale={locale} mode="create" />
+      <LandingPageBuilder mode="create" />
     </UserShell>
   );
 }

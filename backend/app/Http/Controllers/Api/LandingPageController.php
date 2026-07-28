@@ -51,11 +51,16 @@ class LandingPageController extends Controller
             ->with(['products.product'])
             ->firstOrFail();
 
-        $resolvedFields = CheckoutFieldResolver::resolve($page->content['checkout_fields'] ?? null);
         $settings = $page->content['settings'] ?? [];
+        $language = $settings['language'] ?? 'bn';
+        $resolvedFields = CheckoutFieldResolver::resolve($page->content['checkout_fields'] ?? null, $language);
         $phoneValidationEnabled = (bool) ($settings['phone_validation_enabled'] ?? true);
-        // Mirrors DEFAULT_SETTINGS.phone_validation_message in frontend/src/lib/landing-pages.ts.
-        $phoneValidationMessage = trim((string) ($settings['phone_validation_message'] ?? '')) ?: 'সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)';
+        // Mirrors getDefaultSettings() in frontend/src/lib/landing-pages.ts.
+        $phoneValidationMessage = trim((string) ($settings['phone_validation_message'] ?? '')) ?: (
+            $language === 'en'
+                ? 'Enter a valid 11-digit Bangladeshi mobile number (e.g. 017XXXXXXXX)'
+                : 'সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)'
+        );
 
         $validated = $request->validate(array_merge(
             CheckoutFieldResolver::buildRules($resolvedFields, $phoneValidationEnabled),

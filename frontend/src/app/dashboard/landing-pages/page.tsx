@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import UserShell from "@/components/user-shell";
-import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
+import { useLocale } from "@/lib/locale-context";
 import { LANDING_API_BASE, getLandingTemplateName } from "@/lib/landing-pages";
 
 // New block-based no-code builder (Phase 2-3) — primary editor as of
@@ -54,18 +54,32 @@ interface LandingPage {
 }
 
 export default function LandingPages() {
+  return (
+    <UserShell
+      activeKey="landing-pages"
+      pageTitle={{ bn: text.bn.title, en: text.en.title }}
+      pageSubtitle={{
+        bn: "আপনার সেলার ল্যান্ডিং পেজগুলো তৈরি, দেখা ও ম্যানেজ করুন।",
+        en: "Create, review, and manage your seller landing pages.",
+      }}
+    >
+      <LandingPagesContent />
+    </UserShell>
+  );
+}
+
+// Rendered as UserShell's children, so useLocale() picks up the live,
+// instantly-toggled locale from UserShell's own Provider — reading
+// getStoredLocale() independently here (as this file previously did) races
+// against UserShell's own locale-correction effect and can get stuck.
+function LandingPagesContent() {
   const [pages, setPages] = useState<LandingPage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [locale, setLocale] = useState<Locale>("bn");
+  const locale = useLocale();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
   useEffect(() => {
-    setLocale(getStoredLocale());
-
-    const handleStorage = () => setLocale(getStoredLocale());
-    window.addEventListener("storage", handleStorage);
-
     const fetchPages = async () => {
       try {
         const token = localStorage.getItem("auth_token");
@@ -94,7 +108,6 @@ export default function LandingPages() {
     };
     
     fetchPages();
-    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   const t = text[locale] || text.bn;
@@ -192,14 +205,7 @@ export default function LandingPages() {
   };
 
   return (
-    <UserShell
-      activeKey="landing-pages"
-      pageTitle={{ bn: text.bn.title, en: text.en.title }}
-      pageSubtitle={{
-        bn: "আপনার সেলার ল্যান্ডিং পেজগুলো তৈরি, দেখা ও ম্যানেজ করুন।",
-        en: "Create, review, and manage your seller landing pages.",
-      }}
-    >
+    <>
       <section className="catv-panel p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -296,6 +302,6 @@ export default function LandingPages() {
           </div>
         )}
       </section>
-    </UserShell>
+    </>
   );
 }

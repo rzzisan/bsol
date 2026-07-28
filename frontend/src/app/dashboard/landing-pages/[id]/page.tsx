@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import UserShell from "@/components/user-shell";
-import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
+import { useLocale } from "@/lib/locale-context";
 import { LANDING_API_BASE, getLandingTemplateName, type LandingPageRecord } from "@/lib/landing-pages";
 
 // New block-based no-code builder (Phase 2-3) — primary editor as of
@@ -29,23 +29,33 @@ const text: Record<string, Record<string, string>> = {
 };
 
 export default function LandingPageDetails() {
+  return (
+    <UserShell
+      activeKey="landing-pages"
+      pageTitle={{ bn: text.bn.title, en: text.en.title }}
+      pageSubtitle={{
+        bn: "Landing page এর বিস্তারিত তথ্য দেখুন।",
+        en: "Review landing page details.",
+      }}
+    >
+      <LandingPageDetailsContent />
+    </UserShell>
+  );
+}
+
+// Rendered as UserShell's children, so useLocale() picks up the live,
+// instantly-toggled locale from UserShell's own Provider — reading
+// getStoredLocale() independently here (as this file previously did) races
+// against UserShell's own locale-correction effect and can get stuck.
+function LandingPageDetailsContent() {
   const [page, setPage] = useState<LandingPageRecord | null>(null);
   const [loading, setLoading] = useState(true);
-  const [locale, setLocale] = useState<Locale>("bn");
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const pageId = Array.isArray(params?.id) ? params.id[0] : params?.id;
-
-  useEffect(() => {
-    setLocale(getStoredLocale());
-
-    const handleStorage = () => setLocale(getStoredLocale());
-    window.addEventListener("storage", handleStorage);
-
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
 
   useEffect(() => {
     const fetchPage = async () => {
@@ -172,31 +182,15 @@ export default function LandingPageDetails() {
   };
 
   if (loading) {
-    return (
-      <UserShell activeKey="landing-pages" pageTitle={{ bn: text.bn.title, en: text.en.title }}>
-        <div className="catv-panel p-4 sm:p-5 text-sm text-[var(--muted)]">{t.loading}</div>
-      </UserShell>
-    );
+    return <div className="catv-panel p-4 sm:p-5 text-sm text-[var(--muted)]">{t.loading}</div>;
   }
 
   if (!page) {
-    return (
-      <UserShell activeKey="landing-pages" pageTitle={{ bn: text.bn.title, en: text.en.title }}>
-        <div className="catv-panel p-4 sm:p-5 text-sm text-red-400">{t.notFound}</div>
-      </UserShell>
-    );
+    return <div className="catv-panel p-4 sm:p-5 text-sm text-red-400">{t.notFound}</div>;
   }
 
   return (
-    <UserShell
-      activeKey="landing-pages"
-      pageTitle={{ bn: text.bn.title, en: text.en.title }}
-      pageSubtitle={{
-        bn: "Landing page এর বিস্তারিত তথ্য দেখুন।",
-        en: "Review landing page details.",
-      }}
-    >
-      <section className="mx-auto max-w-2xl catv-panel p-4 sm:p-5">
+    <section className="mx-auto max-w-2xl catv-panel p-4 sm:p-5">
         {flash ? <div className="mb-4 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">{flash}</div> : null}
         <button
           className="mb-4 inline-flex rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)]"
@@ -260,6 +254,5 @@ export default function LandingPageDetails() {
           )}
         </div>
       </section>
-    </UserShell>
   );
 }
