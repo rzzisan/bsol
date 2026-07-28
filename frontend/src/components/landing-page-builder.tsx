@@ -253,6 +253,12 @@ const text = {
     thankYouMessage: "কাস্টম মেসেজ",
     thankYouShowSummary: "অর্ডার সামারী দেখাবে",
     thankYouShowAddress: "শিপিং ঠিকানা দেখাবে",
+    deliveryContact: "ডেলিভারি ও যোগাযোগ",
+    deliveryContactHint: "পেজের নিচে দেখানো ডেলিভারি চার্জ ও যোগাযোগ নম্বর এখানে ঠিক করুন।",
+    insideDhaka: "ঢাকার ভিতরে (ডেলিভারি চার্জ)",
+    outsideDhaka: "ঢাকার বাইরে (ডেলিভারি চার্জ)",
+    contactPhone: "যোগাযোগ ফোন নাম্বার (ঐচ্ছিক)",
+    addBlockHere: "ব্লক যোগ করুন",
     livePreview: "লাইভ প্রিভিউ",
     livePreviewHint: "মার্চেন্ট ঠিক এই ভিউ-টাই লাইভ পেজে দেখবে — একই কম্পোনেন্ট ব্যবহার করা হয়েছে।",
     duplicate: "কপি করুন",
@@ -337,6 +343,12 @@ const text = {
     thankYouMessage: "Custom message",
     thankYouShowSummary: "Show order summary",
     thankYouShowAddress: "Show shipping address",
+    deliveryContact: "Delivery & Contact",
+    deliveryContactHint: "Set the delivery charges and contact number shown near the bottom of the page.",
+    insideDhaka: "Inside Dhaka (delivery charge)",
+    outsideDhaka: "Outside Dhaka (delivery charge)",
+    contactPhone: "Contact phone (optional)",
+    addBlockHere: "Add block",
     livePreview: "Live preview",
     livePreviewHint: "This is exactly what a merchant will see on the live page — same component.",
     duplicate: "Duplicate",
@@ -394,6 +406,9 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [productsSubtitle, setProductsSubtitle] = useState("");
   const [checkoutFields, setCheckoutFields] = useState<CheckoutFieldConfig[]>(DEFAULT_CHECKOUT_FIELDS);
   const [draggingFieldKey, setDraggingFieldKey] = useState<string | null>(null);
+  const [shippingInsideDhaka, setShippingInsideDhaka] = useState("80");
+  const [shippingOutsideDhaka, setShippingOutsideDhaka] = useState("120");
+  const [contactPhone, setContactPhone] = useState("");
   const [thankYouTitle, setThankYouTitle] = useState(DEFAULT_THANK_YOU.title);
   const [thankYouMessage, setThankYouMessage] = useState(DEFAULT_THANK_YOU.message);
   const [thankYouShowSummary, setThankYouShowSummary] = useState(true);
@@ -412,6 +427,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [contentState, setContentState] = useState<ContentState>(emptyContentState());
   const [layoutEntries, setLayoutEntries] = useState<LayoutEntry[]>([]);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [addAfterKey, setAddAfterKey] = useState<string | null>(null);
 
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<ProductDraft[]>([]);
@@ -486,6 +502,9 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           setProductsTitle(merged.products_section_title ?? "");
           setProductsSubtitle(merged.products_section_subtitle ?? "");
           setCheckoutFields(merged.checkout_fields ?? DEFAULT_CHECKOUT_FIELDS);
+          setShippingInsideDhaka(String(merged.shipping?.inside_dhaka ?? 80));
+          setShippingOutsideDhaka(String(merged.shipping?.outside_dhaka ?? 120));
+          setContactPhone(merged.contact?.phone ?? "");
           setThankYouTitle(merged.thank_you?.title ?? DEFAULT_THANK_YOU.title);
           setThankYouMessage(merged.thank_you?.message ?? DEFAULT_THANK_YOU.message);
           setThankYouShowSummary(merged.thank_you?.show_order_summary ?? true);
@@ -530,12 +549,20 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     }));
   }
 
-  function addBlock(type: BlockType) {
+  function addBlock(type: BlockType, afterEntry?: LayoutEntry) {
     const id = `${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     const item: Item = { id, ...defaultItemFor(type) };
     setContentState((prev) => ({ ...prev, [type]: [...prev[type], item] }));
-    setLayoutEntries((prev) => [...prev, { type, id }]);
+    setLayoutEntries((prev) => {
+      if (!afterEntry) return [...prev, { type, id }];
+      const index = prev.findIndex((entry) => entry.type === afterEntry.type && entry.id === afterEntry.id);
+      if (index < 0) return [...prev, { type, id }];
+      const next = [...prev];
+      next.splice(index + 1, 0, { type, id });
+      return next;
+    });
     setAddMenuOpen(false);
+    setAddAfterKey(null);
   }
 
   function removeBlock(type: BlockType, id: string) {
@@ -719,6 +746,11 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
       products_section_title: productsTitle || null,
       products_section_subtitle: productsSubtitle || null,
       checkout_fields: checkoutFields,
+      contact: { phone: contactPhone || null },
+      shipping: {
+        inside_dhaka: toNumberOrNull(shippingInsideDhaka) ?? 80,
+        outside_dhaka: toNumberOrNull(shippingOutsideDhaka) ?? 120,
+      },
       thank_you: {
         title: thankYouTitle || null,
         message: thankYouMessage || null,
@@ -756,7 +788,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -842,6 +874,27 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
             <Icon size={14} /> {blockLabels[entry.type]}
           </span>
           <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setAddAfterKey((prev) => (prev === `${entry.type}:${entry.id}` ? null : `${entry.type}:${entry.id}`))}
+                className="flex items-center gap-1 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-2 py-1 text-xs font-semibold text-[var(--accent)]"
+              >
+                <Plus size={12} /> {t.addBlockHere}
+              </button>
+              {addAfterKey === `${entry.type}:${entry.id}` ? (
+                <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-lg">
+                  {ADDABLE_TYPES.map((addType) => {
+                    const AddIcon = BLOCK_ICONS[addType];
+                    return (
+                      <button key={addType} type="button" onClick={() => addBlock(addType, entry)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--surface-soft)]">
+                        <AddIcon size={14} /> {blockLabels[addType]}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
             <button type="button" onClick={() => duplicateBlock(entry.type, entry.id)} className="flex items-center gap-1 rounded-lg border border-[var(--border)] px-2 py-1 text-xs font-semibold text-[var(--foreground)]">
               <Copy size={12} /> {t.duplicate}
             </button>
@@ -1103,6 +1156,24 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
                   <input type="checkbox" checked={thankYouShowAddress} onChange={(event) => setThankYouShowAddress(event.target.checked)} />
                   {t.thankYouShowAddress}
                 </label>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <h3 className="text-base font-semibold text-[var(--foreground)]">{t.deliveryContact}</h3>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t.deliveryContactHint}</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t.insideDhaka}</span>
+                  <input type="number" min={0} step="1" value={shippingInsideDhaka} onChange={(e) => setShippingInsideDhaka(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t.outsideDhaka}</span>
+                  <input type="number" min={0} step="1" value={shippingOutsideDhaka} onChange={(e) => setShippingOutsideDhaka(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]" />
+                </label>
+                <div className="md:col-span-2">
+                  <TextField label={t.contactPhone} value={contactPhone} onChange={setContactPhone} />
+                </div>
               </div>
             </div>
           </div>
