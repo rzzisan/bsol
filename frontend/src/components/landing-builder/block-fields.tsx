@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, type JSONContent } from "@tiptap/react";
 import { Bold, Italic, LinkIcon, List, ListOrdered, Heading2 } from "lucide-react";
 import type { Locale } from "@/lib/dashboard-client";
@@ -27,28 +28,76 @@ export function TextAreaField({ label, value, onChange, rows = 3 }: { label: str
   );
 }
 
-export function IconPickerField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+export function IconPickerField({ label, value, onChange, locale = "bn" }: { label: string; value: string; onChange: (v: string) => void; locale?: Locale }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const SelectedIcon = resolveBlockIcon(value);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const filteredNames = query.trim()
+    ? BLOCK_ICON_NAMES.filter((name) => name.includes(query.trim().toLowerCase()))
+    : BLOCK_ICON_NAMES;
+
   return (
-    <label className="block">
+    <div className="relative" ref={containerRef}>
       <span className={labelClass}>{label}</span>
-      <div className="flex flex-wrap gap-1.5">
-        {BLOCK_ICON_NAMES.map((name) => {
-          const Icon = BLOCK_ICON_MAP[name];
-          const active = value === name;
-          return (
-            <button
-              key={name}
-              type="button"
-              onClick={() => onChange(name)}
-              title={name}
-              className={`rounded-lg border p-2 transition ${active ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]" : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--accent)]/40"}`}
-            >
-              <Icon size={16} />
-            </button>
-          );
-        })}
-      </div>
-    </label>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] hover:border-[var(--accent)]/40"
+      >
+        <SelectedIcon size={16} className="shrink-0 text-[var(--muted)]" />
+        <span className="truncate capitalize">{value ? value.replace(/-/g, " ") : locale === "bn" ? "আইকন বাছাই করুন" : "Choose icon"}</span>
+      </button>
+
+      {open ? (
+        <div className="absolute z-20 mt-1 w-72 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg">
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={locale === "bn" ? "আইকন খুঁজুন..." : "Search icons..."}
+            className="mb-2 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-2.5 py-1.5 text-xs text-[var(--foreground)]"
+          />
+          <div className="grid max-h-44 grid-cols-8 gap-1 overflow-y-auto">
+            {filteredNames.map((name) => {
+              const Icon = BLOCK_ICON_MAP[name];
+              const active = value === name;
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => {
+                    onChange(name);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  title={name}
+                  className={`flex items-center justify-center rounded-lg border p-1.5 transition ${active ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]" : "border-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-[var(--surface-soft)]"}`}
+                >
+                  <Icon size={15} />
+                </button>
+              );
+            })}
+            {filteredNames.length === 0 ? (
+              <div className="col-span-8 py-3 text-center text-xs text-[var(--muted)]">{locale === "bn" ? "কোনো আইকন পাওয়া যায়নি।" : "No icons found."}</div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

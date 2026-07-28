@@ -1031,7 +1031,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
                 </label>
               </div>
             ) : null}
-            <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "star")} onChange={(v) => patch({ icon: v })} />
+            <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "star")} onChange={(v) => patch({ icon: v })} locale={locale} />
             <TextField label={locale === "bn" ? "শিরোনাম" : "Title"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
             <TextAreaField label={locale === "bn" ? "বর্ণনা" : "Description"} value={String(item.description ?? "")} onChange={(v) => patch({ description: v })} rows={2} />
           </>
@@ -1058,7 +1058,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
                 </label>
               </div>
             ) : null}
-            <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "shield-check")} onChange={(v) => patch({ icon: v })} />
+            <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "shield-check")} onChange={(v) => patch({ icon: v })} locale={locale} />
             <TextField label={locale === "bn" ? "লেবেল" : "Label"} value={String(item.label ?? "")} onChange={(v) => patch({ label: v })} />
             <TextField label={locale === "bn" ? "সাব-লেবেল (ঐচ্ছিক)" : "Sublabel (optional)"} value={String(item.sublabel ?? "")} onChange={(v) => patch({ sublabel: v })} />
           </>
