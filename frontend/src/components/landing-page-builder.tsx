@@ -207,6 +207,15 @@ const text = {
     heroCtaText: "CTA বাটন টেক্সট",
     heroImage: "Hero ব্যাকগ্রাউন্ড ছবি (ঐচ্ছিক)",
     featuresTitle: "ফিচার গ্রিড সেকশনের টাইটেল",
+    featuresLayout: "ফিচার গ্রিডের লে-আউট",
+    featuresLayoutCards: "কার্ড গ্রিড",
+    featuresLayoutList: "লিস্ট",
+    featuresLayoutMinimal: "মিনিমাল (আইকন সেন্টার)",
+    trustBadgesLayout: "ট্রাস্ট ব্যাজের লে-আউট",
+    trustBadgesLayoutCards: "কার্ড গ্রিড",
+    trustBadgesLayoutRow: "কম্প্যাক্ট রো",
+    trustBadgesLayoutMinimal: "মিনিমাল (আইকন সেন্টার)",
+    sectionWideHint: "এই সেটিং পুরো সেকশনের সবগুলো আইটেমের জন্য প্রযোজ্য (শুধু প্রথম আইটেমে দেখানো হচ্ছে)।",
     productsTitle: "প্রোডাক্ট সেকশনের টাইটেল",
     productsSubtitle: "প্রোডাক্ট সেকশনের সাবটাইটেল",
     checkoutFields: "চেকআউট ফর্ম ফিল্ড",
@@ -301,6 +310,15 @@ const text = {
     heroCtaText: "CTA button text",
     heroImage: "Hero background image (optional)",
     featuresTitle: "Feature Grid section title",
+    featuresLayout: "Feature Grid layout",
+    featuresLayoutCards: "Card grid",
+    featuresLayoutList: "List",
+    featuresLayoutMinimal: "Minimal (centered icon)",
+    trustBadgesLayout: "Trust Badges layout",
+    trustBadgesLayoutCards: "Card grid",
+    trustBadgesLayoutRow: "Compact row",
+    trustBadgesLayoutMinimal: "Minimal (centered icon)",
+    sectionWideHint: "This setting applies to the whole section (shown here on the first item only).",
     productsTitle: "Products section title",
     productsSubtitle: "Products section subtitle",
     checkoutFields: "Checkout form fields",
@@ -413,6 +431,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
   const [heroCtaText, setHeroCtaText] = useState("");
   const [heroImage, setHeroImage] = useState("");
   const [featuresTitle, setFeaturesTitle] = useState("");
+  const [featuresLayout, setFeaturesLayout] = useState<"cards" | "list" | "minimal">("cards");
+  const [trustBadgesLayout, setTrustBadgesLayout] = useState<"cards" | "row" | "minimal">("cards");
   const [productsTitle, setProductsTitle] = useState("");
   const [productsSubtitle, setProductsSubtitle] = useState("");
   const [pageLanguage, setPageLanguageState] = useState<"bn" | "en">("bn");
@@ -542,6 +562,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
           setHeroCtaText(merged.hero?.cta_text ?? "");
           setHeroImage(merged.hero?.background_image_url ?? "");
           setFeaturesTitle(merged.features_title ?? "");
+          setFeaturesLayout(merged.features_layout ?? "cards");
+          setTrustBadgesLayout(merged.trust_badges_layout ?? "cards");
           setProductsTitle(merged.products_section_title ?? "");
           setProductsSubtitle(merged.products_section_subtitle ?? "");
           setCheckoutFields(merged.checkout_fields ?? getDefaultCheckoutFields(loadedLanguage));
@@ -786,6 +808,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
         background_image_url: heroImage || null,
       },
       features_title: featuresTitle || null,
+      features_layout: featuresLayout,
+      trust_badges_layout: trustBadgesLayout,
       products_section_title: productsTitle || null,
       products_section_subtitle: productsSubtitle || null,
       checkout_fields: checkoutFields,
@@ -832,7 +856,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -985,22 +1009,61 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
             <TextField label={locale === "bn" ? "বাটন লিংক (ঐচ্ছিক)" : "Button link (optional)"} value={String(item.cta_url ?? "")} onChange={(v) => patch({ cta_url: v })} />
           </>
         );
-      case "features":
+      case "features": {
+        const isFirst = contentState.features[0]?.id === item.id;
         return (
           <>
+            {isFirst ? (
+              <div className="mb-3 space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                <p className="text-xs text-[var(--muted)]">{t.sectionWideHint}</p>
+                <TextField label={t.featuresTitle} value={featuresTitle} onChange={setFeaturesTitle} />
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t.featuresLayout}</span>
+                  <select
+                    value={featuresLayout}
+                    onChange={(e) => setFeaturesLayout(e.target.value as "cards" | "list" | "minimal")}
+                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+                  >
+                    <option value="cards">{t.featuresLayoutCards}</option>
+                    <option value="list">{t.featuresLayoutList}</option>
+                    <option value="minimal">{t.featuresLayoutMinimal}</option>
+                  </select>
+                </label>
+              </div>
+            ) : null}
             <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "star")} onChange={(v) => patch({ icon: v })} />
             <TextField label={locale === "bn" ? "শিরোনাম" : "Title"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
             <TextAreaField label={locale === "bn" ? "বর্ণনা" : "Description"} value={String(item.description ?? "")} onChange={(v) => patch({ description: v })} rows={2} />
           </>
         );
-      case "trust_badges":
+      }
+      case "trust_badges": {
+        const isFirst = contentState.trust_badges[0]?.id === item.id;
         return (
           <>
+            {isFirst ? (
+              <div className="mb-3 space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                <p className="text-xs text-[var(--muted)]">{t.sectionWideHint}</p>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t.trustBadgesLayout}</span>
+                  <select
+                    value={trustBadgesLayout}
+                    onChange={(e) => setTrustBadgesLayout(e.target.value as "cards" | "row" | "minimal")}
+                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+                  >
+                    <option value="cards">{t.trustBadgesLayoutCards}</option>
+                    <option value="row">{t.trustBadgesLayoutRow}</option>
+                    <option value="minimal">{t.trustBadgesLayoutMinimal}</option>
+                  </select>
+                </label>
+              </div>
+            ) : null}
             <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "shield-check")} onChange={(v) => patch({ icon: v })} />
             <TextField label={locale === "bn" ? "লেবেল" : "Label"} value={String(item.label ?? "")} onChange={(v) => patch({ label: v })} />
             <TextField label={locale === "bn" ? "সাব-লেবেল (ঐচ্ছিক)" : "Sublabel (optional)"} value={String(item.sublabel ?? "")} onChange={(v) => patch({ sublabel: v })} />
           </>
         );
+      }
       case "video_embeds": {
         const url = String(item.url ?? "");
         const invalid = url.trim().length > 0 && !isAllowedVideoUrl(url);
@@ -1248,12 +1311,6 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
                   ) : null}
                 </div>
               </div>
-
-              {contentState.features.length > 0 ? (
-                <div className="mb-3">
-                  <TextField label={t.featuresTitle} value={featuresTitle} onChange={setFeaturesTitle} />
-                </div>
-              ) : null}
 
               <BlockList entries={layoutEntries} onReorder={setLayoutEntries} renderItem={renderBlockItem} />
             </div>

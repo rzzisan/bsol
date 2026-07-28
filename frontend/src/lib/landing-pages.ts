@@ -71,6 +71,7 @@ export type LandingPageRecord = {
     }>;
     features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
     features_title?: string | null;
+    features_layout?: "cards" | "list" | "minimal" | null;
     products_section_title?: string | null;
     products_section_subtitle?: string | null;
     checkout_fields?: CheckoutFieldConfig[];
@@ -87,6 +88,7 @@ export type LandingPageRecord = {
       cta_url?: string | null;
     }>;
     trust_badges?: Array<{ id?: string; icon?: string | null; label?: string | null; sublabel?: string | null }>;
+    trust_badges_layout?: "cards" | "row" | "minimal" | null;
     countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
     video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
     spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
@@ -171,6 +173,7 @@ export type LandingPageContent = {
   }>;
   features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
   features_title?: string | null;
+  features_layout?: "cards" | "list" | "minimal" | null;
   products_section_title?: string | null;
   products_section_subtitle?: string | null;
   checkout_fields?: CheckoutFieldConfig[];
@@ -187,6 +190,7 @@ export type LandingPageContent = {
     cta_url?: string | null;
   }>;
   trust_badges?: Array<{ id?: string; icon?: string | null; label?: string | null; sublabel?: string | null }>;
+  trust_badges_layout?: "cards" | "row" | "minimal" | null;
   countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
   video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
   spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
@@ -330,6 +334,7 @@ export function mergeLandingContent(
     carousel_images: pickArray(pageContent.carousel_images, templateContent.carousel_images),
     features: pickArray(pageContent.features, templateContent.features),
     features_title: pageContent.features_title ?? templateContent.features_title ?? null,
+    features_layout: pageContent.features_layout ?? templateContent.features_layout ?? "cards",
     products_section_title: pageContent.products_section_title ?? templateContent.products_section_title ?? null,
     products_section_subtitle: pageContent.products_section_subtitle ?? templateContent.products_section_subtitle ?? null,
     checkout_fields: checkoutFields.length > 0 ? checkoutFields : defaultCheckoutFields,
@@ -338,6 +343,7 @@ export function mergeLandingContent(
     rich_text_blocks: pickArray(pageContent.rich_text_blocks, templateContent.rich_text_blocks),
     image_text_blocks: pickArray(pageContent.image_text_blocks, templateContent.image_text_blocks),
     trust_badges: pickArray(pageContent.trust_badges, templateContent.trust_badges),
+    trust_badges_layout: pageContent.trust_badges_layout ?? templateContent.trust_badges_layout ?? "cards",
     countdown_blocks: pickArray(pageContent.countdown_blocks, templateContent.countdown_blocks),
     video_embeds: pickArray(pageContent.video_embeds, templateContent.video_embeds),
     spacers: pickArray(pageContent.spacers, templateContent.spacers),

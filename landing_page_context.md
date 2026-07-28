@@ -130,14 +130,14 @@
 | `hero` | `{headline, subheadline, cta_text, background_image_url, layout: "center"\|"image-right"}` | সবসময় একটাই |
 | `html_sections` | `[{id, title, html}]` | raw HTML ব্লক, legacy |
 | `carousel_images` | `[{id, title, template, images:[{id,url,alt}]}]` | |
-| `features` | `[{id, title, description, icon}]` | + `features_title` |
+| `features` | `[{id, title, description, icon}]` | + `features_title`, `features_layout` (§১৮) |
 | `products_section_title`, `products_section_subtitle` | string | |
 | `checkout_fields` | `CheckoutFieldConfig[]` | §৬ দেখো |
 | `reviews` | `[{id, name, quote, rating, avatar_url}]` | |
 | `faq` | `[{id, q, a}]` | |
 | `rich_text_blocks` | `[{id, title, body}]` | body = Tiptap JSON |
 | `image_text_blocks` | `[{id, image_url, image_position, heading, body, cta_text, cta_url}]` | |
-| `trust_badges` | `[{id, icon, label, sublabel}]` | |
+| `trust_badges` | `[{id, icon, label, sublabel}]` | + `trust_badges_layout` (§১৮) |
 | `countdown_blocks` | `[{id, message, end_datetime}]` | |
 | `video_embeds` | `[{id, title, url}]` | host restricted server-side |
 | `spacers` | `[{id, style:"space"\|"line"\|"dots", size:"sm"\|"md"\|"lg"}]` | |
@@ -267,6 +267,8 @@ text_color: '#0f172a', button_text_color: '#ffffff', font_family: 'Hind Siliguri
 | টেমপ্লেট ইমপোর্ট (admin) | `LandingTemplateImportController.php`, `CartFlowsImportService` |
 | লে-আউট রি-অর্ডার (drag-drop) | `landing-layout.ts`, `block-list.tsx` |
 | পাবলিক পেজের ভাষা (bn/en) | `content.settings.language` (§১৬) |
+| আইকন লাইব্রেরি (Feature/Trust Badge) | `block-icons.ts::BLOCK_ICON_MAP` (§১৮) |
+| Feature Grid/Trust Badges স্টাইল ভ্যারিয়েন্ট | `content.features_layout`/`content.trust_badges_layout` (§১৮) |
 
 ## ১৫. Dead/legacy code (ভুলবশত এডিট না করার জন্য)
 
@@ -320,3 +322,31 @@ const [locale] = useState<Locale>(getStoredLocale);
 উপরের ৪টা ফাইলেই `useState<Locale>("bn")` + mount-effect + storage-listener প্যাটার্ন সরিয়ে `useState<Locale>(getStoredLocale)`-এ পরিবর্তন করা হয়েছে (data-fetching effect গুলো অক্ষত রাখা হয়েছে, শুধু locale-reading অংশ বাদ)। পাশাপাশি `theme-presets.ts::FONT_OPTIONS` (flat array, locale-independent) → `getFontOptions(locale)` ফাংশনে রূপান্তর করা হয়েছে যাতে একমাত্র hardcoded বাংলা label ("Hind Siliguri (ডিফল্ট)") ইংরেজি মোডে ঠিকমতো দেখায়।
 
 **ভবিষ্যতে নতুন dashboard page লেখার সময়**: কখনো `useState("bn") + useEffect(() => setLocale(getStoredLocale()), [])` প্যাটার্ন ব্যবহার কোরো না — সবসময় `const [locale] = useState<Locale>(getStoredLocale);` ব্যবহার করো (orders/page.tsx-এর pattern অনুসরণ করে)।
+
+
+## ১৮. আইকন লাইব্রেরি সম্প্রসারণ + Feature Grid/Trust Badges স্টাইল ভ্যারিয়েন্ট (2026-07-28)
+
+### আইকন লাইব্রেরি (`frontend/src/lib/block-icons.ts`)
+
+আগে ছিল মাত্র ১৭টা আইকন। এখন **৬৭টা** — সবই `lucide-react` (v1.17.0) থেকে, e-commerce trust/feature-এর জন্য প্রাসঙ্গিক (shipping, payment, warranty/return, quality, discount, support ইত্যাদি ক্যাটাগরি)। `BLOCK_ICON_MAP: Record<string, LucideIcon>` — কী হলো kebab-case নাম (যেমন `"package-check"`, `"badge-percent"`, `"heart-handshake"`), ভ্যালু lucide কম্পোনেন্ট। `BLOCK_ICON_NAMES = Object.keys(BLOCK_ICON_MAP)`, `resolveBlockIcon(name)` অপরিবর্তিত (fallback `Star`)। নতুন আইকন যোগ করতে হলে শুধু এই একটা ফাইলে import + map entry যোগ করলেই `IconPickerField` (builder) ও `resolveBlockIcon` (public render) দুই জায়গাতেই automatically পাওয়া যায় — অন্য কোনো ফাইল ছোঁয়ার দরকার নেই।
+
+### Feature Grid / Trust Badges লে-আউট স্টাইল
+
+Carousel ব্লকের (`content.carousel_images[].template: "style-1"|"style-2"`) মতো একই ধরনের "একাধিক স্টাইল বেছে নেওয়ার" প্যাটার্ন Feature Grid ও Trust Badges-এও যোগ হয়েছে — কিন্তু গঠনগত পার্থক্যের কারণে implementation আলাদা:
+
+- Carousel-এ প্রতিটা ব্লক entry নিজেই একটা সম্পূর্ণ ক্যারোসেল ইউনিট (`{id, title, template, images[]}`) — তাই `template` প্রতি-ব্লক ফিল্ড।
+- Feature/Trust Badge-এ প্রতিটা array item একটা single feature/badge (flat array, `content.features[]` / `content.trust_badges[]`), আর পাবলিক রেন্ডারার consecutive entry-গুলো গ্রুপ করে (renderRuns) **একটাই** `FeatureGrid`/`TrustBadgeRow` সেকশনে দেখায় — তাই "স্টাইল" per-item না হয়ে **page-level global setting** হিসেবে যোগ করা হয়েছে, ঠিক `features_title`-এর মতোই।
+
+**স্কিমা** (`landing-pages.ts`, দুই জায়গাতেই — `LandingPageRecord.content` ও standalone `LandingPageContent`):
+- `content.features_layout?: "cards" | "list" | "minimal" | null` (ডিফল্ট `"cards"`)
+- `content.trust_badges_layout?: "cards" | "row" | "minimal" | null` (ডিফল্ট `"cards"`)
+- `mergeLandingContent()` — `pageContent.features_layout ?? templateContent.features_layout ?? "cards"` প্যাটার্নে resolve করে (trust_badges_layout-ও একইভাবে)।
+
+**৩টা স্টাইল প্রতিটার জন্য** (`public-landing-page-view.tsx::FeatureGrid`/`TrustBadgeRow`):
+- Feature Grid: `cards` (আগের ডিফল্ট — বর্ডারড কার্ড গ্রিড), `list` (আইকন-বাদাম-বাক্স + শিরোনাম/বর্ণনা, ডিভাইডার সহ vertical লিস্ট, কার্ড বর্ডার নেই), `minimal` (centered — গোলাকার theme-tinted আইকন ব্যাজ, টাইটেল/description কেন্দ্রীভূত)।
+- Trust Badges: `cards` (আগের ডিফল্ট — বর্ডারড বক্স গ্রিড), `row` (কম্প্যাক্ট pill-shaped ইনলাইন রো, wrap করে), `minimal` (centered, গোলাকার theme-tinted আইকন ব্যাজ)।
+- `theme.primary` কালার ব্যবহার হয় `minimal`/`list` ভ্যারিয়েন্টের আইকন-ব্যাজ ব্যাকগ্রাউন্ডে (hex + alpha suffix `"1a"`, যেমন `${theme.primary}1a`)।
+
+**বিল্ডার UI** (`landing-page-builder.tsx`): এই সেটিংস "Blocks" ট্যাবের উপরের কোনো গ্লোবাল হেডারে না — বরং **প্রতিটা ব্লক-টাইপের নিজের ভেতরেই** থাকে, ঠিক merchant যেভাবে carousel-এর `template` select প্রতিটা carousel ব্লকের ভেতরে দেখে। যেহেতু `features`/`trust_badges` flat array (প্রতিটা item একটা আলাদা ড্র্যাগেবল কার্ড), তাই পুরো সেকশনের জন্য একটাই global state — কিন্তু UI-তে সেটা দেখানো হয় **শুধু ওই টাইপের প্রথম ব্লক কার্ডে** (একটা হালকা hint লাইন সহ — "এই সেটিং পুরো সেকশনের সবগুলো আইটেমের জন্য প্রযোজ্য")। `renderBlockFields()`-এর `case "features"`/`case "trust_badges"`-এ `const isFirst = contentState.features[0]?.id === item.id;` (trust_badges-এর জন্য একই প্যাটার্ন) দিয়ে চেক করে conditionally রেন্ডার হয়; দ্বিতীয়/তৃতীয় ফিচার-কার্ডে এই সেটিং repeat হয় না। State: `featuresLayout`/`trustBadgesLayout` (`useState<"cards"|"list"|"minimal">`/`useState<"cards"|"row"|"minimal">`), লোড হয় `merged.features_layout ?? "cards"` থেকে, সেভ হয় `buildContent()`-এর মধ্যে। Live preview (`draftPage`) একই কম্পোনেন্ট (`PublicLandingPageView`) ব্যবহার করে বলে merchant সাথে সাথে স্টাইল পরিবর্তন দেখতে পায়।
+
+**মনে রাখা জরুরি**: এই দুটো ফিল্ড pure page-level global settings — carousel-এর মতো per-block না। ভবিষ্যতে যদি কেউ একই পেজে একাধিক আলাদা-স্টাইলের Feature Grid সেকশন চায় (যেমন consecutive না এমন দুইটা আলাদা রান), সেটার জন্য এই সিম্পল global-field অ্যাপ্রোচ যথেষ্ট না — তখন per-run বা per-item স্টাইল স্টোরেজ স্কিমা পুনর্বিবেচনা করতে হবে।

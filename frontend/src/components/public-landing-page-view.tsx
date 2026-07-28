@@ -85,6 +85,7 @@ export type PublicLandingPage = {
     }>;
     features?: Array<{ id?: string; title?: string | null; description?: string | null; icon?: string | null }>;
     features_title?: string | null;
+    features_layout?: "cards" | "list" | "minimal" | null;
     products_section_title?: string | null;
     products_section_subtitle?: string | null;
     checkout_fields?: CheckoutFieldConfig[];
@@ -101,6 +102,7 @@ export type PublicLandingPage = {
       cta_url?: string | null;
     }>;
     trust_badges?: Array<{ id?: string; icon?: string | null; label?: string | null; sublabel?: string | null }>;
+    trust_badges_layout?: "cards" | "row" | "minimal" | null;
     countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
     video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
     spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
@@ -432,8 +434,52 @@ function ImageTextBlockView({
   );
 }
 
-function TrustBadgeRow({ badges }: { badges: Array<{ icon?: string | null; label?: string | null; sublabel?: string | null }> }) {
+function TrustBadgeRow({
+  badges,
+  layout,
+  theme,
+}: {
+  badges: Array<{ icon?: string | null; label?: string | null; sublabel?: string | null }>;
+  layout?: "cards" | "row" | "minimal" | null;
+  theme: { primary: string };
+}) {
   if (badges.length === 0) return null;
+
+  if (layout === "row") {
+    return (
+      <div className="lp-card flex flex-wrap items-center justify-center gap-3 rounded-3xl p-6 sm:gap-4 sm:p-8">
+        {badges.map((badge, index) => {
+          const Icon = resolveBlockIcon(badge.icon);
+          return (
+            <div key={`trust-${index}`} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2">
+              <Icon size={18} className="shrink-0 text-slate-700" />
+              <span className="text-sm font-semibold text-slate-900">{badge.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (layout === "minimal") {
+    return (
+      <div className="lp-card grid gap-6 rounded-3xl p-6 text-center sm:grid-cols-3 sm:p-8">
+        {badges.map((badge, index) => {
+          const Icon = resolveBlockIcon(badge.icon);
+          return (
+            <div key={`trust-${index}`} className="flex flex-col items-center gap-2">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: `${theme.primary}1a` }}>
+                <Icon size={22} style={{ color: theme.primary }} />
+              </span>
+              <div className="text-sm font-semibold text-slate-900">{badge.label}</div>
+              {badge.sublabel ? <div className="text-xs text-slate-500">{badge.sublabel}</div> : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="lp-card grid gap-3 rounded-3xl p-6 sm:grid-cols-2 sm:p-8 lg:grid-cols-3">
       {badges.map((badge, index) => {
@@ -452,8 +498,71 @@ function TrustBadgeRow({ badges }: { badges: Array<{ icon?: string | null; label
   );
 }
 
-function FeatureGrid({ features, title, fallbackTitle, theme }: { features: Array<{ title?: string | null; description?: string | null; icon?: string | null }>; title?: string | null; fallbackTitle: string; theme: { primary: string } }) {
+function FeatureGrid({
+  features,
+  title,
+  fallbackTitle,
+  layout,
+  theme,
+}: {
+  features: Array<{ title?: string | null; description?: string | null; icon?: string | null }>;
+  title?: string | null;
+  fallbackTitle: string;
+  layout?: "cards" | "list" | "minimal" | null;
+  theme: { primary: string };
+}) {
   if (features.length === 0) return null;
+
+  if (layout === "list") {
+    return (
+      <div className="lp-card rounded-3xl p-6 sm:p-8">
+        <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{title || fallbackTitle}</h2>
+        <div className="divide-y divide-slate-200">
+          {features.map((feature, index) => {
+            const Icon = resolveBlockIcon(feature.icon);
+            return (
+              <div key={`${feature.title ?? "feature"}-${index}`} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+                {feature.icon ? (
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${theme.primary}1a` }}>
+                    <Icon size={20} style={{ color: theme.primary }} />
+                  </span>
+                ) : null}
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-slate-900">{feature.title || `Feature ${index + 1}`}</h3>
+                  {feature.description ? <p className="mt-1 text-sm text-slate-600">{feature.description}</p> : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (layout === "minimal") {
+    return (
+      <div className="lp-card rounded-3xl p-6 sm:p-8">
+        <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{title || fallbackTitle}</h2>
+        <div className="grid gap-6 text-center sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((feature, index) => {
+            const Icon = resolveBlockIcon(feature.icon);
+            return (
+              <div key={`${feature.title ?? "feature"}-${index}`} className="flex flex-col items-center gap-2">
+                {feature.icon ? (
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: `${theme.primary}1a` }}>
+                    <Icon size={26} style={{ color: theme.primary }} />
+                  </span>
+                ) : null}
+                <h3 className="text-base font-bold text-slate-900">{feature.title || `Feature ${index + 1}`}</h3>
+                {feature.description ? <p className="text-sm text-slate-600">{feature.description}</p> : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="lp-card rounded-3xl p-6 sm:p-8">
       <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{title || fallbackTitle}</h2>
@@ -862,11 +971,20 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             }
 
             if (sectionKey === "features") {
-              return <FeatureGrid key={`features-${runIndex}`} features={pickRun(features, run)} title={content.features_title} fallbackTitle={t.whyChoose} theme={theme} />;
+              return (
+                <FeatureGrid
+                  key={`features-${runIndex}`}
+                  features={pickRun(features, run)}
+                  title={content.features_title}
+                  fallbackTitle={t.whyChoose}
+                  layout={content.features_layout}
+                  theme={theme}
+                />
+              );
             }
 
             if (sectionKey === "trust_badges") {
-              return <TrustBadgeRow key={`trust-${runIndex}`} badges={pickRun(trustBadges, run)} />;
+              return <TrustBadgeRow key={`trust-${runIndex}`} badges={pickRun(trustBadges, run)} layout={content.trust_badges_layout} theme={theme} />;
             }
 
             if (sectionKey === "rich_text_blocks") {
