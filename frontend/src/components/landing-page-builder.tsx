@@ -13,6 +13,7 @@ import {
   type LandingTemplate,
   type ProductItem,
   DEFAULT_CHECKOUT_FIELDS,
+  DEFAULT_THANK_YOU,
   mergeLandingContent,
   toNumberOrNull,
 } from "@/lib/landing-pages";
@@ -214,6 +215,12 @@ const text = {
     seo: "SEO",
     metaTitle: "Meta title",
     metaDescription: "Meta description",
+    thankYou: "Thank You পেজ",
+    thankYouHint: "অর্ডার সাবমিটের পর কাস্টমার এই পেজটি দেখবে।",
+    thankYouTitle: "টাইটেল",
+    thankYouMessage: "কাস্টম মেসেজ",
+    thankYouShowSummary: "অর্ডার সামারী দেখাবে",
+    thankYouShowAddress: "শিপিং ঠিকানা দেখাবে",
     livePreview: "লাইভ প্রিভিউ",
     livePreviewHint: "মার্চেন্ট ঠিক এই ভিউ-টাই লাইভ পেজে দেখবে — একই কম্পোনেন্ট ব্যবহার করা হয়েছে।",
     duplicate: "কপি করুন",
@@ -274,6 +281,12 @@ const text = {
     seo: "SEO",
     metaTitle: "Meta title",
     metaDescription: "Meta description",
+    thankYou: "Thank You Page",
+    thankYouHint: "Customers see this page after submitting an order.",
+    thankYouTitle: "Title",
+    thankYouMessage: "Custom message",
+    thankYouShowSummary: "Show order summary",
+    thankYouShowAddress: "Show shipping address",
     livePreview: "Live preview",
     livePreviewHint: "This is exactly what a merchant will see on the live page — same component.",
     duplicate: "Duplicate",
@@ -323,6 +336,10 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [productsSubtitle, setProductsSubtitle] = useState("");
   const [checkoutFields, setCheckoutFields] = useState<CheckoutFieldConfig[]>(DEFAULT_CHECKOUT_FIELDS);
   const [draggingFieldKey, setDraggingFieldKey] = useState<string | null>(null);
+  const [thankYouTitle, setThankYouTitle] = useState(DEFAULT_THANK_YOU.title);
+  const [thankYouMessage, setThankYouMessage] = useState(DEFAULT_THANK_YOU.message);
+  const [thankYouShowSummary, setThankYouShowSummary] = useState(true);
+  const [thankYouShowAddress, setThankYouShowAddress] = useState(true);
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   const [contentState, setContentState] = useState<ContentState>(emptyContentState());
@@ -402,6 +419,10 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           setProductsTitle(merged.products_section_title ?? "");
           setProductsSubtitle(merged.products_section_subtitle ?? "");
           setCheckoutFields(merged.checkout_fields ?? DEFAULT_CHECKOUT_FIELDS);
+          setThankYouTitle(merged.thank_you?.title ?? DEFAULT_THANK_YOU.title);
+          setThankYouMessage(merged.thank_you?.message ?? DEFAULT_THANK_YOU.message);
+          setThankYouShowSummary(merged.thank_you?.show_order_summary ?? true);
+          setThankYouShowAddress(merged.thank_you?.show_shipping_address ?? true);
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
             accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
@@ -622,6 +643,12 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
       products_section_title: productsTitle || null,
       products_section_subtitle: productsSubtitle || null,
       checkout_fields: checkoutFields,
+      thank_you: {
+        title: thankYouTitle || null,
+        message: thankYouMessage || null,
+        show_order_summary: thankYouShowSummary,
+        show_shipping_address: thankYouShowAddress,
+      },
       layout_order: layoutEntries,
     };
     for (const type of BLOCK_TYPES) {
@@ -642,7 +669,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -949,6 +976,25 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <TextField label={t.metaTitle} value={metaTitle} onChange={setMetaTitle} />
               <TextAreaField label={t.metaDescription} value={metaDescription} onChange={setMetaDescription} />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+            <h3 className="text-base font-semibold text-[var(--foreground)]">{t.thankYou}</h3>
+            <p className="mt-1 text-xs text-[var(--muted)]">{t.thankYouHint}</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <TextField label={t.thankYouTitle} value={thankYouTitle} onChange={setThankYouTitle} />
+              <TextAreaField label={t.thankYouMessage} value={thankYouMessage} onChange={setThankYouMessage} />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                <input type="checkbox" checked={thankYouShowSummary} onChange={(event) => setThankYouShowSummary(event.target.checked)} />
+                {t.thankYouShowSummary}
+              </label>
+              <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                <input type="checkbox" checked={thankYouShowAddress} onChange={(event) => setThankYouShowAddress(event.target.checked)} />
+                {t.thankYouShowAddress}
+              </label>
             </div>
           </div>
 

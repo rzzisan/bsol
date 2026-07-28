@@ -92,6 +92,7 @@ export type LandingPageRecord = {
     spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
     contact?: { phone?: string | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
+    thank_you?: ThankYouConfig | null;
     layout_order?: Array<string | { type: string; id: string }>;
     [key: string]: unknown;
   } | null;
@@ -164,9 +165,24 @@ export type LandingPageContent = {
   spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
   contact?: { phone?: string | null };
   shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
+  thank_you?: ThankYouConfig | null;
   layout_order?: Array<string | { type: string; id: string }>;
   [key: string]: unknown;
 };
+
+export type ThankYouConfig = {
+  title?: string | null;
+  message?: string | null;
+  show_order_summary?: boolean | null;
+  show_shipping_address?: boolean | null;
+};
+
+export const DEFAULT_THANK_YOU = {
+  title: "ধন্যবাদ!",
+  message: "আপনার অর্ডারটি প্লেস হয়েছে, শীঘ্রই কনফার্ম করা হবে।",
+  show_order_summary: true,
+  show_shipping_address: true,
+} satisfies ThankYouConfig;
 
 export function getLandingTemplateName(template: LandingTemplate | null | undefined, locale: "bn" | "en") {
   if (!template) return locale === "bn" ? "কাস্টম" : "Custom";
@@ -222,6 +238,12 @@ export function mergeLandingContent(
     shipping: {
       inside_dhaka: pageContent.shipping?.inside_dhaka ?? templateContent.shipping?.inside_dhaka ?? 80,
       outside_dhaka: pageContent.shipping?.outside_dhaka ?? templateContent.shipping?.outside_dhaka ?? 120,
+    },
+    thank_you: {
+      title: pageContent.thank_you?.title ?? templateContent.thank_you?.title ?? DEFAULT_THANK_YOU.title,
+      message: pageContent.thank_you?.message ?? templateContent.thank_you?.message ?? DEFAULT_THANK_YOU.message,
+      show_order_summary: pageContent.thank_you?.show_order_summary ?? templateContent.thank_you?.show_order_summary ?? DEFAULT_THANK_YOU.show_order_summary,
+      show_shipping_address: pageContent.thank_you?.show_shipping_address ?? templateContent.thank_you?.show_shipping_address ?? DEFAULT_THANK_YOU.show_shipping_address,
     },
     layout_order: Array.isArray(pageContent.layout_order)
       ? pageContent.layout_order

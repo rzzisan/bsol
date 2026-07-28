@@ -12,6 +12,7 @@ use App\Support\CheckoutFieldResolver;
 use App\Support\PhoneIntelCache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class LandingPageOrderService
 {
@@ -25,6 +26,7 @@ class LandingPageOrderService
             $order = Order::create([
                 'user_id' => $userId,
                 'order_number' => Order::generateOrderNumber($userId),
+                'public_token' => Str::random(40),
                 'customer_name' => $validated['customer_name'],
                 'customer_phone' => $validated['customer_phone'],
                 'customer_address' => $validated['customer_address'],

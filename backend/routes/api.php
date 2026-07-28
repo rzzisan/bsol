@@ -59,6 +59,10 @@ Route::post('/password/reset',        [PasswordResetController::class, 'resetPas
 
 Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow'])->middleware('track_landing_page_visit');
 Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder'])->middleware('track_landing_page_visit');
+// Thank-you page order lookup — token-guarded, deliberately not tracked as a landing visit.
+Route::get('/public/landing-pages/{slug}/orders/{orderId}', [LandingPageController::class, 'publicShowOrder'])
+    ->where('orderId', '[0-9]+')
+    ->middleware('throttle:30,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)

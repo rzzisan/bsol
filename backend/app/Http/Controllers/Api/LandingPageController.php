@@ -7,6 +7,7 @@ use App\Services\LandingPageOrderService;
 use App\Support\CheckoutFieldResolver;
 use App\Models\LandingPage;
 use App\Models\LandingPageProduct;
+use App\Models\Order;
 use App\Models\LandingTemplate;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
@@ -87,11 +88,65 @@ class LandingPageController extends Controller
             'data' => [
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
+                'public_token' => $order->public_token,
                 'subtotal' => $order->subtotal,
                 'shipping_charge' => $order->shipping_charge,
                 'total' => $order->total,
             ],
         ], 201);
+    }
+
+    public function publicShowOrder(Request $request, string $slug, int $orderId): JsonResponse
+    {
+        $page = LandingPage::query()
+            ->where('slug', $slug)
+            ->where('status', 'published')
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'max:64'],
+        ]);
+
+        $order = Order::query()
+            ->with('items')
+            ->where('id', $orderId)
+            ->where('source', 'landing_page')
+            ->where('source_ref', (string) $page->id)
+            ->whereNotNull('public_token')
+            ->first();
+
+        // Same 404 for every failure mode — don't reveal which check failed.
+        if (!$order || !hash_equals($order->public_token, $validated['token'])) {
+            abort(404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'order_number' => $order->order_number,
+                'created_at' => $order->created_at,
+                'status' => $order->status,
+                'payment_method' => $order->payment_method,
+                'payment_status' => $order->payment_status,
+                'customer_name' => $order->customer_name,
+                'customer_phone' => $order->customer_phone,
+                'customer_address' => $order->customer_address,
+                'customer_district' => $order->customer_district,
+                'customer_thana' => $order->customer_thana,
+                'customer_area' => $order->customer_area,
+                'subtotal' => $order->subtotal,
+                'shipping_charge' => $order->shipping_charge,
+                'discount' => $order->discount,
+                'total' => $order->total,
+                'custom_fields' => $order->custom_fields,
+                'items' => $order->items->map(fn ($item) => [
+                    'product_name' => $item->product_name,
+                    'quantity' => $item->quantity,
+                    'unit_price' => $item->unit_price,
+                    'total' => $item->total,
+                ])->values(),
+            ],
+        ]);
     }
 
     public function index(Request $request): JsonResponse

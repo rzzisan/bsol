@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { JSONContent } from "@tiptap/core";
 import { mergeLandingContent, DEFAULT_CHECKOUT_FIELDS, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
@@ -518,6 +519,7 @@ function SpacerView({ block }: { block: { style?: string | null; size?: string |
 }
 
 export default function PublicLandingPageView({ page, previewMode = false }: { page: PublicLandingPage; previewMode?: boolean }) {
+  const router = useRouter();
   const [checkout, setCheckout] = useState<Record<number, CheckoutDraft>>(
     Object.fromEntries(
       (page.products ?? []).map((item) => [
@@ -623,7 +625,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
 
     if (previewMode) {
       setSubmitError(null);
-      setSubmitSuccess("এটি একটি প্রিভিউ — অর্ডার আসলে সাবমিট হয়নি।");
+      setSubmitSuccess("এটি একটি প্রিভিউ — অর্ডার সাবমিট হয়নি। আসল অর্ডারে কাস্টমার Thank You পেজে যাবে।");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -656,6 +658,12 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         throw new Error(message);
       }
 
+      if (json.data?.order_id && json.data?.public_token) {
+        router.push(`/lp/${page.slug}/thank-you?order=${json.data.order_id}&token=${encodeURIComponent(json.data.public_token)}`);
+        return;
+      }
+
+      // Fallback (e.g. backend not yet returning public_token): inline banner.
       setSubmitSuccess(json.message || `অর্ডার সফল হয়েছে। অর্ডার নম্বর: ${json.data?.order_number ?? "—"}`);
       setCustomer({
         customer_name: "",
