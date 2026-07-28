@@ -2,7 +2,7 @@
 আংশিক পড়ে কাজ শুরু করা হলে সেটি invalid execution হিসেবে গণ্য হবে।
 # Hybrid Stack Server Context
 
-Last updated: 2026-07-28 (see "🚨 Frontend process manager পরিবর্তন" note below — frontend is systemd-managed; Supervisor's frontend config file has now been **fully deleted**, not just disabled — see §28)
+Last updated: 2026-07-28 — Supervisor fully removed from frontend management (§28), landing pages bilingual bn/en support + dashboard-wide instant language-switch fix via LocaleContext (§29, §30).
 
 📄 **সহ-ডকুমেন্ট**: ল্যান্ডিং পেজ বিল্ডার ফিচার (backend + frontend, সব ফাইল/লাইন নম্বরসহ)-এর জন্য আলাদা deep-reference ফাইল আছে — `/var/www/hybrid-stack/landing_page_context.md`। এই `CONTEXT.md` server/ops/deployment-level master context; landing-page-builder-related কাজের আগে ওই ফাইলটাও পড়ে নাও, এখানে সেটার বিষয়বস্তু ডুপ্লিকেট করা হয়নি।
 Native/local host domain: `bsol.zyrotechbd.com`
@@ -1241,3 +1241,27 @@ Landing-page-builder ফিচারের সম্পূর্ণ, বিস�
 - Frontend: `frontend/src/lib/landing-pages.ts` (`getDefaultCheckoutFields/getDefaultThankYou/getDefaultSettings(language)` factories), `public-landing-page-view.tsx` (`PUBLIC_UI_TEXT`), `thank-you-view.tsx` (`THANK_YOU_UI_TEXT`), `landing-page-builder.tsx` (Settings ট্যাবে ভাষা toggle + auto-translate-unedited-defaults লজিক)
 - Backend: `CheckoutFieldResolver.php`, `CheckoutOtpService.php`, `CheckoutOtpController.php`, `LandingPageController.php` — সব bn/en message picker page-এর `content.settings.language` অনুযায়ী
 - Deploy করা হয়েছে `npm run deploy:prod:safe` দিয়ে (§28-এর updated script), live verify করা হয়েছে
+
+
+## ৩০. Dashboard-এর নিজস্ব bn/en toggle এখন সাথে সাথে পুরো পেজে effect করে — `LocaleContext` যোগ (2026-07-28)
+
+আগে (§১৭, landing_page_context.md-এ ডকুমেন্টেড) topbar-এর "Language: EN/BN" toggle করলে সাথে সাথেই শুধু topbar/sidebar বদলাত, কিন্তু পেজের মূল body content বদলাতে পুরো page reload/navigation লাগত। কারণ: `UserShell`-এর নিজের `locale` state instantly reactive, কিন্তু প্রতিটা dashboard page component (landing-pages-এর ৪টা route সহ) নিজে আলাদাভাবে `getStoredLocale()` পড়ত (mount-এ একবার) — সেই read, `UserShell`-এর নিজের locale-sync effect-এর সাথে race করে ভুল/স্টেল ভ্যালুতে আটকে যেতে পারত (§১৭-এর মূল bug), আর এমনকি ঠিকভাবে read করলেও toggle click-এ live update হতো না (রিফ্রেশ/navigation লাগত)।
+
+### Fix
+
+- নতুন ফাইল **`frontend/src/lib/locale-context.tsx`**: `LocaleContext` (React Context) + `useLocale()` hook এক্সপোর্ট করে। Provider না থাকলে `getStoredLocale()`-এ fallback করে (safe default)।
+- **`user-shell.tsx`**: `{children}`-কে `<LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>` দিয়ে wrap করা হয়েছে — `UserShell`-এর নিজস্ব, ইতিমধ্যে instantly-reactive `locale` state-ই এখন descendant page-গুলোর জন্য single source of truth।
+- **`landing-page-builder.tsx`**: `locale` prop এখন `optional` — না দিলে `useLocale()` context থেকে resolve হয় (`const locale = localeProp ?? contextLocale;`)।
+- **Landing-pages-এর ৪টা route file**:
+  - `landing-pages/builder/create/page.tsx`, `landing-pages/[id]/builder/page.tsx` — নিজেদের `useState(getStoredLocale)` সরিয়ে `<LandingPageBuilder mode="..." />` (locale prop ছাড়াই, context থেকে auto-resolve হয়) রেন্ডার করে।
+  - `landing-pages/page.tsx`, `landing-pages/[id]/page.tsx` — এই দুটো ফাইল নিজেই `<UserShell>` রেন্ডার করত (parent, not child), তাই সরাসরি `useLocale()` কল করলে কাজ করত না (Context শুধু descendant-দের জন্য কাজ করে, ancestor-দের জন্য না)। তাই প্রতিটাকে দুই ভাগে split করা হয়েছে: একটা পাতলা outer wrapper (যেটা `<UserShell><XyzContent /></UserShell>` রেন্ডার করে) + একটা `XyzContent` inner component (যেটা `UserShell`-এর children হিসেবে রেন্ডার হয় বলে `useLocale()` সঠিকভাবে কাজ করে)।
+
+### গুরুত্বপূর্ণ architectural rule (ভবিষ্যতের জন্য)
+
+React Context শুধু **descendant** কম্পোনেন্টে কাজ করে — যে কম্পোনেন্ট নিজেই Provider রেন্ডার করে (এখানে `UserShell`), সেই কম্পোনেন্ট নিজে বা তার **parent/ancestor** কখনো সেই Context consume করতে পারবে না। তাই:
+- যদি কোনো dashboard page component নিজে `<UserShell>...</UserShell>` রেন্ডার করে, আর তার নিজের body content-এ locale দরকার হয় — body content-টাকে অবশ্যই একটা **আলাদা child component**-এ বের করে আনতে হবে (`UserShell`-এর children হিসেবে), তারপর সেই child component-এ `useLocale()` কল করতে হবে। সরাসরি outer wrapper component-এ `useLocale()` কল করলে ভুল (stale/default) ভ্যালু পাবে।
+- নতুন dashboard page লেখার সময় `useState("bn") + useEffect(() => setLocale(getStoredLocale()), [])` প্যাটার্ন **ব্যবহার কোরো না** — `useLocale()` hook ব্যবহার করো (child/descendant component-এ), অথবা প্রয়োজনে `useState<Locale>(getStoredLocale)` lazy initializer (§১৭-এ described, শুধু non-live fallback হিসেবে)।
+
+### Commit reference
+
+- `9a85a82` — bilingual public landing pages + LocaleContext fix + deploy-safe.sh systemd migration (pushed to `origin/main`, 2026-07-28)
