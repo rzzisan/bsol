@@ -11,7 +11,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductVariant;
 use App\Services\AccountingService;
-use App\Services\SmsAutomationService;
+use App\Services\OrderStatusService;
 use App\Support\PhoneIntelCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,8 +22,8 @@ use Illuminate\Validation\ValidationException;
 class OrderController extends Controller
 {
     public function __construct(
-        private readonly SmsAutomationService $smsAutomationService,
         private readonly AccountingService $accountingService,
+        private readonly OrderStatusService $orderStatusService,
     ) {}
 
     private const VALID_STATUSES = [
@@ -406,57 +406,14 @@ class OrderController extends Controller
             'note'   => 'nullable|string|max:500',
         ]);
 
-        $oldStatus = $order->status;
-        $order->update(['status' => $data['status']]);
-        PhoneIntelCache::bump($order->customer_phone);
-
-        $this->adjustVariantInventoryForStatusTransition($order, $oldStatus, $data['status']);
-
-        OrderStatusLog::create([
-            'order_id'   => $order->id,
-            'old_status' => $oldStatus,
-            'new_status' => $data['status'],
-            'note'       => $data['note'] ?? null,
-            'changed_by' => auth()->id(),
-        ]);
-
-        $this->smsAutomationService->handleOrderStatusChanged($order, $oldStatus, $data['status']);
-
-        if ($data['status'] === 'delivered') {
-            $this->accountingService->onOrderDelivered($order);
-        }
-
-        if (in_array($data['status'], ['cancelled', 'returned'], true)) {
-            $this->accountingService->onOrderCancelledOrReturned($order);
-        }
+        $this->orderStatusService->transition(
+            $order,
+            $data['status'],
+            $data['note'] ?? null,
+            auth()->id(),
+        );
 
         return response()->json(['success' => true, 'data' => $order]);
-    }
-
-    private function adjustVariantInventoryForStatusTransition(Order $order, string $oldStatus, string $newStatus): void
-    {
-        $reserveStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
-        $releaseStatuses = ['cancelled', 'returned'];
-
-        $wasReserved = in_array($oldStatus, $reserveStatuses, true);
-        $isReserved  = in_array($newStatus, $reserveStatuses, true);
-
-        if (!$wasReserved && $isReserved) {
-            foreach ($order->items()->whereNotNull('product_variant_id')->get() as $item) {
-                ProductVariant::where('id', $item->product_variant_id)
-                    ->whereNull('deleted_at')
-                    ->decrement('stock_qty', (int) $item->quantity);
-            }
-            return;
-        }
-
-        if ($wasReserved && in_array($newStatus, $releaseStatuses, true)) {
-            foreach ($order->items()->whereNotNull('product_variant_id')->get() as $item) {
-                ProductVariant::where('id', $item->product_variant_id)
-                    ->whereNull('deleted_at')
-                    ->increment('stock_qty', (int) $item->quantity);
-            }
-        }
     }
 
     // ── Bulk Status ───────────────────────────────────────────────────────────
@@ -475,26 +432,15 @@ class OrderController extends Controller
             ->get();
 
         foreach ($orders as $order) {
-            $old = $order->status;
-            $order->update(['status' => $data['status']]);
-            PhoneIntelCache::bump($order->customer_phone);
-            OrderStatusLog::create([
-                'order_id'   => $order->id,
-                'old_status' => $old,
-                'new_status' => $data['status'],
-                'note'       => $data['note'] ?? 'Bulk update.',
-                'changed_by' => auth()->id(),
-            ]);
-
-            $this->smsAutomationService->handleOrderStatusChanged($order, $old, $data['status']);
-
-            if ($data['status'] === 'delivered') {
-                $this->accountingService->onOrderDelivered($order);
-            }
-
-            if (in_array($data['status'], ['cancelled', 'returned'], true)) {
-                $this->accountingService->onOrderCancelledOrReturned($order);
-            }
+            // adjustInventory: false preserves this endpoint's pre-existing behavior
+            // of not touching variant stock on bulk status changes.
+            $this->orderStatusService->transition(
+                $order,
+                $data['status'],
+                $data['note'] ?? 'Bulk update.',
+                auth()->id(),
+                adjustInventory: false,
+            );
         }
 
         return response()->json([

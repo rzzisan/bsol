@@ -19,7 +19,7 @@ class Order extends Model
         'subtotal', 'shipping_charge', 'discount', 'total', 'notes', 'custom_fields',
         'fraud_score', 'risk_level',
         'courier_name', 'courier_tracking_id', 'courier_status', 'courier_charge',
-        'assigned_to',
+        'assigned_to', 'otp_required', 'otp_verified_at',
     ];
 
     protected $casts = [
@@ -30,6 +30,8 @@ class Order extends Model
         'courier_charge' => 'decimal:2',
         'fraud_score'    => 'integer',
         'custom_fields'  => 'array',
+        'otp_required'   => 'boolean',
+        'otp_verified_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

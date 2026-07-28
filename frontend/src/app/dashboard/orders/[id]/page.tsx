@@ -70,6 +70,7 @@ type Order = {
   courier_name: string | null; courier_tracking_id: string | null;
   courier_status: string | null; courier_charge: string | null;
   created_at: string; updated_at: string;
+  otp_verified_at: string | null;
   items: OrderItem[]; status_logs: StatusLog[];
 };
 
@@ -417,10 +418,18 @@ export default function OrderDetailPage() {
             <dd>{fmtDate(order.created_at)}</dd>
 
             <dt className="text-[var(--muted)]">{txt.status}</dt>
-            <dd>
+            <dd className="flex flex-wrap items-center gap-1.5">
               <span className={`rounded-full px-2 py-0.5 font-semibold ${STATUS_STYLE[order.status] ?? ""}`}>
                 {order.status}
               </span>
+              {order.otp_verified_at ? (
+                <span
+                  title={locale === "bn" ? "OTP ভেরিফাইড" : "OTP verified"}
+                  className="rounded-full bg-teal-500/15 px-2 py-0.5 text-xs font-semibold text-teal-400"
+                >
+                  OTP
+                </span>
+              ) : null}
             </dd>
 
             <dt className="text-[var(--muted)]">{txt.source}</dt>

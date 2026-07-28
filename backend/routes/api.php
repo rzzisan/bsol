@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\EmailConfigurationController;
 use App\Http\Controllers\Api\NotificationDispatchController;
 use App\Http\Controllers\Api\NotificationTemplateController;
 use App\Http\Controllers\Api\NotificationUseCaseBindingController;
+use App\Http\Controllers\Api\CheckoutOtpController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\FraudController;
@@ -63,6 +64,14 @@ Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class,
 Route::get('/public/landing-pages/{slug}/orders/{orderId}', [LandingPageController::class, 'publicShowOrder'])
     ->where('orderId', '[0-9]+')
     ->middleware('throttle:30,1');
+
+// Checkout OTP verification — token-guarded like the order lookup above.
+Route::post('/public/landing-pages/{slug}/orders/{orderId}/verify-otp', [CheckoutOtpController::class, 'verify'])
+    ->where('orderId', '[0-9]+')
+    ->middleware('throttle:10,1');
+Route::post('/public/landing-pages/{slug}/orders/{orderId}/resend-otp', [CheckoutOtpController::class, 'resend'])
+    ->where('orderId', '[0-9]+')
+    ->middleware('throttle:10,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)

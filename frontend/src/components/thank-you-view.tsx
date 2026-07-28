@@ -1,6 +1,7 @@
 "use client";
 
-import { mergeLandingContent, DEFAULT_THANK_YOU } from "@/lib/landing-pages";
+import { useEffect, useState } from "react";
+import { mergeLandingContent, DEFAULT_THANK_YOU, DEFAULT_SETTINGS } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
 import type { PublicLandingPage } from "@/components/public-landing-page-view";
 
@@ -8,6 +9,8 @@ export type ThankYouOrder = {
   order_number: string;
   created_at?: string | null;
   status?: string | null;
+  otp_required?: boolean | null;
+  otp_verified?: boolean | null;
   payment_method?: string | null;
   payment_status?: string | null;
   customer_name?: string | null;
@@ -29,6 +32,121 @@ export type ThankYouOrder = {
   }>;
 };
 
+function OtpVerificationCard({
+  slug,
+  orderId,
+  token,
+  createdAt,
+  onVerified,
+  title,
+  description,
+  buttonText,
+  resendText,
+}: {
+  slug: string;
+  orderId: string;
+  token: string;
+  createdAt?: string | null;
+  onVerified: () => void;
+  title: string;
+  description: string;
+  buttonText: string;
+  resendText: string;
+}) {
+  const [code, setCode] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    const sentAt = createdAt ? new Date(createdAt).getTime() : Date.now();
+    const elapsed = Math.floor((Date.now() - sentAt) / 1000);
+    setResendCooldown(Math.max(0, 60 - elapsed));
+  }, [createdAt]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  async function verify(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/public/landing-pages/${slug}/orders/${orderId}/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, otp_code: code.trim() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        setError(json?.message || "ভুল OTP। আবার চেষ্টা করুন।");
+        return;
+      }
+      onVerified();
+    } catch {
+      setError("যোগাযোগ করা যায়নি। আবার চেষ্টা করুন।");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function resend() {
+    setError(null);
+    try {
+      const res = await fetch(`/api/public/landing-pages/${slug}/orders/${orderId}/resend-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        setError(json?.message || "OTP পাঠানো যায়নি।");
+        setResendCooldown(Number(json?.retry_after_seconds) || 60);
+        return;
+      }
+      setResendCooldown(60);
+    } catch {
+      setError("যোগাযোগ করা যায়নি। আবার চেষ্টা করুন।");
+    }
+  }
+
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+      <p className="mt-2 text-sm text-slate-500">{description}</p>
+      <form onSubmit={verify} className="mt-4 flex flex-wrap items-center gap-3">
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+          inputMode="numeric"
+          maxLength={4}
+          placeholder="OTP"
+          className="w-28 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-lg tracking-[0.4em] text-slate-900"
+        />
+        <button
+          type="submit"
+          disabled={submitting || code.trim().length !== 4}
+          className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {submitting ? "যাচাই হচ্ছে..." : buttonText}
+        </button>
+      </form>
+      {error ? <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div> : null}
+      <button
+        type="button"
+        onClick={resend}
+        disabled={resendCooldown > 0}
+        className="mt-3 text-sm font-medium text-slate-500 underline disabled:opacity-50"
+      >
+        {resendCooldown > 0 ? `${resendText} (${resendCooldown}s)` : resendText}
+      </button>
+    </div>
+  );
+}
+
 function money(value: string | number | null | undefined) {
   const amount = Number(value ?? 0);
   return Number.isFinite(amount)
@@ -39,10 +157,16 @@ function money(value: string | number | null | undefined) {
 export default function ThankYouView({
   page,
   order,
+  orderId,
+  token,
 }: {
   page: PublicLandingPage;
   order: ThankYouOrder | null;
+  orderId?: string;
+  token?: string;
 }) {
+  const [otpVerified, setOtpVerified] = useState(Boolean(order?.otp_verified));
+
   const theme = {
     primary: page?.theme_settings?.primary_color ?? "#0f766e",
     accent: page?.theme_settings?.accent_color ?? "#f97316",
@@ -57,6 +181,8 @@ export default function ThankYouView({
   const showSummary = thankYou.show_order_summary ?? true;
   const showAddress = thankYou.show_shipping_address ?? true;
   const contactPhone = content.contact?.phone ?? null;
+  const otpVerifiedMessage = content.settings?.otp_verified_message || DEFAULT_SETTINGS.otp_verified_message;
+  const showOtpGate = Boolean(order?.otp_required) && !otpVerified && Boolean(orderId) && Boolean(token);
 
   const areaLine = order
     ? [order.customer_area, order.customer_thana, order.customer_district].filter((part) => (part ?? "").trim()).join(", ")
@@ -106,6 +232,26 @@ export default function ThankYouView({
             </div>
           ) : (
             <>
+              {showOtpGate ? (
+                <OtpVerificationCard
+                  slug={page.slug}
+                  orderId={orderId!}
+                  token={token!}
+                  createdAt={order.created_at}
+                  onVerified={() => setOtpVerified(true)}
+                  title={content.settings?.otp_form_title || DEFAULT_SETTINGS.otp_form_title}
+                  description={content.settings?.otp_form_description || DEFAULT_SETTINGS.otp_form_description}
+                  buttonText={content.settings?.otp_form_button_text || DEFAULT_SETTINGS.otp_form_button_text}
+                  resendText={content.settings?.otp_form_resend_text || DEFAULT_SETTINGS.otp_form_resend_text}
+                />
+              ) : null}
+
+              {otpVerified && order.otp_required ? (
+                <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                  {otpVerifiedMessage}
+                </div>
+              ) : null}
+
               {showSummary ? (
                 <div className="lp-card rounded-3xl p-6 sm:p-8">
                   <h2 className="text-xl font-bold" style={{ color: theme.primary }}>অর্ডার সামারী</h2>

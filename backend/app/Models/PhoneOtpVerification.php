@@ -8,6 +8,7 @@ class PhoneOtpVerification extends Model
 {
     protected $fillable = [
         'token',
+        'order_id',
         'mobile',
         'otp_code',
         'purpose',

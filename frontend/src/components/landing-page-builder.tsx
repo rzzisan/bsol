@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Copy, Image as ImageIcon, Type, Video, ShieldCheck, Timer, Star, HelpCircle, Images, Rows3, LayoutGrid } from "lucide-react";
+import { Plus, Trash2, Copy, Image as ImageIcon, Type, Video, ShieldCheck, Timer, Star, HelpCircle, Images, Rows3, LayoutGrid, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
 import { getStoredToken, type Locale } from "@/lib/dashboard-client";
 import {
   LANDING_API_BASE,
@@ -15,6 +15,7 @@ import {
   DEFAULT_CHECKOUT_FIELDS,
   DEFAULT_THANK_YOU,
   DEFAULT_SETTINGS,
+  OTP_SMS_TEMPLATE_PLACEHOLDERS,
   mergeLandingContent,
   toNumberOrNull,
 } from "@/lib/landing-pages";
@@ -148,6 +149,18 @@ const BLOCK_ICONS: Record<BlockType, React.ComponentType<{ size?: number }>> = {
   products: LayoutGrid,
 };
 
+type TabKey = "content" | "design" | "blocks" | "products" | "settings";
+
+const TAB_ORDER: TabKey[] = ["content", "design", "blocks", "products", "settings"];
+
+const TAB_ICONS: Record<TabKey, React.ComponentType<{ size?: number }>> = {
+  content: FileText,
+  design: Palette,
+  blocks: Layers,
+  products: ShoppingBag,
+  settings: SettingsIcon,
+};
+
 function defaultItemFor(type: BlockType): Record<string, unknown> {
   switch (type) {
     case "rich_text_blocks":
@@ -204,10 +217,24 @@ const text = {
     fieldShown: "দেখাবে",
     fieldRequired: "বাধ্যতামূলক",
     fieldOptionsPlaceholder: "অপশন, কমা দিয়ে আলাদা করুন (যেমন: S, M, L)",
+    tabContent: "কন্টেন্ট",
+    tabDesign: "ডিজাইন",
+    tabBlocks: "ব্লক",
+    tabProducts: "প্রোডাক্ট ও চেকআউট",
+    tabSettings: "সেটিংস",
     settingsTitle: "সেটিংস",
     phoneValidation: "ফোন নাম্বার ভ্যালিডেশন",
     phoneValidationHint: "চালু থাকলে সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর ছাড়া অর্ডার করা যাবে না।",
     phoneValidationMessage: "ভুল নম্বরে দেখানোর মেসেজ",
+    otpVerification: "OTP ফোন নাম্বার ভেরিফিকেশন",
+    otpVerificationHint: "চালু থাকলে অর্ডার প্লেসের পর কাস্টমারকে থ্যাংক ইউ পেজে ৪ সংখ্যার OTP দিয়ে ফোন নাম্বার ভেরিফাই করতে হবে, তবেই অর্ডার Confirmed হবে। SMS ব্যালেন্স না থাকলে এটি বন্ধ থাকা অবস্থার মতোই কাজ করবে।",
+    otpVerifiedMessage: "ভেরিফাই হলে থ্যাংক ইউ পেজে দেখানোর মেসেজ",
+    otpSmsTemplate: "OTP SMS টেমপ্লেট",
+    otpSmsTemplateHint: "ব্যবহারযোগ্য Placeholder:",
+    otpFormTitle: "OTP ফর্মের শিরোনাম",
+    otpFormDescription: "OTP ফর্মের বর্ণনা",
+    otpFormButtonText: "কনফার্ম বাটনের টেক্সট",
+    otpFormResendText: "পুনরায় পাঠান লিংকের টেক্সট",
     save: "সংরক্ষণ করুন",
     saving: "সংরক্ষণ হচ্ছে...",
     blocksTitle: "পেজ ব্লক (ড্র্যাগ করে সাজান)",
@@ -274,10 +301,24 @@ const text = {
     fieldShown: "Shown",
     fieldRequired: "Required",
     fieldOptionsPlaceholder: "Comma-separated options (e.g. S, M, L)",
+    tabContent: "Content",
+    tabDesign: "Design",
+    tabBlocks: "Blocks",
+    tabProducts: "Products & Checkout",
+    tabSettings: "Settings",
     settingsTitle: "Settings",
     phoneValidation: "Phone number validation",
     phoneValidationHint: "When on, orders require a valid 11-digit Bangladeshi mobile number.",
     phoneValidationMessage: "Message shown for an invalid number",
+    otpVerification: "OTP phone number verification",
+    otpVerificationHint: "When on, customers must verify their phone with a 4-digit OTP on the thank-you page before an order becomes Confirmed. If SMS balance runs out, this behaves as if it were off.",
+    otpVerifiedMessage: "Message shown on the thank-you page once verified",
+    otpSmsTemplate: "OTP SMS template",
+    otpSmsTemplateHint: "Available placeholders:",
+    otpFormTitle: "OTP form title",
+    otpFormDescription: "OTP form description",
+    otpFormButtonText: "Confirm button text",
+    otpFormResendText: "Resend link text",
     save: "Save",
     saving: "Saving...",
     blocksTitle: "Page blocks (drag to reorder)",
@@ -322,6 +363,13 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const router = useRouter();
   const t = text[locale] ?? text.en;
   const blockLabels = BLOCK_LABELS[locale] ?? BLOCK_LABELS.en;
+  const tabLabels: Record<TabKey, string> = {
+    content: t.tabContent,
+    design: t.tabDesign,
+    blocks: t.tabBlocks,
+    products: t.tabProducts,
+    settings: t.tabSettings,
+  };
   const token = getStoredToken();
 
   const [loading, setLoading] = useState(true);
@@ -330,6 +378,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [success, setSuccess] = useState<string | null>(null);
   const [page, setPage] = useState<LandingPageRecord | null>(null);
   const [templates, setTemplates] = useState<LandingTemplate[]>([]);
+  const [activeTab, setActiveTab] = useState<TabKey>("content");
 
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -351,6 +400,13 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
   const [thankYouShowAddress, setThankYouShowAddress] = useState(true);
   const [phoneValidationEnabled, setPhoneValidationEnabled] = useState<boolean>(DEFAULT_SETTINGS.phone_validation_enabled);
   const [phoneValidationMessage, setPhoneValidationMessage] = useState<string>(DEFAULT_SETTINGS.phone_validation_message);
+  const [otpVerificationEnabled, setOtpVerificationEnabled] = useState<boolean>(DEFAULT_SETTINGS.otp_verification_enabled);
+  const [otpVerifiedMessage, setOtpVerifiedMessage] = useState<string>(DEFAULT_SETTINGS.otp_verified_message);
+  const [otpSmsTemplate, setOtpSmsTemplate] = useState<string>(DEFAULT_SETTINGS.otp_sms_template);
+  const [otpFormTitle, setOtpFormTitle] = useState<string>(DEFAULT_SETTINGS.otp_form_title);
+  const [otpFormDescription, setOtpFormDescription] = useState<string>(DEFAULT_SETTINGS.otp_form_description);
+  const [otpFormButtonText, setOtpFormButtonText] = useState<string>(DEFAULT_SETTINGS.otp_form_button_text);
+  const [otpFormResendText, setOtpFormResendText] = useState<string>(DEFAULT_SETTINGS.otp_form_resend_text);
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   const [contentState, setContentState] = useState<ContentState>(emptyContentState());
@@ -436,6 +492,13 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
           setThankYouShowAddress(merged.thank_you?.show_shipping_address ?? true);
           setPhoneValidationEnabled(merged.settings?.phone_validation_enabled ?? DEFAULT_SETTINGS.phone_validation_enabled);
           setPhoneValidationMessage(merged.settings?.phone_validation_message ?? DEFAULT_SETTINGS.phone_validation_message);
+          setOtpVerificationEnabled(merged.settings?.otp_verification_enabled ?? DEFAULT_SETTINGS.otp_verification_enabled);
+          setOtpVerifiedMessage(merged.settings?.otp_verified_message ?? DEFAULT_SETTINGS.otp_verified_message);
+          setOtpSmsTemplate(merged.settings?.otp_sms_template ?? DEFAULT_SETTINGS.otp_sms_template);
+          setOtpFormTitle(merged.settings?.otp_form_title ?? DEFAULT_SETTINGS.otp_form_title);
+          setOtpFormDescription(merged.settings?.otp_form_description ?? DEFAULT_SETTINGS.otp_form_description);
+          setOtpFormButtonText(merged.settings?.otp_form_button_text ?? DEFAULT_SETTINGS.otp_form_button_text);
+          setOtpFormResendText(merged.settings?.otp_form_resend_text ?? DEFAULT_SETTINGS.otp_form_resend_text);
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
             accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
@@ -665,6 +728,13 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
       settings: {
         phone_validation_enabled: phoneValidationEnabled,
         phone_validation_message: phoneValidationMessage || null,
+        otp_verification_enabled: otpVerificationEnabled,
+        otp_verified_message: otpVerifiedMessage || null,
+        otp_sms_template: otpSmsTemplate || null,
+        otp_form_title: otpFormTitle || null,
+        otp_form_description: otpFormDescription || null,
+        otp_form_button_text: otpFormButtonText || null,
+        otp_form_resend_text: otpFormResendText || null,
       },
       layout_order: layoutEntries,
     };
@@ -686,7 +756,7 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, phoneValidationEnabled, phoneValidationMessage, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, productsTitle, productsSubtitle, checkoutFields, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -956,268 +1026,322 @@ export default function LandingPageBuilder({ locale, mode, pageId }: LandingPage
             <div className={`rounded-xl px-4 py-3 text-sm ${error ? "bg-red-500/10 text-red-400" : "bg-emerald-500/10 text-emerald-400"}`}>{error || success}</div>
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <label className="block xl:col-span-2">
-              <span className={"mb-1 block text-sm font-medium text-[var(--foreground)]"}>{t.title}</span>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2.5 text-[var(--foreground)]" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.slug}</span>
-              <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2.5 text-[var(--foreground)]" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.status}</span>
-              <select value={status} onChange={(e) => setStatus(e.target.value as "draft" | "published")} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2.5 text-[var(--foreground)]">
-                <option value="draft">{t.draft}</option>
-                <option value="published">{t.published}</option>
-              </select>
-            </label>
-          </div>
-
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h3 className="text-base font-semibold text-[var(--foreground)]">{t.hero}</h3>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <div className="space-y-3">
-                <TextField label={t.heroHeadline} value={heroHeadline} onChange={setHeroHeadline} />
-                <TextAreaField label={t.heroSubheadline} value={heroSubheadline} onChange={setHeroSubheadline} />
-                <TextField label={t.heroCtaText} value={heroCtaText} onChange={setHeroCtaText} />
-              </div>
-              <ImagePickerField label={t.heroImage} value={heroImage} locale={locale} onPick={() => setMediaTarget({ type: "hero", id: "hero", field: "background_image_url" })} />
-            </div>
-          </div>
-
-          <LandingDesignPanel locale={locale} theme={theme} onChange={setTheme} />
-
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h3 className="text-base font-semibold text-[var(--foreground)]">{t.seo}</h3>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <TextField label={t.metaTitle} value={metaTitle} onChange={setMetaTitle} />
-              <TextAreaField label={t.metaDescription} value={metaDescription} onChange={setMetaDescription} />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h3 className="text-base font-semibold text-[var(--foreground)]">{t.thankYou}</h3>
-            <p className="mt-1 text-xs text-[var(--muted)]">{t.thankYouHint}</p>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <TextField label={t.thankYouTitle} value={thankYouTitle} onChange={setThankYouTitle} />
-              <TextAreaField label={t.thankYouMessage} value={thankYouMessage} onChange={setThankYouMessage} />
-            </div>
-            <div className="mt-3 flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
-                <input type="checkbox" checked={thankYouShowSummary} onChange={(event) => setThankYouShowSummary(event.target.checked)} />
-                {t.thankYouShowSummary}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <label className="block xl:col-span-2">
+                <span className={"mb-1 block text-sm font-medium text-[var(--foreground)]"}>{t.title}</span>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]" />
               </label>
-              <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
-                <input type="checkbox" checked={thankYouShowAddress} onChange={(event) => setThankYouShowAddress(event.target.checked)} />
-                {t.thankYouShowAddress}
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.slug}</span>
+                <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.status}</span>
+                <select value={status} onChange={(e) => setStatus(e.target.value as "draft" | "published")} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]">
+                  <option value="draft">{t.draft}</option>
+                  <option value="published">{t.published}</option>
+                </select>
               </label>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-base font-semibold text-[var(--foreground)]">{t.blocksTitle}</h3>
-              <div className="relative">
-                <button type="button" onClick={() => setAddMenuOpen((prev) => !prev)} className="flex items-center gap-1 rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white">
-                  <Plus size={14} /> {t.addBlock}
+          <div className="flex flex-wrap gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-1.5">
+            {TAB_ORDER.map((tabKey) => {
+              const Icon = TAB_ICONS[tabKey];
+              const label = tabLabels[tabKey];
+              const isActive = activeTab === tabKey;
+              return (
+                <button
+                  key={tabKey}
+                  type="button"
+                  onClick={() => setActiveTab(tabKey)}
+                  className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                    isActive ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  <Icon size={15} /> {label}
                 </button>
-                {addMenuOpen ? (
-                  <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-lg">
-                    {ADDABLE_TYPES.map((type) => {
-                      const Icon = BLOCK_ICONS[type];
-                      return (
-                        <button key={type} type="button" onClick={() => addBlock(type)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--surface-soft)]">
-                          <Icon size={14} /> {blockLabels[type]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            {contentState.features.length > 0 ? (
-              <div className="mb-3">
-                <TextField label={t.featuresTitle} value={featuresTitle} onChange={setFeaturesTitle} />
-              </div>
-            ) : null}
-
-            <BlockList entries={layoutEntries} onReorder={setLayoutEntries} renderItem={renderBlockItem} />
+              );
+            })}
           </div>
 
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-[var(--foreground)]">{t.selectedProducts}</h3>
-                <p className="text-sm text-[var(--muted)]">{t.productsHint}</p>
+          <div className={activeTab === "content" ? "space-y-5" : "hidden"}>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <h3 className="text-base font-semibold text-[var(--foreground)]">{t.hero}</h3>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="space-y-3">
+                  <TextField label={t.heroHeadline} value={heroHeadline} onChange={setHeroHeadline} />
+                  <TextAreaField label={t.heroSubheadline} value={heroSubheadline} onChange={setHeroSubheadline} />
+                  <TextField label={t.heroCtaText} value={heroCtaText} onChange={setHeroCtaText} />
+                </div>
+                <ImagePickerField label={t.heroImage} value={heroImage} locale={locale} onPick={() => setMediaTarget({ type: "hero", id: "hero", field: "background_image_url" })} />
               </div>
-              <span className="text-xs text-[var(--muted)]">{t.dragHint}</span>
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <TextField label={t.productsTitle} value={productsTitle} onChange={setProductsTitle} />
-              <TextField label={t.productsSubtitle} value={productsSubtitle} onChange={setProductsSubtitle} />
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <h3 className="text-base font-semibold text-[var(--foreground)]">{t.seo}</h3>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <TextField label={t.metaTitle} value={metaTitle} onChange={setMetaTitle} />
+                <TextAreaField label={t.metaDescription} value={metaDescription} onChange={setMetaDescription} />
+              </div>
             </div>
-            {selectedProductDetails.length === 0 ? (
-              <div className="mt-3 rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">{t.emptyProducts}</div>
-            ) : (
-              <div className="mt-3 space-y-4">
-                {selectedProductDetails.map((item, index) => (
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <h3 className="text-base font-semibold text-[var(--foreground)]">{t.thankYou}</h3>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t.thankYouHint}</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <TextField label={t.thankYouTitle} value={thankYouTitle} onChange={setThankYouTitle} />
+                <TextAreaField label={t.thankYouMessage} value={thankYouMessage} onChange={setThankYouMessage} />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                  <input type="checkbox" checked={thankYouShowSummary} onChange={(event) => setThankYouShowSummary(event.target.checked)} />
+                  {t.thankYouShowSummary}
+                </label>
+                <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                  <input type="checkbox" checked={thankYouShowAddress} onChange={(event) => setThankYouShowAddress(event.target.checked)} />
+                  {t.thankYouShowAddress}
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className={activeTab === "design" ? "space-y-5" : "hidden"}>
+            <LandingDesignPanel locale={locale} theme={theme} onChange={setTheme} />
+          </div>
+
+          <div className={activeTab === "blocks" ? "space-y-5" : "hidden"}>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-semibold text-[var(--foreground)]">{t.blocksTitle}</h3>
+                <div className="relative">
+                  <button type="button" onClick={() => setAddMenuOpen((prev) => !prev)} className="flex items-center gap-1 rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-white">
+                    <Plus size={14} /> {t.addBlock}
+                  </button>
+                  {addMenuOpen ? (
+                    <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-lg">
+                      {ADDABLE_TYPES.map((type) => {
+                        const Icon = BLOCK_ICONS[type];
+                        return (
+                          <button key={type} type="button" onClick={() => addBlock(type)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--surface-soft)]">
+                            <Icon size={14} /> {blockLabels[type]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {contentState.features.length > 0 ? (
+                <div className="mb-3">
+                  <TextField label={t.featuresTitle} value={featuresTitle} onChange={setFeaturesTitle} />
+                </div>
+              ) : null}
+
+              <BlockList entries={layoutEntries} onReorder={setLayoutEntries} renderItem={renderBlockItem} />
+            </div>
+          </div>
+
+          <div className={activeTab === "products" ? "space-y-5" : "hidden"}>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-[var(--foreground)]">{t.selectedProducts}</h3>
+                  <p className="text-sm text-[var(--muted)]">{t.productsHint}</p>
+                </div>
+                <span className="text-xs text-[var(--muted)]">{t.dragHint}</span>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <TextField label={t.productsTitle} value={productsTitle} onChange={setProductsTitle} />
+                <TextField label={t.productsSubtitle} value={productsSubtitle} onChange={setProductsSubtitle} />
+              </div>
+              {selectedProductDetails.length === 0 ? (
+                <div className="mt-3 rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">{t.emptyProducts}</div>
+              ) : (
+                <div className="mt-3 space-y-4">
+                  {selectedProductDetails.map((item, index) => (
+                    <div
+                      key={item.product_id}
+                      draggable
+                      onDragStart={() => setDraggingProductId(item.product_id)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (draggingProductId != null) reorderProductsByIds(draggingProductId, item.product_id);
+                        setDraggingProductId(null);
+                      }}
+                      onDragEnd={() => setDraggingProductId(null)}
+                      className={`rounded-2xl border bg-[var(--surface)] p-4 ${draggingProductId === item.product_id ? "border-[var(--accent)] shadow-lg" : "border-[var(--border)]"}`}
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="cursor-grab text-lg text-[var(--muted)]">⋮⋮</span>
+                            <h4 className="text-sm font-semibold text-[var(--foreground)]">{item.product?.name ?? `#${item.product_id}`}</h4>
+                          </div>
+                          <p className="mt-1 text-xs text-[var(--muted)]">SKU: {item.product?.sku || "—"} · ৳{Number(item.product?.selling_price ?? item.product?.regular_price ?? 0).toLocaleString()} · #{index + 1}</p>
+                        </div>
+                        <button type="button" onClick={() => removeProduct(item.product_id)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-400">{t.remove}</button>
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <input value={item.title_override} onChange={(e) => patchProduct(item.product_id, { title_override: e.target.value })} placeholder={t.overrideTitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                        <input value={item.subtitle} onChange={(e) => patchProduct(item.product_id, { subtitle: e.target.value })} placeholder={t.overrideSubtitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                        <input value={item.badge_text} onChange={(e) => patchProduct(item.product_id, { badge_text: e.target.value })} placeholder={t.badge} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                        <input value={item.price_override} onChange={(e) => patchProduct(item.product_id, { price_override: e.target.value })} placeholder={t.overridePrice} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                        <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]">
+                          <span>{t.defaultQty}</span>
+                          <input type="number" min={1} max={100} value={item.default_qty} onChange={(e) => patchProduct(item.product_id, { default_qty: Math.max(1, Number(e.target.value) || 1) })} className="w-20 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm" />
+                        </label>
+                        <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]">
+                          <input type="checkbox" checked={item.selected_by_default} onChange={(e) => patchProduct(item.product_id, { selected_by_default: e.target.checked })} className="accent-[var(--accent)]" />
+                          <span>{t.selectedByDefault}</span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-5 border-t border-[var(--border)] pt-4">
+                <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.products}</h4>
+                <input value={productQuery} onChange={(e) => setProductQuery(e.target.value)} placeholder={t.searchProducts} className="mt-3 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]" />
+                <div className="mt-3 space-y-3">
+                  {filteredProducts.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">{t.noProducts}</div>
+                  ) : (
+                    filteredProducts.slice(0, 30).map((product) => (
+                      <div key={product.id} className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <div className="min-w-0">
+                          <h4 className="truncate text-sm font-semibold text-[var(--foreground)]">{product.name}</h4>
+                          <p className="mt-1 text-xs text-[var(--muted)]">SKU: {product.sku || "—"} · ৳{Number(product.selling_price ?? product.regular_price ?? 0).toLocaleString()} · Stock {product.stock ?? 0}</p>
+                        </div>
+                        <button type="button" onClick={() => addProduct(product)} className="shrink-0 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--accent)]">{t.attach}</button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-[var(--foreground)]">{t.checkoutFields}</h3>
+                  <p className="text-sm text-[var(--muted)]">{t.checkoutFieldsHint}</p>
+                </div>
+                <button type="button" onClick={addCustomCheckoutField} className="flex items-center gap-1 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--accent)]">
+                  <Plus size={14} /> {t.addCustomField}
+                </button>
+              </div>
+              <div className="mt-3 space-y-3">
+                {checkoutFields.map((field) => (
                   <div
-                    key={item.product_id}
+                    key={field.key}
                     draggable
-                    onDragStart={() => setDraggingProductId(item.product_id)}
+                    onDragStart={() => setDraggingFieldKey(field.key)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => {
-                      if (draggingProductId != null) reorderProductsByIds(draggingProductId, item.product_id);
-                      setDraggingProductId(null);
+                      if (draggingFieldKey) reorderCheckoutFieldsByKey(draggingFieldKey, field.key);
+                      setDraggingFieldKey(null);
                     }}
-                    onDragEnd={() => setDraggingProductId(null)}
-                    className={`rounded-2xl border bg-[var(--surface)] p-4 ${draggingProductId === item.product_id ? "border-[var(--accent)] shadow-lg" : "border-[var(--border)]"}`}
+                    onDragEnd={() => setDraggingFieldKey(null)}
+                    className={`rounded-2xl border bg-[var(--surface)] p-3 ${draggingFieldKey === field.key ? "border-[var(--accent)] shadow-lg" : "border-[var(--border)]"}`}
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="cursor-grab text-lg text-[var(--muted)]">⋮⋮</span>
-                          <h4 className="text-sm font-semibold text-[var(--foreground)]">{item.product?.name ?? `#${item.product_id}`}</h4>
-                        </div>
-                        <p className="mt-1 text-xs text-[var(--muted)]">SKU: {item.product?.sku || "—"} · ৳{Number(item.product?.selling_price ?? item.product?.regular_price ?? 0).toLocaleString()} · #{index + 1}</p>
-                      </div>
-                      <button type="button" onClick={() => removeProduct(item.product_id)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-400">{t.remove}</button>
-                    </div>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <input value={item.title_override} onChange={(e) => patchProduct(item.product_id, { title_override: e.target.value })} placeholder={t.overrideTitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
-                      <input value={item.subtitle} onChange={(e) => patchProduct(item.product_id, { subtitle: e.target.value })} placeholder={t.overrideSubtitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
-                      <input value={item.badge_text} onChange={(e) => patchProduct(item.product_id, { badge_text: e.target.value })} placeholder={t.badge} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
-                      <input value={item.price_override} onChange={(e) => patchProduct(item.product_id, { price_override: e.target.value })} placeholder={t.overridePrice} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
-                      <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]">
-                        <span>{t.defaultQty}</span>
-                        <input type="number" min={1} max={100} value={item.default_qty} onChange={(e) => patchProduct(item.product_id, { default_qty: Math.max(1, Number(e.target.value) || 1) })} className="w-20 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm" />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="cursor-grab text-lg text-[var(--muted)]">⋮⋮</span>
+                      <input
+                        value={field.label}
+                        onChange={(e) => patchCheckoutField(field.key, { label: e.target.value })}
+                        className="min-w-[10rem] flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]"
+                      />
+                      {field.kind === "custom" ? (
+                        <select
+                          value={field.type ?? "text"}
+                          onChange={(e) => patchCheckoutField(field.key, { type: e.target.value as CheckoutFieldConfig["type"] })}
+                          className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-2 text-xs text-[var(--foreground)]"
+                        >
+                          <option value="text">{t.fieldTypeText}</option>
+                          <option value="textarea">{t.fieldTypeTextarea}</option>
+                          <option value="select">{t.fieldTypeSelect}</option>
+                        </select>
+                      ) : null}
+                      <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-2.5 py-2 text-xs text-[var(--foreground)]">
+                        <input
+                          type="checkbox"
+                          checked={field.enabled}
+                          disabled={field.key === "customer_phone"}
+                          onChange={(e) => patchCheckoutField(field.key, { enabled: e.target.checked })}
+                          className="accent-[var(--accent)]"
+                        />
+                        {t.fieldShown}
                       </label>
-                      <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]">
-                        <input type="checkbox" checked={item.selected_by_default} onChange={(e) => patchProduct(item.product_id, { selected_by_default: e.target.checked })} className="accent-[var(--accent)]" />
-                        <span>{t.selectedByDefault}</span>
+                      <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-2.5 py-2 text-xs text-[var(--foreground)]">
+                        <input
+                          type="checkbox"
+                          checked={field.required}
+                          disabled={field.key === "customer_phone"}
+                          onChange={(e) => patchCheckoutField(field.key, { required: e.target.checked })}
+                          className="accent-[var(--accent)]"
+                        />
+                        {t.fieldRequired}
                       </label>
+                      {field.kind === "custom" ? (
+                        <button type="button" onClick={() => removeCheckoutField(field.key)} className="rounded-xl border border-red-400/30 px-2.5 py-2 text-xs font-semibold text-red-400">
+                          <Trash2 size={12} />
+                        </button>
+                      ) : null}
                     </div>
+                    {field.kind === "custom" && field.type === "select" ? (
+                      <input
+                        defaultValue={(field.options ?? []).join(", ")}
+                        onBlur={(e) => patchCheckoutField(field.key, { options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+                        placeholder={t.fieldOptionsPlaceholder}
+                        className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]"
+                      />
+                    ) : null}
                   </div>
                 ))}
               </div>
-            )}
-
-            <div className="mt-5 border-t border-[var(--border)] pt-4">
-              <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.products}</h4>
-              <input value={productQuery} onChange={(e) => setProductQuery(e.target.value)} placeholder={t.searchProducts} className="mt-3 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]" />
-              <div className="mt-3 space-y-3">
-                {filteredProducts.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">{t.noProducts}</div>
-                ) : (
-                  filteredProducts.slice(0, 30).map((product) => (
-                    <div key={product.id} className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                      <div className="min-w-0">
-                        <h4 className="truncate text-sm font-semibold text-[var(--foreground)]">{product.name}</h4>
-                        <p className="mt-1 text-xs text-[var(--muted)]">SKU: {product.sku || "—"} · ৳{Number(product.selling_price ?? product.regular_price ?? 0).toLocaleString()} · Stock {product.stock ?? 0}</p>
-                      </div>
-                      <button type="button" onClick={() => addProduct(product)} className="shrink-0 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--accent)]">{t.attach}</button>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-[var(--foreground)]">{t.checkoutFields}</h3>
-                <p className="text-sm text-[var(--muted)]">{t.checkoutFieldsHint}</p>
-              </div>
-              <button type="button" onClick={addCustomCheckoutField} className="flex items-center gap-1 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--accent)]">
-                <Plus size={14} /> {t.addCustomField}
-              </button>
-            </div>
-            <div className="mt-3 space-y-3">
-              {checkoutFields.map((field) => (
-                <div
-                  key={field.key}
-                  draggable
-                  onDragStart={() => setDraggingFieldKey(field.key)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {
-                    if (draggingFieldKey) reorderCheckoutFieldsByKey(draggingFieldKey, field.key);
-                    setDraggingFieldKey(null);
-                  }}
-                  onDragEnd={() => setDraggingFieldKey(null)}
-                  className={`rounded-2xl border bg-[var(--surface)] p-3 ${draggingFieldKey === field.key ? "border-[var(--accent)] shadow-lg" : "border-[var(--border)]"}`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="cursor-grab text-lg text-[var(--muted)]">⋮⋮</span>
-                    <input
-                      value={field.label}
-                      onChange={(e) => patchCheckoutField(field.key, { label: e.target.value })}
-                      className="min-w-[10rem] flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]"
-                    />
-                    {field.kind === "custom" ? (
-                      <select
-                        value={field.type ?? "text"}
-                        onChange={(e) => patchCheckoutField(field.key, { type: e.target.value as CheckoutFieldConfig["type"] })}
-                        className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-2 text-xs text-[var(--foreground)]"
-                      >
-                        <option value="text">{t.fieldTypeText}</option>
-                        <option value="textarea">{t.fieldTypeTextarea}</option>
-                        <option value="select">{t.fieldTypeSelect}</option>
-                      </select>
-                    ) : null}
-                    <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-2.5 py-2 text-xs text-[var(--foreground)]">
-                      <input
-                        type="checkbox"
-                        checked={field.enabled}
-                        disabled={field.key === "customer_phone"}
-                        onChange={(e) => patchCheckoutField(field.key, { enabled: e.target.checked })}
-                        className="accent-[var(--accent)]"
-                      />
-                      {t.fieldShown}
-                    </label>
-                    <label className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-2.5 py-2 text-xs text-[var(--foreground)]">
-                      <input
-                        type="checkbox"
-                        checked={field.required}
-                        disabled={field.key === "customer_phone"}
-                        onChange={(e) => patchCheckoutField(field.key, { required: e.target.checked })}
-                        className="accent-[var(--accent)]"
-                      />
-                      {t.fieldRequired}
-                    </label>
-                    {field.kind === "custom" ? (
-                      <button type="button" onClick={() => removeCheckoutField(field.key)} className="rounded-xl border border-red-400/30 px-2.5 py-2 text-xs font-semibold text-red-400">
-                        <Trash2 size={12} />
-                      </button>
-                    ) : null}
-                  </div>
-                  {field.kind === "custom" && field.type === "select" ? (
-                    <input
-                      defaultValue={(field.options ?? []).join(", ")}
-                      onBlur={(e) => patchCheckoutField(field.key, { options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
-                      placeholder={t.fieldOptionsPlaceholder}
-                      className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]"
-                    />
-                  ) : null}
+          <div className={activeTab === "settings" ? "space-y-5" : "hidden"}>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+                <input type="checkbox" checked={phoneValidationEnabled} onChange={(e) => setPhoneValidationEnabled(e.target.checked)} className="accent-[var(--accent)]" />
+                {t.phoneValidation}
+              </label>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t.phoneValidationHint}</p>
+              {phoneValidationEnabled ? (
+                <div className="mt-3">
+                  <TextField label={t.phoneValidationMessage} value={phoneValidationMessage} onChange={setPhoneValidationMessage} />
                 </div>
-              ))}
+              ) : null}
             </div>
-          </div>
 
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h3 className="text-base font-semibold text-[var(--foreground)]">{t.settingsTitle}</h3>
-            <label className="mt-3 flex items-center gap-2 text-sm text-[var(--foreground)]">
-              <input type="checkbox" checked={phoneValidationEnabled} onChange={(e) => setPhoneValidationEnabled(e.target.checked)} className="accent-[var(--accent)]" />
-              {t.phoneValidation}
-            </label>
-            <p className="mt-1 text-xs text-[var(--muted)]">{t.phoneValidationHint}</p>
-            {phoneValidationEnabled ? (
-              <div className="mt-3">
-                <TextField label={t.phoneValidationMessage} value={phoneValidationMessage} onChange={setPhoneValidationMessage} />
-              </div>
-            ) : null}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+                <input type="checkbox" checked={otpVerificationEnabled} onChange={(e) => setOtpVerificationEnabled(e.target.checked)} className="accent-[var(--accent)]" />
+                {t.otpVerification}
+              </label>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t.otpVerificationHint}</p>
+              {otpVerificationEnabled ? (
+                <div className="mt-3 space-y-3">
+                  <TextField label={t.otpVerifiedMessage} value={otpVerifiedMessage} onChange={setOtpVerifiedMessage} />
+                  <div>
+                    <TextAreaField label={t.otpSmsTemplate} value={otpSmsTemplate} onChange={setOtpSmsTemplate} rows={2} />
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {t.otpSmsTemplateHint} {OTP_SMS_TEMPLATE_PLACEHOLDERS.join(" ")}
+                    </p>
+                  </div>
+                  <TextField label={t.otpFormTitle} value={otpFormTitle} onChange={setOtpFormTitle} />
+                  <TextAreaField label={t.otpFormDescription} value={otpFormDescription} onChange={setOtpFormDescription} rows={2} />
+                  <TextField label={t.otpFormButtonText} value={otpFormButtonText} onChange={setOtpFormButtonText} />
+                  <TextField label={t.otpFormResendText} value={otpFormResendText} onChange={setOtpFormResendText} />
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex justify-end">

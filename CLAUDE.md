@@ -1,0 +1,4 @@
+- Be concise. Avoid long explanations unless asked.
+- Don't repeat code that hasn't changed.
+- Skip preamble/summary unless requested.
+- No emoji, no filler phrases.

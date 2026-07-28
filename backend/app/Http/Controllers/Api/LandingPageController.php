@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\CheckoutOtpService;
 use App\Services\LandingPageOrderService;
 use App\Support\CheckoutFieldResolver;
 use App\Models\LandingPage;
@@ -87,6 +88,7 @@ class LandingPageController extends Controller
         }
 
         $order = app(LandingPageOrderService::class)->create($page, $validated, $lineItems, $resolvedFields);
+        app(CheckoutOtpService::class)->maybeSendForOrder($page, $order);
 
         return response()->json([
             'success' => true,
@@ -132,6 +134,8 @@ class LandingPageController extends Controller
                 'order_number' => $order->order_number,
                 'created_at' => $order->created_at,
                 'status' => $order->status,
+                'otp_required' => (bool) $order->otp_required,
+                'otp_verified' => (bool) $order->otp_verified_at,
                 'payment_method' => $order->payment_method,
                 'payment_status' => $order->payment_status,
                 'customer_name' => $order->customer_name,

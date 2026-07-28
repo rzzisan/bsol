@@ -47,6 +47,7 @@ const t = {
     statusNames: { pending:"অপেক্ষমান", confirmed:"নিশ্চিত", processing:"প্রক্রিয়াধীন",
                    shipped:"পাঠানো হয়েছে", delivered:"ডেলিভারি হয়েছে", cancelled:"বাতিল", returned:"ফেরত" },
     riskNames: { low:"কম", medium:"মাঝারি", high:"উচ্চ" },
+    otpVerifiedBadge: "OTP ভেরিফাইড",
     totalOrders: "মোট অর্ডার",
     todayOrders: "আজকের অর্ডার",
     pendingOrders: "অপেক্ষমান",
@@ -77,6 +78,7 @@ const t = {
     statusNames: { pending:"Pending", confirmed:"Confirmed", processing:"Processing",
                    shipped:"Shipped", delivered:"Delivered", cancelled:"Cancelled", returned:"Returned" },
     riskNames: { low:"Low", medium:"Medium", high:"High" },
+    otpVerifiedBadge: "OTP verified",
     totalOrders: "Total Orders",
     todayOrders: "Today",
     pendingOrders: "Pending",
@@ -93,6 +95,7 @@ type Order = {
   id: number; order_number: string; customer_name: string | null;
   customer_phone: string; total: string; status: Status;
   risk_level: string; created_at: string; payment_status: string;
+  otp_verified_at: string | null;
 };
 type Stats = { total: number; today: number; pending: number; delivered: number };
 
@@ -279,10 +282,20 @@ export default function OrdersPage() {
                 </td>
                 <td className="px-3 py-3 text-right font-semibold">৳{Number(o.total).toLocaleString()}</td>
                 <td className="px-3 py-3">
-                  <button onClick={() => openStatusModal(o)}
-                    className={`rounded-full px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80 ${statusColor[o.status] ?? ""}`}>
-                    {txt.statusNames[o.status]}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button onClick={() => openStatusModal(o)}
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80 ${statusColor[o.status] ?? ""}`}>
+                      {txt.statusNames[o.status]}
+                    </button>
+                    {o.otp_verified_at ? (
+                      <span
+                        title={txt.otpVerifiedBadge}
+                        className="rounded-full bg-teal-500/15 px-2 py-0.5 text-xs font-semibold text-teal-400"
+                      >
+                        OTP
+                      </span>
+                    ) : null}
+                  </div>
                 </td>
                 <td className="px-3 py-3 hidden md:table-cell">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${riskColor[o.risk_level] ?? ""}`}>

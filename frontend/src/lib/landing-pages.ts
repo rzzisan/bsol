@@ -177,12 +177,39 @@ export type LandingPageContent = {
 export type LandingPageSettings = {
   phone_validation_enabled?: boolean | null;
   phone_validation_message?: string | null;
+  otp_verification_enabled?: boolean | null;
+  otp_verified_message?: string | null;
+  otp_sms_template?: string | null;
+  otp_form_title?: string | null;
+  otp_form_description?: string | null;
+  otp_form_button_text?: string | null;
+  otp_form_resend_text?: string | null;
 };
 
-export const DEFAULT_SETTINGS: { phone_validation_enabled: boolean; phone_validation_message: string } = {
+export const DEFAULT_SETTINGS: {
+  phone_validation_enabled: boolean;
+  phone_validation_message: string;
+  otp_verification_enabled: boolean;
+  otp_verified_message: string;
+  otp_sms_template: string;
+  otp_form_title: string;
+  otp_form_description: string;
+  otp_form_button_text: string;
+  otp_form_resend_text: string;
+} = {
   phone_validation_enabled: true,
   phone_validation_message: "সঠিক ১১ ডিজিটের বাংলাদেশি মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)",
+  otp_verification_enabled: false,
+  otp_verified_message: "আপনার অর্ডারটি কনফার্ম করা হয়েছে!",
+  otp_sms_template: "আপনার অর্ডার #{order_number} কনফার্ম করতে {otp} কোডটি লিখুন। কোডটি ৫ মিনিটের জন্য বৈধ।",
+  otp_form_title: "ফোন নাম্বার ভেরিফাই করুন",
+  otp_form_description: "আপনার ফোনে পাঠানো ৪ সংখ্যার কোডটি লিখে অর্ডার কনফার্ম করুন।",
+  otp_form_button_text: "কনফার্ম করুন",
+  otp_form_resend_text: "OTP পুনরায় পাঠান",
 };
+
+// Placeholders available in otp_sms_template — mirrors CheckoutOtpService::renderOtpMessage on the backend.
+export const OTP_SMS_TEMPLATE_PLACEHOLDERS = ["{customer_name}", "{order_number}", "{order_total}", "{order_items}", "{otp}"] as const;
 
 // Mirrors CheckoutFieldResolver::BD_PHONE_REGEX on the backend — keep both in sync.
 export const BD_PHONE_REGEX = /^01[3-9]\d{8}$/;
@@ -265,6 +292,13 @@ export function mergeLandingContent(
     settings: {
       phone_validation_enabled: pageContent.settings?.phone_validation_enabled ?? templateContent.settings?.phone_validation_enabled ?? DEFAULT_SETTINGS.phone_validation_enabled,
       phone_validation_message: pageContent.settings?.phone_validation_message ?? templateContent.settings?.phone_validation_message ?? DEFAULT_SETTINGS.phone_validation_message,
+      otp_verification_enabled: pageContent.settings?.otp_verification_enabled ?? templateContent.settings?.otp_verification_enabled ?? DEFAULT_SETTINGS.otp_verification_enabled,
+      otp_verified_message: pageContent.settings?.otp_verified_message ?? templateContent.settings?.otp_verified_message ?? DEFAULT_SETTINGS.otp_verified_message,
+      otp_sms_template: pageContent.settings?.otp_sms_template ?? templateContent.settings?.otp_sms_template ?? DEFAULT_SETTINGS.otp_sms_template,
+      otp_form_title: pageContent.settings?.otp_form_title ?? templateContent.settings?.otp_form_title ?? DEFAULT_SETTINGS.otp_form_title,
+      otp_form_description: pageContent.settings?.otp_form_description ?? templateContent.settings?.otp_form_description ?? DEFAULT_SETTINGS.otp_form_description,
+      otp_form_button_text: pageContent.settings?.otp_form_button_text ?? templateContent.settings?.otp_form_button_text ?? DEFAULT_SETTINGS.otp_form_button_text,
+      otp_form_resend_text: pageContent.settings?.otp_form_resend_text ?? templateContent.settings?.otp_form_resend_text ?? DEFAULT_SETTINGS.otp_form_resend_text,
     },
     layout_order: Array.isArray(pageContent.layout_order)
       ? pageContent.layout_order

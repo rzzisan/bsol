@@ -89,7 +89,7 @@ export default async function ThankYouRoute({ params, searchParams }: RouteProps
 
   return (
     <div className={FONT_VARIABLE_CLASSES}>
-      <ThankYouView page={page} order={order} />
+      <ThankYouView page={page} order={order} orderId={orderId} token={token} />
     </div>
   );
 }
