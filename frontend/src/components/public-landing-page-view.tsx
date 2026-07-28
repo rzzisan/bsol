@@ -629,7 +629,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     if (previewMode) {
       setSubmitError(null);
       setSubmitSuccess("এটি একটি প্রিভিউ — অর্ডার সাবমিট হয়নি। আসল অর্ডারে কাস্টমার Thank You পেজে যাবে।");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
@@ -638,7 +638,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
 
     if (phoneValidationEnabled && !BD_PHONE_REGEX.test(customer.customer_phone.trim())) {
       setSubmitError(phoneValidationMessage);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
@@ -686,7 +686,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       });
       setCustomFieldValues({});
       setCheckout((prev) => Object.fromEntries(Object.entries(prev).map(([productId, item]) => [productId, { ...item, quantity: 1 }])));
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "অর্ডার সাবমিট করা যায়নি।");
     } finally {
