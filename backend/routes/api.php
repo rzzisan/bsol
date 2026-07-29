@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\EmailConfigurationController;
 use App\Http\Controllers\Api\NotificationDispatchController;
 use App\Http\Controllers\Api\NotificationTemplateController;
 use App\Http\Controllers\Api\NotificationUseCaseBindingController;
+use App\Http\Controllers\Api\AbandonedCheckoutController;
 use App\Http\Controllers\Api\CheckoutOtpController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CustomerController;
@@ -73,6 +74,14 @@ Route::post('/public/landing-pages/{slug}/orders/{orderId}/resend-otp', [Checkou
     ->where('orderId', '[0-9]+')
     ->middleware('throttle:10,1');
 
+// Abandoned checkout capture — progressive save while the customer is still
+// filling the form, and a token-guarded resume lookup. Deliberately not
+// tracked as a landing visit (that's already handled by the page-load hit).
+Route::post('/public/landing-pages/{slug}/abandoned-checkout', [AbandonedCheckoutController::class, 'save'])
+    ->middleware('throttle:30,1');
+Route::get('/public/landing-pages/{slug}/abandoned-checkout/resume', [AbandonedCheckoutController::class, 'resumeShow'])
+    ->middleware('throttle:30,1');
+
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
     Route::post('/email/send-verification', [EmailOtpController::class, 'sendVerificationEmail']);
@@ -122,6 +131,16 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/', [LandingMediaLibraryController::class, 'index']);
         Route::get('/policy', [LandingMediaLibraryController::class, 'policy']);
         Route::post('/upload', [LandingMediaLibraryController::class, 'store']);
+    });
+
+    // ── Abandoned Checkouts ──────────────────────────────────────────────────
+    Route::prefix('landing/abandoned-checkouts')->group(function () {
+        Route::get('/', [AbandonedCheckoutController::class, 'index']);
+        Route::get('/stats', [AbandonedCheckoutController::class, 'stats']);
+        Route::get('/export', [AbandonedCheckoutController::class, 'export']);
+        Route::get('/{id}', [AbandonedCheckoutController::class, 'show'])->where('id', '[0-9]+');
+        Route::put('/{id}', [AbandonedCheckoutController::class, 'update'])->where('id', '[0-9]+');
+        Route::delete('/{id}', [AbandonedCheckoutController::class, 'destroy'])->where('id', '[0-9]+');
     });
 
     // ── Product Management ────────────────────────────────────────────────────

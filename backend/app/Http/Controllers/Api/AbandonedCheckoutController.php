@@ -1,0 +1,248 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\AbandonedCheckout;
+use App\Models\Customer;
+use App\Models\LandingPage;
+use App\Services\AbandonedCheckoutService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
+
+class AbandonedCheckoutController extends Controller
+{
+    // ── Public ───────────────────────────────────────────────────────────────
+
+    public function save(Request $request, string $slug): JsonResponse
+    {
+        $page = LandingPage::query()
+            ->where('slug', $slug)
+            ->where('status', 'published')
+            ->with('products.product')
+            ->firstOrFail();
+
+        $data = $request->validate([
+            'session_token' => ['required', 'string', 'max:64'],
+            'customer_name' => ['nullable', 'string', 'max:150'],
+            'customer_phone' => ['nullable', 'string', 'max:20'],
+            'customer_email' => ['nullable', 'string', 'max:150'],
+            'customer_address' => ['nullable', 'string', 'max:500'],
+            'customer_district' => ['nullable', 'string', 'max:100'],
+            'customer_thana' => ['nullable', 'string', 'max:100'],
+            'customer_area' => ['nullable', 'string', 'max:120'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'custom_fields' => ['nullable', 'array'],
+            'items' => ['nullable', 'array'],
+            'items.*.enabled' => ['nullable', 'boolean'],
+            'items.*.product_id' => ['nullable', 'integer'],
+            'items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        app(AbandonedCheckoutService::class)->capture($page, $data, $request->ip());
+
+        return response()->json(['success' => true]);
+    }
+
+    public function resumeShow(Request $request, string $slug): JsonResponse
+    {
+        $page = LandingPage::query()
+            ->where('slug', $slug)
+            ->where('status', 'published')
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'max:64'],
+        ]);
+
+        $checkout = app(AbandonedCheckoutService::class)->resume($page, $validated['token']);
+
+        if (!$checkout) {
+            abort(404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'session_token' => $checkout->session_token,
+                'customer_name' => $checkout->customer_name,
+                'customer_phone' => $checkout->customer_phone,
+                'customer_email' => $checkout->customer_email,
+                'customer_address' => $checkout->customer_address,
+                'customer_district' => $checkout->customer_district,
+                'customer_thana' => $checkout->customer_thana,
+                'customer_area' => $checkout->customer_area,
+                'notes' => $checkout->notes,
+                'custom_fields' => $checkout->custom_fields,
+                'items' => $checkout->items,
+            ],
+        ]);
+    }
+
+    // ── Merchant ─────────────────────────────────────────────────────────────
+
+    public function index(Request $request): JsonResponse
+    {
+        $userId = auth()->id();
+        $perPage = min((int) ($request->per_page ?? 20), 100);
+
+        $query = AbandonedCheckout::query()
+            ->where('user_id', $userId)
+            ->with('landingPage:id,title,slug')
+            ->with('order:id,order_number,status');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status'));
+        }
+        if ($request->filled('landing_page_id')) {
+            $query->where('landing_page_id', (int) $request->landing_page_id);
+        }
+        if ($request->filled('date_from')) {
+            $query->whereDate('last_activity_at', '>=', $request->date('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('last_activity_at', '<=', $request->date('date_to'));
+        }
+        if ($request->filled('q')) {
+            $s = '%' . $request->string('q') . '%';
+            $query->where(fn ($q) => $q->where('customer_name', 'ilike', $s)->orWhere('customer_phone', 'ilike', $s));
+        }
+
+        $rows = $query->orderByDesc('last_activity_at')->paginate($perPage);
+
+        $data = $this->attachCustomerValue(collect($rows->items()), $userId);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+            'meta' => [
+                'total' => $rows->total(),
+                'current_page' => $rows->currentPage(),
+                'last_page' => $rows->lastPage(),
+                'per_page' => $rows->perPage(),
+            ],
+        ]);
+    }
+
+    public function show(int $id): JsonResponse
+    {
+        $checkout = AbandonedCheckout::query()
+            ->where('user_id', auth()->id())
+            ->with(['landingPage:id,title,slug', 'order:id,order_number,status'])
+            ->findOrFail($id);
+
+        $data = $this->attachCustomerValue(collect([$checkout]), auth()->id())->first();
+
+        return response()->json(['success' => true, 'data' => $data]);
+    }
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $checkout = AbandonedCheckout::query()->where('user_id', auth()->id())->findOrFail($id);
+
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(['active', 'dismissed', 'converted'])],
+        ]);
+
+        $checkout->update($validated);
+
+        return response()->json(['success' => true, 'data' => $checkout->fresh()]);
+    }
+
+    public function destroy(int $id): JsonResponse
+    {
+        $checkout = AbandonedCheckout::query()->where('user_id', auth()->id())->findOrFail($id);
+        $checkout->delete();
+
+        return response()->json(['success' => true, 'message' => 'Abandoned checkout deleted.']);
+    }
+
+    public function stats(): JsonResponse
+    {
+        $userId = auth()->id();
+
+        $counts = AbandonedCheckout::where('user_id', $userId)
+            ->selectRaw("
+                COUNT(*) FILTER (WHERE status = 'active') AS active,
+                COUNT(*) FILTER (WHERE status = 'active' AND last_activity_at < ?) AS abandoned,
+                COUNT(*) FILTER (WHERE status = 'converted') AS converted,
+                COUNT(*) FILTER (WHERE status = 'dismissed') AS dismissed,
+                COUNT(*) AS total
+            ", [now()->subMinutes(AbandonedCheckout::ABANDONED_AFTER_MINUTES)])
+            ->first();
+
+        $conversionRate = $counts->total > 0
+            ? round(($counts->converted / $counts->total) * 100, 1)
+            : 0.0;
+
+        return response()->json([
+            'success' => true,
+            'data' => array_merge((array) $counts, ['conversion_rate' => $conversionRate]),
+        ]);
+    }
+
+    public function export(Request $request): Response
+    {
+        $userId = auth()->id();
+
+        $rows = AbandonedCheckout::query()
+            ->where('user_id', $userId)
+            ->with('landingPage:id,title')
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->orderByDesc('last_activity_at')
+            ->get();
+
+        $csv = "ID,Landing Page,Name,Phone,Email,Address,Items,Subtotal,Status,Last Activity\n";
+        foreach ($rows as $row) {
+            $items = collect($row->items ?? [])->map(fn ($i) => "{$i['name']} x{$i['quantity']}")->join('; ');
+            $csv .= implode(',', array_map(
+                fn ($v) => '"' . str_replace('"', '""', (string) $v) . '"',
+                [
+                    $row->id,
+                    $row->landingPage?->title,
+                    $row->customer_name,
+                    $row->customer_phone,
+                    $row->customer_email,
+                    $row->customer_address,
+                    $items,
+                    $row->subtotal,
+                    $row->status,
+                    $row->last_activity_at,
+                ]
+            )) . "\n";
+        }
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename=abandoned-checkouts-' . now()->format('Y-m-d') . '.csv',
+        ]);
+    }
+
+    /** Attach a lightweight {total_orders,total_spent,risk_level} block per matching phone, no external calls. */
+    private function attachCustomerValue(\Illuminate\Support\Collection $rows, int $userId): \Illuminate\Support\Collection
+    {
+        $phones = $rows->pluck('customer_phone')->filter()->unique()->values();
+        if ($phones->isEmpty()) {
+            return $rows->map(fn ($row) => array_merge($row->toArray(), ['customer_value' => null]));
+        }
+
+        $customers = Customer::where('user_id', $userId)
+            ->whereIn('phone', $phones)
+            ->get(['phone', 'total_orders', 'total_spent', 'risk_level'])
+            ->keyBy('phone');
+
+        return $rows->map(function ($row) use ($customers) {
+            $customer = $row->customer_phone ? $customers->get($row->customer_phone) : null;
+
+            return array_merge($row->toArray(), [
+                'customer_value' => $customer ? [
+                    'total_orders' => $customer->total_orders,
+                    'total_spent' => $customer->total_spent,
+                    'risk_level' => $customer->risk_level,
+                ] : null,
+            ]);
+        });
+    }
+}

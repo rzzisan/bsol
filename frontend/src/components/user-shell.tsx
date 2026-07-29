@@ -72,6 +72,7 @@ const menuText = {
     profit: "মুনাফা",
 
     landingPages: "ল্যান্ডিং পেজ",
+    abandonedCheckouts: "অসম্পূর্ণ অর্ডার",
 
     settings: "সেটিংস",
     shopProfile: "শপ প্রোফাইল",
@@ -126,6 +127,7 @@ const menuText = {
     profit: "Profit",
 
     landingPages: "Landing Pages",
+    abandonedCheckouts: "Abandoned Checkouts",
 
     settings: "Settings",
     shopProfile: "Shop Profile",
@@ -149,6 +151,12 @@ function buildMenu(t: typeof menuText.bn): ShellMenuItem[] {
       label:  (t as any).landingPages ?? "ল্যান্ডিং পেজ",
       icon: "🌐",
       href: "/dashboard/landing-pages",
+    },
+    {
+      key: "abandoned-checkouts",
+      label: (t as any).abandonedCheckouts ?? "অসম্পূর্ণ অর্ডার",
+      icon: "🛒",
+      href: "/dashboard/abandoned-checkouts",
     },
     {
       key: "orders",

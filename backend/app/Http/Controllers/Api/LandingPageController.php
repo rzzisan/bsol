@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AbandonedCheckoutService;
 use App\Services\CheckoutOtpService;
 use App\Services\LandingPageOrderService;
 use App\Support\CheckoutFieldResolver;
@@ -94,6 +95,12 @@ class LandingPageController extends Controller
 
         $order = app(LandingPageOrderService::class)->create($page, $validated, $lineItems, $resolvedFields);
         app(CheckoutOtpService::class)->maybeSendForOrder($page, $order);
+        app(AbandonedCheckoutService::class)->convertMatching(
+            $page,
+            $order,
+            $request->input('checkout_session_id'),
+            $validated['customer_phone'] ?? null
+        );
 
         return response()->json([
             'success' => true,

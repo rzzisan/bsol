@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { JSONContent } from "@tiptap/core";
 import { mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
@@ -8,6 +8,7 @@ import { resolveFontCssVar } from "@/lib/theme-presets";
 import { resolveBlockIcon } from "@/lib/block-icons";
 import { renderTiptapJSON } from "@/lib/rich-text-render";
 import type { LayoutEntry } from "@/lib/landing-layout";
+import { getOrCreateCheckoutSessionToken, setCheckoutSessionToken } from "@/lib/checkout-session";
 
 type CheckoutDraft = {
   enabled: boolean;
@@ -725,6 +726,93 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const videoEmbeds = content.video_embeds ?? [];
   const spacers = content.spacers ?? [];
   const products = (page.products ?? []).filter((item) => item.product);
+
+  const [sessionToken, setSessionToken] = useState("");
+  const resumeReadyRef = useRef(previewMode); // skip capture entirely in preview mode
+  const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Resolve/adopt the checkout session token, and — if this is a resumed
+  // abandoned-checkout link (?resume=<token>) — prefill the form from the
+  // saved snapshot before allowing progressive capture to start again.
+  useEffect(() => {
+    if (previewMode) return;
+
+    const resumeToken = new URLSearchParams(window.location.search).get("resume");
+    if (!resumeToken) {
+      setSessionToken(getOrCreateCheckoutSessionToken());
+      resumeReadyRef.current = true;
+      return;
+    }
+
+    setCheckoutSessionToken(resumeToken);
+    setSessionToken(resumeToken);
+
+    fetch(`/api/public/landing-pages/${page.slug}/abandoned-checkout/resume?token=${encodeURIComponent(resumeToken)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const d = json?.data;
+        if (d) {
+          setCustomer({
+            customer_name: d.customer_name ?? "",
+            customer_phone: d.customer_phone ?? "",
+            customer_address: d.customer_address ?? "",
+            customer_district: d.customer_district ?? "",
+            customer_thana: d.customer_thana ?? "",
+            customer_area: d.customer_area ?? "",
+            notes: d.notes ?? "",
+          });
+          setCustomFieldValues(d.custom_fields ?? {});
+          if (Array.isArray(d.items)) {
+            setCheckout((prev) => {
+              const next = { ...prev };
+              for (const item of d.items as Array<{ product_id: number; quantity: number }>) {
+                next[item.product_id] = { enabled: true, quantity: Math.max(1, item.quantity ?? 1) };
+              }
+              return next;
+            });
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        resumeReadyRef.current = true;
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page.slug]);
+
+  // Progressive capture: once the visitor has meaningfully started the
+  // checkout form (name or a partial phone number typed), debounce-save a
+  // snapshot so it can be recovered later if they never submit.
+  useEffect(() => {
+    if (previewMode || !resumeReadyRef.current || !sessionToken) return;
+
+    const phoneDigits = customer.customer_phone.replace(/\D/g, "");
+    const hasStarted = phoneDigits.length >= 4 || customer.customer_name.trim().length >= 2;
+    if (!hasStarted) return;
+
+    if (captureTimerRef.current) clearTimeout(captureTimerRef.current);
+    captureTimerRef.current = setTimeout(() => {
+      fetch(`/api/public/landing-pages/${page.slug}/abandoned-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_token: sessionToken,
+          ...customer,
+          custom_fields: customFieldValues,
+          items: products.map((item) => ({
+            enabled: checkout[item.product_id]?.enabled ?? false,
+            product_id: item.product_id,
+            quantity: checkout[item.product_id]?.quantity ?? 1,
+          })),
+        }),
+      }).catch(() => {});
+    }, 1500);
+
+    return () => {
+      if (captureTimerRef.current) clearTimeout(captureTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer, customFieldValues, checkout, sessionToken]);
   const shipping = content.shipping ?? {};
   const language = content.settings?.language ?? "bn";
   const t = PUBLIC_UI_TEXT[language] ?? PUBLIC_UI_TEXT.bn;
@@ -805,6 +893,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       const payload = {
         ...customer,
         custom_fields: customFieldValues,
+        checkout_session_id: sessionToken || undefined,
         shipping_charge: shippingCharge,
         items: products.map((item) => ({
           enabled: checkout[item.product_id]?.enabled ?? false,
