@@ -840,10 +840,18 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
   }
 
   const filteredProducts = useMemo(() => {
-    const attached = new Set(selectedProducts.map((item) => item.product_id));
+    // A variant product stays browsable even after attaching one variant —
+    // the merchant can attach several specific variants of the same product
+    // (each becomes its own line item), leaving the rest unavailable on this
+    // page. Only hide it once it's fully covered: a "whole product" row
+    // (customer picks) already exists, or it's a plain product with no
+    // variants and is already attached once.
+    const fullyCovered = new Set(
+      selectedProducts.filter((item) => item.product_variant_id === null).map((item) => item.product_id),
+    );
     const needle = productQuery.trim().toLowerCase();
     return products.filter((item) => {
-      if (attached.has(item.id)) return false;
+      if (fullyCovered.has(item.id)) return false;
       if (!needle) return true;
       return [item.name, item.sku ?? ""].join(" ").toLowerCase().includes(needle);
     });
@@ -1430,9 +1438,16 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
                         </div>
                         <div className="flex shrink-0 gap-2">
                           {item.product?.has_variants && (item.product.active_variants_count ?? 0) > 0 ? (
-                            <button type="button" onClick={() => item.product && setVariantPicker({ product: item.product, rowKey })} className="rounded-xl border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]">
-                              {locale === "bn" ? "ভেরিয়েন্ট পরিবর্তন" : "Change variant"}
-                            </button>
+                            <>
+                              <button type="button" onClick={() => item.product && setVariantPicker({ product: item.product, rowKey })} className="rounded-xl border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]">
+                                {locale === "bn" ? "ভেরিয়েন্ট পরিবর্তন" : "Change variant"}
+                              </button>
+                              {item.product_variant_id ? (
+                                <button type="button" onClick={() => item.product && setVariantPicker({ product: item.product, rowKey: null })} className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-xs font-semibold text-[var(--accent)]">
+                                  {locale === "bn" ? "+ আরেকটি ভেরিয়েন্ট" : "+ Another variant"}
+                                </button>
+                              ) : null}
+                            </>
                           ) : null}
                           <button type="button" onClick={() => removeProduct(rowKey)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-400">{t.remove}</button>
                         </div>
