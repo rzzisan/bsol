@@ -48,10 +48,12 @@ class CourierFraudCheckService
             $row = CourierFraudStat::updateOrCreate(
                 ['phone_number' => $phone, 'courier_name' => $courier],
                 [
+                    'data_type' => $result['data_type'] ?? 'delivery',
                     'total_parcels' => $result['total'],
                     'total_delivered' => $result['delivered'],
                     'total_cancelled' => $result['cancelled'],
                     'success_rate' => $result['success_rate'],
+                    'rating' => $result['rating'] ?? null,
                     'status' => $status,
                     'error_message' => $result['error'],
                     'fetched_by_user_id' => $userId,
@@ -112,10 +114,12 @@ class CourierFraudCheckService
     {
         return [
             'name' => $courier,
+            'data_type' => $row->data_type,
             'total' => $row->total_parcels,
             'success' => $row->total_delivered,
             'cancelled' => $row->total_cancelled,
             'success_rate' => $row->success_rate,
+            'rating' => $row->rating,
             'status' => $row->status,
             'message' => $row->error_message,
             'last_checked_at' => optional($row->last_checked_at)->toISOString(),
@@ -126,10 +130,12 @@ class CourierFraudCheckService
     {
         return [
             'name' => $courier,
+            'data_type' => 'delivery',
             'total' => 0,
             'success' => 0,
             'cancelled' => 0,
             'success_rate' => 0,
+            'rating' => null,
             'status' => 'not_configured',
             'message' => null,
             'last_checked_at' => null,
@@ -138,7 +144,9 @@ class CourierFraudCheckService
 
     private function buildOverall(array $cards): array
     {
-        $ok = array_filter($cards, fn ($c) => $c['status'] === 'ok');
+        // Rating-based couriers (currently Pathao) don't have real counts, so
+        // they're excluded from the aggregate — mixing them in would skew it.
+        $ok = array_filter($cards, fn ($c) => $c['status'] === 'ok' && ($c['data_type'] ?? 'delivery') === 'delivery');
         $total = array_sum(array_column($ok, 'total'));
         $success = array_sum(array_column($ok, 'success'));
         $cancelled = array_sum(array_column($ok, 'cancelled'));

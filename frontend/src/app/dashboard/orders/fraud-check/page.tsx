@@ -118,10 +118,12 @@ type FraudResult = {
 
 type CourierCard = {
   name: string;
+  data_type: "delivery" | "rating";
   total: number;
   success: number;
   cancelled: number;
   success_rate: number;
+  rating: string | null;
   status: "ok" | "error" | "not_configured";
   message: string | null;
   last_checked_at: string | null;
@@ -132,6 +134,18 @@ type CourierCheckResult = {
   overall: { total: number; success: number; cancelled: number; success_rate: number };
   couriers: CourierCard[];
 };
+
+// Pathao's dashboard only exposes a qualitative rating label (e.g. "excellent_customer"),
+// not raw delivery counts — map known keywords to a display label + color, best-effort.
+function ratingDisplay(rating: string, locale: Locale): { label: string; color: string } {
+  const r = rating.toLowerCase();
+  if (r.includes("excellent")) return { label: locale === "bn" ? "চমৎকার গ্রাহক" : "Excellent Customer", color: "text-emerald-500" };
+  if (r.includes("good")) return { label: locale === "bn" ? "ভালো গ্রাহক" : "Good Customer", color: "text-emerald-400" };
+  if (r.includes("moderate")) return { label: locale === "bn" ? "মাঝারি" : "Moderate", color: "text-amber-500" };
+  if (r.includes("risky") || r.includes("bad")) return { label: locale === "bn" ? "ঝুঁকিপূর্ণ" : "Risky Customer", color: "text-red-500" };
+  if (r.includes("new")) return { label: locale === "bn" ? "নতুন গ্রাহক" : "New Customer", color: "text-[var(--muted)]" };
+  return { label: rating.replace(/_/g, " "), color: "text-[var(--muted)]" };
+}
 
 const COURIER_META: Record<string, { label: string; header: string }> = {
   pathao: { label: "Pathao", header: "bg-red-600" },
@@ -343,6 +357,12 @@ export default function FraudCheckPage() {
                                 <div className="py-3 text-center text-red-400">
                                   <p className="font-semibold">{txt.fetchFailed}</p>
                                   {card.message && <p className="mt-1 text-[10px] opacity-80">{card.message}</p>}
+                                </div>
+                              ) : card.data_type === "rating" && card.rating ? (
+                                <div className="py-3 text-center">
+                                  <p className={`text-sm font-bold ${ratingDisplay(card.rating, locale).color}`}>
+                                    {ratingDisplay(card.rating, locale).label}
+                                  </p>
                                 </div>
                               ) : (
                                 <div className="space-y-1">

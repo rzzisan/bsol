@@ -46,18 +46,40 @@ class PathaoFraudCheckService implements CourierFraudCheckInterface
                 return $this->error('Pathao stats request failed (HTTP ' . $stats->status() . ').');
             }
 
-            $customer = $stats->json('data.customer') ?? [];
-            $total = (int) ($customer['total_delivery'] ?? 0);
-            $delivered = (int) ($customer['successful_delivery'] ?? 0);
-            $cancelled = max(0, $total - $delivered);
+            $data = $stats->json('data') ?? [];
 
-            return [
-                'total' => $total,
-                'delivered' => $delivered,
-                'cancelled' => $cancelled,
-                'success_rate' => $total > 0 ? round(($delivered / $total) * 100, 2) : 0,
-                'error' => null,
-            ];
+            // Legacy shape (some accounts may still get this): raw counts under data.customer.
+            if (isset($data['customer']['total_delivery']) || isset($data['customer']['successful_delivery'])) {
+                $customer = $data['customer'];
+                $total = (int) ($customer['total_delivery'] ?? 0);
+                $delivered = (int) ($customer['successful_delivery'] ?? 0);
+                $cancelled = max(0, $total - $delivered);
+
+                return [
+                    'total' => $total,
+                    'delivered' => $delivered,
+                    'cancelled' => $cancelled,
+                    'success_rate' => $total > 0 ? round(($delivered / $total) * 100, 2) : 0,
+                    'error' => null,
+                    'data_type' => 'delivery',
+                ];
+            }
+
+            // Current shape: Pathao's dashboard only exposes a qualitative rating
+            // (e.g. "excellent_customer"), no raw delivery counts anymore.
+            if (isset($data['customer_rating'])) {
+                return [
+                    'total' => 0,
+                    'delivered' => 0,
+                    'cancelled' => 0,
+                    'success_rate' => 0,
+                    'error' => null,
+                    'data_type' => 'rating',
+                    'rating' => (string) $data['customer_rating'],
+                ];
+            }
+
+            return $this->error('Unrecognized response from Pathao.');
         } catch (\Throwable $e) {
             return $this->error('Pathao request exception: ' . $e->getMessage());
         }

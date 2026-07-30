@@ -24,8 +24,9 @@ class CourierFraudCheckApiTest extends TestCase
     {
         Http::fake([
             'merchant.pathao.com/api/v1/login' => Http::response(['access_token' => 'pathao-tok']),
+            // Pathao's dashboard now returns a rating label, not raw delivery counts.
             'merchant.pathao.com/api/v1/user/success' => Http::response([
-                'data' => ['customer' => ['total_delivery' => 10, 'successful_delivery' => 8]],
+                'data' => ['version' => 'v2', 'customer_rating' => 'excellent_customer'],
             ]),
             'portal.packzy.com/api/v1/fraud_check/*' => Http::response([
                 'total_parcels' => 20, 'total_delivered' => 18, 'total_cancelled' => 2,
@@ -75,14 +76,20 @@ class CourierFraudCheckApiTest extends TestCase
 
         $response = $this->getJson('/api/fraud/courier-check?phone=01711223344', $this->authHeaders($user));
 
-        // pathao(10/8) + steadfast(20/18) + redx(5/4) + carrybee(3/2) + paperfly(2/1)
+        // Pathao is rating-based and excluded from the aggregate:
+        // steadfast(20/18) + redx(5/4) + carrybee(3/2) + paperfly(2/1)
         $response->assertOk()
-            ->assertJsonPath('data.overall.total', 10 + 20 + 5 + 3 + 2)
-            ->assertJsonPath('data.overall.success', 8 + 18 + 4 + 2 + 1)
+            ->assertJsonPath('data.overall.total', 20 + 5 + 3 + 2)
+            ->assertJsonPath('data.overall.success', 18 + 4 + 2 + 1)
             ->assertJsonCount(5, 'data.couriers');
 
         $names = collect($response->json('data.couriers'))->pluck('name')->sort()->values()->all();
         $this->assertSame(['carrybee', 'paperfly', 'pathao', 'redx', 'steadfast'], $names);
+
+        $pathaoCard = collect($response->json('data.couriers'))->firstWhere('name', 'pathao');
+        $this->assertSame('ok', $pathaoCard['status']);
+        $this->assertSame('rating', $pathaoCard['data_type']);
+        $this->assertSame('excellent_customer', $pathaoCard['rating']);
 
         $this->assertSame(5, CourierFraudStat::where('phone_number', '01711223344')->count());
 
