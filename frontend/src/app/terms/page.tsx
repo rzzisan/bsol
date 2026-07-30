@@ -22,6 +22,16 @@ const t = {
 export default function PublicTermsPage() {
   const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
+  // "Home" should return the visitor to the landing page they came from, not
+  // the bare site root — the footer link passes ?lp=<slug> for that. Read via
+  // window.location.search (not useSearchParams) to avoid a Suspense boundary,
+  // matching the convention used elsewhere in the public checkout flow.
+  const [homeHref, setHomeHref] = useState("/");
+
+  useEffect(() => {
+    const lp = new URLSearchParams(window.location.search).get("lp");
+    if (lp) setHomeHref(`/lp/${lp}`);
+  }, []);
 
   useEffect(() => {
     fetch(`${API}/public/platform-settings`)
@@ -46,7 +56,7 @@ export default function PublicTermsPage() {
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto max-w-3xl">
         <div className="mb-4 flex items-center justify-between">
-          <a href="/" className="text-sm font-semibold text-slate-500 hover:text-slate-700">← Home</a>
+          <a href={homeHref} className="text-sm font-semibold text-slate-500 hover:text-slate-700">← Home</a>
           <button onClick={toggleLocale} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">
             {t[locale].lang}
           </button>

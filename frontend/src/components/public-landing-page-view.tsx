@@ -1537,7 +1537,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           <p>
             {(language === "bn" ? platformSettings.credit_text_bn : platformSettings.credit_text_en) || ""}
             {" "}
-            <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-500">
+            <a href={`/terms?lp=${encodeURIComponent(page.slug)}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-500">
               {(language === "bn" ? platformSettings.terms_link_label_bn : platformSettings.terms_link_label_en) || (language === "bn" ? "ব্যবহারের শর্তাবলি" : "Terms of Use")}
             </a>
           </p>
