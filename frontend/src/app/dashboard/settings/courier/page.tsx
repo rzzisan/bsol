@@ -19,6 +19,8 @@ const t = {
     tabSteadfast: "Steadfast",
     tabPathao: "Pathao",
     tabRedx: "RedX",
+    tabCarrybee: "CarryBee",
+    tabPaperfly: "Paperfly",
     tabManual: "Manual",
     manualTitle: "Manual Courier",
     manualDesc: "ম্যানুয়াল কুরিয়ারের জন্য আলাদা API credentials প্রয়োজন নেই। অর্ডার বুক করার সময় Tracking ID দিয়ে ম্যানুয়ালি এন্ট্রি করা যাবে।",
@@ -56,6 +58,16 @@ const t = {
     storeCreateFailed: "Store তৈরি ব্যর্থ হয়েছে।",
     redxTitle: "RedX API",
     redxApiKey: "API Key",
+    redxFraudTitle: "RedX লগইন (Fraud Check)",
+    redxPhone: "লগইন মোবাইল নাম্বার",
+    redxPassword: "লগইন পাসওয়ার্ড",
+    carrybeeTitle: "CarryBee লগইন (Fraud Check)",
+    carrybeePhone: "লগইন মোবাইল নাম্বার",
+    carrybeePassword: "লগইন পাসওয়ার্ড",
+    paperflyTitle: "Paperfly লগইন (Fraud Check)",
+    paperflyUsername: "লগইন ইউজারনেম",
+    paperflyPassword: "লগইন পাসওয়ার্ড",
+    fraudCheckNote: "এই ক্রেডেনশিয়াল শুধু Fraud Checker ফিচারে ফোন নাম্বার দিয়ে ডেলিভারি হিস্টোরি চেক করতে ব্যবহৃত হয় — অর্ডার বুকিংয়ের সাথে সম্পর্কিত নয়।",
     saveSuccess: "সেটিং সেভ হয়েছে!",
     saveError: "সেভ ব্যর্থ হয়েছে।",
     testSuccess: "Steadfast কানেকশন সফল।",
@@ -74,6 +86,8 @@ const t = {
     tabSteadfast: "Steadfast",
     tabPathao: "Pathao",
     tabRedx: "RedX",
+    tabCarrybee: "CarryBee",
+    tabPaperfly: "Paperfly",
     tabManual: "Manual",
     manualTitle: "Manual Courier",
     manualDesc: "Manual courier does not require API credentials. You can provide tracking IDs manually while booking.",
@@ -111,6 +125,16 @@ const t = {
     storeCreateFailed: "Failed to create store.",
     redxTitle: "RedX API",
     redxApiKey: "API Key",
+    redxFraudTitle: "RedX Login (Fraud Check)",
+    redxPhone: "Login Phone Number",
+    redxPassword: "Login Password",
+    carrybeeTitle: "CarryBee Login (Fraud Check)",
+    carrybeePhone: "Login Phone Number",
+    carrybeePassword: "Login Password",
+    paperflyTitle: "Paperfly Login (Fraud Check)",
+    paperflyUsername: "Login Username",
+    paperflyPassword: "Login Password",
+    fraudCheckNote: "These credentials are only used by the Fraud Checker to look up delivery history by phone number — not related to order booking.",
     saveSuccess: "Settings saved!",
     saveError: "Failed to save.",
     testSuccess: "Steadfast connection successful.",
@@ -125,6 +149,9 @@ type Form = {
   pathao_client_id: string; pathao_client_secret: string; pathao_store_id: string;
   pathao_username: string; pathao_password: string;
   redx_api_key: string;
+  redx_phone: string; redx_password: string;
+  carrybee_phone: string; carrybee_password: string;
+  paperfly_username: string; paperfly_password: string;
 };
 
 type PathaoStore = {
@@ -153,6 +180,9 @@ const EMPTY_FORM: Form = {
   default_courier: "", steadfast_api_key: "", steadfast_secret_key: "",
   pathao_client_id: "", pathao_client_secret: "", pathao_store_id: "",
   pathao_username: "", pathao_password: "", redx_api_key: "",
+  redx_phone: "", redx_password: "",
+  carrybee_phone: "", carrybee_password: "",
+  paperfly_username: "", paperfly_password: "",
 };
 
 export default function CourierSettingsPage() {
@@ -161,7 +191,7 @@ export default function CourierSettingsPage() {
   const token = getStoredToken();
 
   const [form, setForm] = useState<Form>(EMPTY_FORM);
-  const [activeTab, setActiveTab] = useState<"steadfast" | "pathao" | "redx" | "manual">("steadfast");
+  const [activeTab, setActiveTab] = useState<"steadfast" | "pathao" | "redx" | "carrybee" | "paperfly" | "manual">("steadfast");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -391,6 +421,8 @@ export default function CourierSettingsPage() {
                 { key: "steadfast", label: txt.tabSteadfast },
                 { key: "pathao", label: txt.tabPathao },
                 { key: "redx", label: txt.tabRedx },
+                { key: "carrybee", label: txt.tabCarrybee },
+                { key: "paperfly", label: txt.tabPaperfly },
                 { key: "manual", label: txt.tabManual },
               ] as const).map(tab => (
                 <button
@@ -573,6 +605,7 @@ export default function CourierSettingsPage() {
 
           {/* RedX */}
           {activeTab === "redx" && (
+          <>
           <div className="catv-panel p-4" role="tabpanel">
             <h3 className="mb-3 text-sm font-semibold">{txt.redxTitle}</h3>
             <label>
@@ -580,6 +613,66 @@ export default function CourierSettingsPage() {
               <input value={form.redx_api_key} onChange={e => set("redx_api_key", e.target.value)}
                 className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-mono outline-none focus:border-[var(--accent)]" />
             </label>
+          </div>
+
+          <div className="catv-panel p-4" role="tabpanel">
+            <h3 className="mb-1 text-sm font-semibold">{txt.redxFraudTitle}</h3>
+            <p className="mb-3 text-xs text-[var(--muted)]">{txt.fraudCheckNote}</p>
+            <div className="grid gap-3">
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxPhone}</span>
+                <input value={form.redx_phone} onChange={e => set("redx_phone", e.target.value)}
+                  placeholder="01XXXXXXXXX"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxPassword}</span>
+                <input type="password" value={form.redx_password} onChange={e => set("redx_password", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+            </div>
+          </div>
+          </>
+          )}
+
+          {/* CarryBee */}
+          {activeTab === "carrybee" && (
+          <div className="catv-panel p-4" role="tabpanel">
+            <h3 className="mb-1 text-sm font-semibold">{txt.carrybeeTitle}</h3>
+            <p className="mb-3 text-xs text-[var(--muted)]">{txt.fraudCheckNote}</p>
+            <div className="grid gap-3">
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.carrybeePhone}</span>
+                <input value={form.carrybee_phone} onChange={e => set("carrybee_phone", e.target.value)}
+                  placeholder="01XXXXXXXXX"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.carrybeePassword}</span>
+                <input type="password" value={form.carrybee_password} onChange={e => set("carrybee_password", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+            </div>
+          </div>
+          )}
+
+          {/* Paperfly */}
+          {activeTab === "paperfly" && (
+          <div className="catv-panel p-4" role="tabpanel">
+            <h3 className="mb-1 text-sm font-semibold">{txt.paperflyTitle}</h3>
+            <p className="mb-3 text-xs text-[var(--muted)]">{txt.fraudCheckNote}</p>
+            <div className="grid gap-3">
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.paperflyUsername}</span>
+                <input value={form.paperfly_username} onChange={e => set("paperfly_username", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.paperflyPassword}</span>
+                <input type="password" value={form.paperfly_password} onChange={e => set("paperfly_password", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+            </div>
           </div>
           )}
 

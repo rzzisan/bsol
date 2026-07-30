@@ -121,6 +121,16 @@ class SteadfastService
         return $this->jsonResponse($response, []);
     }
 
+    /**
+     * Delivery-success/cancel breakdown for a phone number, used by the courier fraud checker.
+     */
+    public function fraudCheck(string $apiKey, string $secretKey, string $phone): array
+    {
+        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/fraud_check/' . urlencode($this->formatPhone($phone)));
+
+        return $this->jsonResponse($response, []);
+    }
+
     public function createReturnRequest(string $apiKey, string $secretKey, array $data): array
     {
         $payload = ['reason' => $data['reason'] ?? null];

@@ -71,6 +71,12 @@ class CourierController extends Controller
             'pathao_username'     => 'nullable|email|max:200',
             'pathao_password'     => 'nullable|string|max:200',
             'redx_api_key'        => 'nullable|string|max:200',
+            'redx_phone'          => 'nullable|string|max:20',
+            'redx_password'       => 'nullable|string|max:200',
+            'carrybee_phone'      => 'nullable|string|max:20',
+            'carrybee_password'   => 'nullable|string|max:200',
+            'paperfly_username'   => 'nullable|string|max:200',
+            'paperfly_password'   => 'nullable|string|max:200',
         ]);
 
         // Only update keys that are actually sent (not masked placeholders)

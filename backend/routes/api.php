@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\Api\AbandonedCheckoutController;
 use App\Http\Controllers\Api\CheckoutOtpController;
 use App\Http\Controllers\Api\CourierController;
+use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\LandingPageController;
@@ -252,6 +253,7 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/blacklist', [FraudController::class, 'blacklist']);
         Route::post('/blacklist', [FraudController::class, 'addBlacklist']);
         Route::delete('/blacklist/{id}', [FraudController::class, 'removeBlacklist']);
+        Route::get('/courier-check', [CourierFraudCheckController::class, 'check']);
     });
 }); // end active_subscription group
 
