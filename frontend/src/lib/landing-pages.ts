@@ -21,10 +21,41 @@ export type ProductItem = {
   stock?: number | null;
   thumbnail?: string | null;
   status?: string | null;
+  has_variants?: boolean;
+  active_variants_count?: number;
+};
+
+// Mirrors App\Support\ProductVariantFormatter::format() on the backend.
+export type AttachedVariantOption = {
+  option_value_id: number;
+  option_id?: number | null;
+  option_name?: string | null;
+  option_type?: string | null;
+  value: string;
+  label?: string | null;
+  color_hex?: string | null;
+  image_url?: string | null;
+};
+
+export type AttachedVariant = {
+  id: number;
+  sku?: string | null;
+  regular_price?: string | number | null;
+  discount?: string | number | null;
+  discount_type?: "amount" | "percent" | null;
+  selling_price?: string | number | null;
+  stock_qty?: number | null;
+  image_url?: string | null;
+  is_active?: boolean;
+  options?: AttachedVariantOption[];
 };
 
 export type LandingPageProductInput = {
   product_id: number;
+  // Set when the merchant pins one exact variant while building the page
+  // (as opposed to attaching the whole product and letting the customer
+  // pick a variant on the public checkout).
+  product_variant_id?: number | null;
   title_override?: string | null;
   subtitle?: string | null;
   badge_text?: string | null;
@@ -105,7 +136,7 @@ export type LandingPageRecord = {
     [key: string]: unknown;
   } | null;
   custom_css?: string | null;
-  products?: Array<LandingPageProductInput & { id?: number; product?: ProductItem | null }>;
+  products?: Array<LandingPageProductInput & { id?: number; product?: ProductItem | null; variant?: AttachedVariant | null }>;
 };
 
 // Mirrors App\Support\CheckoutFieldResolver on the backend — keep both in sync.

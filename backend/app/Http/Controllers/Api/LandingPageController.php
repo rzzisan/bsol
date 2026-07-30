@@ -12,6 +12,8 @@ use App\Models\LandingPageProduct;
 use App\Models\Order;
 use App\Models\LandingTemplate;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Support\ProductVariantFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +35,7 @@ class LandingPageController extends Controller
         $page = LandingPage::query()
             ->where('slug', $slug)
             ->where('status', 'published')
-            ->with(['template', 'products.product'])
+            ->with(['template', 'products.product.images', 'products.variant.optionValues.option'])
             ->firstOrFail();
 
         return response()->json([
@@ -49,7 +51,7 @@ class LandingPageController extends Controller
         $page = LandingPage::query()
             ->where('slug', $slug)
             ->where('status', 'published')
-            ->with(['products.product'])
+            ->with(['products.product.images', 'products.variant.optionValues.option'])
             ->firstOrFail();
 
         $settings = $page->content['settings'] ?? [];
@@ -171,6 +173,63 @@ class LandingPageController extends Controller
         ]);
     }
 
+    /**
+     * Unauthenticated product option lookup for the public checkout's inline
+     * variant picker ("mode 1" — customer picks the variant themselves). Only
+     * ever exposes a product that is actually attached to this published page,
+     * so this can't be used as a generic product-data oracle.
+     */
+    public function publicProductOptions(string $slug, int $productId): JsonResponse
+    {
+        $product = $this->publicAttachedProduct($slug, $productId);
+
+        return response()->json([
+            'success' => true,
+            'data' => $product->options()->with('values')->get(),
+        ]);
+    }
+
+    /** POST /public/landing-pages/{slug}/products/{productId}/variants/resolve */
+    public function publicResolveVariant(Request $request, string $slug, int $productId): JsonResponse
+    {
+        $product = $this->publicAttachedProduct($slug, $productId);
+
+        $data = $request->validate([
+            'option_value_ids' => ['required', 'array', 'min:1'],
+            'option_value_ids.*' => ['integer'],
+        ]);
+
+        $ids = collect($data['option_value_ids'])->sort()->values()->toArray();
+        $count = count($ids);
+
+        $variant = $product->variants()
+            ->whereHas('optionValues', fn ($q) => $q->whereIn('product_option_values.id', $ids), '=', $count)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$variant) {
+            return response()->json(['success' => false, 'message' => 'No matching variant found.'], 404);
+        }
+
+        $variant->load('optionValues.option');
+
+        return response()->json(['success' => true, 'data' => ProductVariantFormatter::format($variant)]);
+    }
+
+    /** Product must belong to a published page and actually be attached to it. */
+    private function publicAttachedProduct(string $slug, int $productId): Product
+    {
+        $page = LandingPage::query()
+            ->where('slug', $slug)
+            ->where('status', 'published')
+            ->firstOrFail();
+
+        $attached = $page->products()->where('product_id', $productId)->exists();
+        abort_unless($attached, 404);
+
+        return Product::query()->where('id', $productId)->firstOrFail();
+    }
+
     public function index(Request $request): JsonResponse
     {
         $userId = auth()->id();
@@ -232,7 +291,7 @@ class LandingPageController extends Controller
 
             $this->syncProducts($page, $data['products'] ?? [], $userId);
 
-            return $page->load(['template', 'products.product']);
+            return $page->load(['template', 'products.product.images', 'products.variant.optionValues.option']);
         });
 
         return response()->json(['success' => true, 'data' => $page], 201);
@@ -242,7 +301,7 @@ class LandingPageController extends Controller
     {
         $page = LandingPage::query()
             ->where('user_id', auth()->id())
-            ->with(['template', 'products.product'])
+            ->with(['template', 'products.product.images', 'products.variant.optionValues.option'])
             ->findOrFail($id);
 
         return response()->json([
@@ -283,7 +342,7 @@ class LandingPageController extends Controller
                 $this->syncProducts($page, $data['products'] ?? [], $userId);
             }
 
-            return $page->load(['template', 'products.product']);
+            return $page->load(['template', 'products.product.images', 'products.variant.optionValues.option']);
         });
 
         return response()->json(['success' => true, 'data' => $page]);
@@ -310,7 +369,7 @@ class LandingPageController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $page->fresh(['template', 'products.product']),
+            'data' => $page->fresh(['template', 'products.product.images', 'products.variant.optionValues.option']),
         ]);
     }
 
@@ -339,6 +398,11 @@ class LandingPageController extends Controller
                 'integer',
                 Rule::exists('products', 'id')->where('user_id', $userId),
             ],
+            // Pinned variant when the merchant attaches one specific
+            // combination instead of the whole product — validated against
+            // its own product_id in syncProducts() since Rule::exists here
+            // can't see the sibling product_id for this row.
+            'products.*.product_variant_id' => ['nullable', 'integer'],
             'products.*.title_override' => ['nullable', 'string', 'max:180'],
             'products.*.subtitle' => ['nullable', 'string', 'max:220'],
             'products.*.badge_text' => ['nullable', 'string', 'max:80'],
@@ -415,13 +479,28 @@ class LandingPageController extends Controller
             ->map(fn ($id) => (int) $id)
             ->all();
 
+        // Pinned variants (mode: merchant picks one exact combination while
+        // building the page) must actually belong to their row's product —
+        // load them keyed by "productId:variantId" so a mismatched pair is
+        // silently dropped rather than pinning the wrong product's variant.
+        $variantIds = collect($products)->pluck('product_variant_id')->filter()->unique()->values();
+        $validVariantKeys = $variantIds->isEmpty() ? collect() : ProductVariant::query()
+            ->whereIn('id', $variantIds)
+            ->get(['id', 'product_id'])
+            ->map(fn ($v) => $v->product_id . ':' . $v->id)
+            ->all();
+
         $rows = collect($products)
             ->filter(fn ($item) => in_array((int) ($item['product_id'] ?? 0), $validIds, true))
             ->values()
-            ->map(function ($item, $index) use ($page) {
+            ->map(function ($item, $index) use ($page, $validVariantKeys) {
+                $variantId = $item['product_variant_id'] ?? null;
+                $key = $variantId ? ((int) $item['product_id'] . ':' . (int) $variantId) : null;
+
                 return [
                     'landing_page_id' => $page->id,
                     'product_id' => (int) $item['product_id'],
+                    'product_variant_id' => ($key && in_array($key, $validVariantKeys, true)) ? (int) $variantId : null,
                     'title_override' => $item['title_override'] ?? null,
                     'subtitle' => $item['subtitle'] ?? null,
                     'badge_text' => $item['badge_text'] ?? null,

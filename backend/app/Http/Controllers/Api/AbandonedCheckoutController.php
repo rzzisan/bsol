@@ -21,7 +21,7 @@ class AbandonedCheckoutController extends Controller
         $page = LandingPage::query()
             ->where('slug', $slug)
             ->where('status', 'published')
-            ->with('products.product')
+            ->with(['products.product', 'products.variant.optionValues.option'])
             ->firstOrFail();
 
         $data = $request->validate([
@@ -38,6 +38,7 @@ class AbandonedCheckoutController extends Controller
             'items' => ['nullable', 'array'],
             'items.*.enabled' => ['nullable', 'boolean'],
             'items.*.product_id' => ['nullable', 'integer'],
+            'items.*.product_variant_id' => ['nullable', 'integer'],
             'items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -155,6 +156,7 @@ class AbandonedCheckoutController extends Controller
             'custom_fields' => ['nullable', 'array'],
             'items' => ['nullable', 'array'],
             'items.*.product_id' => ['required_with:items', 'integer'],
+            'items.*.product_variant_id' => ['nullable', 'integer'],
             'items.*.quantity' => ['required_with:items', 'integer', 'min:1', 'max:100'],
             // Only meaningful together with status=converted — links this checkout
             // to an order created via the "Convert to Order" flow (order-intake-form).
@@ -162,7 +164,7 @@ class AbandonedCheckoutController extends Controller
         ]);
 
         if (array_key_exists('items', $validated)) {
-            $checkout->load('landingPage.products.product');
+            $checkout->load(['landingPage.products.product', 'landingPage.products.variant.optionValues.option']);
         }
 
         app(AbandonedCheckoutService::class)->applyEdit($checkout, $validated);

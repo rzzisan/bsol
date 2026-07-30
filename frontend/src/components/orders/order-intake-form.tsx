@@ -48,7 +48,17 @@ export type InitialOrderData = {
   customer_address?: string;
   notes?: string;
   capturedLocationHint?: string;
-  items?: Array<{ product_id: number; quantity: number }>;
+  // Full snapshot from the abandoned checkout — seeded directly into the
+  // order form, not re-matched against the (size-capped) product catalog.
+  items?: Array<{
+    product_id: number;
+    product_variant_id?: number | null;
+    name: string;
+    sku?: string | null;
+    quantity: number;
+    unit_price: number;
+    image?: string | null;
+  }>;
 };
 
 const normalizePhone = (value: string): string => {
@@ -110,36 +120,30 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
     void run();
   }, [token]);
 
-  // Converting an abandoned checkout: once the catalog loads, seed items
-  // from the captured product_id/quantity pairs using current catalog
-  // pricing (not the possibly-stale abandoned-checkout snapshot price).
-  // Runs once; a product with variants is skipped here (falls back to the
-  // normal variant picker — landing pages don't support variant selection
-  // today, so this is a rare edge case, not the common path).
+  // Converting an abandoned checkout: seed items directly from the captured
+  // snapshot (name/sku/unit_price/variant already resolved at capture time)
+  // instead of re-matching against the size-capped bootstrap catalog. That
+  // re-match was the bug — any product not in the first 200 catalog rows, or
+  // any variant product at all, silently vanished. Runs once, independent of
+  // the catalog load.
   useEffect(() => {
     if (appliedInitialItemsRef.current) return;
-    if (!initial?.items?.length || products.length === 0) return;
+    if (!initial?.items?.length) return;
     appliedInitialItemsRef.current = true;
 
-    const seeded: OrderItem[] = [];
-    for (const req of initial.items) {
-      const p = products.find((pp) => pp.id === req.product_id);
-      if (!p || (p.has_variants && (p.active_variants_count ?? 0) > 0)) continue;
-      seeded.push({
-        product_id: p.id,
-        product_name: p.name,
-        sku: p.sku ?? "",
-        quantity: Math.max(1, req.quantity),
-        regular_price: Number(p.regular_price ?? p.selling_price),
-        discount: Number(p.discount ?? 0),
-        discount_type: p.discount_type ?? "amount",
-        unit_price: computeSellingPrice(Number(p.regular_price ?? p.selling_price), Number(p.discount ?? 0), p.discount_type ?? "amount"),
-        track_stock: !!p.track_stock,
-        stock: p.stock,
-      });
-    }
+    const seeded: OrderItem[] = initial.items.map((req) => ({
+      product_id: req.product_id,
+      product_variant_id: req.product_variant_id ?? null,
+      product_name: req.name,
+      sku: req.sku ?? "",
+      quantity: Math.max(1, req.quantity),
+      regular_price: req.unit_price,
+      discount: 0,
+      discount_type: "amount",
+      unit_price: req.unit_price,
+    }));
     if (seeded.length) setItems(seeded);
-  }, [products, initial]);
+  }, [initial]);
 
   useEffect(() => {
     const run = async () => {

@@ -13,6 +13,7 @@ import {
   type LandingPageRecord,
   type LandingTemplate,
   type ProductItem,
+  type AttachedVariant,
   getDefaultCheckoutFields,
   getDefaultThankYou,
   getDefaultSettings,
@@ -41,6 +42,8 @@ import {
 } from "@/components/landing-builder/block-fields";
 import type { JSONContent } from "@tiptap/react";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
+import VariantPickerModal from "@/components/products/variant-picker-modal";
+import type { ProductVariant } from "@/types/variant";
 
 type LandingPageBuilderProps = {
   locale?: Locale;
@@ -56,6 +59,11 @@ type ContentState = Record<BlockType, Item[]>;
 
 type ProductDraft = {
   product_id: number;
+  // Set when the merchant pinned one exact variant instead of attaching the
+  // whole product; `variant` is the resolved snapshot kept only for display
+  // (label/image/price) — the backend only needs the id.
+  product_variant_id: number | null;
+  variant: AttachedVariant | null;
   title_override: string;
   subtitle: string;
   badge_text: string;
@@ -65,9 +73,11 @@ type ProductDraft = {
   sort_order: number;
 };
 
-function normalizeProductDraft(input: LandingPageProductInput & { product?: ProductItem | null }, index: number): ProductDraft {
+function normalizeProductDraft(input: LandingPageProductInput & { product?: ProductItem | null; variant?: AttachedVariant | null }, index: number): ProductDraft {
   return {
     product_id: input.product_id,
+    product_variant_id: input.product_variant_id ?? null,
+    variant: input.variant ?? null,
     title_override: input.title_override ?? "",
     subtitle: input.subtitle ?? "",
     badge_text: input.badge_text ?? "",
@@ -76,6 +86,11 @@ function normalizeProductDraft(input: LandingPageProductInput & { product?: Prod
     selected_by_default: input.selected_by_default ?? true,
     sort_order: input.sort_order ?? index + 1,
   };
+}
+
+function variantLabel(variant: AttachedVariant | null): string {
+  if (!variant) return "";
+  return (variant.options ?? []).map((o) => o.label || o.value).filter(Boolean).join(" / ");
 }
 
 function moveItem<T>(items: T[], from: number, to: number) {
@@ -464,7 +479,10 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<ProductDraft[]>([]);
   const [productQuery, setProductQuery] = useState("");
-  const [draggingProductId, setDraggingProductId] = useState<number | null>(null);
+  const [draggingProductId, setDraggingProductId] = useState<string | null>(null);
+  // rowKey is set when re-picking a variant for an already-attached row
+  // ("Change variant"); null means attaching a brand-new product.
+  const [variantPicker, setVariantPicker] = useState<{ product: ProductItem; rowKey: string | null } | null>(null);
 
   const [mediaPolicy, setMediaPolicy] = useState<MediaPolicy | null>(null);
   const [mediaLibrary, setMediaLibrary] = useState<MediaLibraryItem[]>([]);
@@ -651,34 +669,75 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
   }
 
   function addProduct(product: ProductItem) {
-    setSelectedProducts((prev) => [
-      ...prev,
-      {
-        product_id: product.id,
-        title_override: "",
-        subtitle: "",
-        badge_text: "",
-        price_override: "",
-        default_qty: 1,
-        selected_by_default: true,
-        sort_order: prev.length + 1,
-      },
-    ]);
+    // Variant products need the merchant to pick an attach mode first —
+    // pin one exact variant, or attach the whole product and let the
+    // customer choose on the public checkout page.
+    if (product.has_variants && (product.active_variants_count ?? 0) > 0) {
+      setVariantPicker({ product, rowKey: null });
+      return;
+    }
+    attachProduct(product, null);
   }
 
-  function removeProduct(productId: number) {
-    setSelectedProducts((prev) => prev.filter((item) => item.product_id !== productId).map((item, index) => ({ ...item, sort_order: index + 1 })));
-  }
-
-  function patchProduct(productId: number, changes: Partial<ProductDraft>) {
-    setSelectedProducts((prev) => prev.map((item) => (item.product_id === productId ? { ...item, ...changes } : item)));
-  }
-
-  function reorderProductsByIds(sourceId: number, targetId: number) {
-    if (sourceId === targetId) return;
+  function attachProduct(product: ProductItem, variant: ProductVariant | null) {
     setSelectedProducts((prev) => {
-      const from = prev.findIndex((item) => item.product_id === sourceId);
-      const to = prev.findIndex((item) => item.product_id === targetId);
+      if (prev.some((item) => item.product_id === product.id && item.product_variant_id === (variant?.id ?? null))) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          product_id: product.id,
+          product_variant_id: variant?.id ?? null,
+          variant: variant as unknown as AttachedVariant | null,
+          title_override: "",
+          subtitle: "",
+          badge_text: "",
+          price_override: "",
+          default_qty: 1,
+          selected_by_default: true,
+          sort_order: prev.length + 1,
+        },
+      ];
+    });
+    setVariantPicker(null);
+  }
+
+  /** Handles both picker flows: attaching a new row, or re-picking the
+   *  variant for an already-attached row ("Change variant"). */
+  function handleVariantPicked(variant: ProductVariant | null) {
+    if (!variantPicker) return;
+    if (variantPicker.rowKey) {
+      patchProduct(variantPicker.rowKey, {
+        product_variant_id: variant?.id ?? null,
+        variant: variant as unknown as AttachedVariant | null,
+      });
+      setVariantPicker(null);
+      return;
+    }
+    attachProduct(variantPicker.product, variant);
+  }
+
+  // The same product can be attached more than once with different pinned
+  // variants (mode 2), so product_id alone no longer uniquely identifies a
+  // row — key on product_id + product_variant_id instead.
+  function draftRowKey(item: Pick<ProductDraft, "product_id" | "product_variant_id">): string {
+    return `${item.product_id}:${item.product_variant_id ?? 0}`;
+  }
+
+  function removeProduct(rowKey: string) {
+    setSelectedProducts((prev) => prev.filter((item) => draftRowKey(item) !== rowKey).map((item, index) => ({ ...item, sort_order: index + 1 })));
+  }
+
+  function patchProduct(rowKey: string, changes: Partial<ProductDraft>) {
+    setSelectedProducts((prev) => prev.map((item) => (draftRowKey(item) === rowKey ? { ...item, ...changes } : item)));
+  }
+
+  function reorderProductsByKey(sourceKey: string, targetKey: string) {
+    if (sourceKey === targetKey) return;
+    setSelectedProducts((prev) => {
+      const from = prev.findIndex((item) => draftRowKey(item) === sourceKey);
+      const to = prev.findIndex((item) => draftRowKey(item) === targetKey);
       if (from < 0 || to < 0) return prev;
       return moveItem(prev, from, to).map((item, index) => ({ ...item, sort_order: index + 1 }));
     });
@@ -883,6 +942,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
         theme_settings: theme,
         products: selectedProducts.map((item, index) => ({
           product_id: item.product_id,
+          product_variant_id: item.product_variant_id,
           title_override: item.title_override || null,
           subtitle: item.subtitle || null,
           badge_text: item.badge_text || null,
@@ -1333,45 +1393,67 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
                 <div className="mt-3 rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">{t.emptyProducts}</div>
               ) : (
                 <div className="mt-3 space-y-4">
-                  {selectedProductDetails.map((item, index) => (
+                  {selectedProductDetails.map((item, index) => {
+                    const rowKey = draftRowKey(item);
+                    return (
                     <div
-                      key={item.product_id}
+                      key={rowKey}
                       draggable
-                      onDragStart={() => setDraggingProductId(item.product_id)}
+                      onDragStart={() => setDraggingProductId(rowKey)}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => {
-                        if (draggingProductId != null) reorderProductsByIds(draggingProductId, item.product_id);
+                        if (draggingProductId != null) reorderProductsByKey(draggingProductId, rowKey);
                         setDraggingProductId(null);
                       }}
                       onDragEnd={() => setDraggingProductId(null)}
-                      className={`rounded-2xl border bg-[var(--surface)] p-4 ${draggingProductId === item.product_id ? "border-[var(--accent)] shadow-lg" : "border-[var(--border)]"}`}
+                      className={`rounded-2xl border bg-[var(--surface)] p-4 ${draggingProductId === rowKey ? "border-[var(--accent)] shadow-lg" : "border-[var(--border)]"}`}
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="cursor-grab text-lg text-[var(--muted)]">⋮⋮</span>
-                            <h4 className="text-sm font-semibold text-[var(--foreground)]">{item.product?.name ?? `#${item.product_id}`}</h4>
+                        <div className="flex items-start gap-3">
+                          {item.variant?.image_url || item.product?.thumbnail ? (
+                            <img src={item.variant?.image_url || item.product?.thumbnail || ""} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+                          ) : null}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="cursor-grab text-lg text-[var(--muted)]">⋮⋮</span>
+                              <h4 className="text-sm font-semibold text-[var(--foreground)]">{item.product?.name ?? `#${item.product_id}`}</h4>
+                              {item.product_variant_id ? (
+                                <span className="rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">{variantLabel(item.variant)}</span>
+                              ) : item.product?.has_variants && (item.product.active_variants_count ?? 0) > 0 ? (
+                                <span className="rounded-full bg-[var(--surface-soft)] px-2 py-0.5 text-[11px] text-[var(--muted)]">{locale === "bn" ? "সব ভেরিয়েন্ট — কাস্টমার সিলেক্ট করবে" : "All variants — customer picks"}</span>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 text-xs text-[var(--muted)]">
+                              SKU: {item.variant?.sku || item.product?.sku || "—"} · ৳{Number(item.variant?.selling_price ?? item.product?.selling_price ?? item.product?.regular_price ?? 0).toLocaleString()} · #{index + 1}
+                            </p>
                           </div>
-                          <p className="mt-1 text-xs text-[var(--muted)]">SKU: {item.product?.sku || "—"} · ৳{Number(item.product?.selling_price ?? item.product?.regular_price ?? 0).toLocaleString()} · #{index + 1}</p>
                         </div>
-                        <button type="button" onClick={() => removeProduct(item.product_id)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-400">{t.remove}</button>
+                        <div className="flex shrink-0 gap-2">
+                          {item.product?.has_variants && (item.product.active_variants_count ?? 0) > 0 ? (
+                            <button type="button" onClick={() => item.product && setVariantPicker({ product: item.product, rowKey })} className="rounded-xl border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]">
+                              {locale === "bn" ? "ভেরিয়েন্ট পরিবর্তন" : "Change variant"}
+                            </button>
+                          ) : null}
+                          <button type="button" onClick={() => removeProduct(rowKey)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-400">{t.remove}</button>
+                        </div>
                       </div>
                       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <input value={item.title_override} onChange={(e) => patchProduct(item.product_id, { title_override: e.target.value })} placeholder={t.overrideTitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
-                        <input value={item.subtitle} onChange={(e) => patchProduct(item.product_id, { subtitle: e.target.value })} placeholder={t.overrideSubtitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
-                        <input value={item.badge_text} onChange={(e) => patchProduct(item.product_id, { badge_text: e.target.value })} placeholder={t.badge} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
-                        <input value={item.price_override} onChange={(e) => patchProduct(item.product_id, { price_override: e.target.value })} placeholder={t.overridePrice} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                        <input value={item.title_override} onChange={(e) => patchProduct(rowKey, { title_override: e.target.value })} placeholder={t.overrideTitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                        <input value={item.subtitle} onChange={(e) => patchProduct(rowKey, { subtitle: e.target.value })} placeholder={t.overrideSubtitle} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                        <input value={item.badge_text} onChange={(e) => patchProduct(rowKey, { badge_text: e.target.value })} placeholder={t.badge} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
+                        <input value={item.price_override} onChange={(e) => patchProduct(rowKey, { price_override: e.target.value })} placeholder={t.overridePrice} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm" />
                         <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]">
                           <span>{t.defaultQty}</span>
-                          <input type="number" min={1} max={100} value={item.default_qty} onChange={(e) => patchProduct(item.product_id, { default_qty: Math.max(1, Number(e.target.value) || 1) })} className="w-20 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm" />
+                          <input type="number" min={1} max={100} value={item.default_qty} onChange={(e) => patchProduct(rowKey, { default_qty: Math.max(1, Number(e.target.value) || 1) })} className="w-20 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm" />
                         </label>
                         <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--foreground)]">
-                          <input type="checkbox" checked={item.selected_by_default} onChange={(e) => patchProduct(item.product_id, { selected_by_default: e.target.checked })} className="accent-[var(--accent)]" />
+                          <input type="checkbox" checked={item.selected_by_default} onChange={(e) => patchProduct(rowKey, { selected_by_default: e.target.checked })} className="accent-[var(--accent)]" />
                           <span>{t.selectedByDefault}</span>
                         </label>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -1596,6 +1678,19 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
             </div>
           </div>
         </div>
+      ) : null}
+
+      {variantPicker ? (
+        <VariantPickerModal
+          productId={variantPicker.product.id}
+          productName={variantPicker.product.name}
+          token={token}
+          apiBase={LANDING_API_BASE}
+          allowWholeProduct={!variantPicker.rowKey}
+          onSelect={(variant) => handleVariantPicked(variant)}
+          onSelectWhole={() => handleVariantPicked(null)}
+          onClose={() => setVariantPicker(null)}
+        />
       ) : null}
     </section>
   );

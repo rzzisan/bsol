@@ -82,6 +82,15 @@ Route::post('/public/landing-pages/{slug}/abandoned-checkout', [AbandonedCheckou
 Route::get('/public/landing-pages/{slug}/abandoned-checkout/resume', [AbandonedCheckoutController::class, 'resumeShow'])
     ->middleware('throttle:30,1');
 
+// Inline variant picker on the public checkout — only ever exposes a product
+// that's actually attached to this published page (see publicAttachedProduct()).
+Route::get('/public/landing-pages/{slug}/products/{productId}/options', [LandingPageController::class, 'publicProductOptions'])
+    ->where('productId', '[0-9]+')
+    ->middleware('throttle:60,1');
+Route::post('/public/landing-pages/{slug}/products/{productId}/variants/resolve', [LandingPageController::class, 'publicResolveVariant'])
+    ->where('productId', '[0-9]+')
+    ->middleware('throttle:60,1');
+
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
     Route::post('/email/send-verification', [EmailOtpController::class, 'sendVerificationEmail']);

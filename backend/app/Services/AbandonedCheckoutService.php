@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Models\AbandonedCheckout;
 use App\Models\LandingPage;
 use App\Models\Order;
+use App\Models\ProductVariant;
 
 class AbandonedCheckoutService
 {
     /**
      * Upsert the in-progress checkout snapshot for this browsing session.
-     * Requires $page->products.product to already be eager-loaded (caller's responsibility).
+     * Requires $page->products.product and $page->products.variant.optionValues.option
+     * to already be eager-loaded (caller's responsibility).
      */
     public function capture(LandingPage $page, array $data, ?string $ip): AbandonedCheckout
     {
@@ -143,11 +145,37 @@ class AbandonedCheckoutService
                 $landingProduct = $landingProducts->get((int) $item['product_id']);
                 $product = $landingProduct->product;
 
+                // Merchant-pinned variant (attach mode 2) always wins over
+                // whatever the customer's browser sent; otherwise trust the
+                // customer's own in-page selection (attach mode 1), validated
+                // against this exact product so a stray/foreign id can't
+                // spoof a different variant's price into the snapshot.
+                $variant = $landingProduct->variant;
+                if (!$variant && !empty($item['product_variant_id'])) {
+                    $variant = ProductVariant::query()
+                        ->where('id', (int) $item['product_variant_id'])
+                        ->where('product_id', (int) $item['product_id'])
+                        ->where('is_active', true)
+                        ->with('optionValues.option')
+                        ->first();
+                }
+
+                $variantLabel = null;
+                if ($variant) {
+                    $variantLabel = $variant->relationLoaded('optionValues')
+                        ? $variant->optionValues->map(fn ($ov) => $ov->label ?: $ov->value)->filter()->implode(' / ')
+                        : null;
+                }
+
                 return [
                     'product_id' => (int) $item['product_id'],
+                    'product_variant_id' => $variant?->id,
+                    'variant_label' => $variantLabel ?: null,
                     'name' => $landingProduct->title_override ?: ($product?->name ?? 'Product'),
+                    'sku' => $variant?->sku ?? $product?->sku ?? null,
+                    'image' => $variant?->image_url ?? $product?->thumbnail ?? null,
                     'quantity' => max(1, (int) ($item['quantity'] ?? 1)),
-                    'unit_price' => (float) ($landingProduct->price_override ?? $product?->selling_price ?? 0),
+                    'unit_price' => (float) ($landingProduct->price_override ?? $variant?->selling_price ?? $product?->selling_price ?? 0),
                 ];
             })
             ->values()

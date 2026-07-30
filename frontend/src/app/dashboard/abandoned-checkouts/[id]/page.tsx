@@ -98,7 +98,15 @@ const t = {
   },
 };
 
-type CheckoutItem = { product_id: number; name: string; quantity: number; unit_price: number };
+type CheckoutItem = {
+  product_id: number;
+  product_variant_id?: number | null;
+  name: string;
+  quantity: number;
+  unit_price: number;
+  variant_label?: string | null;
+  image?: string | null;
+};
 
 type AbandonedCheckoutDetail = {
   id: number;
@@ -184,7 +192,7 @@ export default function AbandonedCheckoutDetailPage() {
         body: JSON.stringify({
           ...form,
           custom_fields: customFields,
-          items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+          items: items.map((i) => ({ product_id: i.product_id, product_variant_id: i.product_variant_id ?? null, quantity: i.quantity })),
         }),
       });
       setSaved(true);
@@ -350,7 +358,18 @@ export default function AbandonedCheckoutDetailPage() {
                   <tbody>
                     {items.map((i) => (
                       <tr key={i.product_id} className="border-b border-[var(--border)]">
-                        <td className="px-3 py-2">{i.name}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            {i.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={i.image} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+                            ) : null}
+                            <div>
+                              <p>{i.name}</p>
+                              {i.variant_label ? <p className="text-xs text-[var(--muted)]">{i.variant_label}</p> : null}
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-3 py-2 text-center">
                           <input
                             type="number"

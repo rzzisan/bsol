@@ -73,7 +73,7 @@ const t = {
   },
 };
 
-type CheckoutItem = { product_id: number; name: string; quantity: number; unit_price: number };
+type CheckoutItem = { product_id: number; name: string; quantity: number; unit_price: number; variant_label?: string | null; image?: string | null };
 
 type AbandonedCheckoutRow = {
   id: number;
@@ -292,7 +292,7 @@ export default function AbandonedCheckoutsPage() {
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell text-xs">{row.landingPage?.title ?? "—"}</td>
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-[var(--muted)]">
-                    {(row.items ?? []).map((i) => `${i.name} x${i.quantity}`).join(", ") || "—"}
+                    {(row.items ?? []).map((i) => `${i.name}${i.variant_label ? ` (${i.variant_label})` : ""} x${i.quantity}`).join(", ") || "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s.color}`}>{s.text}</span>

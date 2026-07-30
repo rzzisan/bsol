@@ -39,7 +39,23 @@ export default function CreateOrderPage() {
           notes: c.notes ?? undefined,
           capturedLocationHint: locationParts.length ? locationParts.join(" / ") : undefined,
           items: Array.isArray(c.items)
-            ? c.items.map((i: { product_id: number; quantity: number }) => ({ product_id: i.product_id, quantity: i.quantity }))
+            ? c.items.map((i: {
+                product_id: number;
+                product_variant_id?: number | null;
+                name?: string | null;
+                sku?: string | null;
+                quantity: number;
+                unit_price?: number | null;
+                image?: string | null;
+              }) => ({
+                product_id: i.product_id,
+                product_variant_id: i.product_variant_id ?? null,
+                name: i.name ?? "Product",
+                sku: i.sku ?? null,
+                quantity: i.quantity,
+                unit_price: Number(i.unit_price ?? 0),
+                image: i.image ?? null,
+              }))
             : undefined,
         });
       })

@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductOption;
 use App\Models\ProductOptionValue;
 use App\Models\ProductVariant;
+use App\Support\ProductVariantFormatter;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -173,7 +174,7 @@ class ProductVariantController extends Controller
             ->with('optionValues')
             ->orderBy('position')
             ->get()
-            ->map(fn ($v) => $this->formatVariant($v));
+            ->map(fn ($v) => ProductVariantFormatter::format($v));
 
         return response()->json(['success' => true, 'data' => $variants]);
     }
@@ -187,7 +188,7 @@ class ProductVariantController extends Controller
 
         $variant = $this->createVariant($product, $data);
 
-        return response()->json(['success' => true, 'data' => $this->formatVariant($variant)], 201);
+        return response()->json(['success' => true, 'data' => ProductVariantFormatter::format($variant)], 201);
     }
 
     /** PUT /products/{product}/variants/{variant} */
@@ -227,7 +228,7 @@ class ProductVariantController extends Controller
             $variant->optionValues()->sync($data['option_value_ids']);
         }
 
-        return response()->json(['success' => true, 'data' => $this->formatVariant($variant->fresh(['optionValues']))]);
+        return response()->json(['success' => true, 'data' => ProductVariantFormatter::format($variant->fresh(['optionValues']))]);
     }
 
     /** DELETE /products/{product}/variants/{variant} */
@@ -405,7 +406,7 @@ class ProductVariantController extends Controller
 
         $variant->load('optionValues');
 
-        return response()->json(['success' => true, 'data' => $this->formatVariant($variant)]);
+        return response()->json(['success' => true, 'data' => ProductVariantFormatter::format($variant)]);
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -415,38 +416,6 @@ class ProductVariantController extends Controller
     private function authorizeProduct(Product $product): void
     {
         abort_if($product->user_id !== auth()->id(), 403);
-    }
-
-    private function formatVariant(ProductVariant $variant): array
-    {
-        return [
-            'id'                  => $variant->id,
-            'sku'                 => $variant->sku,
-            'regular_price'       => $variant->regular_price,
-            'discount'            => $variant->discount,
-            'discount_type'       => $variant->discount_type,
-            'selling_price'       => $variant->selling_price,
-            'cost_price'          => $variant->cost_price,
-            'stock_qty'           => $variant->stock_qty,
-            'low_stock_threshold' => $variant->low_stock_threshold,
-            'weight'              => $variant->weight,
-            'image_url'           => $variant->image_url,
-            'is_active'           => $variant->is_active,
-            'position'            => $variant->position,
-            'is_low_stock'        => $variant->isLowStock(),
-            'options'             => $variant->relationLoaded('optionValues')
-                ? $variant->optionValues->map(fn ($ov) => [
-                    'option_value_id' => $ov->id,
-                    'option_id'       => $ov->option?->id,
-                    'option_name'     => $ov->option?->name,
-                    'option_type'     => $ov->option?->type,
-                    'value'           => $ov->value,
-                    'label'           => $ov->label,
-                    'color_hex'       => $ov->color_hex,
-                    'image_url'       => $ov->image_url,
-                ])
-                : [],
-        ];
     }
 
     private function validateVariantPayload(Request $request, Product $product, ?int $ignoreId = null): array

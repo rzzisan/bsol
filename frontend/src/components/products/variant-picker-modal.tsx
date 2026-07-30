@@ -10,9 +10,14 @@ interface Props {
   apiBase: string;
   onSelect: (variant: ProductVariant) => void;
   onClose: () => void;
+  /** Landing-page builder only: let the merchant attach the whole product
+   *  instead of pinning one variant (customer picks a variant themselves
+   *  on the public checkout page). */
+  allowWholeProduct?: boolean;
+  onSelectWhole?: () => void;
 }
 
-export default function VariantPickerModal({ productId, productName, token, apiBase, onSelect, onClose }: Props) {
+export default function VariantPickerModal({ productId, productName, token, apiBase, onSelect, onClose, allowWholeProduct, onSelectWhole }: Props) {
   const [options, setOptions] = useState<ProductOption[]>([]);
   const [selected, setSelected] = useState<Record<number, number>>({}); // optionId → valueId
   const [resolvedVariant, setResolvedVariant] = useState<ProductVariant | null>(null);
@@ -149,6 +154,15 @@ export default function VariantPickerModal({ productId, productName, token, apiB
           </div>
         )}
 
+        {allowWholeProduct && (
+          <button
+            onClick={onSelectWhole}
+            className="w-full rounded-lg border-2 border-dashed border-blue-300 bg-blue-50 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+          >
+            Attach whole product — customer picks the variant
+          </button>
+        )}
+
         {/* Actions */}
         <div className="flex gap-3 pt-2">
           <button
@@ -156,7 +170,7 @@ export default function VariantPickerModal({ productId, productName, token, apiB
             disabled={!allOptionsSelected || !resolvedVariant || resolving || resolvedVariant.stock_qty === 0}
             className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {resolvedVariant?.stock_qty === 0 ? "Out of Stock" : "Add to Order"}
+            {resolvedVariant?.stock_qty === 0 ? "Out of Stock" : allowWholeProduct ? "Attach This Variant" : "Add to Order"}
           </button>
           <button onClick={onClose} className="px-5 py-2.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">
             Cancel

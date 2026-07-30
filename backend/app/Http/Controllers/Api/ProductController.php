@@ -16,6 +16,7 @@ class ProductController extends Controller
     {
         $query = Product::where('user_id', auth()->id())
             ->with(['category:id,name', 'images'])
+            ->withCount(['variants as active_variants_count' => fn ($q) => $q->where('is_active', true)])
             ->withTrashed(false);
 
         // Filters

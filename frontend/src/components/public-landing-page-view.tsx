@@ -9,10 +9,28 @@ import { resolveBlockIcon } from "@/lib/block-icons";
 import { renderTiptapJSON } from "@/lib/rich-text-render";
 import type { LayoutEntry } from "@/lib/landing-layout";
 import { getOrCreateCheckoutSessionToken, setCheckoutSessionToken } from "@/lib/checkout-session";
+import type { ProductOption } from "@/types/variant";
+
+// Loose subset of App\Support\ProductVariantFormatter::format() — covers both
+// a merchant-pinned variant (item.variant) and a customer-resolved one
+// (draft.resolvedVariant), and the minimal shape reconstructed from a resumed
+// abandoned-checkout snapshot.
+type PublicVariantSnapshot = {
+  id: number;
+  sku?: string | null;
+  regular_price?: string | number | null;
+  selling_price?: string | number | null;
+  stock_qty?: number | null;
+  image_url?: string | null;
+  options?: Array<{ option_value_id: number; option_name?: string | null; value: string; label?: string | null }>;
+};
 
 type CheckoutDraft = {
   enabled: boolean;
   quantity: number;
+  // Set once the customer has picked a full option combination for a
+  // has_variants product that wasn't pinned by the merchant.
+  resolvedVariant: PublicVariantSnapshot | null;
 };
 
 type CustomerForm = {
@@ -27,6 +45,10 @@ type CustomerForm = {
 
 type PublicProduct = {
   product_id: number;
+  // Set when the merchant pinned one exact variant while building the page;
+  // `variant` is the resolved snapshot for display (no picker shown for it).
+  product_variant_id?: number | null;
+  variant?: PublicVariantSnapshot | null;
   title_override?: string | null;
   subtitle?: string | null;
   badge_text?: string | null;
@@ -41,8 +63,109 @@ type PublicProduct = {
     selling_price?: string | number | null;
     regular_price?: string | number | null;
     thumbnail?: string | null;
+    has_variants?: boolean;
+    active_variants_count?: number;
   } | null;
 };
+
+/** True when the customer needs to pick a variant themselves (mode 1) —
+ *  the merchant attached the whole product instead of pinning one variant. */
+function needsCustomerVariantPick(item: PublicProduct): boolean {
+  return !item.product_variant_id && Boolean(item.product?.has_variants) && (item.product?.active_variants_count ?? 0) > 0;
+}
+
+/**
+ * Unauthenticated, inline (non-modal) variant picker for the public checkout
+ * — mode 1, where the merchant attached the whole product and the customer
+ * chooses which combination they want. Backed by the public, page-scoped
+ * options/resolve endpoints (LandingPageController::publicProductOptions /
+ * publicResolveVariant), which only ever expose a product actually attached
+ * to that published page.
+ */
+function InlineVariantPicker({ slug, productId, onResolved }: { slug: string; productId: number; onResolved: (variant: PublicVariantSnapshot | null) => void }) {
+  const [options, setOptions] = useState<ProductOption[]>([]);
+  const [selected, setSelected] = useState<Record<number, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [resolving, setResolving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch(`/api/public/landing-pages/${slug}/products/${productId}/options`)
+      .then((res) => res.json())
+      .then((json) => setOptions(json.data ?? []))
+      .catch(() => setOptions([]))
+      .finally(() => setLoading(false));
+  }, [slug, productId]);
+
+  useEffect(() => {
+    const allSelected = options.length > 0 && options.every((o) => selected[o.id] != null);
+    if (!allSelected) {
+      onResolved(null);
+      return;
+    }
+
+    setResolving(true);
+    setError("");
+    fetch(`/api/public/landing-pages/${slug}/products/${productId}/variants/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ option_value_ids: Object.values(selected) }),
+    })
+      .then(async (res) => {
+        const json = await res.json();
+        if (res.ok) {
+          onResolved(json.data);
+          setError("");
+        } else {
+          onResolved(null);
+          setError(json.message ?? "No matching variant for this combination.");
+        }
+      })
+      .catch(() => setError("Network error resolving variant."))
+      .finally(() => setResolving(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, options]);
+
+  if (loading) return <p className="mt-2 text-xs text-slate-400">Loading options…</p>;
+  if (options.length === 0) return null;
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      {options.map((option) => (
+        <div key={option.id} className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-semibold text-slate-500">{option.display_name || option.name}:</span>
+          {option.values.map((val) => {
+            const isChosen = selected[option.id] === val.id;
+            if (option.type === "color_swatch") {
+              return (
+                <button
+                  key={val.id}
+                  type="button"
+                  onClick={() => setSelected((prev) => ({ ...prev, [option.id]: val.id }))}
+                  title={val.label || val.value}
+                  className={`h-6 w-6 rounded-full border-2 transition ${isChosen ? "border-orange-500 scale-110" : "border-slate-300"}`}
+                  style={{ backgroundColor: val.color_hex ?? "#ccc" }}
+                />
+              );
+            }
+            return (
+              <button
+                key={val.id}
+                type="button"
+                onClick={() => setSelected((prev) => ({ ...prev, [option.id]: val.id }))}
+                className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${isChosen ? "border-orange-500 bg-orange-50 text-orange-700" : "border-slate-200 text-slate-600 hover:border-slate-400"}`}
+              >
+                {val.label || val.value}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+      {resolving ? <p className="text-xs text-slate-400">Finding matching variant…</p> : null}
+      {error ? <p className="text-xs text-orange-600">{error}</p> : null}
+    </div>
+  );
+}
 
 type CarouselImage = {
   id?: number | null;
@@ -127,9 +250,10 @@ function money(value: string | number | null | undefined) {
     : "৳0.00";
 }
 
-function getProductPrices(item: PublicProduct) {
-  const originalPrice = Number(item.product?.selling_price ?? item.product?.regular_price ?? 0);
-  const currentPrice = Number(item.price_override ?? originalPrice);
+function getProductPrices(item: PublicProduct, resolvedVariant?: PublicVariantSnapshot | null) {
+  const variant = item.variant ?? resolvedVariant ?? null;
+  const originalPrice = Number(variant?.regular_price ?? item.product?.selling_price ?? item.product?.regular_price ?? 0);
+  const currentPrice = Number(item.price_override ?? variant?.selling_price ?? originalPrice);
 
   return {
     originalPrice,
@@ -681,8 +805,12 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       (page.products ?? []).map((item) => [
         item.product_id,
         {
-          enabled: Boolean(item.selected_by_default ?? true),
+          // A whole-product attachment the customer hasn't picked a variant
+          // for yet can't be pre-selected — there's nothing to add to the
+          // order until they choose one.
+          enabled: needsCustomerVariantPick(item) ? false : Boolean(item.selected_by_default ?? true),
           quantity: Math.max(1, Number(item.default_qty ?? 1)),
+          resolvedVariant: null,
         },
       ]),
     ),
@@ -765,8 +893,21 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           if (Array.isArray(d.items)) {
             setCheckout((prev) => {
               const next = { ...prev };
-              for (const item of d.items as Array<{ product_id: number; quantity: number }>) {
-                next[item.product_id] = { enabled: true, quantity: Math.max(1, item.quantity ?? 1) };
+              for (const item of d.items as Array<{
+                product_id: number;
+                quantity: number;
+                product_variant_id?: number | null;
+                sku?: string | null;
+                image?: string | null;
+                unit_price?: number;
+              }>) {
+                // Reconstruct just enough of the variant to show a resumed
+                // price/image — not the full option breakdown, so if the
+                // customer wants to change it they re-open the picker.
+                const resolvedVariant: PublicVariantSnapshot | null = item.product_variant_id
+                  ? { id: item.product_variant_id, sku: item.sku, image_url: item.image, selling_price: item.unit_price }
+                  : null;
+                next[item.product_id] = { enabled: true, quantity: Math.max(1, item.quantity ?? 1), resolvedVariant };
               }
               return next;
             });
@@ -802,6 +943,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           items: products.map((item) => ({
             enabled: checkout[item.product_id]?.enabled ?? false,
             product_id: item.product_id,
+            product_variant_id: item.product_variant_id ?? checkout[item.product_id]?.resolvedVariant?.id ?? null,
             quantity: checkout[item.product_id]?.quantity ?? 1,
           })),
         }),
@@ -826,12 +968,12 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const selectedProducts = products.filter((item) => checkout[item.product_id]?.enabled);
   const subtotal = selectedProducts.reduce((sum, item) => {
     const quantity = checkout[item.product_id]?.quantity ?? 1;
-    const price = getProductPrices(item).currentPrice;
+    const price = getProductPrices(item, checkout[item.product_id]?.resolvedVariant).currentPrice;
     return sum + (price * quantity);
   }, 0);
   const originalSubtotal = selectedProducts.reduce((sum, item) => {
     const quantity = checkout[item.product_id]?.quantity ?? 1;
-    return sum + (getProductPrices(item).originalPrice * quantity);
+    return sum + (getProductPrices(item, checkout[item.product_id]?.resolvedVariant).originalPrice * quantity);
   }, 0);
   const discountTotal = Math.max(0, originalSubtotal - subtotal);
   const total = Math.max(0, subtotal + shippingCharge);
@@ -898,6 +1040,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         items: products.map((item) => ({
           enabled: checkout[item.product_id]?.enabled ?? false,
           product_id: item.product_id,
+          product_variant_id: item.product_variant_id ?? checkout[item.product_id]?.resolvedVariant?.id ?? null,
           quantity: checkout[item.product_id]?.quantity ?? 1,
         })),
       };
@@ -1000,6 +1143,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       [productId]: {
         enabled: prev[productId]?.enabled ?? false,
         quantity: prev[productId]?.quantity ?? 1,
+        resolvedVariant: prev[productId]?.resolvedVariant ?? null,
         ...changes,
       },
     }));
@@ -1160,11 +1304,16 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               <div className="space-y-4">
                 {products.map((item) => {
                   const product = item.product!;
-                  const { originalPrice, currentPrice } = getProductPrices(item);
                   const draft = checkout[item.product_id] ?? {
                     enabled: Boolean(item.selected_by_default ?? true),
                     quantity: Math.max(1, Number(item.default_qty ?? 1)),
+                    resolvedVariant: null,
                   };
+                  const { originalPrice, currentPrice } = getProductPrices(item, draft.resolvedVariant);
+                  const needsPick = needsCustomerVariantPick(item);
+                  const activeVariant = item.variant ?? draft.resolvedVariant ?? null;
+                  const thumbnail = activeVariant?.image_url || product.thumbnail;
+                  const canEnable = !needsPick || Boolean(draft.resolvedVariant);
 
                   return (
                     <article key={`${item.product_id}-${item.sort_order ?? 0}`} className={`rounded-3xl border bg-white p-4 shadow-sm transition ${draft.enabled ? "border-orange-300 ring-1 ring-orange-200" : "border-orange-200"}`}>
@@ -1173,19 +1322,27 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                           <input
                             type="checkbox"
                             checked={draft.enabled}
+                            disabled={!canEnable}
                             onChange={(e) => patchCheckout(item.product_id, { enabled: e.target.checked })}
-                            className="h-4 w-4 rounded border-slate-300 accent-[var(--accent)]"
+                            className="h-4 w-4 rounded border-slate-300 accent-[var(--accent)] disabled:opacity-40"
                           />
-                          {product.thumbnail ? (
+                          {thumbnail ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={product.thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-orange-100 object-cover" />
+                            <img src={thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-orange-100 object-cover" />
                           ) : (
                             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">No image</div>
                           )}
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             {item.badge_text ? <span className="mb-2 inline-flex rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-orange-600">{item.badge_text}</span> : null}
                             <h3 className="truncate text-sm font-bold text-slate-900 sm:text-base">{item.title_override || product.name}</h3>
-                            <p className="mt-1 text-xs text-slate-500">{item.subtitle || product.sku || "Selected product"}</p>
+                            <p className="mt-1 text-xs text-slate-500">{item.subtitle || activeVariant?.sku || product.sku || "Selected product"}</p>
+                            {needsPick ? (
+                              <InlineVariantPicker
+                                slug={page.slug}
+                                productId={item.product_id}
+                                onResolved={(variant) => patchCheckout(item.product_id, { resolvedVariant: variant, enabled: variant ? draft.enabled : false })}
+                              />
+                            ) : null}
                           </div>
                         </div>
 
@@ -1277,19 +1434,22 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                   ) : (
                     selectedProducts.map((item) => {
                       const product = item.product!;
-                      const { currentPrice } = getProductPrices(item);
-                      const quantity = checkout[item.product_id]?.quantity ?? 1;
+                      const draft = checkout[item.product_id];
+                      const { currentPrice } = getProductPrices(item, draft?.resolvedVariant);
+                      const activeVariant = item.variant ?? draft?.resolvedVariant ?? null;
+                      const thumbnail = activeVariant?.image_url || product.thumbnail;
+                      const quantity = draft?.quantity ?? 1;
                       return (
                         <div key={`summary-${item.product_id}`} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3">
-                          {product.thumbnail ? (
+                          {thumbnail ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={product.thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-slate-100 object-cover" />
+                            <img src={thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-slate-100 object-cover" />
                           ) : (
                             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">No image</div>
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-semibold text-slate-900">{item.title_override || product.name}</div>
-                            <div className="mt-1 text-xs text-slate-500">{item.subtitle || product.sku || "Selected product"}</div>
+                            <div className="mt-1 text-xs text-slate-500">{item.subtitle || activeVariant?.sku || product.sku || "Selected product"}</div>
                             <div className="mt-3 inline-flex items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                               <button type="button" onClick={() => patchCheckout(item.product_id, { quantity: Math.max(1, quantity - 1) })} className="px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">−</button>
                               <div className="min-w-10 border-x border-slate-200 px-3 py-2 text-center text-sm font-semibold text-slate-900">{quantity}</div>
