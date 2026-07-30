@@ -25,7 +25,7 @@ class AbandonedCheckoutService
             return $checkout;
         }
 
-        $items = $this->buildItemsSnapshot($page, $data['items'] ?? []);
+        $items = $this->snapshotItems($page, $data['items'] ?? []);
         $subtotal = collect($items)->sum(fn (array $item) => $item['unit_price'] * $item['quantity']);
 
         $attributes = [
@@ -97,7 +97,43 @@ class AbandonedCheckoutService
         }
     }
 
-    private function buildItemsSnapshot(LandingPage $page, array $rawItems): array
+    /**
+     * Merchant-driven edit from the dashboard detail page — only touches keys
+     * actually present in $data, so a status-only PATCH (dismiss/reactivate)
+     * doesn't clobber the captured snapshot, and vice versa.
+     */
+    public function applyEdit(AbandonedCheckout $checkout, array $data): AbandonedCheckout
+    {
+        $attributes = array_intersect_key($data, array_flip([
+            'customer_name',
+            'customer_phone',
+            'customer_email',
+            'customer_address',
+            'customer_district',
+            'customer_thana',
+            'customer_area',
+            'notes',
+            'custom_fields',
+            'status',
+            'order_id',
+        ]));
+
+        if (array_key_exists('items', $data)) {
+            // Dashboard edit form only sends the items it wants kept — treat
+            // every entry as enabled (unlike the public capture payload, which
+            // sends the full product list with an explicit enabled flag).
+            $rawItems = array_map(fn (array $item) => array_merge($item, ['enabled' => true]), $data['items'] ?? []);
+            $items = $this->snapshotItems($checkout->landingPage, $rawItems);
+            $attributes['items'] = $items;
+            $attributes['subtotal'] = collect($items)->sum(fn (array $item) => $item['unit_price'] * $item['quantity']);
+        }
+
+        $checkout->update($attributes);
+
+        return $checkout;
+    }
+
+    public function snapshotItems(LandingPage $page, array $rawItems): array
     {
         $landingProducts = $page->products->keyBy('product_id');
 

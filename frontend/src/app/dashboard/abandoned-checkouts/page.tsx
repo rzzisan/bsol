@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
@@ -24,6 +25,7 @@ const t = {
     status: "স্ট্যাটাস",
     lastActivity: "সর্বশেষ কার্যকলাপ",
     actions: "অ্যাকশন",
+    view: "বিস্তারিত",
     copyLink: "লিংক কপি",
     linkCopied: "কপি হয়েছে!",
     dismiss: "বাতিল করুন",
@@ -55,6 +57,7 @@ const t = {
     status: "Status",
     lastActivity: "Last Activity",
     actions: "Actions",
+    view: "View",
     copyLink: "Copy link",
     linkCopied: "Copied!",
     dismiss: "Dismiss",
@@ -296,6 +299,12 @@ export default function AbandonedCheckoutsPage() {
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell text-xs text-[var(--muted)]">{relativeTime(row.last_activity_at)}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <Link
+                      href={`/dashboard/abandoned-checkouts/${row.id}`}
+                      className="mr-2 rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]"
+                    >
+                      {txt.view}
+                    </Link>
                     {row.landingPage && (
                       <button
                         onClick={() => handleCopyLink(row)}

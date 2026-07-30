@@ -143,10 +143,29 @@ class AbandonedCheckoutController extends Controller
         $checkout = AbandonedCheckout::query()->where('user_id', auth()->id())->findOrFail($id);
 
         $validated = $request->validate([
-            'status' => ['required', Rule::in(['active', 'dismissed', 'converted'])],
+            'status' => ['nullable', Rule::in(['active', 'dismissed', 'converted'])],
+            'customer_name' => ['nullable', 'string', 'max:150'],
+            'customer_phone' => ['nullable', 'string', 'max:20'],
+            'customer_email' => ['nullable', 'string', 'max:150'],
+            'customer_address' => ['nullable', 'string', 'max:500'],
+            'customer_district' => ['nullable', 'string', 'max:100'],
+            'customer_thana' => ['nullable', 'string', 'max:100'],
+            'customer_area' => ['nullable', 'string', 'max:120'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'custom_fields' => ['nullable', 'array'],
+            'items' => ['nullable', 'array'],
+            'items.*.product_id' => ['required_with:items', 'integer'],
+            'items.*.quantity' => ['required_with:items', 'integer', 'min:1', 'max:100'],
+            // Only meaningful together with status=converted — links this checkout
+            // to an order created via the "Convert to Order" flow (order-intake-form).
+            'order_id' => ['nullable', 'integer', Rule::exists('orders', 'id')->where('user_id', auth()->id())],
         ]);
 
-        $checkout->update($validated);
+        if (array_key_exists('items', $validated)) {
+            $checkout->load('landingPage.products.product');
+        }
+
+        app(AbandonedCheckoutService::class)->applyEdit($checkout, $validated);
 
         return response()->json(['success' => true, 'data' => $checkout->fresh()]);
     }

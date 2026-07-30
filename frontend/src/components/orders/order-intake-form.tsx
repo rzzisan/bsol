@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredToken } from "@/lib/dashboard-client";
 import { useLocationDropdowns } from "@/lib/use-location-dropdowns";
@@ -41,13 +41,23 @@ type OrderItem = {
   variant_info?: Record<string, unknown> | null;
 };
 
+export type InitialOrderData = {
+  abandonedCheckoutId?: number;
+  customer_phone?: string;
+  customer_name?: string;
+  customer_address?: string;
+  notes?: string;
+  capturedLocationHint?: string;
+  items?: Array<{ product_id: number; quantity: number }>;
+};
+
 const normalizePhone = (value: string): string => {
   const digits = value.replace(/\D/g, "");
   if (digits.startsWith("880") && digits.length >= 13) return `0${digits.slice(-10)}`;
   return digits.slice(-11);
 };
 
-export default function OrderIntakeForm() {
+export default function OrderIntakeForm({ initial }: { initial?: InitialOrderData } = {}) {
   const token = getStoredToken();
   const router = useRouter();
   const loc = useLocationDropdowns();
@@ -55,17 +65,18 @@ export default function OrderIntakeForm() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<OrderItem[]>([]);
+  const appliedInitialItemsRef = useRef(false);
 
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
+  const [customerPhone, setCustomerPhone] = useState(initial?.customer_phone ?? "");
+  const [customerName, setCustomerName] = useState(initial?.customer_name ?? "");
+  const [customerAddress, setCustomerAddress] = useState(initial?.customer_address ?? "");
   const [source, setSource] = useState<"manual" | "facebook_inbox">("manual");
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online" | "bkash">("cod");
   const [paymentStatus, setPaymentStatus] = useState<"due" | "partial" | "paid">("due");
   const [shippingCharge, setShippingCharge] = useState(0);
   const [discount, setDiscount] = useState(0);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
 
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -98,6 +109,37 @@ export default function OrderIntakeForm() {
     };
     void run();
   }, [token]);
+
+  // Converting an abandoned checkout: once the catalog loads, seed items
+  // from the captured product_id/quantity pairs using current catalog
+  // pricing (not the possibly-stale abandoned-checkout snapshot price).
+  // Runs once; a product with variants is skipped here (falls back to the
+  // normal variant picker — landing pages don't support variant selection
+  // today, so this is a rare edge case, not the common path).
+  useEffect(() => {
+    if (appliedInitialItemsRef.current) return;
+    if (!initial?.items?.length || products.length === 0) return;
+    appliedInitialItemsRef.current = true;
+
+    const seeded: OrderItem[] = [];
+    for (const req of initial.items) {
+      const p = products.find((pp) => pp.id === req.product_id);
+      if (!p || (p.has_variants && (p.active_variants_count ?? 0) > 0)) continue;
+      seeded.push({
+        product_id: p.id,
+        product_name: p.name,
+        sku: p.sku ?? "",
+        quantity: Math.max(1, req.quantity),
+        regular_price: Number(p.regular_price ?? p.selling_price),
+        discount: Number(p.discount ?? 0),
+        discount_type: p.discount_type ?? "amount",
+        unit_price: computeSellingPrice(Number(p.regular_price ?? p.selling_price), Number(p.discount ?? 0), p.discount_type ?? "amount"),
+        track_stock: !!p.track_stock,
+        stock: p.stock,
+      });
+    }
+    if (seeded.length) setItems(seeded);
+  }, [products, initial]);
 
   useEffect(() => {
     const run = async () => {
@@ -272,7 +314,16 @@ export default function OrderIntakeForm() {
         return;
       }
 
-      router.push("/dashboard/orders");
+      const newOrderId = data?.data?.id;
+      if (initial?.abandonedCheckoutId && newOrderId) {
+        await fetch(`${API}/landing/abandoned-checkouts/${initial.abandonedCheckoutId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ status: "converted", order_id: newOrderId }),
+        }).catch(() => {});
+      }
+
+      router.push(newOrderId ? `/dashboard/orders/${newOrderId}` : "/dashboard/orders");
     } finally {
       setSubmitting(false);
     }
@@ -292,6 +343,11 @@ export default function OrderIntakeForm() {
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
             <textarea value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} placeholder="Address" rows={2}
               className="sm:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+            {initial?.capturedLocationHint ? (
+              <p className="sm:col-span-2 -mt-1 text-xs text-[var(--muted)]">
+                Captured location (pick the matching values below): {initial.capturedLocationHint}
+              </p>
+            ) : null}
             <select value={loc.cityId} onChange={(e) => loc.setCity(e.target.value ? Number(e.target.value) : "")}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
               <option value="">District</option>
