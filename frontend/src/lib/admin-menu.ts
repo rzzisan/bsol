@@ -20,6 +20,7 @@ export type AdminMenuLabels = {
   notificationLogs?: string;
   productMediaSettings?: string;
   landingTemplates?: string;
+  platformBranding?: string;
 };
 
 export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
@@ -32,6 +33,11 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
       key: "settings-product-media",
       label: labels.productMediaSettings ?? "Product Media",
       href: "/admin/settings/product-media",
+    },
+    {
+      key: "settings-platform-branding",
+      label: labels.platformBranding ?? "Platform Branding",
+      href: "/admin/settings/platform-branding",
     },
     {
       key: "settings-notification-templates",

@@ -24,7 +24,9 @@ use App\Http\Controllers\Api\LandingTemplateController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
+use App\Http\Controllers\Api\Admin\PlatformSettingsController;
 use App\Http\Controllers\Api\Admin\LandingTemplateImportController;
+use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
@@ -58,6 +60,9 @@ Route::post('/password/send-otp',     [PasswordResetController::class, 'sendOtp'
 Route::post('/password/resend-otp',   [PasswordResetController::class, 'resendOtp']);
 Route::post('/password/verify-otp',   [PasswordResetController::class, 'verifyOtp']);
 Route::post('/password/reset',        [PasswordResetController::class, 'resetPassword']);
+
+// SaaS attribution footer + /terms page content — platform-wide, not per-merchant.
+Route::get('/public/platform-settings', [PublicPlatformSettingsController::class, 'show']);
 
 Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow'])->middleware('track_landing_page_visit');
 Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder'])->middleware('track_landing_page_visit');
@@ -312,6 +317,10 @@ Route::middleware('active_subscription')->group(function () {
         // Product media settings (shared admin config)
         Route::get('/settings/product-media', [ProductMediaSettingsController::class, 'show']);
         Route::put('/settings/product-media', [ProductMediaSettingsController::class, 'update']);
+
+        // Platform branding: attribution footer + public terms page content
+        Route::get('/settings/platform-branding', [PlatformSettingsController::class, 'show']);
+        Route::put('/settings/platform-branding', [PlatformSettingsController::class, 'update']);
 
         // Landing page template importer (CartFlows/Elementor JSON exports)
         Route::prefix('landing/templates')->group(function () {

@@ -859,6 +859,21 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const resumeReadyRef = useRef(previewMode); // skip capture entirely in preview mode
   const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // SaaS attribution footer — admin-controlled, same across every merchant's
+  // landing page (we're a technology provider, not the seller of record).
+  const [platformSettings, setPlatformSettings] = useState<{
+    credit_text_bn?: string | null;
+    credit_text_en?: string | null;
+    terms_link_label_bn?: string | null;
+    terms_link_label_en?: string | null;
+  } | null>(null);
+  useEffect(() => {
+    fetch("/api/public/platform-settings")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => setPlatformSettings(json?.data ?? null))
+      .catch(() => {});
+  }, []);
+
   // Resolve/adopt the checkout session token, and — if this is a resumed
   // abandoned-checkout link (?resume=<token>) — prefill the form from the
   // saved snapshot before allowing progressive capture to start again.
@@ -1516,6 +1531,18 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           </div>
         </div>
       </section>
+
+      {platformSettings ? (
+        <footer className="mx-auto max-w-4xl px-4 pb-8 pt-2 text-center text-xs leading-5 text-slate-400">
+          <p>
+            {(language === "bn" ? platformSettings.credit_text_bn : platformSettings.credit_text_en) || ""}
+            {" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-500">
+              {(language === "bn" ? platformSettings.terms_link_label_bn : platformSettings.terms_link_label_en) || (language === "bn" ? "ব্যবহারের শর্তাবলি" : "Terms of Use")}
+            </a>
+          </p>
+        </footer>
+      ) : null}
     </main>
   );
 }
