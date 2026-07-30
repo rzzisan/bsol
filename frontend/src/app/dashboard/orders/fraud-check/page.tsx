@@ -53,6 +53,17 @@ const t = {
     phone: "ফোন",
     sharedSellers: "শেয়ার্ড বিক্রেতা",
     sharedBlacklist: "গ্লোবাল ব্ল্যাকলিস্ট",
+    courierTitle: "কুরিয়ার ডেলিভারি হিস্টোরি",
+    courierChecking: "কুরিয়ার থেকে ডেটা আনা হচ্ছে...",
+    overall: "সর্বমোট",
+    successRate: "সাফল্যের হার",
+    totalParcel: "মোট পার্সেল",
+    success: "সফল",
+    cancelled2: "বাতিল",
+    notConfigured: "সেটআপ করা হয়নি",
+    notConfiguredHint: "কুরিয়ার সেটিং-এ লগইন যোগ করুন",
+    fetchFailed: "ডেটা আনা যায়নি",
+    lastChecked: "শেষ চেক",
   },
   en: {
     pageTitle: "Fraud Check",
@@ -84,6 +95,17 @@ const t = {
     phone: "Phone",
     sharedSellers: "Shared Sellers",
     sharedBlacklist: "Global Blacklists",
+    courierTitle: "Courier Delivery History",
+    courierChecking: "Fetching data from couriers...",
+    overall: "Overall",
+    successRate: "Success Rate",
+    totalParcel: "Total",
+    success: "Success",
+    cancelled2: "Cancelled",
+    notConfigured: "Not configured",
+    notConfiguredHint: "Add login in Courier Settings",
+    fetchFailed: "Could not fetch data",
+    lastChecked: "Last checked",
   },
 };
 
@@ -92,6 +114,31 @@ type FraudResult = {
   stats: { total: number; delivered: number; cancelled: number; returned: number };
   shared?: { seller_count: number; global_blacklisted_count: number };
   orders: { id: number; order_number: string; status: string; total: string; created_at: string }[];
+};
+
+type CourierCard = {
+  name: string;
+  total: number;
+  success: number;
+  cancelled: number;
+  success_rate: number;
+  status: "ok" | "error" | "not_configured";
+  message: string | null;
+  last_checked_at: string | null;
+};
+
+type CourierCheckResult = {
+  phone: string;
+  overall: { total: number; success: number; cancelled: number; success_rate: number };
+  couriers: CourierCard[];
+};
+
+const COURIER_META: Record<string, { label: string; header: string }> = {
+  pathao: { label: "Pathao", header: "bg-red-600" },
+  steadfast: { label: "Steadfast", header: "bg-teal-600" },
+  redx: { label: "RedX", header: "bg-rose-700" },
+  carrybee: { label: "CarryBee", header: "bg-amber-500 text-neutral-900" },
+  paperfly: { label: "Paperfly", header: "bg-blue-600" },
 };
 
 export default function FraudCheckPage() {
@@ -109,17 +156,44 @@ export default function FraudCheckPage() {
   const [bulkChecking, setBulkChecking] = useState(false);
   const [bulkResults, setBulkResults] = useState<FraudResult[]>([]);
 
+  const [courierData, setCourierData] = useState<CourierCheckResult | null>(null);
+  const [courierChecking, setCourierChecking] = useState(false);
+  const [courierErrorMsg, setCourierErrorMsg] = useState<string | null>(null);
+
   const handleCheck = async () => {
     if (!phone.trim()) return;
+    const ph = phone.trim();
     setChecking(true); setResult(null); setBlMsg(null);
-    try {
-      const res = await fetch(`${API}/fraud/check-phone`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ phone: phone.trim() }),
-      });
-      if (res.ok) { const d = await res.json(); setResult(d.data); }
-    } finally { setChecking(false); }
+    setCourierChecking(true); setCourierData(null); setCourierErrorMsg(null);
+
+    void (async () => {
+      try {
+        const res = await fetch(`${API}/fraud/check-phone`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ phone: ph }),
+        });
+        if (res.ok) { const d = await res.json(); setResult(d.data); }
+      } finally { setChecking(false); }
+    })();
+
+    void (async () => {
+      try {
+        const res = await fetch(`${API}/fraud/courier-check?phone=${encodeURIComponent(ph)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const d = await res.json();
+        if (res.ok && d.success) {
+          setCourierData(d.data);
+        } else {
+          setCourierErrorMsg(d.message ?? txt.fetchFailed);
+        }
+      } catch {
+        setCourierErrorMsg(txt.fetchFailed);
+      } finally {
+        setCourierChecking(false);
+      }
+    })();
   };
 
   const handleBulk = async () => {
@@ -215,13 +289,81 @@ export default function FraudCheckPage() {
 
         {/* Right: Result detail */}
         <div className="lg:col-span-2">
-          {!result ? (
+          {!result && !courierChecking && !courierData && !courierErrorMsg ? (
             <div className="catv-panel flex h-40 items-center justify-center text-sm text-[var(--muted)]">
               {txt.enterPhone}
             </div>
           ) : (
             <div className="flex flex-col gap-4">
 
+              {/* Courier delivery history (external, cached) */}
+              {(courierChecking || courierData || courierErrorMsg) && (
+                <div className="catv-panel p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">{txt.courierTitle}</h3>
+                    {courierChecking && (
+                      <span className="text-xs text-[var(--muted)]">{txt.courierChecking}</span>
+                    )}
+                  </div>
+
+                  {courierErrorMsg && !courierData && (
+                    <p className="text-xs text-red-400">{courierErrorMsg}</p>
+                  )}
+
+                  {courierData && (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6">
+                      {/* Overall */}
+                      <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
+                        <div className="bg-violet-600 px-3 py-2 text-sm font-bold text-white">
+                          {txt.overall}
+                        </div>
+                        <div className="space-y-1 bg-[var(--background)] px-3 py-2.5 text-xs">
+                          <Row label={txt.successRate} value={`${courierData.overall.success_rate}%`} bold />
+                          <Row label={txt.totalParcel} value={courierData.overall.total} />
+                          <Row label={txt.success} value={courierData.overall.success} />
+                          <Row label={txt.cancelled2} value={courierData.overall.cancelled} />
+                          <Progress pct={courierData.overall.success_rate} />
+                        </div>
+                      </div>
+
+                      {courierData.couriers.map(card => {
+                        const meta = COURIER_META[card.name] ?? { label: card.name, header: "bg-neutral-600" };
+                        return (
+                          <div key={card.name} className="overflow-hidden rounded-2xl border border-[var(--border)]">
+                            <div className={`px-3 py-2 text-sm font-bold text-white ${meta.header}`}>
+                              {meta.label}
+                            </div>
+                            <div className="bg-[var(--background)] px-3 py-2.5 text-xs">
+                              {card.status === "not_configured" ? (
+                                <div className="py-3 text-center text-[var(--muted)]">
+                                  <p className="font-semibold">{txt.notConfigured}</p>
+                                  <p className="mt-1 text-[10px]">{txt.notConfiguredHint}</p>
+                                </div>
+                              ) : card.status === "error" ? (
+                                <div className="py-3 text-center text-red-400">
+                                  <p className="font-semibold">{txt.fetchFailed}</p>
+                                  {card.message && <p className="mt-1 text-[10px] opacity-80">{card.message}</p>}
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  <Row label={txt.successRate} value={`${card.success_rate}%`} bold />
+                                  <Row label={txt.totalParcel} value={card.total} />
+                                  <Row label={txt.success} value={card.success} />
+                                  <Row label={txt.cancelled2} value={card.cancelled} />
+                                  <Progress pct={card.success_rate} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {result && (
+              <>
               {/* Score card */}
               <div className={`catv-panel border p-5 ${RISK_STYLE[result.risk_level] ?? ""}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -312,6 +454,8 @@ export default function FraudCheckPage() {
                   </div>
                 )}
               </div>
+              </>
+              )}
             </div>
           )}
         </div>
@@ -320,3 +464,22 @@ export default function FraudCheckPage() {
   );
 }
 
+function Row({ label, value, bold }: { label: string; value: string | number; bold?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[var(--muted)]">{label}</span>
+      <span className={bold ? "font-bold text-emerald-500" : "font-semibold"}>{value}</span>
+    </div>
+  );
+}
+
+function Progress({ pct }: { pct: number }) {
+  return (
+    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+      <div
+        className="h-full rounded-full bg-emerald-500"
+        style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+      />
+    </div>
+  );
+}
