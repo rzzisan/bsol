@@ -91,15 +91,23 @@ class CourierFraudCheckApiTest extends TestCase
         $this->assertSame('rating', $pathaoCard['data_type']);
         $this->assertSame('excellent_customer', $pathaoCard['rating']);
 
+        foreach ($response->json('data.couriers') as $card) {
+            $this->assertFalse($card['from_cache'], "{$card['name']} should be freshly fetched, not cached");
+        }
+
         $this->assertSame(5, CourierFraudStat::where('phone_number', '01711223344')->count());
 
         // Pathao: 2 requests, Steadfast: 1, RedX: 2, Carrybee: 4, Paperfly: 2 = 11
         Http::assertSentCount(11);
 
         // Second call within TTL must be served entirely from cache — no new HTTP calls.
-        $this->getJson('/api/fraud/courier-check?phone=01711223344', $this->authHeaders($user))
+        $second = $this->getJson('/api/fraud/courier-check?phone=01711223344', $this->authHeaders($user))
             ->assertOk()
             ->assertJsonCount(5, 'data.couriers');
+
+        foreach ($second->json('data.couriers') as $card) {
+            $this->assertTrue($card['from_cache'], "{$card['name']} should be served from cache");
+        }
 
         Http::assertSentCount(11);
     }
@@ -115,8 +123,52 @@ class CourierFraudCheckApiTest extends TestCase
         $response->assertOk();
         foreach ($response->json('data.couriers') as $card) {
             $this->assertSame('not_configured', $card['status']);
+            $this->assertFalse($card['from_cache']);
         }
         Http::assertNothingSent();
+    }
+
+    public function test_unconfigured_seller_sees_another_sellers_cached_result(): void
+    {
+        $configuredSeller = User::factory()->create();
+        $this->fullyConfiguredSettings($configuredSeller);
+        $this->fakeAllCouriers();
+
+        $this->getJson('/api/fraud/courier-check?phone=01711223344', $this->authHeaders($configuredSeller))
+            ->assertOk();
+
+        // A second seller with zero courier credentials configured should still
+        // see the shared cache populated by the first seller's lookup, flagged
+        // as cached, instead of "not configured".
+        $bareSeller = User::factory()->create();
+
+        $response = $this->getJson('/api/fraud/courier-check?phone=01711223344', $this->authHeaders($bareSeller));
+
+        $response->assertOk()->assertJsonCount(5, 'data.couriers');
+        foreach ($response->json('data.couriers') as $card) {
+            $this->assertNotSame('not_configured', $card['status']);
+            $this->assertTrue($card['from_cache']);
+        }
+
+        $steadfastCard = collect($response->json('data.couriers'))->firstWhere('name', 'steadfast');
+        $this->assertSame(20, $steadfastCard['total']);
+
+        // No new HTTP calls were made on the bare seller's behalf — the credentials
+        // used to populate this cache belonged to the first (configured) seller.
+        Http::assertSentCount(11);
+    }
+
+    public function test_uncredentialed_seller_still_gets_not_configured_when_no_cache_exists(): void
+    {
+        $bareSeller = User::factory()->create();
+        Http::fake();
+
+        $response = $this->getJson('/api/fraud/courier-check?phone=01799998888', $this->authHeaders($bareSeller));
+
+        $response->assertOk();
+        foreach ($response->json('data.couriers') as $card) {
+            $this->assertSame('not_configured', $card['status']);
+        }
     }
 
     public function test_failed_courier_is_cached_as_error_and_not_retried_within_cooldown(): void

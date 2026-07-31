@@ -28,17 +28,22 @@ class CourierFraudCheckService
 
         $cards = [];
         foreach (self::COURIERS as $courier) {
-            if (! $settings || ! $this->isConfigured($courier, $settings)) {
-                $cards[] = $this->notConfiguredCard($courier);
-                continue;
-            }
+            $configured = $settings && $this->isConfigured($courier, $settings);
 
             $cached = CourierFraudStat::where('phone_number', $phone)
                 ->where('courier_name', $courier)
                 ->first();
 
+            // Cached results (from any seller's earlier lookup) are shown to
+            // every seller — courier credentials are only needed to refresh
+            // a phone number that's missing or stale in the shared cache.
+            if (! $configured) {
+                $cards[] = $cached ? $this->cardFromModel($courier, $cached, fromCache: true) : $this->notConfiguredCard($courier);
+                continue;
+            }
+
             if ($cached && $this->isFresh($cached)) {
-                $cards[] = $this->cardFromModel($courier, $cached);
+                $cards[] = $this->cardFromModel($courier, $cached, fromCache: true);
                 continue;
             }
 
@@ -61,7 +66,7 @@ class CourierFraudCheckService
                 ]
             );
 
-            $cards[] = $this->cardFromModel($courier, $row);
+            $cards[] = $this->cardFromModel($courier, $row, fromCache: false);
         }
 
         return [
@@ -110,7 +115,7 @@ class CourierFraudCheckService
         };
     }
 
-    private function cardFromModel(string $courier, CourierFraudStat $row): array
+    private function cardFromModel(string $courier, CourierFraudStat $row, bool $fromCache): array
     {
         return [
             'name' => $courier,
@@ -123,6 +128,7 @@ class CourierFraudCheckService
             'status' => $row->status,
             'message' => $row->error_message,
             'last_checked_at' => optional($row->last_checked_at)->toISOString(),
+            'from_cache' => $fromCache,
         ];
     }
 
@@ -139,6 +145,7 @@ class CourierFraudCheckService
             'status' => 'not_configured',
             'message' => null,
             'last_checked_at' => null,
+            'from_cache' => false,
         ];
     }
 

@@ -3,7 +3,7 @@
 return [
 
     // How long a successful courier fraud-check result stays fresh before re-fetching.
-    'cache_ttl_hours' => env('FRAUD_CHECKER_CACHE_TTL_HOURS', 24),
+    'cache_ttl_hours' => env('FRAUD_CHECKER_CACHE_TTL_HOURS', 48),
 
     // How long a failed fetch (bad creds, courier changed its login flow, rate limit) is
     // left alone before retrying, so a broken courier isn't hit on every single check.

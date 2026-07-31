@@ -65,6 +65,7 @@ const t = {
     fetchFailed: "ডেটা আনা যায়নি",
     lastChecked: "শেষ চেক",
     estimatedLabel: "আনুমানিক:",
+    cachedBadge: "ক্যাশ",
   },
   en: {
     pageTitle: "Fraud Check",
@@ -108,6 +109,7 @@ const t = {
     fetchFailed: "Could not fetch data",
     lastChecked: "Last checked",
     estimatedLabel: "Estimated:",
+    cachedBadge: "Cached",
   },
 };
 
@@ -129,6 +131,7 @@ type CourierCard = {
   status: "ok" | "error" | "not_configured";
   message: string | null;
   last_checked_at: string | null;
+  from_cache: boolean;
 };
 
 type CourierCheckResult = {
@@ -346,8 +349,13 @@ export default function FraudCheckPage() {
                         const meta = COURIER_META[card.name] ?? { label: card.name, header: "bg-neutral-600" };
                         return (
                           <div key={card.name} className="overflow-hidden rounded-2xl border border-[var(--border)]">
-                            <div className={`px-3 py-2 text-sm font-bold text-white ${meta.header}`}>
-                              {meta.label}
+                            <div className={`flex items-center justify-between px-3 py-2 text-sm font-bold text-white ${meta.header}`}>
+                              <span>{meta.label}</span>
+                              {card.from_cache && (
+                                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
+                                  {txt.cachedBadge}
+                                </span>
+                              )}
                             </div>
                             <div className="bg-[var(--background)] px-3 py-2.5 text-xs">
                               {card.status === "not_configured" ? (
