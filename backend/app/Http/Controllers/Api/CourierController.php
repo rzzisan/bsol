@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Services\PathaoLocationService;
 use App\Services\SteadfastService;
 use App\Services\PathaoService;
+use App\Services\RedxService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -47,6 +48,54 @@ class CourierController extends Controller
         return response()->json(['success' => true, 'data' => $areas]);
     }
 
+    // ── RedX Areas / Pickup Stores / Charge ─────────────────────────────────────
+
+    public function redxAreas(Request $request): JsonResponse
+    {
+        $svc    = new RedxService();
+        $result = $svc->getAreas(auth()->id(), $request->query('post_code'), $request->query('district_name'));
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function redxPickupStores(): JsonResponse
+    {
+        $svc    = new RedxService();
+        $result = $svc->getPickupStores(auth()->id());
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function createRedxPickupStore(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name'    => 'required|string|min:3|max:50',
+            'phone'   => 'required|string|max:20',
+            'address' => 'required|string|min:10|max:200',
+            'area_id' => 'required|integer',
+        ]);
+        $svc    = new RedxService();
+        $result = $svc->createPickupStore(auth()->id(), $data);
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function redxCharge(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'delivery_area_id' => 'required|integer',
+            'pickup_area_id'   => 'required|integer',
+            'cod_amount'       => 'required|numeric|min:0',
+            'weight_kg'        => 'required|numeric|min:0.01',
+        ]);
+        $svc    = new RedxService();
+        $result = $svc->calculateCharge(
+            auth()->id(),
+            $data['delivery_area_id'],
+            $data['pickup_area_id'],
+            (float) $data['cod_amount'],
+            (float) $data['weight_kg'] * 1000
+        );
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
     // ── Courier Settings ──────────────────────────────────────────────────────
 
     public function getSettings(): JsonResponse
@@ -70,7 +119,9 @@ class CourierController extends Controller
             'pathao_store_id'     => 'nullable|string|max:100',
             'pathao_username'     => 'nullable|email|max:200',
             'pathao_password'     => 'nullable|string|max:200',
-            'redx_api_key'        => 'nullable|string|max:200',
+            'redx_api_key'        => 'nullable|string|max:4000',
+            'redx_environment'    => 'nullable|in:sandbox,production',
+            'redx_pickup_store_id'=> 'nullable|integer',
             'redx_phone'          => 'nullable|string|max:20',
             'redx_password'       => 'nullable|string|max:200',
             'carrybee_phone'      => 'nullable|string|max:20',
@@ -82,9 +133,13 @@ class CourierController extends Controller
         // Only update keys that are actually sent (not masked placeholders)
         $existing = CourierSetting::firstOrNew(['user_id' => auth()->id()]);
 
+        // These columns are NOT NULL in the DB; an empty selection must not blank them out
+        $notNullable = ['default_courier', 'redx_environment'];
+
         foreach ($data as $field => $value) {
             // Skip masked values (contain ***)
             if ($value !== null && str_contains((string) $value, '***')) continue;
+            if ($value === null && in_array($field, $notNullable, true)) continue;
             $existing->$field = $value;
         }
         $existing->user_id = auth()->id();
@@ -340,6 +395,12 @@ class CourierController extends Controller
             'item_type'            => 'nullable|integer|in:1,2',
             'item_weight'          => 'nullable|numeric|min:0.5|max:10',
             'special_instruction'  => 'nullable|string|max:300',
+            // RedX-specific
+            'delivery_area_id'     => 'nullable|integer',
+            'delivery_area'        => 'nullable|string|max:100',
+            'pickup_store_id'      => 'nullable|integer',
+            'value'                => 'nullable|numeric|min:0',
+            'parcel_weight_kg'     => 'nullable|numeric|min:0.01',
         ]);
 
         $courier = $data['courier'] ?? 'steadfast';
@@ -363,13 +424,17 @@ class CourierController extends Controller
             return $this->bookPathao($order, $data);
         }
 
+        if ($courier === 'redx') {
+            return $this->bookRedx($order, $data);
+        }
+
         return response()->json(['success' => false, 'message' => 'Courier not supported yet.'], 422);
     }
 
     public function bookBulk(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'courier'            => 'required|in:pathao,steadfast',
+            'courier'            => 'required|in:pathao,steadfast,redx',
             'order_ids'          => 'required|array|min:2|max:200',
             'order_ids.*'        => 'integer',
             'store_id'           => 'nullable|integer',
@@ -379,6 +444,10 @@ class CourierController extends Controller
             'item_description'   => 'nullable|string|max:250',
             'special_instruction'=> 'nullable|string|max:300',
             'note'               => 'nullable|string|max:300',
+            // RedX-specific
+            'pickup_store_id'    => 'nullable|integer',
+            'parcel_weight_kg'   => 'nullable|numeric|min:0.01',
+            'delivery_area'      => 'nullable|string|max:100',
         ]);
 
         $orders = Order::where('user_id', auth()->id())
@@ -400,7 +469,9 @@ class CourierController extends Controller
         $failedCount  = 0;
 
         foreach ($orders as $order) {
-            $result = $this->bookPathaoAndPersist($order, $data);
+            $result = $data['courier'] === 'redx'
+                ? $this->bookRedxAndPersist($order, $data)
+                : $this->bookPathaoAndPersist($order, $data);
             $results[] = [
                 'order_id'       => $order->id,
                 'order_number'   => $order->order_number,
@@ -655,6 +726,110 @@ class CourierController extends Controller
         return ['success' => true, 'payload' => $payload];
     }
 
+    private function bookRedx(Order $order, array $data): JsonResponse
+    {
+        $result = $this->bookRedxAndPersist($order, $data);
+
+        if ($result['success']) {
+            return response()->json([
+                'success'        => true,
+                'data'           => $order->fresh(),
+                'consignment_id' => $result['consignment_id'],
+                'message'        => $result['message'] ?? 'RedX parcel booked.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $result['message'] ?? 'RedX booking failed.',
+            'errors'  => $result['errors'] ?? null,
+            'raw'     => $result['raw'] ?? null,
+        ], 422);
+    }
+
+    private function bookRedxAndPersist(Order $order, array $data): array
+    {
+        $svc     = new RedxService();
+        $payload = $this->buildRedxPayload($order, $data);
+
+        if (! $payload['success']) {
+            return $payload;
+        }
+
+        $result = $svc->createParcel(auth()->id(), $payload['payload']);
+
+        if ($result['success']) {
+            $order->update([
+                'courier_name'        => 'redx',
+                'courier_tracking_id' => $result['tracking_id'],
+                'courier_status'      => 'booked',
+                'status'              => 'processing',
+            ]);
+            return ['success' => true, 'consignment_id' => $result['tracking_id'], 'message' => 'RedX parcel booked.'];
+        }
+
+        return [
+            'success' => false,
+            'message' => $result['message'] ?? 'RedX booking failed.',
+            'errors'  => $result['errors'] ?? null,
+            'raw'     => $result['raw'] ?? null,
+        ];
+    }
+
+    private function buildRedxPayload(Order $order, array $data): array
+    {
+        $settings = CourierSetting::where('user_id', auth()->id())->first();
+        if (! $settings || ! $settings->redx_api_key) {
+            return ['success' => false, 'message' => 'RedX API credentials not configured. Go to Settings → Courier.'];
+        }
+
+        $pickupStoreId = $data['pickup_store_id'] ?? $settings->redx_pickup_store_id ?? null;
+        if (! $pickupStoreId) {
+            return ['success' => false, 'message' => 'RedX pickup store is required. Configure a default in Settings → Courier or select one when booking.'];
+        }
+
+        $deliveryAreaId = $data['delivery_area_id'] ?? $order->redx_area_id ?? null;
+        $deliveryAreaName = $data['delivery_area'] ?? null;
+        if (! $deliveryAreaId || ! $deliveryAreaName) {
+            return ['success' => false, 'message' => 'RedX delivery area is required. Search and select the customer\'s area when booking.'];
+        }
+
+        $address = trim(implode(', ', array_filter([
+            $order->customer_address,
+            $order->customer_area,
+            $order->customer_thana,
+            $order->customer_district,
+        ])));
+
+        if ($address === '') {
+            return ['success' => false, 'message' => 'Customer address is required for RedX booking.'];
+        }
+
+        $codAmount = (float) ($data['cod_amount'] ?? $order->total);
+        $value     = (float) ($data['value'] ?? $codAmount);
+        $weightKg  = (float) ($data['parcel_weight_kg'] ?? 0.5);
+
+        $payload = [
+            'customer_name'          => $order->customer_name ?? $order->customer_phone,
+            'customer_phone'         => $order->customer_phone,
+            'delivery_area'          => $deliveryAreaName,
+            'delivery_area_id'       => (int) $deliveryAreaId,
+            'customer_address'       => substr($address, 0, 220),
+            'merchant_invoice_id'    => $order->order_number,
+            'cash_collection_amount' => $codAmount,
+            'parcel_weight'          => (int) round($weightKg * 1000),
+            'value'                  => $value,
+            'pickup_store_id'        => (int) $pickupStoreId,
+        ];
+
+        $instruction = $data['note'] ?? $order->notes ?? '';
+        if ($instruction !== '') {
+            $payload['instruction'] = $instruction;
+        }
+
+        return ['success' => true, 'payload' => $payload];
+    }
+
     // ── Track ─────────────────────────────────────────────────────────────────
 
     public function trackOrder(int $orderId): JsonResponse
@@ -669,6 +844,15 @@ class CourierController extends Controller
             $result = $svc->getOrderInfo(auth()->id(), $order->courier_tracking_id);
             if ($result['success'] && isset($result['data']['order_status_slug'])) {
                 $order->update(['courier_status' => $result['data']['order_status_slug']]);
+            }
+            return response()->json(['success' => true, 'data' => $result['data'] ?? [], 'order' => $order->fresh()]);
+        }
+
+        if ($order->courier_name === 'redx') {
+            $svc    = new RedxService();
+            $result = $svc->getParcelInfo(auth()->id(), (string) $order->courier_tracking_id);
+            if ($result['success'] && isset($result['data']['status'])) {
+                $order->update(['courier_status' => $result['data']['status']]);
             }
             return response()->json(['success' => true, 'data' => $result['data'] ?? [], 'order' => $order->fresh()]);
         }

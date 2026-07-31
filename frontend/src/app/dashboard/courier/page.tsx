@@ -28,11 +28,21 @@ const t = {
     modalTitle: "পার্সেল বুক করুন",
     steadfast: "Steadfast",
     pathao: "Pathao",
+    redx: "RedX",
     manual: "ম্যানুয়াল",
     courier: "কুরিয়ার সার্ভিস",
     store: "পার্সেল পিকআপ স্টোর",
     selectStore: "স্টোর নির্বাচন করুন",
     loadingStores: "স্টোর লোড হচ্ছে...",
+    redxAreaSearch: "জেলার নাম দিয়ে ডেলিভারি Area খুঁজুন",
+    redxAreaSearchPlaceholder: "যেমন: Dhaka",
+    redxSearchBtn: "খুঁজুন",
+    redxSearching: "খোঁজা হচ্ছে...",
+    redxAreaLabel: "Area",
+    redxSelectArea: "Area নির্বাচন করুন",
+    redxNoAreas: "কোনো area পাওয়া যায়নি।",
+    redxDeclaredValue: "পণ্যের মূল্য (৳)",
+    redxNoStoreWarning: "RedX Pickup Store পাওয়া যায়নি। Settings → Courier-এ তৈরি করুন।",
     deliveryType: "ডেলিভারি ধরন",
     normalDelivery: "Normal Delivery",
     onDemandDelivery: "On Demand",
@@ -82,11 +92,21 @@ const t = {
     modalTitle: "Book Parcel",
     steadfast: "Steadfast",
     pathao: "Pathao",
+    redx: "RedX",
     manual: "Manual",
     courier: "Courier Service",
     store: "Pickup Store",
     selectStore: "Select store",
     loadingStores: "Loading stores...",
+    redxAreaSearch: "Search Delivery Area by District",
+    redxAreaSearchPlaceholder: "e.g. Dhaka",
+    redxSearchBtn: "Search",
+    redxSearching: "Searching...",
+    redxAreaLabel: "Area",
+    redxSelectArea: "Select area",
+    redxNoAreas: "No areas found.",
+    redxDeclaredValue: "Declared Value (৳)",
+    redxNoStoreWarning: "No RedX pickup store found. Create one in Settings → Courier.",
     deliveryType: "Delivery Type",
     normalDelivery: "Normal Delivery",
     onDemandDelivery: "On Demand",
@@ -126,9 +146,11 @@ type Order = {
 };
 
 type PathaoStore = { store_id: number; store_name: string; store_address: string; is_active: number };
+type RedxStore = { id: number; name: string; address: string; area_name: string; area_id: number };
+type RedxArea = { id: number; name: string; post_code: number; district_name: string };
 
 type BookForm = {
-  courier: "steadfast" | "pathao" | "manual";
+  courier: "steadfast" | "pathao" | "redx" | "manual";
   cod_amount: string;
   note: string;
   tracking_id: string;
@@ -137,10 +159,13 @@ type BookForm = {
   item_type: "1" | "2";
   item_weight: string;
   item_description: string;
+  redx_value: string;
+  redx_delivery_area_id: string;
+  redx_delivery_area: string;
 };
 
 type BulkForm = {
-  courier: "pathao" | "steadfast";
+  courier: "pathao" | "steadfast" | "redx";
   store_id: string;
   delivery_type: "48" | "12";
   item_type: "1" | "2";
@@ -165,6 +190,7 @@ export default function BookParcelPage() {
   const [form, setForm] = useState<BookForm>({
     courier: "pathao", cod_amount: "", note: "", tracking_id: "",
     store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "",
+    redx_value: "", redx_delivery_area_id: "", redx_delivery_area: "",
   });
   const [booking, setBooking] = useState(false);
   const [bookResult, setBookResult] = useState<{ success: boolean; msg: string } | null>(null);
@@ -179,6 +205,14 @@ export default function BookParcelPage() {
   const [storesFetched, setStoresFetched] = useState(false);
   const [priceResult, setPriceResult] = useState<{ fee: number; final: number } | null>(null);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
+
+  const [redxStores, setRedxStores] = useState<RedxStore[]>([]);
+  const [loadingRedxStores, setLoadingRedxStores] = useState(false);
+  const [redxStoresFetched, setRedxStoresFetched] = useState(false);
+  const [redxAreaSearch, setRedxAreaSearch] = useState("");
+  const [redxAreaResults, setRedxAreaResults] = useState<RedxArea[]>([]);
+  const [searchingRedxAreas, setSearchingRedxAreas] = useState(false);
+
   const [bulkForm, setBulkForm] = useState<BulkForm>({
     courier: "pathao", store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "", note: "",
   });
@@ -224,15 +258,53 @@ export default function BookParcelPage() {
     }
   }, [storesFetched, token]);
 
+  const fetchRedxStores = useCallback(async () => {
+    if (redxStoresFetched) return;
+    setLoadingRedxStores(true);
+    try {
+      const res = await fetch(`${API}/courier/redx/pickup-stores`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        const list: RedxStore[] = d.data ?? [];
+        setRedxStores(list);
+        if (list.length > 0) {
+          setForm(f => (f.courier === "redx" ? { ...f, store_id: String(list[0].id) } : f));
+        }
+      }
+    } finally {
+      setLoadingRedxStores(false);
+      setRedxStoresFetched(true);
+    }
+  }, [redxStoresFetched, token]);
+
+  const searchRedxAreas = async () => {
+    if (!redxAreaSearch.trim()) return;
+    setSearchingRedxAreas(true);
+    try {
+      const res = await fetch(`${API}/courier/redx/areas?district_name=${encodeURIComponent(redxAreaSearch.trim())}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.success) setRedxAreaResults(d.data ?? []);
+      }
+    } finally {
+      setSearchingRedxAreas(false);
+    }
+  };
+
   const openModal = (o: Order) => {
     setModal(o);
     setForm({
       courier: "pathao", cod_amount: String(Math.round(Number(o.total))), note: "", tracking_id: "",
       store_id: pathaoStores.length > 0 ? String(pathaoStores[0].store_id) : "",
       delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "",
+      redx_value: String(Math.round(Number(o.total))), redx_delivery_area_id: "", redx_delivery_area: "",
     });
     setBookResult(null);
     setPriceResult(null);
+    setRedxAreaSearch("");
+    setRedxAreaResults([]);
     void fetchPathaoStores();
   };
 
@@ -357,6 +429,12 @@ export default function BookParcelPage() {
         body.item_weight = Number(form.item_weight);
         if (form.item_description) body.item_description = form.item_description;
         if (form.note) body.special_instruction = form.note;
+      } else if (form.courier === "redx") {
+        if (form.store_id) body.pickup_store_id = Number(form.store_id);
+        body.delivery_area_id = Number(form.redx_delivery_area_id);
+        body.delivery_area = form.redx_delivery_area;
+        body.value = Number(form.redx_value);
+        body.parcel_weight_kg = Number(form.item_weight);
       }
 
       const res = await fetch(`${API}/courier/book/${modal.id}`, {
@@ -486,10 +564,17 @@ export default function BookParcelPage() {
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.courier}</span>
                 <select value={form.courier}
-                  onChange={e => { setForm(f => ({ ...f, courier: e.target.value as BookForm["courier"] })); setPriceResult(null); if (e.target.value === "pathao") void fetchPathaoStores(); }}
+                  onChange={e => {
+                    const courier = e.target.value as BookForm["courier"];
+                    setForm(f => ({ ...f, courier }));
+                    setPriceResult(null);
+                    if (courier === "pathao") void fetchPathaoStores();
+                    if (courier === "redx") void fetchRedxStores();
+                  }}
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
                   <option value="pathao">{txt.pathao}</option>
                   <option value="steadfast">{txt.steadfast}</option>
+                  <option value="redx">{txt.redx}</option>
                   <option value="manual">{txt.manual}</option>
                 </select>
               </label>
@@ -567,6 +652,74 @@ export default function BookParcelPage() {
                 </>
               )}
 
+              {form.courier === "redx" && (
+                <>
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.store}</span>
+                    <select value={form.store_id} onChange={e => setForm(f => ({ ...f, store_id: e.target.value }))}
+                      disabled={loadingRedxStores}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                      <option value="">{loadingRedxStores ? txt.loadingStores : txt.selectStore}</option>
+                      {redxStores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    {redxStoresFetched && !loadingRedxStores && redxStores.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-400">{txt.redxNoStoreWarning}</p>
+                    )}
+                  </label>
+
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxAreaSearch}</span>
+                    <div className="flex gap-2">
+                      <input value={redxAreaSearch}
+                        onChange={e => setRedxAreaSearch(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && void searchRedxAreas()}
+                        placeholder={txt.redxAreaSearchPlaceholder}
+                        className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+                      <button type="button" onClick={() => void searchRedxAreas()} disabled={searchingRedxAreas || !redxAreaSearch.trim()}
+                        className="rounded-xl border border-[var(--accent)] px-4 py-2 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/10 disabled:opacity-60">
+                        {searchingRedxAreas ? txt.redxSearching : txt.redxSearchBtn}
+                      </button>
+                    </div>
+                  </label>
+
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxAreaLabel}</span>
+                    <select value={form.redx_delivery_area_id}
+                      onChange={e => {
+                        const id = e.target.value;
+                        const picked = redxAreaResults.find(a => String(a.id) === id);
+                        setForm(f => ({ ...f, redx_delivery_area_id: id, redx_delivery_area: picked?.name ?? "" }));
+                      }}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                      <option value="">{txt.redxSelectArea}</option>
+                      {redxAreaResults.map(a => (
+                        <option key={a.id} value={a.id}>{a.name} — {a.district_name} ({a.post_code})</option>
+                      ))}
+                    </select>
+                    {redxAreaResults.length === 0 && redxAreaSearch && !searchingRedxAreas && (
+                      <p className="mt-1 text-xs text-[var(--muted)]">{txt.redxNoAreas}</p>
+                    )}
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.itemWeight}</span>
+                      <input type="number" step="0.1" min="0.1" value={form.item_weight}
+                        onChange={e => setForm(f => ({ ...f, item_weight: e.target.value }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxDeclaredValue}</span>
+                      <input type="number" value={form.redx_value}
+                        onChange={e => setForm(f => ({ ...f, redx_value: e.target.value }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                    </label>
+                  </div>
+                </>
+              )}
+
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.codAmount}</span>
                 <input type="number" value={form.cod_amount} onChange={e => setForm(f => ({ ...f, cod_amount: e.target.value }))}
@@ -585,7 +738,8 @@ export default function BookParcelPage() {
                 className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm hover:bg-[var(--surface-soft)]">
                 {txt.cancel}
               </button>
-              <button onClick={() => void handleBook()} disabled={booking}
+              <button onClick={() => void handleBook()}
+                disabled={booking || (form.courier === "redx" && (!form.redx_delivery_area_id || !form.store_id))}
                 className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {booking ? txt.confirming : txt.confirm}
               </button>

@@ -244,6 +244,11 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/pathao/stores', [CourierController::class, 'pathaoStores']);
         Route::post('/pathao/stores', [CourierController::class, 'createPathaoStore']);
         Route::post('/pathao/price', [CourierController::class, 'pathaoPrice']);
+        // RedX areas, pickup stores & charge
+        Route::get('/redx/areas', [CourierController::class, 'redxAreas']);
+        Route::get('/redx/pickup-stores', [CourierController::class, 'redxPickupStores']);
+        Route::post('/redx/pickup-stores', [CourierController::class, 'createRedxPickupStore']);
+        Route::post('/redx/charge', [CourierController::class, 'redxCharge']);
     });
 
     // ── Fraud Check ───────────────────────────────────────────────────────────

@@ -56,8 +56,26 @@ const t = {
     noStores: "কোনো store পাওয়া যায়নি।",
     storeCreateSuccess: "Store তৈরি হয়েছে। Pathao approval পেতে কিছু সময় লাগতে পারে।",
     storeCreateFailed: "Store তৈরি ব্যর্থ হয়েছে।",
-    redxTitle: "RedX API",
-    redxApiKey: "API Key",
+    redxTitle: "RedX API (বুকিং)",
+    redxApiKey: "API Access Token",
+    redxEnvironment: "এনভায়রনমেন্ট",
+    redxSandbox: "Sandbox (টেস্ট)",
+    redxProduction: "Production (লাইভ)",
+    redxDefaultStore: "ডিফল্ট Pickup Store",
+    redxStoreTitle: "RedX Pickup Store তৈরি করুন",
+    redxStoreName: "Store নাম",
+    redxStorePhone: "মোবাইল নাম্বার",
+    redxStoreAddress: "ঠিকানা",
+    redxAreaSearch: "জেলার নাম দিয়ে Area খুঁজুন",
+    redxAreaSearchPlaceholder: "যেমন: Dhaka",
+    redxSearchBtn: "খুঁজুন",
+    redxSearching: "খোঁজা হচ্ছে...",
+    redxSelectArea: "Area নির্বাচন করুন",
+    redxNoAreas: "কোনো area পাওয়া যায়নি।",
+    redxStoresList: "আপনার RedX Pickup Stores",
+    redxNoStores: "কোনো store পাওয়া যায়নি।",
+    redxStoreCreateSuccess: "Pickup Store তৈরি হয়েছে।",
+    redxStoreCreateFailed: "Store তৈরি ব্যর্থ হয়েছে।",
     redxFraudTitle: "RedX লগইন (Fraud Check)",
     redxPhone: "লগইন মোবাইল নাম্বার",
     redxPassword: "লগইন পাসওয়ার্ড",
@@ -123,8 +141,26 @@ const t = {
     noStores: "No store found.",
     storeCreateSuccess: "Store created. Pathao approval may take some time.",
     storeCreateFailed: "Failed to create store.",
-    redxTitle: "RedX API",
-    redxApiKey: "API Key",
+    redxTitle: "RedX API (Booking)",
+    redxApiKey: "API Access Token",
+    redxEnvironment: "Environment",
+    redxSandbox: "Sandbox (Test)",
+    redxProduction: "Production (Live)",
+    redxDefaultStore: "Default Pickup Store",
+    redxStoreTitle: "Create RedX Pickup Store",
+    redxStoreName: "Store Name",
+    redxStorePhone: "Phone Number",
+    redxStoreAddress: "Address",
+    redxAreaSearch: "Search Area by District",
+    redxAreaSearchPlaceholder: "e.g. Dhaka",
+    redxSearchBtn: "Search",
+    redxSearching: "Searching...",
+    redxSelectArea: "Select area",
+    redxNoAreas: "No areas found.",
+    redxStoresList: "Your RedX Pickup Stores",
+    redxNoStores: "No store found.",
+    redxStoreCreateSuccess: "Pickup store created.",
+    redxStoreCreateFailed: "Failed to create store.",
     redxFraudTitle: "RedX Login (Fraud Check)",
     redxPhone: "Login Phone Number",
     redxPassword: "Login Password",
@@ -148,7 +184,7 @@ type Form = {
   steadfast_api_key: string; steadfast_secret_key: string;
   pathao_client_id: string; pathao_client_secret: string; pathao_store_id: string;
   pathao_username: string; pathao_password: string;
-  redx_api_key: string;
+  redx_api_key: string; redx_environment: string; redx_pickup_store_id: string;
   redx_phone: string; redx_password: string;
   carrybee_phone: string; carrybee_password: string;
   paperfly_username: string; paperfly_password: string;
@@ -165,6 +201,11 @@ type PathaoStore = {
 
 type PathaoLocation = { id: number; name: string };
 
+type RedxStore = { id: number; name: string; address: string; area_name: string; area_id: number; phone: string };
+type RedxArea = { id: number; name: string; post_code: number; district_name: string };
+
+type RedxStoreForm = { name: string; phone: string; address: string; district: string; area_id: string };
+
 type CreateStoreForm = {
   name: string;
   contact_name: string;
@@ -180,6 +221,7 @@ const EMPTY_FORM: Form = {
   default_courier: "", steadfast_api_key: "", steadfast_secret_key: "",
   pathao_client_id: "", pathao_client_secret: "", pathao_store_id: "",
   pathao_username: "", pathao_password: "", redx_api_key: "",
+  redx_environment: "production", redx_pickup_store_id: "",
   redx_phone: "", redx_password: "",
   carrybee_phone: "", carrybee_password: "",
   paperfly_username: "", paperfly_password: "",
@@ -213,6 +255,15 @@ export default function CourierSettingsPage() {
     city_id: "",
     zone_id: "",
     area_id: "",
+  });
+
+  const [redxStores, setRedxStores] = useState<RedxStore[]>([]);
+  const [loadingRedxStores, setLoadingRedxStores] = useState(false);
+  const [creatingRedxStore, setCreatingRedxStore] = useState(false);
+  const [redxAreaResults, setRedxAreaResults] = useState<RedxArea[]>([]);
+  const [searchingRedxAreas, setSearchingRedxAreas] = useState(false);
+  const [redxStoreForm, setRedxStoreForm] = useState<RedxStoreForm>({
+    name: "", phone: "", address: "", district: "", area_id: "",
   });
 
   const set = (field: keyof Form, value: string) => setForm(f => ({ ...f, [field]: value }));
@@ -286,10 +337,24 @@ export default function CourierSettingsPage() {
     }
   };
 
+  const fetchRedxStores = async () => {
+    setLoadingRedxStores(true);
+    try {
+      const res = await fetch(`${API}/courier/redx/pickup-stores`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setRedxStores(d.data ?? []);
+      }
+    } finally {
+      setLoadingRedxStores(false);
+    }
+  };
+
   useEffect(() => {
     if (!loading) {
       void fetchPathaoStores();
       void fetchCities();
+      void fetchRedxStores();
     }
   }, [loading]);
 
@@ -298,15 +363,21 @@ export default function CourierSettingsPage() {
     try {
       const res = await fetch(`${API}/courier/settings`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(form),
       });
-      const d = await res.json();
-      if (res.ok) {
+      let d: { success?: boolean; data?: Record<string, unknown>; message?: string; errors?: Record<string, string[]> } | null = null;
+      try {
+        d = await res.json();
+      } catch {
+        // Non-JSON response (e.g. an unexpected redirect/500 page)
+      }
+      if (res.ok && d) {
         setMessage({ type: "success", text: txt.saveSuccess });
         if (d.data) setForm({ ...EMPTY_FORM, ...d.data });
       } else {
-        setMessage({ type: "error", text: d.message ?? txt.saveError });
+        const firstFieldError = d?.errors ? Object.values(d.errors)[0]?.[0] : undefined;
+        setMessage({ type: "error", text: firstFieldError ?? d?.message ?? txt.saveError });
       }
     } finally {
       setSaving(false);
@@ -383,6 +454,50 @@ export default function CourierSettingsPage() {
       }
     } finally {
       setCreatingStore(false);
+    }
+  };
+
+  const searchRedxAreas = async () => {
+    if (!redxStoreForm.district.trim()) return;
+    setSearchingRedxAreas(true);
+    try {
+      const res = await fetch(`${API}/courier/redx/areas?district_name=${encodeURIComponent(redxStoreForm.district.trim())}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setRedxAreaResults(d.data ?? []);
+      }
+    } finally {
+      setSearchingRedxAreas(false);
+    }
+  };
+
+  const handleCreateRedxStore = async () => {
+    setCreatingRedxStore(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`${API}/courier/redx/pickup-stores`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: redxStoreForm.name.trim(),
+          phone: redxStoreForm.phone.trim(),
+          address: redxStoreForm.address.trim(),
+          area_id: Number(redxStoreForm.area_id),
+        }),
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setMessage({ type: "success", text: txt.redxStoreCreateSuccess });
+        setRedxStoreForm({ name: "", phone: "", address: "", district: "", area_id: "" });
+        setRedxAreaResults([]);
+        void fetchRedxStores();
+      } else {
+        setMessage({ type: "error", text: d.message ?? txt.redxStoreCreateFailed });
+      }
+    } finally {
+      setCreatingRedxStore(false);
     }
   };
 
@@ -608,11 +723,115 @@ export default function CourierSettingsPage() {
           <>
           <div className="catv-panel p-4" role="tabpanel">
             <h3 className="mb-3 text-sm font-semibold">{txt.redxTitle}</h3>
-            <label>
-              <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxApiKey}</span>
-              <input value={form.redx_api_key} onChange={e => set("redx_api_key", e.target.value)}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-mono outline-none focus:border-[var(--accent)]" />
-            </label>
+            <div className="grid gap-3">
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxApiKey}</span>
+                <input value={form.redx_api_key} onChange={e => set("redx_api_key", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-mono outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxEnvironment}</span>
+                <select value={form.redx_environment || "production"} onChange={e => set("redx_environment", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                  <option value="production">{txt.redxProduction}</option>
+                  <option value="sandbox">{txt.redxSandbox}</option>
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxDefaultStore}</span>
+                <select value={form.redx_pickup_store_id} onChange={e => set("redx_pickup_store_id", e.target.value)}
+                  disabled={loadingRedxStores}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                  <option value="">{txt.none}</option>
+                  {redxStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          {/* Create RedX Pickup Store */}
+          <div className="catv-panel p-4" role="tabpanel">
+            <h3 className="mb-3 text-sm font-semibold">{txt.redxStoreTitle}</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxStoreName}</span>
+                <input value={redxStoreForm.name} onChange={e => setRedxStoreForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxStorePhone}</span>
+                <input value={redxStoreForm.phone} onChange={e => setRedxStoreForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="01XXXXXXXXX"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+              </label>
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxStoreAddress}</span>
+                <textarea value={redxStoreForm.address} onChange={e => setRedxStoreForm(f => ({ ...f, address: e.target.value }))}
+                  rows={2}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm resize-none" />
+              </label>
+
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.redxAreaSearch}</span>
+                <div className="flex gap-2">
+                  <input value={redxStoreForm.district}
+                    onChange={e => setRedxStoreForm(f => ({ ...f, district: e.target.value }))}
+                    onKeyDown={e => e.key === "Enter" && void searchRedxAreas()}
+                    placeholder={txt.redxAreaSearchPlaceholder}
+                    className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+                  <button type="button" onClick={() => void searchRedxAreas()} disabled={searchingRedxAreas || !redxStoreForm.district.trim()}
+                    className="rounded-xl border border-[var(--accent)] px-4 py-2 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/10 disabled:opacity-60">
+                    {searchingRedxAreas ? txt.redxSearching : txt.redxSearchBtn}
+                  </button>
+                </div>
+              </label>
+
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.area}</span>
+                <select value={redxStoreForm.area_id} onChange={e => setRedxStoreForm(f => ({ ...f, area_id: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                  <option value="">{txt.redxSelectArea}</option>
+                  {redxAreaResults.map(a => (
+                    <option key={a.id} value={a.id}>{a.name} — {a.district_name} ({a.post_code})</option>
+                  ))}
+                </select>
+                {redxAreaResults.length === 0 && redxStoreForm.district && !searchingRedxAreas && (
+                  <p className="mt-1 text-xs text-[var(--muted)]">{txt.redxNoAreas}</p>
+                )}
+              </label>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button onClick={() => void handleCreateRedxStore()}
+                disabled={creatingRedxStore || !redxStoreForm.name || !redxStoreForm.phone || !redxStoreForm.address || !redxStoreForm.area_id}
+                className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                {creatingRedxStore ? txt.creatingStore : txt.createStoreBtn}
+              </button>
+            </div>
+
+            <div className="mt-5 border-t border-[var(--border)] pt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="text-sm font-semibold">{txt.redxStoresList}</h4>
+                <button onClick={() => void fetchRedxStores()} disabled={loadingRedxStores}
+                  className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs hover:bg-[var(--surface-soft)] disabled:opacity-60">
+                  {txt.refreshStores}
+                </button>
+              </div>
+              {loadingRedxStores ? (
+                <p className="text-xs text-[var(--muted)]">{txt.loading}</p>
+              ) : redxStores.length === 0 ? (
+                <p className="text-xs text-[var(--muted)]">{txt.redxNoStores}</p>
+              ) : (
+                <div className="grid gap-2">
+                  {redxStores.map(s => (
+                    <div key={s.id} className="rounded-xl border border-[var(--border)] px-3 py-2">
+                      <p className="text-sm font-medium">{s.name} <span className="text-xs text-[var(--muted)]">#{s.id}</span></p>
+                      <p className="text-xs text-[var(--muted)]">{s.address} — {s.area_name}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="catv-panel p-4" role="tabpanel">

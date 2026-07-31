@@ -35,6 +35,15 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Always render JSON for API routes, even if the client omitted an
+        // Accept header — otherwise validation/auth failures fall back to
+        // Laravel's web-style redirect response, which silently breaks
+        // fetch() callers expecting JSON (they get a redirect to follow,
+        // not an error body).
+        $exceptions->shouldRenderJsonWhen(function (Request $request, \Throwable $e) {
+            return $request->is('api/*') || $request->expectsJson();
+        });
+
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             if (! $request->is('api/*')) {
                 return null;

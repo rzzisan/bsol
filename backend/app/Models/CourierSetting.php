@@ -12,7 +12,7 @@ class CourierSetting extends Model
         'pathao_client_id', 'pathao_client_secret', 'pathao_store_id',
         'pathao_username', 'pathao_password',
         'pathao_access_token', 'pathao_refresh_token', 'pathao_token_expires_at',
-        'redx_api_key',
+        'redx_api_key', 'redx_environment', 'redx_pickup_store_id',
         'redx_phone', 'redx_password',
         'carrybee_phone', 'carrybee_password',
         'paperfly_username', 'paperfly_password',

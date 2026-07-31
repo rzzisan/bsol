@@ -14,7 +14,7 @@ class Order extends Model
     protected $fillable = [
         'user_id', 'order_number', 'public_token', 'customer_name', 'customer_phone',
         'customer_address', 'customer_district', 'customer_thana', 'customer_area',
-        'pathao_city_id', 'pathao_zone_id', 'pathao_area_id',
+        'pathao_city_id', 'pathao_zone_id', 'pathao_area_id', 'redx_area_id',
         'source', 'source_ref', 'status', 'payment_method', 'payment_status',
         'subtotal', 'shipping_charge', 'discount', 'total', 'notes', 'custom_fields',
         'fraud_score', 'risk_level',
