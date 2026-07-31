@@ -64,6 +64,7 @@ const t = {
     notConfiguredHint: "কুরিয়ার সেটিং-এ লগইন যোগ করুন",
     fetchFailed: "ডেটা আনা যায়নি",
     lastChecked: "শেষ চেক",
+    estimatedLabel: "আনুমানিক:",
   },
   en: {
     pageTitle: "Fraud Check",
@@ -106,6 +107,7 @@ const t = {
     notConfiguredHint: "Add login in Courier Settings",
     fetchFailed: "Could not fetch data",
     lastChecked: "Last checked",
+    estimatedLabel: "Estimated:",
   },
 };
 
@@ -137,14 +139,14 @@ type CourierCheckResult = {
 
 // Pathao's dashboard only exposes a qualitative rating label (e.g. "excellent_customer"),
 // not raw delivery counts — map known keywords to a display label + color, best-effort.
-function ratingDisplay(rating: string, locale: Locale): { label: string; color: string } {
+function ratingDisplay(rating: string, locale: Locale): { label: string; color: string; estimate: string | null } {
   const r = rating.toLowerCase();
-  if (r.includes("excellent")) return { label: locale === "bn" ? "চমৎকার গ্রাহক" : "Excellent Customer", color: "text-emerald-500" };
-  if (r.includes("good")) return { label: locale === "bn" ? "ভালো গ্রাহক" : "Good Customer", color: "text-emerald-400" };
-  if (r.includes("moderate")) return { label: locale === "bn" ? "মাঝারি" : "Moderate", color: "text-amber-500" };
-  if (r.includes("risky") || r.includes("bad")) return { label: locale === "bn" ? "ঝুঁকিপূর্ণ" : "Risky Customer", color: "text-red-500" };
-  if (r.includes("new")) return { label: locale === "bn" ? "নতুন গ্রাহক" : "New Customer", color: "text-[var(--muted)]" };
-  return { label: rating.replace(/_/g, " "), color: "text-[var(--muted)]" };
+  if (r.includes("excellent")) return { label: locale === "bn" ? "চমৎকার গ্রাহক" : "Excellent Customer", color: "text-emerald-500", estimate: "~90-100%" };
+  if (r.includes("good")) return { label: locale === "bn" ? "ভালো গ্রাহক" : "Good Customer", color: "text-emerald-400", estimate: "~70-89%" };
+  if (r.includes("moderate")) return { label: locale === "bn" ? "মাঝারি" : "Moderate", color: "text-amber-500", estimate: "~50-69%" };
+  if (r.includes("risky") || r.includes("bad")) return { label: locale === "bn" ? "ঝুঁকিপূর্ণ" : "Risky Customer", color: "text-red-500", estimate: "<50%" };
+  if (r.includes("new")) return { label: locale === "bn" ? "নতুন গ্রাহক" : "New Customer", color: "text-[var(--muted)]", estimate: null };
+  return { label: rating.replace(/_/g, " "), color: "text-[var(--muted)]", estimate: null };
 }
 
 const COURIER_META: Record<string, { label: string; header: string }> = {
@@ -359,11 +361,19 @@ export default function FraudCheckPage() {
                                   {card.message && <p className="mt-1 text-[10px] opacity-80">{card.message}</p>}
                                 </div>
                               ) : card.data_type === "rating" && card.rating ? (
-                                <div className="py-3 text-center">
-                                  <p className={`text-sm font-bold ${ratingDisplay(card.rating, locale).color}`}>
-                                    {ratingDisplay(card.rating, locale).label}
-                                  </p>
-                                </div>
+                                (() => {
+                                  const r = ratingDisplay(card.rating as string, locale);
+                                  return (
+                                    <div className="py-3 text-center">
+                                      <p className={`text-sm font-bold ${r.color}`}>{r.label}</p>
+                                      {r.estimate && (
+                                        <p className="mt-1 text-[10px] text-[var(--muted)]">
+                                          {txt.estimatedLabel} {r.estimate}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })()
                               ) : (
                                 <div className="space-y-1">
                                   <Row label={txt.successRate} value={`${card.success_rate}%`} bold />
