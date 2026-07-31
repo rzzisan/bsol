@@ -250,6 +250,12 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/redx/pickup-stores', [CourierController::class, 'redxPickupStores']);
         Route::post('/redx/pickup-stores', [CourierController::class, 'createRedxPickupStore']);
         Route::post('/redx/charge', [CourierController::class, 'redxCharge']);
+        Route::get('/carrybee/cities', [CourierController::class, 'carrybeeCities']);
+        Route::get('/carrybee/cities/{cityId}/zones', [CourierController::class, 'carrybeeZones']);
+        Route::get('/carrybee/cities/{cityId}/zones/{zoneId}/areas', [CourierController::class, 'carrybeeAreas']);
+        Route::get('/carrybee/area-suggestion', [CourierController::class, 'carrybeeAreaSuggestion']);
+        Route::get('/carrybee/stores', [CourierController::class, 'carrybeeStores']);
+        Route::post('/carrybee/stores', [CourierController::class, 'createCarrybeeStore']);
     });
 
     // ── Fraud Check ───────────────────────────────────────────────────────────

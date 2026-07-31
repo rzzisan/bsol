@@ -39,7 +39,7 @@ class CarrybeeFraudCheckService implements CourierFraudCheckInterface
                 ->withHeaders(array_merge(self::HEADERS, [
                     'Authorization' => 'Bearer ' . $auth['accessToken'],
                 ]))
-                ->get(self::API_BASE . "/api/v2/businesses/{$auth['businessId']}/fraud-check/{$phone}");
+                ->get(self::API_BASE . "/api/v2/businesses/{$auth['businessId']}/customers/{$phone}");
 
             if ($response->status() === 401) {
                 Cache::forget($this->cacheKey($settings));

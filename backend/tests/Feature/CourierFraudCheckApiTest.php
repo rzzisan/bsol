@@ -40,7 +40,7 @@ class CourierFraudCheckApiTest extends TestCase
             'merchant.carrybee.com/api/auth/session' => Http::response([
                 'accessToken' => 'carrybee-tok', 'user' => ['selectedBusinessId' => 'biz-1'],
             ]),
-            'api-merchant.carrybee.com/api/v2/businesses/*/fraud-check/*' => Http::response([
+            'api-merchant.carrybee.com/api/v2/businesses/*/customers/*' => Http::response([
                 'data' => ['total_order' => 3, 'cancelled_order' => 1, 'success_rate' => 66.67],
             ]),
             'go-app.paperfly.com.bd/merchant/api/react/authentication/login_using_password.php' => Http::response(['token' => 'paperfly-tok']),

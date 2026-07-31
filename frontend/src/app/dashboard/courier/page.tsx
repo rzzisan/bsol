@@ -43,6 +43,14 @@ const t = {
     redxNoAreas: "কোনো area পাওয়া যায়নি।",
     redxDeclaredValue: "পণ্যের মূল্য (৳)",
     redxNoStoreWarning: "RedX Pickup Store পাওয়া যায়নি। Settings → Courier-এ তৈরি করুন।",
+    carrybee: "CarryBee",
+    carrybeeNoStoreWarning: "CarryBee Store পাওয়া যায়নি। Settings → Courier-এ তৈরি করুন।",
+    city: "City",
+    zone: "Zone",
+    area: "Area (ঐচ্ছিক)",
+    selectCity: "City নির্বাচন করুন",
+    selectZone: "Zone নির্বাচন করুন",
+    selectArea: "Area নির্বাচন করুন",
     deliveryType: "ডেলিভারি ধরন",
     normalDelivery: "Normal Delivery",
     onDemandDelivery: "On Demand",
@@ -107,6 +115,14 @@ const t = {
     redxNoAreas: "No areas found.",
     redxDeclaredValue: "Declared Value (৳)",
     redxNoStoreWarning: "No RedX pickup store found. Create one in Settings → Courier.",
+    carrybee: "CarryBee",
+    carrybeeNoStoreWarning: "No CarryBee store found. Create one in Settings → Courier.",
+    city: "City",
+    zone: "Zone",
+    area: "Area (optional)",
+    selectCity: "Select city",
+    selectZone: "Select zone",
+    selectArea: "Select area",
     deliveryType: "Delivery Type",
     normalDelivery: "Normal Delivery",
     onDemandDelivery: "On Demand",
@@ -148,9 +164,11 @@ type Order = {
 type PathaoStore = { store_id: number; store_name: string; store_address: string; is_active: number };
 type RedxStore = { id: number; name: string; address: string; area_name: string; area_id: number };
 type RedxArea = { id: number; name: string; post_code: number; district_name: string };
+type CarrybeeStore = { id: number; name: string; address: string; city_id: number; zone_id: number; area_id?: number };
+type CarrybeeLocation = { id: number; name: string };
 
 type BookForm = {
-  courier: "steadfast" | "pathao" | "redx" | "manual";
+  courier: "steadfast" | "pathao" | "redx" | "carrybee" | "manual";
   cod_amount: string;
   note: string;
   tracking_id: string;
@@ -162,6 +180,9 @@ type BookForm = {
   redx_value: string;
   redx_delivery_area_id: string;
   redx_delivery_area: string;
+  carrybee_city_id: string;
+  carrybee_zone_id: string;
+  carrybee_area_id: string;
 };
 
 type BulkForm = {
@@ -191,6 +212,7 @@ export default function BookParcelPage() {
     courier: "pathao", cod_amount: "", note: "", tracking_id: "",
     store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "",
     redx_value: "", redx_delivery_area_id: "", redx_delivery_area: "",
+    carrybee_city_id: "", carrybee_zone_id: "", carrybee_area_id: "",
   });
   const [booking, setBooking] = useState(false);
   const [bookResult, setBookResult] = useState<{ success: boolean; msg: string } | null>(null);
@@ -212,6 +234,14 @@ export default function BookParcelPage() {
   const [redxAreaSearch, setRedxAreaSearch] = useState("");
   const [redxAreaResults, setRedxAreaResults] = useState<RedxArea[]>([]);
   const [searchingRedxAreas, setSearchingRedxAreas] = useState(false);
+
+  const [carrybeeStores, setCarrybeeStores] = useState<CarrybeeStore[]>([]);
+  const [loadingCarrybeeStores, setLoadingCarrybeeStores] = useState(false);
+  const [carrybeeStoresFetched, setCarrybeeStoresFetched] = useState(false);
+  const [carrybeeCities, setCarrybeeCities] = useState<CarrybeeLocation[]>([]);
+  const [carrybeeZones, setCarrybeeZones] = useState<CarrybeeLocation[]>([]);
+  const [carrybeeAreas, setCarrybeeAreas] = useState<CarrybeeLocation[]>([]);
+  const [carrybeeLocationLoading, setCarrybeeLocationLoading] = useState({ cities: false, zones: false, areas: false });
 
   const [bulkForm, setBulkForm] = useState<BulkForm>({
     courier: "pathao", store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "", note: "",
@@ -293,6 +323,67 @@ export default function BookParcelPage() {
     }
   };
 
+  const fetchCarrybeeStores = useCallback(async () => {
+    if (carrybeeStoresFetched) return;
+    setLoadingCarrybeeStores(true);
+    try {
+      const res = await fetch(`${API}/courier/carrybee/stores`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        const list: CarrybeeStore[] = d.data ?? [];
+        setCarrybeeStores(list);
+        if (list.length > 0) {
+          setForm(f => (f.courier === "carrybee" ? { ...f, store_id: String(list[0].id) } : f));
+        }
+      }
+    } finally {
+      setLoadingCarrybeeStores(false);
+      setCarrybeeStoresFetched(true);
+    }
+  }, [carrybeeStoresFetched, token]);
+
+  const fetchCarrybeeCities = useCallback(async () => {
+    if (carrybeeCities.length > 0) return;
+    setCarrybeeLocationLoading(prev => ({ ...prev, cities: true }));
+    try {
+      const res = await fetch(`${API}/courier/carrybee/cities`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.success) setCarrybeeCities(d.data ?? []);
+      }
+    } finally {
+      setCarrybeeLocationLoading(prev => ({ ...prev, cities: false }));
+    }
+  }, [carrybeeCities.length, token]);
+
+  const fetchCarrybeeZones = async (cityId: string) => {
+    if (!cityId) return;
+    setCarrybeeLocationLoading(prev => ({ ...prev, zones: true }));
+    try {
+      const res = await fetch(`${API}/courier/carrybee/cities/${cityId}/zones`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.success) setCarrybeeZones(d.data ?? []);
+      }
+    } finally {
+      setCarrybeeLocationLoading(prev => ({ ...prev, zones: false }));
+    }
+  };
+
+  const fetchCarrybeeAreas = async (cityId: string, zoneId: string) => {
+    if (!cityId || !zoneId) return;
+    setCarrybeeLocationLoading(prev => ({ ...prev, areas: true }));
+    try {
+      const res = await fetch(`${API}/courier/carrybee/cities/${cityId}/zones/${zoneId}/areas`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.success) setCarrybeeAreas(d.data ?? []);
+      }
+    } finally {
+      setCarrybeeLocationLoading(prev => ({ ...prev, areas: false }));
+    }
+  };
+
   const openModal = (o: Order) => {
     setModal(o);
     setForm({
@@ -300,11 +391,14 @@ export default function BookParcelPage() {
       store_id: pathaoStores.length > 0 ? String(pathaoStores[0].store_id) : "",
       delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "",
       redx_value: String(Math.round(Number(o.total))), redx_delivery_area_id: "", redx_delivery_area: "",
+      carrybee_city_id: "", carrybee_zone_id: "", carrybee_area_id: "",
     });
     setBookResult(null);
     setPriceResult(null);
     setRedxAreaSearch("");
     setRedxAreaResults([]);
+    setCarrybeeZones([]);
+    setCarrybeeAreas([]);
     void fetchPathaoStores();
   };
 
@@ -434,6 +528,12 @@ export default function BookParcelPage() {
         body.delivery_area_id = Number(form.redx_delivery_area_id);
         body.delivery_area = form.redx_delivery_area;
         body.value = Number(form.redx_value);
+        body.parcel_weight_kg = Number(form.item_weight);
+      } else if (form.courier === "carrybee") {
+        if (form.store_id) body.carrybee_store_id = form.store_id;
+        body.delivery_city_id = Number(form.carrybee_city_id);
+        body.delivery_zone_id = Number(form.carrybee_zone_id);
+        if (form.carrybee_area_id) body.delivery_area_id = Number(form.carrybee_area_id);
         body.parcel_weight_kg = Number(form.item_weight);
       }
 
@@ -570,11 +670,13 @@ export default function BookParcelPage() {
                     setPriceResult(null);
                     if (courier === "pathao") void fetchPathaoStores();
                     if (courier === "redx") void fetchRedxStores();
+                    if (courier === "carrybee") { void fetchCarrybeeStores(); void fetchCarrybeeCities(); }
                   }}
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
                   <option value="pathao">{txt.pathao}</option>
                   <option value="steadfast">{txt.steadfast}</option>
                   <option value="redx">{txt.redx}</option>
+                  <option value="carrybee">{txt.carrybee}</option>
                   <option value="manual">{txt.manual}</option>
                 </select>
               </label>
@@ -720,6 +822,73 @@ export default function BookParcelPage() {
                 </>
               )}
 
+              {form.courier === "carrybee" && (
+                <>
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.store}</span>
+                    <select value={form.store_id} onChange={e => setForm(f => ({ ...f, store_id: e.target.value }))}
+                      disabled={loadingCarrybeeStores}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                      <option value="">{loadingCarrybeeStores ? txt.loadingStores : txt.selectStore}</option>
+                      {carrybeeStores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    {carrybeeStoresFetched && !loadingCarrybeeStores && carrybeeStores.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-400">{txt.carrybeeNoStoreWarning}</p>
+                    )}
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.city}</span>
+                      <select value={form.carrybee_city_id} onChange={e => {
+                        const val = e.target.value;
+                        setForm(f => ({ ...f, carrybee_city_id: val, carrybee_zone_id: "", carrybee_area_id: "" }));
+                        setCarrybeeZones([]); setCarrybeeAreas([]);
+                        if (val) void fetchCarrybeeZones(val);
+                      }}
+                        disabled={carrybeeLocationLoading.cities}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                        <option value="">{txt.selectCity}</option>
+                        {carrybeeCities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.zone}</span>
+                      <select value={form.carrybee_zone_id} onChange={e => {
+                        const val = e.target.value;
+                        setForm(f => ({ ...f, carrybee_zone_id: val, carrybee_area_id: "" }));
+                        setCarrybeeAreas([]);
+                        if (val) void fetchCarrybeeAreas(form.carrybee_city_id, val);
+                      }}
+                        disabled={!form.carrybee_city_id || carrybeeLocationLoading.zones}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                        <option value="">{txt.selectZone}</option>
+                        {carrybeeZones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                      </select>
+                    </label>
+                  </div>
+
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.area}</span>
+                    <select value={form.carrybee_area_id} onChange={e => setForm(f => ({ ...f, carrybee_area_id: e.target.value }))}
+                      disabled={!form.carrybee_zone_id || carrybeeLocationLoading.areas}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm disabled:opacity-50">
+                      <option value="">{txt.selectArea}</option>
+                      {carrybeeAreas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.itemWeight}</span>
+                    <input type="number" step="0.1" min="0.1" value={form.item_weight}
+                      onChange={e => setForm(f => ({ ...f, item_weight: e.target.value }))}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                  </label>
+                </>
+              )}
+
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.codAmount}</span>
                 <input type="number" value={form.cod_amount} onChange={e => setForm(f => ({ ...f, cod_amount: e.target.value }))}
@@ -739,7 +908,9 @@ export default function BookParcelPage() {
                 {txt.cancel}
               </button>
               <button onClick={() => void handleBook()}
-                disabled={booking || (form.courier === "redx" && (!form.redx_delivery_area_id || !form.store_id))}
+                disabled={booking
+                  || (form.courier === "redx" && (!form.redx_delivery_area_id || !form.store_id))
+                  || (form.courier === "carrybee" && (!form.carrybee_city_id || !form.carrybee_zone_id || !form.store_id))}
                 className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {booking ? txt.confirming : txt.confirm}
               </button>

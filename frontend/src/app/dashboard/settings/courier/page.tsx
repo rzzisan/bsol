@@ -82,6 +82,17 @@ const t = {
     redxFraudTitle: "RedX লগইন (Fraud Check)",
     redxPhone: "লগইন মোবাইল নাম্বার",
     redxPassword: "লগইন পাসওয়ার্ড",
+    carrybeeBookingTitle: "CarryBee API (বুকিং)",
+    carrybeeClientId: "Client ID",
+    carrybeeClientSecret: "Client Secret",
+    carrybeeClientContext: "Client Context",
+    carrybeeEnvironment: "এনভায়রনমেন্ট",
+    carrybeeSandbox: "Sandbox (টেস্ট)",
+    carrybeeProduction: "Production (লাইভ)",
+    carrybeeDefaultStore: "ডিফল্ট Store",
+    carrybeeStoreTitle: "CarryBee Store তৈরি করুন",
+    carrybeeStoresList: "আপনার CarryBee Stores",
+    carrybeeNoStores: "কোনো store পাওয়া যায়নি।",
     carrybeeTitle: "CarryBee লগইন (Fraud Check)",
     carrybeePhone: "লগইন মোবাইল নাম্বার",
     carrybeePassword: "লগইন পাসওয়ার্ড",
@@ -170,6 +181,17 @@ const t = {
     redxFraudTitle: "RedX Login (Fraud Check)",
     redxPhone: "Login Phone Number",
     redxPassword: "Login Password",
+    carrybeeBookingTitle: "CarryBee API (Booking)",
+    carrybeeClientId: "Client ID",
+    carrybeeClientSecret: "Client Secret",
+    carrybeeClientContext: "Client Context",
+    carrybeeEnvironment: "Environment",
+    carrybeeSandbox: "Sandbox (Test)",
+    carrybeeProduction: "Production (Live)",
+    carrybeeDefaultStore: "Default Store",
+    carrybeeStoreTitle: "Create CarryBee Store",
+    carrybeeStoresList: "Your CarryBee Stores",
+    carrybeeNoStores: "No store found.",
     carrybeeTitle: "CarryBee Login (Fraud Check)",
     carrybeePhone: "Login Phone Number",
     carrybeePassword: "Login Password",
@@ -193,6 +215,8 @@ type Form = {
   redx_api_key: string; redx_environment: string; redx_pickup_store_id: string;
   redx_phone: string; redx_password: string;
   carrybee_phone: string; carrybee_password: string;
+  carrybee_client_id: string; carrybee_client_secret: string; carrybee_client_context: string;
+  carrybee_environment: string; carrybee_store_id: string;
   paperfly_username: string; paperfly_password: string;
 };
 
@@ -212,6 +236,19 @@ type RedxArea = { id: number; name: string; post_code: number; district_name: st
 
 type RedxStoreForm = { name: string; phone: string; address: string; district: string; area_id: string };
 
+type CarrybeeStore = { id: number; name: string; address: string; city_id: number; zone_id: number; area_id?: number; is_default_pickup_store: boolean };
+
+type CarrybeeStoreForm = {
+  name: string;
+  contact_person_name: string;
+  contact_person_number: string;
+  contact_person_secondary_number: string;
+  address: string;
+  city_id: string;
+  zone_id: string;
+  area_id: string;
+};
+
 type CreateStoreForm = {
   name: string;
   contact_name: string;
@@ -230,6 +267,8 @@ const EMPTY_FORM: Form = {
   redx_environment: "production", redx_pickup_store_id: "",
   redx_phone: "", redx_password: "",
   carrybee_phone: "", carrybee_password: "",
+  carrybee_client_id: "", carrybee_client_secret: "", carrybee_client_context: "",
+  carrybee_environment: "production", carrybee_store_id: "",
   paperfly_username: "", paperfly_password: "",
 };
 
@@ -274,6 +313,18 @@ export default function CourierSettingsPage() {
 
   const [steadfastFraudStatus, setSteadfastFraudStatus] = useState<{ checking: boolean; ok: boolean | null; message: string }>({
     checking: false, ok: null, message: "",
+  });
+
+  const [carrybeeStores, setCarrybeeStores] = useState<CarrybeeStore[]>([]);
+  const [loadingCarrybeeStores, setLoadingCarrybeeStores] = useState(false);
+  const [creatingCarrybeeStore, setCreatingCarrybeeStore] = useState(false);
+  const [carrybeeCities, setCarrybeeCities] = useState<PathaoLocation[]>([]);
+  const [carrybeeZones, setCarrybeeZones] = useState<PathaoLocation[]>([]);
+  const [carrybeeAreas, setCarrybeeAreas] = useState<PathaoLocation[]>([]);
+  const [carrybeeLocationLoading, setCarrybeeLocationLoading] = useState({ cities: false, zones: false, areas: false });
+  const [carrybeeStoreForm, setCarrybeeStoreForm] = useState<CarrybeeStoreForm>({
+    name: "", contact_person_name: "", contact_person_number: "", contact_person_secondary_number: "",
+    address: "", city_id: "", zone_id: "", area_id: "",
   });
 
   const set = (field: keyof Form, value: string) => setForm(f => ({ ...f, [field]: value }));
@@ -360,6 +411,60 @@ export default function CourierSettingsPage() {
     }
   };
 
+  const fetchCarrybeeStores = async () => {
+    setLoadingCarrybeeStores(true);
+    try {
+      const res = await fetch(`${API}/courier/carrybee/stores`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setCarrybeeStores(d.data ?? []);
+      }
+    } finally {
+      setLoadingCarrybeeStores(false);
+    }
+  };
+
+  const fetchCarrybeeCities = async () => {
+    setCarrybeeLocationLoading(prev => ({ ...prev, cities: true }));
+    try {
+      const res = await fetch(`${API}/courier/carrybee/cities`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setCarrybeeCities(d.data ?? []);
+      }
+    } finally {
+      setCarrybeeLocationLoading(prev => ({ ...prev, cities: false }));
+    }
+  };
+
+  const fetchCarrybeeZones = async (cityId: string) => {
+    if (!cityId) return;
+    setCarrybeeLocationLoading(prev => ({ ...prev, zones: true }));
+    try {
+      const res = await fetch(`${API}/courier/carrybee/cities/${cityId}/zones`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setCarrybeeZones(d.data ?? []);
+      }
+    } finally {
+      setCarrybeeLocationLoading(prev => ({ ...prev, zones: false }));
+    }
+  };
+
+  const fetchCarrybeeAreas = async (cityId: string, zoneId: string) => {
+    if (!cityId || !zoneId) return;
+    setCarrybeeLocationLoading(prev => ({ ...prev, areas: true }));
+    try {
+      const res = await fetch(`${API}/courier/carrybee/cities/${cityId}/zones/${zoneId}/areas`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setCarrybeeAreas(d.data ?? []);
+      }
+    } finally {
+      setCarrybeeLocationLoading(prev => ({ ...prev, areas: false }));
+    }
+  };
+
   const checkSteadfastFraudStatus = async (apiKey: string, secretKey: string) => {
     if (!apiKey || !secretKey) return;
     setSteadfastFraudStatus({ checking: true, ok: null, message: "" });
@@ -380,6 +485,8 @@ export default function CourierSettingsPage() {
       void fetchPathaoStores();
       void fetchCities();
       void fetchRedxStores();
+      void fetchCarrybeeStores();
+      void fetchCarrybeeCities();
       void checkSteadfastFraudStatus(form.steadfast_api_key, form.steadfast_secret_key);
     }
   }, [loading]);
@@ -480,6 +587,41 @@ export default function CourierSettingsPage() {
       }
     } finally {
       setCreatingStore(false);
+    }
+  };
+
+  const handleCreateCarrybeeStore = async () => {
+    setCreatingCarrybeeStore(true);
+    setMessage(null);
+    try {
+      const payload = {
+        name: carrybeeStoreForm.name.trim(),
+        contact_person_name: carrybeeStoreForm.contact_person_name.trim(),
+        contact_person_number: carrybeeStoreForm.contact_person_number.trim(),
+        contact_person_secondary_number: carrybeeStoreForm.contact_person_secondary_number.trim() || undefined,
+        address: carrybeeStoreForm.address.trim(),
+        city_id: Number(carrybeeStoreForm.city_id),
+        zone_id: Number(carrybeeStoreForm.zone_id),
+        area_id: Number(carrybeeStoreForm.area_id),
+      };
+
+      const res = await fetch(`${API}/courier/carrybee/stores`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setMessage({ type: "success", text: d.message ?? txt.storeCreateSuccess });
+        setCarrybeeStoreForm({ name: "", contact_person_name: "", contact_person_number: "", contact_person_secondary_number: "", address: "", city_id: "", zone_id: "", area_id: "" });
+        setCarrybeeZones([]);
+        setCarrybeeAreas([]);
+        void fetchCarrybeeStores();
+      } else {
+        setMessage({ type: "error", text: d.message ?? txt.storeCreateFailed });
+      }
+    } finally {
+      setCreatingCarrybeeStore(false);
     }
   };
 
@@ -893,6 +1035,146 @@ export default function CourierSettingsPage() {
 
           {/* CarryBee */}
           {activeTab === "carrybee" && (
+          <>
+          <div className="catv-panel p-4" role="tabpanel">
+            <h3 className="mb-3 text-sm font-semibold">{txt.carrybeeBookingTitle}</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.carrybeeClientId}</span>
+                <input value={form.carrybee_client_id} onChange={e => set("carrybee_client_id", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-mono outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.carrybeeClientSecret}</span>
+                <input type="password" value={form.carrybee_client_secret} onChange={e => set("carrybee_client_secret", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-mono outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.carrybeeClientContext}</span>
+                <input value={form.carrybee_client_context} onChange={e => set("carrybee_client_context", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-mono outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.carrybeeEnvironment}</span>
+                <select value={form.carrybee_environment || "production"} onChange={e => set("carrybee_environment", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]">
+                  <option value="production">{txt.carrybeeProduction}</option>
+                  <option value="sandbox">{txt.carrybeeSandbox}</option>
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.carrybeeDefaultStore}</span>
+                <select value={form.carrybee_store_id} onChange={e => set("carrybee_store_id", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]">
+                  <option value="">{txt.none}</option>
+                  {carrybeeStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div className="catv-panel p-4" role="tabpanel">
+            <h3 className="mb-3 text-sm font-semibold">{txt.carrybeeStoreTitle}</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.storeName}</span>
+                <input value={carrybeeStoreForm.name} onChange={e => setCarrybeeStoreForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.contactName}</span>
+                <input value={carrybeeStoreForm.contact_person_name} onChange={e => setCarrybeeStoreForm(f => ({ ...f, contact_person_name: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.contactNumber}</span>
+                <input value={carrybeeStoreForm.contact_person_number} onChange={e => setCarrybeeStoreForm(f => ({ ...f, contact_person_number: e.target.value }))}
+                  placeholder="01XXXXXXXXX"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.secondaryContact}</span>
+                <input value={carrybeeStoreForm.contact_person_secondary_number} onChange={e => setCarrybeeStoreForm(f => ({ ...f, contact_person_secondary_number: e.target.value }))}
+                  placeholder="01XXXXXXXXX"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label className="sm:col-span-2">
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.storeAddress}</span>
+                <textarea value={carrybeeStoreForm.address} onChange={e => setCarrybeeStoreForm(f => ({ ...f, address: e.target.value }))}
+                  rows={2}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.city}</span>
+                <select value={carrybeeStoreForm.city_id} onChange={e => {
+                  const val = e.target.value;
+                  setCarrybeeStoreForm(f => ({ ...f, city_id: val, zone_id: "", area_id: "" }));
+                  setCarrybeeZones([]); setCarrybeeAreas([]);
+                  if (val) void fetchCarrybeeZones(val);
+                }}
+                  disabled={carrybeeLocationLoading.cities}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]">
+                  <option value="">{txt.selectCity}</option>
+                  {carrybeeCities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.zone}</span>
+                <select value={carrybeeStoreForm.zone_id} onChange={e => {
+                  const val = e.target.value;
+                  setCarrybeeStoreForm(f => ({ ...f, zone_id: val, area_id: "" }));
+                  setCarrybeeAreas([]);
+                  if (val) void fetchCarrybeeAreas(carrybeeStoreForm.city_id, val);
+                }}
+                  disabled={!carrybeeStoreForm.city_id || carrybeeLocationLoading.zones}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)] disabled:opacity-50">
+                  <option value="">{txt.selectZone}</option>
+                  {carrybeeZones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.area}</span>
+                <select value={carrybeeStoreForm.area_id} onChange={e => setCarrybeeStoreForm(f => ({ ...f, area_id: e.target.value }))}
+                  disabled={!carrybeeStoreForm.zone_id || carrybeeLocationLoading.areas}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)] disabled:opacity-50">
+                  <option value="">{txt.selectArea}</option>
+                  {carrybeeAreas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="mt-4">
+              <button onClick={() => void handleCreateCarrybeeStore()}
+                disabled={creatingCarrybeeStore || !carrybeeStoreForm.name || !carrybeeStoreForm.contact_person_name || !carrybeeStoreForm.contact_person_number || !carrybeeStoreForm.address || !carrybeeStoreForm.city_id || !carrybeeStoreForm.zone_id || !carrybeeStoreForm.area_id}
+                className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                {creatingCarrybeeStore ? txt.creatingStore : txt.createStoreBtn}
+              </button>
+            </div>
+
+            <div className="mt-5 border-t border-[var(--border)] pt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="text-sm font-semibold">{txt.carrybeeStoresList}</h4>
+                <button onClick={() => void fetchCarrybeeStores()} disabled={loadingCarrybeeStores}
+                  className="rounded-lg border border-[var(--border)] px-3 py-1 text-xs hover:bg-[var(--surface-soft)] disabled:opacity-60">
+                  {txt.refreshStores}
+                </button>
+              </div>
+              {loadingCarrybeeStores ? (
+                <p className="text-xs text-[var(--muted)]">{txt.loading}</p>
+              ) : carrybeeStores.length === 0 ? (
+                <p className="text-xs text-[var(--muted)]">{txt.carrybeeNoStores}</p>
+              ) : (
+                <div className="grid gap-2">
+                  {carrybeeStores.map(s => (
+                    <div key={s.id} className="rounded-xl border border-[var(--border)] px-3 py-2">
+                      <p className="text-sm font-medium">{s.name} <span className="text-xs text-[var(--muted)]">#{s.id}</span></p>
+                      <p className="text-xs text-[var(--muted)]">{s.address}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="catv-panel p-4" role="tabpanel">
             <h3 className="mb-1 text-sm font-semibold">{txt.carrybeeTitle}</h3>
             <p className="mb-3 text-xs text-[var(--muted)]">{txt.fraudCheckNote}</p>
@@ -910,6 +1192,7 @@ export default function CourierSettingsPage() {
               </label>
             </div>
           </div>
+          </>
           )}
 
           {/* Paperfly */}

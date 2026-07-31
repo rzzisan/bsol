@@ -9,6 +9,7 @@ use App\Services\PathaoLocationService;
 use App\Services\SteadfastService;
 use App\Services\PathaoService;
 use App\Services\RedxService;
+use App\Services\CarrybeeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -96,6 +97,61 @@ class CourierController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    // ── CarryBee Location / Stores ───────────────────────────────────────────
+
+    public function carrybeeCities(): JsonResponse
+    {
+        $svc    = new CarrybeeService();
+        $result = $svc->getCities(auth()->id());
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function carrybeeZones(int $cityId): JsonResponse
+    {
+        $svc    = new CarrybeeService();
+        $result = $svc->getZones(auth()->id(), $cityId);
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function carrybeeAreas(int $cityId, int $zoneId): JsonResponse
+    {
+        $svc    = new CarrybeeService();
+        $result = $svc->getAreas(auth()->id(), $cityId, $zoneId);
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function carrybeeAreaSuggestion(Request $request): JsonResponse
+    {
+        $data = $request->validate(['search' => 'required|string|min:3']);
+        $svc    = new CarrybeeService();
+        $result = $svc->searchAreas(auth()->id(), $data['search']);
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function carrybeeStores(): JsonResponse
+    {
+        $svc    = new CarrybeeService();
+        $result = $svc->getStores(auth()->id());
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function createCarrybeeStore(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name'                             => 'required|string|min:3|max:30',
+            'contact_person_name'               => 'required|string|min:3|max:30',
+            'contact_person_number'             => 'required|string|max:20',
+            'contact_person_secondary_number'   => 'nullable|string|max:20',
+            'address'                           => 'required|string|min:3|max:100',
+            'city_id'                            => 'required|integer',
+            'zone_id'                            => 'required|integer',
+            'area_id'                            => 'required|integer',
+        ]);
+        $svc    = new CarrybeeService();
+        $result = $svc->createStore(auth()->id(), $data);
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
     // ── Courier Settings ──────────────────────────────────────────────────────
 
     public function getSettings(): JsonResponse
@@ -111,7 +167,7 @@ class CourierController extends Controller
     public function saveSettings(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'default_courier'     => 'nullable|in:steadfast,pathao,redx,manual',
+            'default_courier'     => 'nullable|in:steadfast,pathao,redx,carrybee,manual',
             'steadfast_api_key'   => 'nullable|string|max:200',
             'steadfast_secret_key'=> 'nullable|string|max:200',
             'pathao_client_id'    => 'nullable|string|max:200',
@@ -126,6 +182,11 @@ class CourierController extends Controller
             'redx_password'       => 'nullable|string|max:200',
             'carrybee_phone'      => 'nullable|string|max:20',
             'carrybee_password'   => 'nullable|string|max:200',
+            'carrybee_client_id'      => 'nullable|string|max:255',
+            'carrybee_client_secret'  => 'nullable|string|max:255',
+            'carrybee_client_context' => 'nullable|string|max:255',
+            'carrybee_environment'    => 'nullable|in:sandbox,production',
+            'carrybee_store_id'       => 'nullable|string|max:100',
             'paperfly_username'   => 'nullable|string|max:200',
             'paperfly_password'   => 'nullable|string|max:200',
         ]);
@@ -134,7 +195,7 @@ class CourierController extends Controller
         $existing = CourierSetting::firstOrNew(['user_id' => auth()->id()]);
 
         // These columns are NOT NULL in the DB; an empty selection must not blank them out
-        $notNullable = ['default_courier', 'redx_environment'];
+        $notNullable = ['default_courier', 'redx_environment', 'carrybee_environment'];
 
         foreach ($data as $field => $value) {
             // Skip masked values (contain ***)
@@ -399,7 +460,7 @@ class CourierController extends Controller
         $order = Order::where('user_id', auth()->id())->findOrFail($orderId);
 
         $data = $request->validate([
-            'courier'       => 'nullable|in:steadfast,pathao,redx,manual',
+            'courier'       => 'nullable|in:steadfast,pathao,redx,carrybee,manual',
             'cod_amount'    => 'nullable|numeric|min:0',
             'note'          => 'nullable|string|max:300',
             'tracking_id'   => 'nullable|string|max:100', // for manual entry
@@ -420,6 +481,11 @@ class CourierController extends Controller
             'pickup_store_id'      => 'nullable|integer',
             'value'                => 'nullable|numeric|min:0',
             'parcel_weight_kg'     => 'nullable|numeric|min:0.01',
+            // CarryBee-specific
+            'carrybee_store_id'    => 'nullable|string|max:100',
+            'delivery_city_id'     => 'nullable|integer',
+            'delivery_zone_id'     => 'nullable|integer',
+            'delivery_area_name'   => 'nullable|string|max:100',
         ]);
 
         $courier = $data['courier'] ?? 'steadfast';
@@ -447,6 +513,10 @@ class CourierController extends Controller
             return $this->bookRedx($order, $data);
         }
 
+        if ($courier === 'carrybee') {
+            return $this->bookCarrybee($order, $data);
+        }
+
         return response()->json(['success' => false, 'message' => 'Courier not supported yet.'], 422);
     }
 
@@ -468,6 +538,9 @@ class CourierController extends Controller
             'parcel_weight_kg'   => 'nullable|numeric|min:0.01',
             'delivery_area'      => 'nullable|string|max:100',
         ]);
+        // CarryBee is intentionally excluded from bulk booking — like RedX's area
+        // pick, it needs a per-order location search that the bulk UI doesn't
+        // support yet.
 
         $orders = Order::where('user_id', auth()->id())
             ->whereIn('id', $data['order_ids'])
@@ -849,6 +922,112 @@ class CourierController extends Controller
         return ['success' => true, 'payload' => $payload];
     }
 
+    private function bookCarrybee(Order $order, array $data): JsonResponse
+    {
+        $result = $this->bookCarrybeeAndPersist($order, $data);
+
+        if ($result['success']) {
+            return response()->json([
+                'success'        => true,
+                'data'           => $order->fresh(),
+                'consignment_id' => $result['consignment_id'],
+                'message'        => $result['message'] ?? 'CarryBee order booked.',
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $result['message'] ?? 'CarryBee booking failed.',
+            'causes'  => $result['causes'] ?? null,
+            'raw'     => $result['raw'] ?? null,
+        ], 422);
+    }
+
+    private function bookCarrybeeAndPersist(Order $order, array $data): array
+    {
+        $svc     = new CarrybeeService();
+        $payload = $this->buildCarrybeePayload($order, $data);
+
+        if (! $payload['success']) {
+            return $payload;
+        }
+
+        $result = $svc->createOrder(auth()->id(), $payload['payload']);
+
+        if ($result['success']) {
+            $order->update([
+                'courier_name'        => 'carrybee',
+                'courier_tracking_id' => $result['data']['consignment_id'],
+                'courier_status'      => 'booked',
+                'courier_charge'      => $result['data']['delivery_fee'] ?? null,
+                'status'              => 'processing',
+            ]);
+            return ['success' => true, 'consignment_id' => $result['data']['consignment_id'], 'message' => 'CarryBee order booked.'];
+        }
+
+        return [
+            'success' => false,
+            'message' => $result['message'] ?? 'CarryBee booking failed.',
+            'causes'  => $result['causes'] ?? null,
+            'raw'     => $result['raw'] ?? null,
+        ];
+    }
+
+    private function buildCarrybeePayload(Order $order, array $data): array
+    {
+        $settings = CourierSetting::where('user_id', auth()->id())->first();
+        if (! $settings || ! $settings->carrybee_client_id || ! $settings->carrybee_client_secret || ! $settings->carrybee_client_context) {
+            return ['success' => false, 'message' => 'CarryBee API credentials not configured. Go to Settings → Courier.'];
+        }
+
+        $storeId = $data['carrybee_store_id'] ?? $settings->carrybee_store_id ?? null;
+        if (! $storeId) {
+            return ['success' => false, 'message' => 'CarryBee pickup store is required. Configure a default in Settings → Courier or select one when booking.'];
+        }
+
+        $cityId = $data['delivery_city_id'] ?? null;
+        $zoneId = $data['delivery_zone_id'] ?? null;
+        if (! $cityId || ! $zoneId) {
+            return ['success' => false, 'message' => 'CarryBee delivery city/zone is required. Search and select the customer\'s area when booking.'];
+        }
+
+        $address = trim(implode(', ', array_filter([
+            $order->customer_address,
+            $order->customer_area,
+            $order->customer_thana,
+            $order->customer_district,
+        ])));
+
+        if (strlen($address) < 10) {
+            return ['success' => false, 'message' => 'Customer address is too short for CarryBee booking (min 10 chars).'];
+        }
+
+        $weightKg = (float) ($data['parcel_weight_kg'] ?? 0.5);
+
+        $payload = [
+            'store_id'           => (string) $storeId,
+            'merchant_order_id'  => $order->order_number,
+            'delivery_type'      => 1, // Normal
+            'product_type'       => 1, // Parcel
+            'recipient_phone'    => $order->customer_phone,
+            'recipient_name'     => $order->customer_name ?? $order->customer_phone,
+            'recipient_address'  => substr($address, 0, 200),
+            'city_id'            => (int) $cityId,
+            'zone_id'            => (int) $zoneId,
+            'item_weight'        => (int) round($weightKg * 1000),
+            'collectable_amount' => (int) ($data['cod_amount'] ?? $order->total),
+        ];
+
+        if (! empty($data['delivery_area_id'])) $payload['area_id'] = (int) $data['delivery_area_id'];
+
+        $instruction = $data['note'] ?? $order->notes ?? '';
+        if ($instruction !== '') {
+            $payload['special_instruction'] = substr($instruction, 0, 255);
+        }
+
+        return ['success' => true, 'payload' => $payload];
+    }
+
     // ── Track ─────────────────────────────────────────────────────────────────
 
     public function trackOrder(int $orderId): JsonResponse
@@ -872,6 +1051,15 @@ class CourierController extends Controller
             $result = $svc->getParcelInfo(auth()->id(), (string) $order->courier_tracking_id);
             if ($result['success'] && isset($result['data']['status'])) {
                 $order->update(['courier_status' => $result['data']['status']]);
+            }
+            return response()->json(['success' => true, 'data' => $result['data'] ?? [], 'order' => $order->fresh()]);
+        }
+
+        if ($order->courier_name === 'carrybee') {
+            $svc    = new CarrybeeService();
+            $result = $svc->getOrderDetails(auth()->id(), (string) $order->courier_tracking_id);
+            if ($result['success'] && isset($result['data']['transfer_status'])) {
+                $order->update(['courier_status' => $result['data']['transfer_status']]);
             }
             return response()->json(['success' => true, 'data' => $result['data'] ?? [], 'order' => $order->fresh()]);
         }
