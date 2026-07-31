@@ -22,6 +22,9 @@ const t = {
     tabCarrybee: "CarryBee",
     tabPaperfly: "Paperfly",
     tabManual: "Manual",
+    steadfastFraudChecking: "ফ্রড চেক অ্যাক্সেস যাচাই করা হচ্ছে...",
+    steadfastFraudActive: "\u2713 ফ্রড চেক অ্যাক্সেস সক্রিয়",
+    steadfastFraudInactive: "\u26a0 ফ্রড চেক অ্যাক্সেস নেই",
     manualTitle: "Manual Courier",
     manualDesc: "ম্যানুয়াল কুরিয়ারের জন্য আলাদা API credentials প্রয়োজন নেই। অর্ডার বুক করার সময় Tracking ID দিয়ে ম্যানুয়ালি এন্ট্রি করা যাবে।",
     steadfastTitle: "Steadfast API",
@@ -107,6 +110,9 @@ const t = {
     tabCarrybee: "CarryBee",
     tabPaperfly: "Paperfly",
     tabManual: "Manual",
+    steadfastFraudChecking: "Checking fraud check access...",
+    steadfastFraudActive: "\u2713 Fraud check access is active",
+    steadfastFraudInactive: "\u26a0 Fraud check access unavailable",
     manualTitle: "Manual Courier",
     manualDesc: "Manual courier does not require API credentials. You can provide tracking IDs manually while booking.",
     steadfastTitle: "Steadfast API",
@@ -266,6 +272,10 @@ export default function CourierSettingsPage() {
     name: "", phone: "", address: "", district: "", area_id: "",
   });
 
+  const [steadfastFraudStatus, setSteadfastFraudStatus] = useState<{ checking: boolean; ok: boolean | null; message: string }>({
+    checking: false, ok: null, message: "",
+  });
+
   const set = (field: keyof Form, value: string) => setForm(f => ({ ...f, [field]: value }));
 
   useEffect(() => {
@@ -350,11 +360,27 @@ export default function CourierSettingsPage() {
     }
   };
 
+  const checkSteadfastFraudStatus = async (apiKey: string, secretKey: string) => {
+    if (!apiKey || !secretKey) return;
+    setSteadfastFraudStatus({ checking: true, ok: null, message: "" });
+    try {
+      const res = await fetch(`${API}/courier/settings/test-steadfast-fraud-check`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      setSteadfastFraudStatus({ checking: false, ok: !!d.success, message: d.message ?? "" });
+    } catch {
+      setSteadfastFraudStatus({ checking: false, ok: false, message: txt.testError });
+    }
+  };
+
   useEffect(() => {
     if (!loading) {
       void fetchPathaoStores();
       void fetchCities();
       void fetchRedxStores();
+      void checkSteadfastFraudStatus(form.steadfast_api_key, form.steadfast_secret_key);
     }
   }, [loading]);
 
@@ -575,6 +601,17 @@ export default function CourierSettingsPage() {
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm font-mono outline-none focus:border-[var(--accent)]" />
               </label>
             </div>
+            {form.steadfast_api_key && form.steadfast_secret_key && (
+              <div className="mt-3">
+                {steadfastFraudStatus.checking ? (
+                  <p className="text-xs text-[var(--muted)]">{txt.steadfastFraudChecking}</p>
+                ) : steadfastFraudStatus.ok === true ? (
+                  <p className="text-xs font-medium text-emerald-600">{txt.steadfastFraudActive}</p>
+                ) : steadfastFraudStatus.ok === false ? (
+                  <p className="text-xs font-medium text-red-600">{txt.steadfastFraudInactive}: {steadfastFraudStatus.message}</p>
+                ) : null}
+              </div>
+            )}
           </div>
           )}
 

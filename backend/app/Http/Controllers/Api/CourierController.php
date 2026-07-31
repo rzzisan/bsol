@@ -166,6 +166,25 @@ class CourierController extends Controller
         ]);
     }
 
+    public function testSteadfastFraudCheck(Request $request): JsonResponse
+    {
+        $settings = $this->getSteadfastSettings();
+        if (! $settings) {
+            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        }
+
+        // Balance/booking access can be fine while fraud_check is gated separately
+        // by Steadfast, so probe the endpoint itself with a throwaway BD number.
+        $service = new SteadfastService();
+        $result  = $service->fraudCheck($settings->steadfast_api_key, $settings->steadfast_secret_key, '01700000000');
+
+        $ok = isset($result['total_delivered']) || isset($result['total_parcels']);
+        return response()->json([
+            'success' => $ok,
+            'message' => $ok ? 'Fraud check access is active.' : ($result['message'] ?? 'Fraud check request failed.'),
+        ]);
+    }
+
     // ── Steadfast Utilities ───────────────────────────────────────────────────
 
     public function steadfastBalance(): JsonResponse
