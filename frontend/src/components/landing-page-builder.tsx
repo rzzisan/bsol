@@ -47,8 +47,14 @@ import type { ProductVariant } from "@/types/variant";
 
 type LandingPageBuilderProps = {
   locale?: Locale;
-  mode: "create" | "edit";
+  mode: "create" | "edit" | "admin-template";
   pageId?: string;
+  // create mode: merchant picked a starter template before entering the builder.
+  initialTemplateId?: string;
+  // admin-template mode: seed content from a seller's existing landing page
+  // (new template) or re-open an already-published template for editing.
+  sourcePageId?: string;
+  templateId?: string;
 };
 
 type MediaLibraryItem = { id: number; url: string; file_name?: string | null };
@@ -211,6 +217,16 @@ const text = {
     submitFailed: "সংরক্ষণ করা যায়নি।",
     createSuccess: "ল্যান্ডিং পেজ তৈরি হয়েছে।",
     updateSuccess: "ল্যান্ডিং পেজ আপডেট হয়েছে।",
+    templateCreateSuccess: "টেমপ্লেট তৈরি হয়েছে।",
+    templateUpdateSuccess: "টেমপ্লেট আপডেট হয়েছে।",
+    templateInfoTitle: "টেমপ্লেট তথ্য",
+    templateNameBn: "টেমপ্লেটের নাম (বাংলা)",
+    templateNameEn: "টেমপ্লেটের নাম (English)",
+    templateDescription: "বর্ণনা (ঐচ্ছিক)",
+    templateScreenshot: "স্ক্রীনশট",
+    templateScreenshotUpload: "স্ক্রীনশট আপলোড করুন",
+    templateScreenshotUploading: "আপলোড হচ্ছে...",
+    templateActive: "সক্রিয় (সেলাররা এখনই ব্যবহার করতে পারবে)",
     title: "পেজ শিরোনাম",
     slug: "স্লাগ",
     status: "স্ট্যাটাস",
@@ -317,6 +333,16 @@ const text = {
     submitFailed: "Failed to save landing page.",
     createSuccess: "Landing page created.",
     updateSuccess: "Landing page updated.",
+    templateCreateSuccess: "Template created.",
+    templateUpdateSuccess: "Template updated.",
+    templateInfoTitle: "Template info",
+    templateNameBn: "Template name (Bengali)",
+    templateNameEn: "Template name (English)",
+    templateDescription: "Description (optional)",
+    templateScreenshot: "Screenshot",
+    templateScreenshotUpload: "Upload screenshot",
+    templateScreenshotUploading: "Uploading...",
+    templateActive: "Active (sellers can use it immediately)",
     title: "Page title",
     slug: "Slug",
     status: "Status",
@@ -419,7 +445,7 @@ const text = {
   },
 };
 
-export default function LandingPageBuilder({ locale: localeProp, mode, pageId }: LandingPageBuilderProps) {
+export default function LandingPageBuilder({ locale: localeProp, mode, pageId, initialTemplateId, sourcePageId, templateId }: LandingPageBuilderProps) {
   const router = useRouter();
   const contextLocale = useLocale();
   const locale = localeProp ?? contextLocale;
@@ -432,6 +458,10 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
     products: t.tabProducts,
     settings: t.tabSettings,
   };
+  // Templates have no product list of their own (products are per-page,
+  // attached from the seller's own inventory) — hide that tab when authoring
+  // a template.
+  const visibleTabs = TAB_ORDER.filter((tab) => mode !== "admin-template" || tab !== "products");
   const token = getStoredToken();
 
   const [loading, setLoading] = useState(true);
@@ -477,6 +507,14 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
   const [otpFormResendText, setOtpFormResendText] = useState<string>(getDefaultSettings("bn").otp_form_resend_text);
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
+  const isAdminTemplateMode = mode === "admin-template";
+  const [templateNameBn, setTemplateNameBn] = useState("");
+  const [templateNameEn, setTemplateNameEn] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [templatePreviewImage, setTemplatePreviewImage] = useState("");
+  const [templateIsActive, setTemplateIsActive] = useState(true);
+  const [templateScreenshotUploading, setTemplateScreenshotUploading] = useState(false);
+
   const [contentState, setContentState] = useState<ContentState>(emptyContentState());
   const [layoutEntries, setLayoutEntries] = useState<LayoutEntry[]>([]);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -489,6 +527,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
   // rowKey is set when re-picking a variant for an already-attached row
   // ("Change variant"); null means attaching a brand-new product.
   const [variantPicker, setVariantPicker] = useState<{ product: ProductItem; rowKey: string | null } | null>(null);
+
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
 
   const [mediaPolicy, setMediaPolicy] = useState<MediaPolicy | null>(null);
   const [mediaLibrary, setMediaLibrary] = useState<MediaLibraryItem[]>([]);
@@ -533,10 +573,99 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
       return;
     }
 
+    const applySourceContent = (source: LandingPageContent | null, sourceTheme: ThemeSettings | null) => {
+      const merged = mergeLandingContent(source, null);
+      const nextContent = emptyContentState();
+      for (const type of BLOCK_TYPES) {
+        if (SINGLETON_BLOCK_TYPES.includes(type)) continue;
+        nextContent[type] = ensureItemIds((merged[type] as Item[] | undefined) ?? [], type);
+      }
+      setContentState(nextContent);
+      setLayoutEntries(expandLegacyLayoutOrder(merged.layout_order, nextContent));
+
+      const loadedLanguage = merged.settings?.language ?? "bn";
+      const loadedDefaults = getDefaultSettings(loadedLanguage);
+      setPageLanguageState(loadedLanguage);
+      setHeroHeadline(merged.hero?.headline ?? "");
+      setHeroSubheadline(merged.hero?.subheadline ?? "");
+      setHeroCtaText(merged.hero?.cta_text ?? "");
+      setHeroImage(merged.hero?.background_image_url ?? "");
+      setFeaturesTitle(merged.features_title ?? "");
+      setFeaturesLayout(merged.features_layout ?? "cards");
+      setTrustBadgesLayout(merged.trust_badges_layout ?? "cards");
+      setProductsTitle(merged.products_section_title ?? "");
+      setProductsSubtitle(merged.products_section_subtitle ?? "");
+      setCheckoutFields(merged.checkout_fields ?? getDefaultCheckoutFields(loadedLanguage));
+      setShippingInsideDhaka(String(merged.shipping?.inside_dhaka ?? 80));
+      setShippingOutsideDhaka(String(merged.shipping?.outside_dhaka ?? 120));
+      setContactPhone(merged.contact?.phone ?? "");
+      setThankYouTitle(merged.thank_you?.title ?? "");
+      setThankYouMessage(merged.thank_you?.message ?? "");
+      setThankYouShowSummary(merged.thank_you?.show_order_summary ?? true);
+      setThankYouShowAddress(merged.thank_you?.show_shipping_address ?? true);
+      setPhoneValidationEnabled(merged.settings?.phone_validation_enabled ?? loadedDefaults.phone_validation_enabled);
+      setPhoneValidationMessage(merged.settings?.phone_validation_message ?? loadedDefaults.phone_validation_message);
+      setOtpVerificationEnabled(merged.settings?.otp_verification_enabled ?? loadedDefaults.otp_verification_enabled);
+      setOtpVerifiedMessage(merged.settings?.otp_verified_message ?? loadedDefaults.otp_verified_message);
+      setOtpSmsTemplate(merged.settings?.otp_sms_template ?? loadedDefaults.otp_sms_template);
+      setOtpFormTitle(merged.settings?.otp_form_title ?? loadedDefaults.otp_form_title);
+      setOtpFormDescription(merged.settings?.otp_form_description ?? loadedDefaults.otp_form_description);
+      setOtpFormButtonText(merged.settings?.otp_form_button_text ?? loadedDefaults.otp_form_button_text);
+      setOtpFormResendText(merged.settings?.otp_form_resend_text ?? loadedDefaults.otp_form_resend_text);
+      if (sourceTheme) {
+        setTheme({
+          primary_color: sourceTheme.primary_color ?? DEFAULT_THEME.primary_color,
+          accent_color: sourceTheme.accent_color ?? DEFAULT_THEME.accent_color,
+          background_color: sourceTheme.background_color ?? DEFAULT_THEME.background_color,
+          text_color: sourceTheme.text_color ?? DEFAULT_THEME.text_color,
+          button_text_color: sourceTheme.button_text_color ?? DEFAULT_THEME.button_text_color,
+          font_family: sourceTheme.font_family ?? DEFAULT_THEME.font_family,
+        });
+      }
+    };
+
     const load = async () => {
       try {
         setError(null);
-        const [templatesRes, productsRes, mediaPolicyRes, mediaLibraryRes, pageRes] = await Promise.all([
+
+        if (isAdminTemplateMode) {
+          const [mediaPolicyRes, mediaLibraryRes] = await Promise.all([
+            fetch(`${LANDING_API_BASE}/landing/media-library/policy`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${LANDING_API_BASE}/landing/media-library`, { headers: { Authorization: `Bearer ${token}` } }),
+          ]);
+          if (!mediaPolicyRes.ok || !mediaLibraryRes.ok) throw new Error(t.loadFailed);
+          setMediaPolicy((await mediaPolicyRes.json()).data ?? null);
+          setMediaLibrary((await mediaLibraryRes.json()).data ?? []);
+          setProducts([]);
+
+          let sourceContent: LandingPageContent | null = null;
+          let sourceTheme: ThemeSettings | null = null;
+
+          if (templateId) {
+            const res = await fetch(`${LANDING_API_BASE}/admin/landing/templates/${templateId}`, { headers: { Authorization: `Bearer ${token}` } });
+            if (!res.ok) throw new Error(t.loadFailed);
+            const tpl = (await res.json()).data as LandingTemplate;
+            sourceContent = (tpl.default_content ?? {}) as LandingPageContent;
+            sourceTheme = (tpl.theme_settings ?? null) as ThemeSettings | null;
+            setTemplateNameBn(tpl.name_bn ?? "");
+            setTemplateNameEn(tpl.name_en ?? "");
+            setTemplateDescription(tpl.description ?? "");
+            setTemplatePreviewImage(tpl.preview_image ?? "");
+            setTemplateIsActive(tpl.is_active ?? true);
+          } else if (sourcePageId) {
+            const res = await fetch(`${LANDING_API_BASE}/admin/landing/pages/${sourcePageId}`, { headers: { Authorization: `Bearer ${token}` } });
+            if (!res.ok) throw new Error(t.loadFailed);
+            const src = (await res.json()).data as { title?: string; content?: LandingPageContent; theme_settings?: ThemeSettings };
+            sourceContent = src.content ?? null;
+            sourceTheme = src.theme_settings ?? null;
+            setTemplateNameBn(src.title ?? "");
+          }
+
+          applySourceContent(sourceContent, sourceTheme);
+          return;
+        }
+
+        const [templatesRes, productsRes, mediaPolicyRes, mediaLibraryRes, pageRes, initialTemplateRes] = await Promise.all([
           fetch(`${LANDING_API_BASE}/landing/templates`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${LANDING_API_BASE}/products?per_page=100`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${LANDING_API_BASE}/landing/media-library/policy`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -544,9 +673,12 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
           mode === "edit" && pageId
             ? fetch(`${LANDING_API_BASE}/landing/pages/${pageId}`, { headers: { Authorization: `Bearer ${token}` } })
             : Promise.resolve(null),
+          mode === "create" && initialTemplateId
+            ? fetch(`${LANDING_API_BASE}/landing/templates/${initialTemplateId}`, { headers: { Authorization: `Bearer ${token}` } })
+            : Promise.resolve(null),
         ]);
 
-        if (!templatesRes.ok || !productsRes.ok || !mediaPolicyRes.ok || !mediaLibraryRes.ok || (pageRes && !pageRes.ok)) {
+        if (!templatesRes.ok || !productsRes.ok || !mediaPolicyRes.ok || !mediaLibraryRes.ok || (pageRes && !pageRes.ok) || (initialTemplateRes && !initialTemplateRes.ok)) {
           throw new Error(t.loadFailed);
         }
 
@@ -556,7 +688,42 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
         setMediaPolicy((await mediaPolicyRes.json()).data ?? null);
         setMediaLibrary((await mediaLibraryRes.json()).data ?? []);
 
-        if (pageRes) {
+        if (!pageRes && initialTemplateRes) {
+          const initialTemplate = (await initialTemplateRes.json()).data as LandingTemplate;
+          setSelectedTemplateId(initialTemplate.id);
+          const nextContent = emptyContentState();
+          const merged = mergeLandingContent(null, initialTemplate);
+          for (const type of BLOCK_TYPES) {
+            if (SINGLETON_BLOCK_TYPES.includes(type)) continue;
+            nextContent[type] = ensureItemIds((merged[type] as Item[] | undefined) ?? [], type);
+          }
+          setContentState(nextContent);
+          setLayoutEntries(expandLegacyLayoutOrder(merged.layout_order, nextContent));
+          setHeroHeadline(merged.hero?.headline ?? "");
+          setHeroSubheadline(merged.hero?.subheadline ?? "");
+          setHeroCtaText(merged.hero?.cta_text ?? "");
+          setHeroImage(merged.hero?.background_image_url ?? "");
+          setFeaturesTitle(merged.features_title ?? "");
+          setFeaturesLayout(merged.features_layout ?? "cards");
+          setTrustBadgesLayout(merged.trust_badges_layout ?? "cards");
+          setProductsTitle(merged.products_section_title ?? "");
+          setProductsSubtitle(merged.products_section_subtitle ?? "");
+          setCheckoutFields(merged.checkout_fields ?? getDefaultCheckoutFields(merged.settings?.language ?? "bn"));
+          setShippingInsideDhaka(String(merged.shipping?.inside_dhaka ?? 80));
+          setShippingOutsideDhaka(String(merged.shipping?.outside_dhaka ?? 120));
+          setContactPhone(merged.contact?.phone ?? "");
+          const tplTheme = (initialTemplate.theme_settings ?? null) as ThemeSettings | null;
+          if (tplTheme) {
+            setTheme({
+              primary_color: tplTheme.primary_color ?? DEFAULT_THEME.primary_color,
+              accent_color: tplTheme.accent_color ?? DEFAULT_THEME.accent_color,
+              background_color: tplTheme.background_color ?? DEFAULT_THEME.background_color,
+              text_color: tplTheme.text_color ?? DEFAULT_THEME.text_color,
+              button_text_color: tplTheme.button_text_color ?? DEFAULT_THEME.button_text_color,
+              font_family: tplTheme.font_family ?? DEFAULT_THEME.font_family,
+            });
+          }
+        } else if (pageRes) {
           const pageJson = await pageRes.json();
           const loadedPage = pageJson.data as LandingPageRecord;
           const merged = mergeLandingContent(loadedPage.content, loadedPage.template);
@@ -629,7 +796,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
 
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, mode, pageId]);
+  }, [token, mode, pageId, initialTemplateId, sourcePageId, templateId]);
 
   function patchItem(type: BlockType, id: string, changes: Record<string, unknown>) {
     setContentState((prev) => ({
@@ -818,6 +985,32 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
     }
   }
 
+  async function uploadTemplateScreenshot(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!token) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    setTemplateScreenshotUploading(true);
+    try {
+      const res = await fetch(`${LANDING_API_BASE}/admin/landing/templates/upload-preview`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.message || "Upload failed");
+      setTemplatePreviewImage(json.data?.url ?? "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setTemplateScreenshotUploading(false);
+      event.target.value = "";
+    }
+  }
+
   function applyMediaPick(url: string) {
     if (!mediaTarget) return;
     if (mediaTarget.type === "hero") {
@@ -947,6 +1140,34 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
         throw new Error(t.invalidVideoUrl);
       }
 
+      if (isAdminTemplateMode) {
+        const templatePayload = {
+          name_bn: templateNameBn,
+          name_en: templateNameEn || templateNameBn,
+          description: templateDescription || null,
+          preview_image: templatePreviewImage || null,
+          default_content: content,
+          theme_settings: theme,
+          is_active: templateIsActive,
+          source_landing_page_id: sourcePageId ? Number(sourcePageId) : null,
+        };
+        const url = templateId
+          ? `${LANDING_API_BASE}/admin/landing/templates/${templateId}`
+          : `${LANDING_API_BASE}/admin/landing/templates`;
+        const res = await fetch(url, {
+          method: templateId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(templatePayload),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(json.message || Object.values(json.errors ?? {}).flat().join(" ") || t.submitFailed);
+        }
+        setSuccess(templateId ? t.templateUpdateSuccess : t.templateCreateSuccess);
+        setTimeout(() => router.push("/admin/landing/templates"), 700);
+        return;
+      }
+
       const payload = {
         title,
         slug: slug.trim() || undefined,
@@ -954,6 +1175,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
         content,
         seo_meta: { meta_title: metaTitle || title, meta_description: metaDescription || null },
         theme_settings: theme,
+        template_id: selectedTemplateId ?? undefined,
         products: selectedProducts.map((item, index) => ({
           product_id: item.product_id,
           product_variant_id: item.product_variant_id,
@@ -1274,28 +1496,65 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
             </div>
           ) : null}
 
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <label className="block xl:col-span-2">
-                <span className={"mb-1 block text-sm font-medium text-[var(--foreground)]"}>{t.title}</span>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.slug}</span>
-                <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.status}</span>
-                <select value={status} onChange={(e) => setStatus(e.target.value as "draft" | "published")} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]">
-                  <option value="draft">{t.draft}</option>
-                  <option value="published" disabled={Boolean(page?.admin_locked)}>{t.published}</option>
-                </select>
-              </label>
+          {isAdminTemplateMode ? (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <h3 className="mb-3 text-base font-semibold text-[var(--foreground)]">{t.templateInfoTitle}</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.templateNameBn}</span>
+                  <input value={templateNameBn} onChange={(e) => setTemplateNameBn(e.target.value)} required className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.templateNameEn}</span>
+                  <input value={templateNameEn} onChange={(e) => setTemplateNameEn(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]" />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.templateDescription}</span>
+                  <textarea value={templateDescription} onChange={(e) => setTemplateDescription(e.target.value)} rows={2} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]" />
+                </label>
+                <div>
+                  <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.templateScreenshot}</span>
+                  <div className="flex items-center gap-3">
+                    {templatePreviewImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={templatePreviewImage} alt="" className="h-16 w-24 rounded-lg border border-[var(--border)] object-cover" />
+                    ) : null}
+                    <label className="cursor-pointer rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)]">
+                      {templateScreenshotUploading ? t.templateScreenshotUploading : t.templateScreenshotUpload}
+                      <input type="file" accept="image/*" className="hidden" disabled={templateScreenshotUploading} onChange={uploadTemplateScreenshot} />
+                    </label>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 self-end text-sm font-medium text-[var(--foreground)]">
+                  <input type="checkbox" checked={templateIsActive} onChange={(e) => setTemplateIsActive(e.target.checked)} />
+                  {t.templateActive}
+                </label>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <label className="block xl:col-span-2">
+                  <span className={"mb-1 block text-sm font-medium text-[var(--foreground)]"}>{t.title}</span>
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.slug}</span>
+                  <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.status}</span>
+                  <select value={status} onChange={(e) => setStatus(e.target.value as "draft" | "published")} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]">
+                    <option value="draft">{t.draft}</option>
+                    <option value="published" disabled={Boolean(page?.admin_locked)}>{t.published}</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-1.5">
-            {TAB_ORDER.map((tabKey) => {
+            {visibleTabs.map((tabKey) => {
               const Icon = TAB_ICONS[tabKey];
               const label = tabLabels[tabKey];
               const isActive = activeTab === tabKey;

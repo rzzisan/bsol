@@ -26,7 +26,7 @@ use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
 use App\Http\Controllers\Api\Admin\PlatformSettingsController;
-use App\Http\Controllers\Api\Admin\LandingTemplateImportController;
+use App\Http\Controllers\Api\Admin\LandingTemplateController as AdminLandingTemplateController;
 use App\Http\Controllers\Api\Admin\LandingPageAdminController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\OrderController;
@@ -337,17 +337,24 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/settings/platform-branding', [PlatformSettingsController::class, 'show']);
         Route::put('/settings/platform-branding', [PlatformSettingsController::class, 'update']);
 
-        // Landing page template importer (CartFlows/Elementor JSON exports)
+        // Landing page templates — authored by converting a seller's landing
+        // page into a reusable template (replaces the old CartFlows/Elementor
+        // JSON importer, which relied on a content shape the current builder
+        // no longer produces).
         Route::prefix('landing/templates')->group(function () {
-            Route::get('/', [LandingTemplateImportController::class, 'index']);
-            Route::post('/import/preview', [LandingTemplateImportController::class, 'preview']);
-            Route::post('/import', [LandingTemplateImportController::class, 'store']);
-            Route::put('/{id}', [LandingTemplateImportController::class, 'toggleActive'])->where('id', '[0-9]+');
+            Route::get('/', [AdminLandingTemplateController::class, 'index']);
+            Route::post('/', [AdminLandingTemplateController::class, 'store']);
+            Route::post('/upload-preview', [AdminLandingTemplateController::class, 'uploadPreviewImage']);
+            Route::get('/{id}', [AdminLandingTemplateController::class, 'show'])->where('id', '[0-9]+');
+            Route::put('/{id}', [AdminLandingTemplateController::class, 'update'])->where('id', '[0-9]+');
+            Route::patch('/{id}/toggle-active', [AdminLandingTemplateController::class, 'toggleActive'])->where('id', '[0-9]+');
+            Route::delete('/{id}', [AdminLandingTemplateController::class, 'destroy'])->where('id', '[0-9]+');
         });
 
         // Landing pages (all sellers) — moderation: publish/unpublish + lock
         Route::prefix('landing/pages')->group(function () {
             Route::get('/', [LandingPageAdminController::class, 'index']);
+            Route::get('/{id}', [LandingPageAdminController::class, 'show'])->where('id', '[0-9]+');
             Route::post('/{id}/lock', [LandingPageAdminController::class, 'lock'])->where('id', '[0-9]+');
             Route::post('/{id}/unlock', [LandingPageAdminController::class, 'unlock'])->where('id', '[0-9]+');
         });

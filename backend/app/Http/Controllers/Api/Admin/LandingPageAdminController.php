@@ -48,6 +48,35 @@ class LandingPageAdminController extends Controller
         ]);
     }
 
+    /**
+     * Full page detail (content/theme included) for any seller — used to
+     * seed the admin "convert to template" builder. Deliberately no
+     * ownership filter (admin scope), unlike the merchant-facing
+     * LandingPageController::show().
+     */
+    public function show(int $id): JsonResponse
+    {
+        $page = LandingPage::query()
+            ->with(['user:id,name,email,mobile', 'template:id,code,name_bn,name_en'])
+            ->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $page->id,
+                'title' => $page->title,
+                'slug' => $page->slug,
+                'status' => $page->status,
+                'theme_settings' => $page->theme_settings,
+                'content' => $page->content,
+                'seo_meta' => $page->seo_meta,
+                'template' => $page->template,
+                'seller' => $page->user,
+                'created_at' => $page->created_at,
+            ],
+        ]);
+    }
+
     public function lock(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([

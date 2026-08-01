@@ -14,12 +14,14 @@ class LandingTemplate extends Model
 
     protected $fillable = [
         'created_by',
+        'source_landing_page_id',
         'code',
         'name_bn',
         'name_en',
         'description',
         'preview_image',
         'default_content',
+        'theme_settings',
         'schema',
         'is_active',
         'sort_order',
@@ -27,6 +29,7 @@ class LandingTemplate extends Model
 
     protected $casts = [
         'default_content' => 'array',
+        'theme_settings' => 'array',
         'schema' => 'array',
         'is_active' => 'boolean',
     ];
@@ -34,6 +37,11 @@ class LandingTemplate extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function sourceLandingPage(): BelongsTo
+    {
+        return $this->belongsTo(LandingPage::class, 'source_landing_page_id');
     }
 
     public function pages(): HasMany

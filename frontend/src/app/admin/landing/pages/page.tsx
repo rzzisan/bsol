@@ -101,6 +101,7 @@ const text = {
     lockBtn: "পাবলিশ লক করুন",
     unlockBtn: "আনলক করুন",
     viewPublic: "পাবলিক পেজ দেখুন",
+    convertToTemplate: "টেমপ্লেটে কনভার্ট করুন",
     lockedByLine: "লক করেছেন",
     lockedAtLine: "লক করার সময়",
     reasonLine: "কারণ",
@@ -178,6 +179,7 @@ const text = {
     lockBtn: "Lock Publish",
     unlockBtn: "Unlock",
     viewPublic: "View Public Page",
+    convertToTemplate: "Convert to Template",
     lockedByLine: "Locked by",
     lockedAtLine: "Locked at",
     reasonLine: "Reason",
@@ -604,6 +606,12 @@ export default function AdminLandingPagesPage() {
                             {t.viewPublic}
                           </a>
                         )}
+                        <a
+                          href={`/admin/landing/templates/builder/create?from_page=${row.id}`}
+                          className="rounded px-2 py-1 text-xs font-semibold bg-violet-50 text-violet-700 hover:bg-violet-100"
+                        >
+                          {t.convertToTemplate}
+                        </a>
                         {row.admin_locked ? (
                           <button
                             onClick={() => setUnlockTarget(row)}

@@ -8,8 +8,12 @@ export type LandingTemplate = {
   description?: string | null;
   preview_image?: string | null;
   default_content?: Record<string, unknown> | null;
+  theme_settings?: Record<string, unknown> | null;
   schema?: Record<string, unknown> | null;
+  is_active?: boolean;
+  source_landing_page_id?: number | null;
   sort_order?: number;
+  created_at?: string;
 };
 
 export type ProductItem = {

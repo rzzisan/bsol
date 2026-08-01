@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import UserShell from "@/components/user-shell";
 import LandingPageBuilder from "@/components/landing-page-builder";
 
@@ -14,6 +16,13 @@ const text: Record<string, Record<string, string>> = {
   },
 };
 
+function CreateLandingPageBuilderContent() {
+  const searchParams = useSearchParams();
+  const templateId = searchParams.get("template") ?? undefined;
+
+  return <LandingPageBuilder mode="create" initialTemplateId={templateId} />;
+}
+
 export default function CreateLandingPageBuilder() {
   return (
     <UserShell
@@ -21,7 +30,9 @@ export default function CreateLandingPageBuilder() {
       pageTitle={{ bn: text.bn.title, en: text.en.title }}
       pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
-      <LandingPageBuilder mode="create" />
+      <Suspense fallback={null}>
+        <CreateLandingPageBuilderContent />
+      </Suspense>
     </UserShell>
   );
 }

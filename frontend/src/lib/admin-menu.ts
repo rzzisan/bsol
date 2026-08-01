@@ -93,7 +93,7 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
         {
           key: "landing-templates",
           label: labels.landingTemplates ?? "Landing Templates",
-          href: "/admin/landing/templates/import",
+          href: "/admin/landing/templates",
         },
       ],
     },
