@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
 use App\Http\Controllers\Api\Admin\PlatformSettingsController;
 use App\Http\Controllers\Api\Admin\LandingTemplateImportController;
+use App\Http\Controllers\Api\Admin\LandingPageAdminController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductMediaController;
@@ -342,6 +343,13 @@ Route::middleware('active_subscription')->group(function () {
             Route::post('/import/preview', [LandingTemplateImportController::class, 'preview']);
             Route::post('/import', [LandingTemplateImportController::class, 'store']);
             Route::put('/{id}', [LandingTemplateImportController::class, 'toggleActive'])->where('id', '[0-9]+');
+        });
+
+        // Landing pages (all sellers) — moderation: publish/unpublish + lock
+        Route::prefix('landing/pages')->group(function () {
+            Route::get('/', [LandingPageAdminController::class, 'index']);
+            Route::post('/{id}/lock', [LandingPageAdminController::class, 'lock'])->where('id', '[0-9]+');
+            Route::post('/{id}/unlock', [LandingPageAdminController::class, 'unlock'])->where('id', '[0-9]+');
         });
 
         // Notification Dispatch Routes

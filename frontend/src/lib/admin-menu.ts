@@ -20,6 +20,7 @@ export type AdminMenuLabels = {
   notificationLogs?: string;
   productMediaSettings?: string;
   landingTemplates?: string;
+  landingPages?: string;
   platformBranding?: string;
 };
 
@@ -84,10 +85,17 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
     { key: "packages", label: labels.packages, icon: "📦", href: "/admin/packages" },
     { key: "billing", label: labels.billing, icon: "💳", href: "/admin/billing" },
     {
-      key: "landing-templates",
-      label: labels.landingTemplates ?? "Landing Templates",
+      key: "landing",
+      label: labels.landingPages ?? "Landing Pages",
       icon: "🧩",
-      href: "/admin/landing/templates/import",
+      children: [
+        { key: "landing-pages-all", label: labels.landingPages ?? "Landing Pages", href: "/admin/landing/pages" },
+        {
+          key: "landing-templates",
+          label: labels.landingTemplates ?? "Landing Templates",
+          href: "/admin/landing/templates/import",
+        },
+      ],
     },
     { key: "reports", label: labels.reports, icon: "📊" },
     {

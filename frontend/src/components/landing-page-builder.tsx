@@ -216,6 +216,9 @@ const text = {
     status: "স্ট্যাটাস",
     draft: "Draft",
     published: "Published",
+    adminLockedTitle: "অ্যাডমিন এই পেজটি লক করে দিয়েছে",
+    adminLockedBody: "এই পেজটি অ্যাডমিন আনপাবলিশ করে লক করে দিয়েছে। আপনি নিজে থেকে এটি আর পাবলিশ করতে পারবেন না, তবে ড্রাফট হিসেবে এডিট করে সংরক্ষণ করতে পারবেন।",
+    adminLockedReason: "কারণ",
     hero: "Hero",
     heroHeadline: "Hero headline",
     heroSubheadline: "Hero subheadline",
@@ -319,6 +322,9 @@ const text = {
     status: "Status",
     draft: "Draft",
     published: "Published",
+    adminLockedTitle: "This page has been locked by the admin",
+    adminLockedBody: "The admin has unpublished and locked this page. You can no longer publish it yourself, but you can still edit and save it as a draft.",
+    adminLockedReason: "Reason",
     hero: "Hero",
     heroHeadline: "Hero headline",
     heroSubheadline: "Hero subheadline",
@@ -969,7 +975,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(json.message || Object.values(json.errors ?? {}).flat().join(" ") || t.submitFailed);
+        const baseMessage = json.message || Object.values(json.errors ?? {}).flat().join(" ") || t.submitFailed;
+        const message = json.admin_lock_reason ? `${baseMessage} (${t.adminLockedReason}: ${json.admin_lock_reason})` : baseMessage;
+        throw new Error(message);
       }
 
       const nextId = json.data?.id ?? pageId;
@@ -1254,6 +1262,18 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
             <div className={`rounded-xl px-4 py-3 text-sm ${error ? "bg-red-500/10 text-red-400" : "bg-emerald-500/10 text-emerald-400"}`}>{error || success}</div>
           ) : null}
 
+          {page?.admin_locked ? (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              <p className="font-semibold">{t.adminLockedTitle}</p>
+              <p className="mt-1">{t.adminLockedBody}</p>
+              {page.admin_lock_reason ? (
+                <p className="mt-1">
+                  <span className="font-semibold">{t.adminLockedReason}:</span> {page.admin_lock_reason}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <label className="block xl:col-span-2">
@@ -1268,7 +1288,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId }:
                 <span className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.status}</span>
                 <select value={status} onChange={(e) => setStatus(e.target.value as "draft" | "published")} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[var(--foreground)]">
                   <option value="draft">{t.draft}</option>
-                  <option value="published">{t.published}</option>
+                  <option value="published" disabled={Boolean(page?.admin_locked)}>{t.published}</option>
                 </select>
               </label>
             </div>

@@ -45,6 +45,8 @@ interface LandingPage {
   title: string;
   slug: string;
   status: string;
+  admin_locked?: boolean;
+  admin_lock_reason?: string | null;
   published_at?: string | null;
   product_count?: number;
   public_url?: string;
@@ -78,6 +80,7 @@ function LandingPagesContent() {
   const locale = useLocale();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [flashError, setFlashError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPages = async () => {
@@ -131,14 +134,20 @@ function LandingPagesContent() {
     if (!token) return;
     setBusyId(pageId);
     setFlash(null);
+    setFlashError(null);
     try {
       const res = await fetch(`${LANDING_API_BASE}/landing/pages/${pageId}/publish`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setFlash(locale === "bn" ? "পেজ publish হয়েছে।" : "Page published.");
+        setFlash(locale === "bn" ? "পেজ publish হয়েছে।" : "Page published.");
         await loadPages();
+      } else {
+        const reason = data.admin_lock_reason;
+        const base = data.message || (locale === "bn" ? "পেজ publish করা যায়নি।" : "Could not publish the page.");
+        setFlashError(reason ? `${base} (${locale === "bn" ? "কারণ" : "Reason"}: ${reason})` : base);
       }
     } finally {
       setBusyId(null);
@@ -231,6 +240,7 @@ function LandingPagesContent() {
 
       <section className="catv-panel mt-4 overflow-hidden">
         {flash ? <div className="border-b border-[var(--border)] px-5 py-3 text-sm text-emerald-400">{flash}</div> : null}
+        {flashError ? <div className="border-b border-[var(--border)] px-5 py-3 text-sm text-red-400">{flashError}</div> : null}
         {loading ? (
           <div className="p-5 text-sm text-[var(--muted)]">{t.loading}</div>
         ) : pages.length === 0 ? (
@@ -258,6 +268,14 @@ function LandingPagesContent() {
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${page.status === "published" ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"}`}>
                         {page.status === "published" ? t.published : t.draft}
                       </span>
+                      {page.admin_locked ? (
+                        <span
+                          title={page.admin_lock_reason ?? undefined}
+                          className="ml-1.5 inline-flex rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-red-400"
+                        >
+                          {locale === "bn" ? "লকড" : "Locked"}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-sm text-[var(--muted)]">{page.product_count ?? 0}</td>
                     <td className="px-4 py-3">
@@ -282,7 +300,13 @@ function LandingPagesContent() {
                           {locale === "bn" ? "URL copy" : "Copy URL"}
                         </button>
                         {page.status !== "published" ? (
-                          <button type="button" disabled={busyId === page.id} onClick={() => void publishPage(page.id)} className="font-medium text-emerald-400 hover:underline disabled:opacity-50">
+                          <button
+                            type="button"
+                            disabled={busyId === page.id || Boolean(page.admin_locked)}
+                            title={page.admin_locked ? (page.admin_lock_reason ?? undefined) : undefined}
+                            onClick={() => void publishPage(page.id)}
+                            className="font-medium text-emerald-400 hover:underline disabled:opacity-50"
+                          >
                             {busyId === page.id ? "..." : locale === "bn" ? "Publish" : "Publish"}
                           </button>
                         ) : (

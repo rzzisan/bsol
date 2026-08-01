@@ -18,6 +18,10 @@ class LandingPage extends Model
         'title',
         'slug',
         'status',
+        'admin_locked',
+        'admin_lock_reason',
+        'admin_locked_at',
+        'admin_locked_by',
         'theme_settings',
         'content',
         'seo_meta',
@@ -34,11 +38,18 @@ class LandingPage extends Model
         'published_at' => 'datetime',
         'editor_state' => 'array',
         'last_editor_save' => 'datetime',
+        'admin_locked' => 'boolean',
+        'admin_locked_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function adminLockedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'admin_locked_by');
     }
 
     public function template(): BelongsTo

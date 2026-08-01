@@ -247,6 +247,8 @@ class LandingPageController extends Controller
                 'title' => $page->title,
                 'slug' => $page->slug,
                 'status' => $page->status,
+                'admin_locked' => $page->admin_locked,
+                'admin_lock_reason' => $page->admin_lock_reason,
                 'published_at' => $page->published_at,
                 'product_count' => $page->products->count(),
                 'template' => $page->template,
@@ -318,6 +320,14 @@ class LandingPageController extends Controller
         $page = LandingPage::query()->where('user_id', $userId)->findOrFail($id);
         $data = $this->validatePayload($request, $userId, $page);
 
+        if (($data['status'] ?? null) === 'published' && $page->admin_locked) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This landing page has been locked by the admin and cannot be published.',
+                'admin_lock_reason' => $page->admin_lock_reason,
+            ], 403);
+        }
+
         $page = DB::transaction(function () use ($page, $data, $userId) {
             $status = $data['status'] ?? $page->status;
             $slug = $this->resolveSlug(
@@ -362,6 +372,15 @@ class LandingPageController extends Controller
     public function publish(int $id): JsonResponse
     {
         $page = LandingPage::query()->where('user_id', auth()->id())->findOrFail($id);
+
+        if ($page->admin_locked) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This landing page has been locked by the admin and cannot be published.',
+                'admin_lock_reason' => $page->admin_lock_reason,
+            ], 403);
+        }
+
         $page->update([
             'status' => 'published',
             'published_at' => now(),

@@ -18,6 +18,9 @@ const text: Record<string, Record<string, string>> = {
     builder: "এডিট করুন",
     loading: "লোড হচ্ছে...",
     notFound: "ল্যান্ডিং পেজ পাওয়া যায়নি।",
+    adminLockedTitle: "অ্যাডমিন এই পেজটি লক করে দিয়েছে",
+    adminLockedBody: "এই পেজটি অ্যাডমিন আনপাবলিশ করে লক করে দিয়েছে। আপনি নিজে থেকে এটি আর পাবলিশ করতে পারবেন না।",
+    adminLockedReason: "কারণ",
   },
   en: {
     title: "Landing Page Details",
@@ -25,6 +28,9 @@ const text: Record<string, Record<string, string>> = {
     builder: "Edit",
     loading: "Loading...",
     notFound: "Landing page not found.",
+    adminLockedTitle: "This page has been locked by the admin",
+    adminLockedBody: "The admin has unpublished and locked this page. You can no longer publish it yourself.",
+    adminLockedReason: "Reason",
   },
 };
 
@@ -53,6 +59,7 @@ function LandingPageDetailsContent() {
   const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [flashError, setFlashError] = useState<string | null>(null);
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const pageId = Array.isArray(params?.id) ? params.id[0] : params?.id;
@@ -108,15 +115,21 @@ function LandingPageDetailsContent() {
     const token = localStorage.getItem("auth_token");
     if (!token || !page) return;
     setBusy(true);
+    setFlash(null);
+    setFlashError(null);
     try {
       const res = await fetch(`${LANDING_API_BASE}/landing/pages/${page.id}/publish`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setPage((prev) => prev ? { ...prev, ...data.data, public_url: prev.public_url } : prev);
-        setFlash(locale === "bn" ? "পেজ publish হয়েছে।" : "Page published.");
+        setFlash(locale === "bn" ? "পেজ publish হয়েছে।" : "Page published.");
+      } else {
+        const reason = data.admin_lock_reason;
+        const base = data.message || (locale === "bn" ? "পেজ publish করা যায়নি।" : "Could not publish the page.");
+        setFlashError(reason ? `${base} (${locale === "bn" ? "কারণ" : "Reason"}: ${reason})` : base);
       }
     } finally {
       setBusy(false);
@@ -192,6 +205,18 @@ function LandingPageDetailsContent() {
   return (
     <section className="mx-auto max-w-2xl catv-panel p-4 sm:p-5">
         {flash ? <div className="mb-4 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">{flash}</div> : null}
+        {flashError ? <div className="mb-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">{flashError}</div> : null}
+        {page.admin_locked ? (
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            <p className="font-semibold">{t.adminLockedTitle}</p>
+            <p className="mt-1">{t.adminLockedBody}</p>
+            {page.admin_lock_reason ? (
+              <p className="mt-1">
+                <span className="font-semibold">{t.adminLockedReason}:</span> {page.admin_lock_reason}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <button
           className="mb-4 inline-flex rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--foreground)]"
           onClick={() => router.back()}
@@ -225,7 +250,13 @@ function LandingPageDetailsContent() {
             {locale === "bn" ? "URL copy" : "Copy URL"}
           </button>
           {page.status !== "published" ? (
-            <button type="button" disabled={busy} onClick={() => void publishPage()} className="inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+            <button
+              type="button"
+              disabled={busy || Boolean(page.admin_locked)}
+              title={page.admin_locked ? (page.admin_lock_reason ?? undefined) : undefined}
+              onClick={() => void publishPage()}
+              className="inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
               {busy ? "..." : locale === "bn" ? "Publish" : "Publish"}
             </button>
           ) : (

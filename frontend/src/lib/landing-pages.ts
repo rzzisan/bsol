@@ -70,6 +70,8 @@ export type LandingPageRecord = {
   title: string;
   slug: string;
   status: "draft" | "published" | string;
+  admin_locked?: boolean;
+  admin_lock_reason?: string | null;
   published_at?: string | null;
   created_at: string;
   updated_at: string;
