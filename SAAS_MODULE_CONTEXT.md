@@ -1,7 +1,7 @@
 # F-Commerce SaaS — Module Context
 
 Last updated: 2026-08-02 — Added §15 (full codebase feature audit, ground-truth scanned), §16 (prioritized recommendations), and §17 (deep line-by-line code review with specific file:line bugs/risks, 6-pass independent review covering every controller/service). Sections 12–14 below are the **original Phase 1/2 plan and are now stale** (last accurate as of 2026-05-04) — কোডবেস অনেক এগিয়ে গেছে তার পরে। **§15-কে "কী আছে" এবং §17-কে "কতটা ভালো/নিরাপদ" প্রশ্নের single source of truth হিসেবে ব্যবহার করো**, sections 12–14 শুধু historical record হিসেবে রাখা হয়েছে।
-Status: Phase 1 complete; Phase 2 mostly complete (SMS automation, accounting, courier — 4 providers — all live); Analytics + Shop Settings + payment-gateway automation + Facebook/Meta integration still not started (§15/§16)। **§17-এর ১১টা 🔴/🟠 critical finding সবগুলো ফিক্স করা হয়েছে এবং deploy করা হয়েছে (২০২৬-০৮-০২, একই সেশনে) — বিস্তারিত §17.9-এ, implementation log-সহ।** Backend সব migrate/live; frontend XSS fix `npm run deploy:prod:safe` দিয়ে সফলভাবে deploy হয়েছে (৮/৮ ধাপ pass, `hybrid-frontend.service` active)।
+Status: Phase 1 complete; Phase 2 mostly complete (SMS automation, accounting, courier — 4 providers — all live); Analytics (sales/customer/courier — §15.7) এখন **DONE**; Shop Settings + payment-gateway automation + Facebook/Meta integration (incl. Ads ROI, যেটা Facebook-নির্ভর) still not started (§15/§16)। **§17-এর ১১টা 🔴/🟠 critical finding সবগুলো ফিক্স করা হয়েছে এবং deploy করা হয়েছে (২০২৬-০৮-০২, একই সেশনে) — বিস্তারিত §17.9-এ, implementation log-সহ।** Backend সব migrate/live; frontend XSS fix `npm run deploy:prod:safe` দিয়ে সফলভাবে deploy হয়েছে (৮/৮ ধাপ pass, `hybrid-frontend.service` active)। **নন-variant stock deduction + bulkStatus inventory gap (§17.9-এর শেষে) এখনো একই দিনে ফিক্স হয়েছে।** Analytics module (§16.1) একই দিনে শেষ — বিস্তারিত §15.7-এ, deploy-এর সময় একটা self-caused frontend build/restart incident হয়েছিল যেটা সাথে সাথে ধরা পড়ে ও ফিক্স হয়েছে (details §15.7-এ)।
 
 ---
 
@@ -669,7 +669,16 @@ backend/app/
 
 | Module | Status | নোট |
 |---|---|---|
-| Sales funnel, Product performance, Customer intelligence, Ads ROI, Courier analytics | ⛔ **NOT STARTED** | চারটা frontend page (`analytics/sales`, `/courier`, `/intelligence`, `/ads-roi`) সব **pure `ModulePlaceholder`** — কোনো backend controller নেই। §14.4-এর checklist যেমন ছিল ঠিক তেমনই আছে, ৩ মাসে অগ্রগতি হয়নি। **এটা এখন সবচেয়ে বড়/সবচেয়ে পুরনো unfinished-known-gap।** |
+| Sales funnel + top products (`analytics/sales`) | ✅ DONE (2026-08-02) | `Api/AnalyticsController::sales()` + `::products()` — funnel by status, daily trend, top products with revenue/margin/return-rate. Frontend replaces placeholder with stat cards, funnel grid, CSS bar-chart trend, product table |
+| Customer intelligence (`analytics/intelligence`) | ✅ DONE (2026-08-02) | `AnalyticsController::customers()` — loyal/VIP/risky/blocked counts, repeat-buyer rate, avg LTV, district-wise order breakdown |
+| Courier analytics (`analytics/courier`) | ✅ DONE (2026-08-02) | `AnalyticsController::courier()` — per-courier success/return rate, avg delivery time (from `order_status_logs`), charges, delivered revenue |
+| Ads ROI (`analytics/ads-roi`) | ⛔ still placeholder — **intentional** | No UTM/ad-spend/Facebook data source exists yet (§16.3 Facebook MVP is the prerequisite); building this now would show fake numbers |
+
+**Backend:** `app/Http/Controllers/Api/AnalyticsController.php`, routes under `auth:sanctum` at `/api/analytics/{sales,products,customers,courier}`, all scoped `where('user_id', auth()->id())`, date-range filterable (`range=today\|week\|month`, or `from`/`to`). No new migrations — built entirely on existing `orders`, `order_items`, `customers`, `order_status_logs` tables.
+
+**Verification:** rollback-wrapped tinker test against real production data (all 4 endpoints, correct joins/margins/rates) + live HTTP smoke test through nginx/php-fpm/Sanctum + `npm run build` clean + browser-verified rendering (styled, real data, both light theme).
+
+**Incident during this rollout (self-caused, fixed same session):** running `npm run build` while `hybrid-frontend.service` (`next start`) was still live overwrote `.next` under the running process, breaking all CSS/JS chunk hashes — same failure mode as the 2026-05-04 incident logged below. Fixed by restarting the service after build (the step 8 checklist in §7 exists precisely for this — don't skip it after `npm run build` on a live server).
 
 ### 15.8 Subscription & Billing
 

@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\NotificationDispatchController;
 use App\Http\Controllers\Api\NotificationTemplateController;
 use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\Api\AbandonedCheckoutController;
+use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\CheckoutOtpController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CourierFraudCheckController;
@@ -210,6 +211,14 @@ Route::middleware('active_subscription')->group(function () {
     Route::post('/accounting/transactions', [TransactionController::class, 'store']);
     Route::put('/accounting/transactions/{id}', [TransactionController::class, 'update']);
     Route::delete('/accounting/transactions/{id}', [TransactionController::class, 'destroy']);
+
+    // ── Analytics ────────────────────────────────────────────────────────────
+    Route::prefix('analytics')->group(function () {
+        Route::get('/sales', [AnalyticsController::class, 'sales']);
+        Route::get('/products', [AnalyticsController::class, 'products']);
+        Route::get('/customers', [AnalyticsController::class, 'customers']);
+        Route::get('/courier', [AnalyticsController::class, 'courier']);
+    });
 
     // ── Customer Management ───────────────────────────────────────────────────
     Route::get('/customers/lookup-by-phone', [CustomerController::class, 'lookupByPhone']);
