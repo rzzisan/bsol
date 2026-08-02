@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CourierSetting;
 use App\Models\Order;
+use App\Services\Courier\CourierFactory;
 use App\Services\PathaoLocationService;
 use App\Services\SteadfastService;
 use App\Services\PathaoService;
@@ -501,23 +502,40 @@ class CourierController extends Controller
             return response()->json(['success' => true, 'data' => $order, 'message' => 'Manual tracking saved.']);
         }
 
-        if ($courier === 'steadfast') {
-            return $this->bookSteadfast($order, $data);
+        $provider = CourierFactory::make($courier);
+        if (! $provider) {
+            return response()->json(['success' => false, 'message' => 'Courier not supported yet.'], 422);
         }
 
-        if ($courier === 'pathao') {
-            return $this->bookPathao($order, $data);
+        $result = $provider->book($order, $data);
+
+        if ($result['success']) {
+            $update = [
+                'courier_name'        => $courier,
+                'courier_tracking_id' => $result['consignment_id'],
+                'courier_status'      => $result['courier_status'] ?? 'booked',
+                'status'              => 'processing',
+            ];
+            if (($result['delivery_fee'] ?? null) !== null) {
+                $update['courier_charge'] = $result['delivery_fee'];
+            }
+            $order->update($update);
+
+            return response()->json([
+                'success'        => true,
+                'data'           => $order->fresh(),
+                'consignment_id' => $result['consignment_id'],
+                'delivery_fee'   => $result['delivery_fee'] ?? null,
+                'message'        => $result['message'] ?? ucfirst($courier) . ' order booked.',
+            ]);
         }
 
-        if ($courier === 'redx') {
-            return $this->bookRedx($order, $data);
-        }
-
-        if ($courier === 'carrybee') {
-            return $this->bookCarrybee($order, $data);
-        }
-
-        return response()->json(['success' => false, 'message' => 'Courier not supported yet.'], 422);
+        return response()->json([
+            'success' => false,
+            'message' => $result['message'] ?? ucfirst($courier) . ' booking failed.',
+            'errors'  => $result['errors'] ?? null,
+            'raw'     => $result['raw'] ?? null,
+        ], 422);
     }
 
     public function bookBulk(Request $request): JsonResponse
@@ -552,32 +570,34 @@ class CourierController extends Controller
             return response()->json(['success' => false, 'message' => 'No eligible orders found for bulk booking.'], 422);
         }
 
-        if ($data['courier'] === 'steadfast') {
-            return $this->bookSteadfastBulk($orders->all(), $data);
+        $provider = CourierFactory::make($data['courier']);
+        if (! $provider) {
+            return response()->json(['success' => false, 'message' => 'Courier not supported for bulk booking.'], 422);
         }
 
-        $results = [];
-        $successCount = 0;
-        $failedCount  = 0;
+        $results = $provider->bookBulk($orders->all(), $data);
 
-        foreach ($orders as $order) {
-            $result = $data['courier'] === 'redx'
-                ? $this->bookRedxAndPersist($order, $data)
-                : $this->bookPathaoAndPersist($order, $data);
-            $results[] = [
-                'order_id'       => $order->id,
-                'order_number'   => $order->order_number,
-                'success'        => $result['success'],
-                'consignment_id' => $result['consignment_id'] ?? null,
-                'message'        => $result['message'] ?? null,
-            ];
-
-            if ($result['success']) {
-                $successCount++;
-            } else {
-                $failedCount++;
+        // Persist the successfully-booked orders — bookBulk() only reports
+        // the outcome, it doesn't touch the DB (unlike single book()).
+        $ordersById = $orders->keyBy('id');
+        foreach ($results as $row) {
+            if (! $row['success'] || ! $row['consignment_id']) {
+                continue;
             }
+            $update = [
+                'courier_name'        => $data['courier'],
+                'courier_tracking_id' => $row['consignment_id'],
+                'courier_status'      => $row['courier_status'] ?? 'booked',
+                'status'              => 'processing',
+            ];
+            if (($row['delivery_fee'] ?? null) !== null) {
+                $update['courier_charge'] = $row['delivery_fee'];
+            }
+            $ordersById[$row['order_id']]?->update($update);
         }
+
+        $successCount = count(array_filter($results, fn ($r) => $r['success']));
+        $failedCount  = count($results) - $successCount;
 
         return response()->json([
             'success' => $successCount > 0,
@@ -591,449 +611,6 @@ class CourierController extends Controller
         ], $successCount > 0 ? 200 : 422);
     }
 
-    private function bookSteadfastBulk(array $orders, array $data): JsonResponse
-    {
-        $settings = $this->getSteadfastSettings();
-        if (! $settings) {
-            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
-        }
-
-        $service = new SteadfastService();
-        $items = array_map(function (Order $order) use ($data, $service) {
-            $address = trim(implode(', ', array_filter([
-                $order->customer_address,
-                $order->customer_area,
-                $order->customer_thana,
-                $order->customer_district,
-            ])));
-
-            return $service->formatBulkItem([
-                'invoice'           => $order->order_number,
-                'recipient_name'    => $order->customer_name ?? $order->customer_phone,
-                'recipient_phone'   => $order->customer_phone,
-                'recipient_address' => $address !== '' ? $address : 'Address not provided',
-                'cod_amount'        => $order->total,
-                'note'              => $data['note'] ?? $order->notes ?? '',
-                'item_description'  => $data['item_description'] ?? null,
-                'delivery_type'     => isset($data['delivery_type']) ? (int) $data['delivery_type'] : null,
-            ]);
-        }, $orders);
-
-        $result = $service->createBulkOrder($settings->steadfast_api_key, $settings->steadfast_secret_key, $items);
-
-        $successCount = 0;
-        $failedCount = 0;
-        $results = [];
-
-        $resultItems = $result['data'] ?? $result['result'] ?? $result;
-        $resultItems = is_array($resultItems) ? array_values(array_filter($resultItems, fn ($item) => is_array($item))) : [];
-
-        foreach ($orders as $index => $order) {
-            $item = $resultItems[$index] ?? [];
-            $consignmentId = $service->extractSteadfastConsignment($item);
-            $message = $item['message'] ?? $item['status'] ?? null;
-            $success = $consignmentId !== null || (isset($item['status']) && (string) $item['status'] === 'success');
-
-            if ($success && $consignmentId !== null) {
-                $order->update([
-                    'courier_name'        => 'steadfast',
-                    'courier_tracking_id' => $consignmentId,
-                    'courier_status'      => 'booked',
-                    'status'              => 'processing',
-                ]);
-                $successCount++;
-            } else {
-                $failedCount++;
-            }
-
-            $results[] = [
-                'order_id'       => $order->id,
-                'order_number'   => $order->order_number,
-                'success'        => $success,
-                'consignment_id' => $consignmentId,
-                'message'        => $message,
-            ];
-        }
-
-        return response()->json([
-            'success' => $successCount > 0,
-            'message' => "Bulk booking completed. Success: {$successCount}, Failed: {$failedCount}",
-            'data'    => [
-                'total'   => count($orders),
-                'success' => $successCount,
-                'failed'  => $failedCount,
-                'results' => $results,
-                'raw'     => $result,
-            ],
-        ], $successCount > 0 ? 200 : 422);
-    }
-
-    private function bookSteadfast(Order $order, array $data): JsonResponse
-    {
-        $settings = CourierSetting::where('user_id', auth()->id())->first();
-        if (! $settings || ! $settings->steadfast_api_key) {
-            return response()->json(['success' => false, 'message' => 'Steadfast API credentials not configured. Go to Settings → Courier.'], 422);
-        }
-
-        $address = trim(implode(', ', array_filter([
-            $order->customer_address,
-            $order->customer_area,
-            $order->customer_thana,
-            $order->customer_district,
-        ])));
-
-        if ($address === '') {
-            return response()->json(['success' => false, 'message' => 'Customer address is required for Steadfast booking.'], 422);
-        }
-
-        $service = new SteadfastService();
-        $result  = $service->createOrder($settings->steadfast_api_key, $settings->steadfast_secret_key, [
-            'invoice'           => $order->order_number,
-            'recipient_name'    => $order->customer_name ?? $order->customer_phone,
-            'recipient_phone'   => $order->customer_phone,
-            'recipient_address' => $address,
-            'cod_amount'        => $data['cod_amount'] ?? $order->total,
-            'note'              => $data['note'] ?? $order->notes ?? '',
-            'delivery_type'     => isset($data['delivery_type']) && in_array((int) $data['delivery_type'], [0, 1], true)
-                ? (int) $data['delivery_type']
-                : null,
-            'item_description'  => $data['item_description'] ?? null,
-            'alternative_phone' => $data['alternative_phone'] ?? null,
-            'recipient_email'   => $data['recipient_email'] ?? null,
-            'total_lot'         => $data['total_lot'] ?? null,
-        ]);
-
-        // Steadfast returns consignment_id on success
-        $consignmentId = $service->extractSteadfastConsignment($result);
-        if ($consignmentId) {
-            $order->update([
-                'courier_name'        => 'steadfast',
-                'courier_tracking_id' => (string) $consignmentId,
-                'courier_status'      => 'booked',
-                // Steadfast's create_order response doesn't return a delivery
-                // fee (unlike Pathao/Carrybee) — this used to write the
-                // consignment's status string (e.g. "in_review") into this
-                // decimal column instead, which Laravel's decimal cast
-                // silently coerced to 0.00, corrupting fee data on every
-                // Steadfast booking. Leave it unset until a real fee source
-                // (e.g. the balance/payments API) is wired in.
-                'status'              => 'processing',
-            ]);
-            return response()->json(['success' => true, 'data' => $order, 'consignment_id' => $consignmentId]);
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => $result['message'] ?? 'Steadfast booking failed.',
-            'raw'     => $result,
-        ], 422);
-    }
-
-    private function bookPathao(Order $order, array $data): JsonResponse
-    {
-        $result = $this->bookPathaoAndPersist($order, $data);
-
-        if ($result['success']) {
-            return response()->json([
-                'success'        => true,
-                'data'           => $order->fresh(),
-                'consignment_id' => $result['consignment_id'],
-                'delivery_fee'   => $result['delivery_fee'] ?? null,
-                'message'        => $result['message'] ?? 'Pathao order booked.',
-            ]);
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => $result['message'] ?? 'Pathao booking failed.',
-            'errors'  => $result['errors'] ?? null,
-            'raw'     => $result['raw'] ?? null,
-        ], 422);
-    }
-
-    private function bookPathaoAndPersist(Order $order, array $data): array
-    {
-        $svc      = new PathaoService();
-        $payload  = $this->buildPathaoPayload($order, $data);
-
-        if (! $payload['success']) {
-            return $payload;
-        }
-
-        $result = $svc->createOrder(auth()->id(), $payload['payload']);
-
-        if ($result['success']) {
-            $order->update([
-                'courier_name'        => 'pathao',
-                'courier_tracking_id' => $result['consignment_id'],
-                'courier_status'      => strtolower($result['order_status'] ?? 'booked'),
-                'courier_charge'      => $result['delivery_fee'] ?? null,
-                'status'              => 'processing',
-            ]);
-            return $result;
-        }
-
-        return [
-            'success' => false,
-            'message' => $result['message'] ?? 'Pathao booking failed.',
-            'errors'  => $result['errors'] ?? null,
-            'raw'     => $result['raw'] ?? null,
-        ];
-    }
-
-    private function buildPathaoPayload(Order $order, array $data): array
-    {
-        $settings = CourierSetting::where('user_id', auth()->id())->first();
-
-        $storeId = $data['store_id'] ?? ($settings->pathao_store_id ?? null);
-        if (! $storeId) {
-            return ['success' => false, 'message' => 'Pathao store_id is required. Configure it in Settings → Courier.'];
-        }
-
-        $address = $order->customer_address ?? '';
-        if ($order->customer_district) $address .= ', ' . $order->customer_district;
-        if ($order->customer_thana)    $address .= ', ' . $order->customer_thana;
-        if ($order->customer_area)     $address .= ', ' . $order->customer_area;
-        $address = trim($address, ', ');
-
-        if (strlen($address) < 10) {
-            $address = ($address ?: ($order->customer_district ?? 'Bangladesh')) . ', Bangladesh';
-        }
-
-        $payload = [
-            'store_id'             => (int) $storeId,
-            'merchant_order_id'    => $order->order_number,
-            'recipient_name'       => $order->customer_name ?? $order->customer_phone,
-            'recipient_phone'      => $order->customer_phone,
-            'recipient_address'    => substr($address, 0, 220),
-            'delivery_type'        => $data['delivery_type'] ?? 48,
-            'item_type'            => $data['item_type'] ?? 2,
-            'item_quantity'        => 1,
-            'item_weight'          => $data['item_weight'] ?? 0.5,
-            'amount_to_collect'    => (int) ($data['cod_amount'] ?? $order->total),
-        ];
-
-        if ($order->pathao_city_id) $payload['recipient_city'] = $order->pathao_city_id;
-        if ($order->pathao_zone_id) $payload['recipient_zone'] = $order->pathao_zone_id;
-        if ($order->pathao_area_id) $payload['recipient_area'] = $order->pathao_area_id;
-
-        if (! empty($data['special_instruction'])) $payload['special_instruction'] = $data['special_instruction'];
-        if (! empty($data['item_description']))    $payload['item_description']    = $data['item_description'];
-        if (! empty($data['note']))                $payload['special_instruction'] = $data['note'];
-
-        return ['success' => true, 'payload' => $payload];
-    }
-
-    private function bookRedx(Order $order, array $data): JsonResponse
-    {
-        $result = $this->bookRedxAndPersist($order, $data);
-
-        if ($result['success']) {
-            return response()->json([
-                'success'        => true,
-                'data'           => $order->fresh(),
-                'consignment_id' => $result['consignment_id'],
-                'message'        => $result['message'] ?? 'RedX parcel booked.',
-            ]);
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => $result['message'] ?? 'RedX booking failed.',
-            'errors'  => $result['errors'] ?? null,
-            'raw'     => $result['raw'] ?? null,
-        ], 422);
-    }
-
-    private function bookRedxAndPersist(Order $order, array $data): array
-    {
-        $svc     = new RedxService();
-        $payload = $this->buildRedxPayload($order, $data);
-
-        if (! $payload['success']) {
-            return $payload;
-        }
-
-        $result = $svc->createParcel(auth()->id(), $payload['payload']);
-
-        if ($result['success']) {
-            $order->update([
-                'courier_name'        => 'redx',
-                'courier_tracking_id' => $result['tracking_id'],
-                'courier_status'      => 'booked',
-                'status'              => 'processing',
-            ]);
-            return ['success' => true, 'consignment_id' => $result['tracking_id'], 'message' => 'RedX parcel booked.'];
-        }
-
-        return [
-            'success' => false,
-            'message' => $result['message'] ?? 'RedX booking failed.',
-            'errors'  => $result['errors'] ?? null,
-            'raw'     => $result['raw'] ?? null,
-        ];
-    }
-
-    private function buildRedxPayload(Order $order, array $data): array
-    {
-        $settings = CourierSetting::where('user_id', auth()->id())->first();
-        if (! $settings || ! $settings->redx_api_key) {
-            return ['success' => false, 'message' => 'RedX API credentials not configured. Go to Settings → Courier.'];
-        }
-
-        $pickupStoreId = $data['pickup_store_id'] ?? $settings->redx_pickup_store_id ?? null;
-        if (! $pickupStoreId) {
-            return ['success' => false, 'message' => 'RedX pickup store is required. Configure a default in Settings → Courier or select one when booking.'];
-        }
-
-        $deliveryAreaId = $data['delivery_area_id'] ?? $order->redx_area_id ?? null;
-        $deliveryAreaName = $data['delivery_area'] ?? null;
-        if (! $deliveryAreaId || ! $deliveryAreaName) {
-            return ['success' => false, 'message' => 'RedX delivery area is required. Search and select the customer\'s area when booking.'];
-        }
-
-        $address = trim(implode(', ', array_filter([
-            $order->customer_address,
-            $order->customer_area,
-            $order->customer_thana,
-            $order->customer_district,
-        ])));
-
-        if ($address === '') {
-            return ['success' => false, 'message' => 'Customer address is required for RedX booking.'];
-        }
-
-        $codAmount = (float) ($data['cod_amount'] ?? $order->total);
-        $value     = (float) ($data['value'] ?? $codAmount);
-        $weightKg  = (float) ($data['parcel_weight_kg'] ?? 0.5);
-
-        $payload = [
-            'customer_name'          => $order->customer_name ?? $order->customer_phone,
-            'customer_phone'         => $order->customer_phone,
-            'delivery_area'          => $deliveryAreaName,
-            'delivery_area_id'       => (int) $deliveryAreaId,
-            'customer_address'       => substr($address, 0, 220),
-            'merchant_invoice_id'    => $order->order_number,
-            'cash_collection_amount' => $codAmount,
-            'parcel_weight'          => (int) round($weightKg * 1000),
-            'value'                  => $value,
-            'pickup_store_id'        => (int) $pickupStoreId,
-        ];
-
-        $instruction = $data['note'] ?? $order->notes ?? '';
-        if ($instruction !== '') {
-            $payload['instruction'] = $instruction;
-        }
-
-        return ['success' => true, 'payload' => $payload];
-    }
-
-    private function bookCarrybee(Order $order, array $data): JsonResponse
-    {
-        $result = $this->bookCarrybeeAndPersist($order, $data);
-
-        if ($result['success']) {
-            return response()->json([
-                'success'        => true,
-                'data'           => $order->fresh(),
-                'consignment_id' => $result['consignment_id'],
-                'message'        => $result['message'] ?? 'CarryBee order booked.',
-            ]);
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => $result['message'] ?? 'CarryBee booking failed.',
-            'causes'  => $result['causes'] ?? null,
-            'raw'     => $result['raw'] ?? null,
-        ], 422);
-    }
-
-    private function bookCarrybeeAndPersist(Order $order, array $data): array
-    {
-        $svc     = new CarrybeeService();
-        $payload = $this->buildCarrybeePayload($order, $data);
-
-        if (! $payload['success']) {
-            return $payload;
-        }
-
-        $result = $svc->createOrder(auth()->id(), $payload['payload']);
-
-        if ($result['success']) {
-            $order->update([
-                'courier_name'        => 'carrybee',
-                'courier_tracking_id' => $result['data']['consignment_id'],
-                'courier_status'      => 'booked',
-                'courier_charge'      => $result['data']['delivery_fee'] ?? null,
-                'status'              => 'processing',
-            ]);
-            return ['success' => true, 'consignment_id' => $result['data']['consignment_id'], 'message' => 'CarryBee order booked.'];
-        }
-
-        return [
-            'success' => false,
-            'message' => $result['message'] ?? 'CarryBee booking failed.',
-            'causes'  => $result['causes'] ?? null,
-            'raw'     => $result['raw'] ?? null,
-        ];
-    }
-
-    private function buildCarrybeePayload(Order $order, array $data): array
-    {
-        $settings = CourierSetting::where('user_id', auth()->id())->first();
-        if (! $settings || ! $settings->carrybee_client_id || ! $settings->carrybee_client_secret || ! $settings->carrybee_client_context) {
-            return ['success' => false, 'message' => 'CarryBee API credentials not configured. Go to Settings → Courier.'];
-        }
-
-        $storeId = $data['carrybee_store_id'] ?? $settings->carrybee_store_id ?? null;
-        if (! $storeId) {
-            return ['success' => false, 'message' => 'CarryBee pickup store is required. Configure a default in Settings → Courier or select one when booking.'];
-        }
-
-        $cityId = $data['delivery_city_id'] ?? null;
-        $zoneId = $data['delivery_zone_id'] ?? null;
-        if (! $cityId || ! $zoneId) {
-            return ['success' => false, 'message' => 'CarryBee delivery city/zone is required. Search and select the customer\'s area when booking.'];
-        }
-
-        $address = trim(implode(', ', array_filter([
-            $order->customer_address,
-            $order->customer_area,
-            $order->customer_thana,
-            $order->customer_district,
-        ])));
-
-        if (strlen($address) < 10) {
-            return ['success' => false, 'message' => 'Customer address is too short for CarryBee booking (min 10 chars).'];
-        }
-
-        $weightKg = (float) ($data['parcel_weight_kg'] ?? 0.5);
-
-        $payload = [
-            'store_id'           => (string) $storeId,
-            'merchant_order_id'  => $order->order_number,
-            'delivery_type'      => 1, // Normal
-            'product_type'       => 1, // Parcel
-            'recipient_phone'    => $order->customer_phone,
-            'recipient_name'     => $order->customer_name ?? $order->customer_phone,
-            'recipient_address'  => substr($address, 0, 200),
-            'city_id'            => (int) $cityId,
-            'zone_id'            => (int) $zoneId,
-            'item_weight'        => (int) round($weightKg * 1000),
-            'collectable_amount' => (int) ($data['cod_amount'] ?? $order->total),
-        ];
-
-        if (! empty($data['delivery_area_id'])) $payload['area_id'] = (int) $data['delivery_area_id'];
-
-        $instruction = $data['note'] ?? $order->notes ?? '';
-        if ($instruction !== '') {
-            $payload['special_instruction'] = substr($instruction, 0, 255);
-        }
-
-        return ['success' => true, 'payload' => $payload];
-    }
-
     // ── Track ─────────────────────────────────────────────────────────────────
 
     public function trackOrder(int $orderId): JsonResponse
@@ -1043,53 +620,24 @@ class CourierController extends Controller
         if (! $order->courier_tracking_id) {
             return response()->json(['success' => false, 'message' => 'No tracking ID.'], 422);
         }
-        if ($order->courier_name === 'pathao') {
-            $svc    = new PathaoService();
-            $result = $svc->getOrderInfo(auth()->id(), $order->courier_tracking_id);
-            if ($result['success'] && isset($result['data']['order_status_slug'])) {
-                $order->update(['courier_status' => $result['data']['order_status_slug']]);
-            }
-            return response()->json(['success' => true, 'data' => $result['data'] ?? [], 'order' => $order->fresh()]);
-        }
 
-        if ($order->courier_name === 'redx') {
-            $svc    = new RedxService();
-            $result = $svc->getParcelInfo(auth()->id(), (string) $order->courier_tracking_id);
-            if ($result['success'] && isset($result['data']['status'])) {
-                $order->update(['courier_status' => $result['data']['status']]);
-            }
-            return response()->json(['success' => true, 'data' => $result['data'] ?? [], 'order' => $order->fresh()]);
-        }
-
-        if ($order->courier_name === 'carrybee') {
-            $svc    = new CarrybeeService();
-            $result = $svc->getOrderDetails(auth()->id(), (string) $order->courier_tracking_id);
-            if ($result['success'] && isset($result['data']['transfer_status'])) {
-                $order->update(['courier_status' => $result['data']['transfer_status']]);
-            }
-            return response()->json(['success' => true, 'data' => $result['data'] ?? [], 'order' => $order->fresh()]);
-        }
-
-        if ($order->courier_name !== 'steadfast') {
+        $provider = CourierFactory::make($order->courier_name);
+        if (! $provider) {
             return response()->json(['success' => true, 'data' => ['status' => $order->courier_status], 'message' => 'Manual tracking.']);
         }
 
-        $settings = CourierSetting::where('user_id', auth()->id())->first();
-        if (! $settings || ! $settings->steadfast_api_key) {
-            return response()->json(['success' => false, 'message' => 'Steadfast credentials not configured.'], 422);
+        $result = $provider->track($order);
+
+        if ($result['success'] && ! empty($result['status'])) {
+            $order->update(['courier_status' => $result['status']]);
         }
 
-        $service = new SteadfastService();
-        $trackingId = (string) $order->courier_tracking_id;
-        $result  = ctype_digit($trackingId)
-            ? $service->getStatus($settings->steadfast_api_key, $settings->steadfast_secret_key, $trackingId)
-            : $service->getStatusByTrackingCode($settings->steadfast_api_key, $settings->steadfast_secret_key, $trackingId);
-
-        if (isset($result['delivery_status'])) {
-            $order->update(['courier_status' => $result['delivery_status']]);
-        }
-
-        return response()->json(['success' => true, 'data' => $result, 'order' => $order]);
+        return response()->json([
+            'success' => $result['success'],
+            'data'    => $result['raw'] ?? [],
+            'order'   => $order->fresh(),
+            'message' => $result['message'] ?? null,
+        ], $result['success'] ? 200 : 422);
     }
 
     // ── Booked orders (with tracking) ─────────────────────────────────────────
