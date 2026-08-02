@@ -435,21 +435,38 @@ class OrderController extends Controller
             ->whereIn('id', $data['ids'])
             ->get();
 
+        $updated = 0;
+        $failed = [];
+
         foreach ($orders as $order) {
-            // adjustInventory: false preserves this endpoint's pre-existing behavior
-            // of not touching variant stock on bulk status changes.
-            $this->orderStatusService->transition(
-                $order,
-                $data['status'],
-                $data['note'] ?? 'Bulk update.',
-                auth()->id(),
-                adjustInventory: false,
-            );
+            try {
+                $this->orderStatusService->transition(
+                    $order,
+                    $data['status'],
+                    $data['note'] ?? 'Bulk update.',
+                    auth()->id(),
+                );
+                $updated++;
+            } catch (ValidationException $e) {
+                // Insufficient stock on this order shouldn't block the rest
+                // of the batch — record it and keep going.
+                $failed[] = [
+                    'id'           => $order->id,
+                    'order_number' => $order->order_number,
+                    'message'      => $e->getMessage(),
+                ];
+            }
+        }
+
+        $message = $updated . ' orders updated.';
+        if ($failed) {
+            $message .= ' ' . count($failed) . ' skipped (insufficient stock).';
         }
 
         return response()->json([
             'success' => true,
-            'message' => $orders->count() . ' orders updated.',
+            'message' => $message,
+            'failed'  => $failed,
         ]);
     }
 

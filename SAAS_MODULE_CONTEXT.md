@@ -938,7 +938,11 @@ backend/app/
 
 **Verification method:** প্রতিটা fix-এ syntax check (`php -l`) + একটা tinker-based functional test চালানো হয়েছে (আসল/বাস্তব ডেটার উপর, কিন্তু সবসময় `DB::beginTransaction()`/`rollBack()`-এর ভেতরে যাতে কোনো test data persist না হয়) — race condition (#5, #8), validation rejection (#8), ledger sync (#9), soft-delete visibility (#10), encryption round-trip (#11) সবগুলো সরাসরি পরীক্ষা করে pass confirm করা হয়েছে। `php artisan route:list` (227 routes) ও `php artisan migrate:status` দিয়ে পুরো backend health verify করা হয়েছে।
 
-### নতুন gap যা এই fix pass-এ ধরা পড়েছে (§16/§17.0-এ ছিল না, ভবিষ্যতে track করা উচিত)
+### নতুন gap যা এই fix pass-এ ধরা পড়েছে (§16/§17.0-এ ছিল না) — ✅ উভয়টাই ফিক্স করা হয়েছে (2026-08-02, পরের সেশনে)
 
-- অ-variant (`track_stock`) product-এর জন্য stock deduction path এখনো নেই (§17.0 #8-এর ফিক্স শুধু variant-এর জন্য) — এটা আলাদা কাজ হিসেবে দরকার
-- `bulkStatus` (`adjustInventory: false`) এখনো inventory reserve/release completely skip করে — bulk আর single status-change-এর আচরণ এখনো inconsistent
+- ~~অ-variant (`track_stock`) product-এর জন্য stock deduction path এখনো নেই~~ — ✅ FIXED: `OrderStatusService::reserveProductStock()`/release path যোগ করা হয়েছে, variant-এর মতোই atomic guarded UPDATE (`WHERE track_stock=true AND stock>=qty`), untracked product হলে no-op
+- ~~`bulkStatus` (`adjustInventory: false`) inventory reserve/release completely skip করত~~ — ✅ FIXED: `adjustInventory` param পুরোপুরি সরানো হয়েছে (single আর bulk এখন identical inventory behavior); বাড়তি হিসেবে per-order `try/catch` যোগ করা হয়েছে যাতে একটা order-এ insufficient-stock বাকি batch আটকে না দেয় — response এখন `{updated, failed:[{id, order_number, message}]}` রিপোর্ট করে
+
+**পরিবর্তিত ফাইল:** `backend/app/Services/OrderStatusService.php` (`adjustInventoryForStatusTransition` — variant + product দুটোই হ্যান্ডল করে), `backend/app/Http/Controllers/Api/OrderController.php::bulkStatus`
+
+**Verification:** rollback-wrapped tinker test — reserve/reject/release/untracked-no-op সবগুলো scenario আর bulk partial-failure (2 succeed + 1 skip, stock/response সঠিক) pass করেছে। কোনো migration লাগেনি (schema অপরিবর্তিত, শুধু query-level guard)। `php -l` clean, কোনো ব্রেকিং caller নেই (`transition()`-এর একমাত্র positional/named caller ছিল `bulkStatus`, বাকি সব caller ইতিমধ্যে default ব্যবহার করত)।
