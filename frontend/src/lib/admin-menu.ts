@@ -22,6 +22,7 @@ export type AdminMenuLabels = {
   landingTemplates?: string;
   landingPages?: string;
   platformBranding?: string;
+  facebookSettings?: string;
 };
 
 export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
@@ -39,6 +40,11 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
       key: "settings-platform-branding",
       label: labels.platformBranding ?? "Platform Branding",
       href: "/admin/settings/platform-branding",
+    },
+    {
+      key: "settings-facebook",
+      label: labels.facebookSettings ?? "Facebook App",
+      href: "/admin/settings/facebook",
     },
     {
       key: "settings-notification-templates",

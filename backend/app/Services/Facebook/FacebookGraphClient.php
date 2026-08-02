@@ -2,30 +2,30 @@
 
 namespace App\Services\Facebook;
 
+use App\Models\PlatformFacebookSetting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Thin wrapper around the Meta Graph API for the per-seller Page-connect
  * OAuth flow and webhook subscription. Credentials come from
- * config('services.facebook') (FACEBOOK_APP_ID / FACEBOOK_APP_SECRET /
- * FACEBOOK_WEBHOOK_VERIFY_TOKEN in .env) — see SAAS_MODULE_CONTEXT.md §16.3
- * for the Meta for Developers setup steps required before this goes live.
+ * PlatformFacebookSetting (super-admin UI: Admin → Settings → Facebook),
+ * falling back to FACEBOOK_APP_ID/APP_SECRET/WEBHOOK_VERIFY_TOKEN in .env
+ * when unset — see SAAS_MODULE_CONTEXT.md §15.11 for the Meta for
+ * Developers setup steps required before this goes live.
  */
 class FacebookGraphClient
 {
     private function baseUrl(): string
     {
-        $version = config('services.facebook.graph_version', 'v21.0');
-
-        return "https://graph.facebook.com/{$version}";
+        return 'https://graph.facebook.com/' . PlatformFacebookSetting::resolvedGraphVersion();
     }
 
     public function loginDialogUrl(string $redirectUri, string $state): string
     {
-        $version = config('services.facebook.graph_version', 'v21.0');
+        $version = PlatformFacebookSetting::resolvedGraphVersion();
         $params = http_build_query([
-            'client_id' => config('services.facebook.app_id'),
+            'client_id' => PlatformFacebookSetting::resolvedAppId(),
             'redirect_uri' => $redirectUri,
             'state' => $state,
             'response_type' => 'code',
@@ -47,8 +47,8 @@ class FacebookGraphClient
     public function exchangeCodeForUserToken(string $code, string $redirectUri): ?array
     {
         $response = Http::get("{$this->baseUrl()}/oauth/access_token", [
-            'client_id' => config('services.facebook.app_id'),
-            'client_secret' => config('services.facebook.app_secret'),
+            'client_id' => PlatformFacebookSetting::resolvedAppId(),
+            'client_secret' => PlatformFacebookSetting::resolvedAppSecret(),
             'redirect_uri' => $redirectUri,
             'code' => $code,
         ]);
@@ -72,8 +72,8 @@ class FacebookGraphClient
     {
         $response = Http::get("{$this->baseUrl()}/oauth/access_token", [
             'grant_type' => 'fb_exchange_token',
-            'client_id' => config('services.facebook.app_id'),
-            'client_secret' => config('services.facebook.app_secret'),
+            'client_id' => PlatformFacebookSetting::resolvedAppId(),
+            'client_secret' => PlatformFacebookSetting::resolvedAppSecret(),
             'fb_exchange_token' => $shortLivedToken,
         ]);
 
@@ -140,7 +140,7 @@ class FacebookGraphClient
             return false;
         }
 
-        $appSecret = (string) config('services.facebook.app_secret');
+        $appSecret = (string) PlatformFacebookSetting::resolvedAppSecret();
         if ($appSecret === '') {
             return false;
         }

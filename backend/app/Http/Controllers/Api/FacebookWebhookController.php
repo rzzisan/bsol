@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\PlatformFacebookSetting;
 use App\Services\Facebook\FacebookGraphClient;
 use App\Services\Facebook\FacebookLeadCaptureService;
 use Illuminate\Http\Request;
@@ -27,7 +28,7 @@ class FacebookWebhookController extends Controller
         $token = $request->query('hub_verify_token') ?? $request->query('hub.verify_token');
         $challenge = $request->query('hub_challenge') ?? $request->query('hub.challenge');
 
-        if ($mode === 'subscribe' && $token === config('services.facebook.webhook_verify_token') && $challenge) {
+        if ($mode === 'subscribe' && $token === PlatformFacebookSetting::resolvedWebhookVerifyToken() && $challenge) {
             return response((string) $challenge, 200)->header('Content-Type', 'text/plain');
         }
 

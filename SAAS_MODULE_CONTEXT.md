@@ -1,6 +1,6 @@
 # F-Commerce SaaS — Module Context
 
-Last updated: 2026-08-02 — Added §15 (full codebase feature audit, ground-truth scanned), §16 (prioritized recommendations), and §17 (deep line-by-line code review with specific file:line bugs/risks, 6-pass independent review covering every controller/service). Sections 12–14 below are the **original Phase 1/2 plan and are now stale** (last accurate as of 2026-05-04) — কোডবেস অনেক এগিয়ে গেছে তার পরে। **§15-কে "কী আছে" এবং §17-কে "কতটা ভালো/নিরাপদ" প্রশ্নের single source of truth হিসেবে ব্যবহার করো**, sections 12–14 শুধু historical record হিসেবে রাখা হয়েছে। **Courier provider abstraction (§16.2) commit `0fdc3ab`-এ সম্পন্ন — §16 suggested execution order-এ এখন Facebook/Meta MVP (16.3) পরবর্তী priority।**
+Last updated: 2026-08-02 — Added §15 (full codebase feature audit, ground-truth scanned), §16 (prioritized recommendations), and §17 (deep line-by-line code review with specific file:line bugs/risks, 6-pass independent review covering every controller/service). Sections 12–14 below are the **original Phase 1/2 plan and are now stale** (last accurate as of 2026-05-04) — কোডবেস অনেক এগিয়ে গেছে তার পরে। **§15-কে "কী আছে" এবং §17-কে "কতটা ভালো/নিরাপদ" প্রশ্নের single source of truth হিসেবে ব্যবহার করো**, sections 12–14 শুধু historical record হিসেবে রাখা হয়েছে। **Courier provider abstraction (§16.2) commit `0fdc3ab`-এ সম্পন্ন। Facebook/Meta lead-capture MVP (§16.3) কোড+deploy সম্পন্ন কিন্তু Meta App credentials না থাকায় এখনো live নয় — বিস্তারিত §15.11-এ। এই কাজের সময় একটা নতুন 🔴 CRITICAL finding ধরা পড়েছে: production-এ কোনো queue worker নেই, delayed SMS automation silently ভাঙা — §17.0 item #12 / §17.5-এ বিস্তারিত, এখনো ফিক্স করা হয়নি।**
 Status: Phase 1 complete; Phase 2 mostly complete (SMS automation, accounting, courier — 4 providers — all live); Analytics (sales/customer/courier — §15.7) এখন **DONE**; Shop Settings + payment-gateway automation + Facebook/Meta integration (incl. Ads ROI, যেটা Facebook-নির্ভর) still not started (§15/§16)। **§17-এর ১১টা 🔴/🟠 critical finding সবগুলো ফিক্স করা হয়েছে এবং deploy করা হয়েছে (২০২৬-০৮-০২, একই সেশনে) — বিস্তারিত §17.9-এ, implementation log-সহ।** Backend সব migrate/live; frontend XSS fix `npm run deploy:prod:safe` দিয়ে সফলভাবে deploy হয়েছে (৮/৮ ধাপ pass, `hybrid-frontend.service` active)। **নন-variant stock deduction + bulkStatus inventory gap (§17.9-এর শেষে) এখনো একই দিনে ফিক্স হয়েছে।** Analytics module (§16.1) একই দিনে শেষ — বিস্তারিত §15.7-এ, deploy-এর সময় একটা self-caused frontend build/restart incident হয়েছিল যেটা সাথে সাথে ধরা পড়ে ও ফিক্স হয়েছে (details §15.7-এ)।
 
 ---
@@ -87,6 +87,7 @@ export default function Page() {
 | `customer-list` | `customers` | `/dashboard/customers` |
 | `vip-customers` | `customers` | `/dashboard/customers/vip` |
 | `risky-customers` | `customers` | `/dashboard/customers/risky` |
+| `facebook-leads` | — (top-level) | `/dashboard/leads` |
 | `book-parcel` | `courier` | `/dashboard/courier` |
 | `track-orders` | `courier` | `/dashboard/courier/track` |
 | `courier-perf` | `courier` | `/dashboard/courier/performance` |
@@ -102,6 +103,7 @@ export default function Page() {
 | `profit` | `accounting` | `/dashboard/accounting/profit` |
 | `shop-profile` | `settings` | `/dashboard/settings/shop` |
 | `courier-accounts` | `settings` | `/dashboard/settings/courier` |
+| `facebook-connect` | `settings` | `/dashboard/settings/facebook` |
 | `subscription` | `settings` | `/dashboard/settings/subscription` |
 
 ---
@@ -706,13 +708,37 @@ backend/app/
 
 | মডিউল | ভেরিফিকেশন মেথড | ফলাফল |
 |---|---|---|
-| Facebook Graph API / Comment-Inbox bot / Messenger CRM / WhatsApp | `grep -rli facebook\|messenger\|whatsapp\|capi` পুরো backend+frontend-এ | শুধু "facebook_inbox" order-source label + FB video-embed domain whitelist — কোনো real API integration নেই |
+| ~~Facebook Graph API / Comment-Inbox bot / Messenger CRM~~ WhatsApp | — | WhatsApp এখনো সম্পূর্ণ অনুপস্থিত। Facebook/Messenger lead capture এখন §15.4-বহির্ভূত নতুন §15.11-এ move করা হলো — নিচে দেখুন |
 | Automated payment gateway (bKash/Nagad/SSLCommerz API) | `grep -rli bkash\|sslcommerz\|nagad` | শুধু manual trx-ID entry ফর্ম, কোনো SDK/API call নেই |
 | Staff/Team/sub-account roles | `grep -rli staff\|team_member` + users migration পড়া | `users.role` শুধু `user`/`admin` — কোনো per-shop multi-staff concept নেই |
 | Shop Profile Settings | `/dashboard/settings/shop/page.tsx` | Pure `ModulePlaceholder`, কোনো backend controller নেই |
 | Invoice / Waybill PDF generation | `composer.json`-এ dompdf/barryvdh নেই, controller grep-এ কিছু নেই | কোনো PDF export নেই — courier booking-এর পর প্রিন্টেবল label/invoice ফিচার অনুপস্থিত |
 | Bulk/CSV order import | `OrderController.php`-এ import/csv grep শূন্য | শুধু abandoned-checkout-এর export আছে, order-এর দিকে bulk import নেই |
 | PWA / mobile app manifest | `frontend/public/manifest*`, `sw.js` কিছুই নেই | Dashboard শুধু responsive web, installable PWA না |
+| WhatsApp integration | `grep -rli whatsapp` | কোনো trace নেই — এখনো সম্পূর্ণ অনুপস্থিত |
+
+### 15.11 Facebook/Meta Lead Capture — 🟡 PARTIAL (built 2026-08-02 — কোড লাইভ, Meta App configure করা হয়েছে, seller OAuth connect flow-এ একটা open issue এখনো আছে)
+
+**বিস্তারিত reference: [`facebook_integration_context.md`](facebook_integration_context.md)** — architecture diagram, প্রতিটা backend/frontend ফাইলের সম্পূর্ণ ম্যাপ, Meta App setup log (App ID, permissions, webhook config, App Domains/Redirect URI gotcha), known issue, এবং resume/debug করার জন্য quick-orientation — সব ওখানে। এই section শুধু summary।
+
+§16.3-এর MVP scope (per-seller Page comment + Messenger inbox lead capture → `customers` auto-save যখন ফোন নাম্বার message-এ পাওয়া যায়, নাহলে seller review-এর জন্য lead হিসেবে থাকে) পুরোপুরি কোড করা হয়েছে এবং backend+frontend দুটোই deploy হয়েছে। Meta for Developers App-ও তৈরি + configure করা হয়েছে (App ID `1900768904642203`, webhook ✅ verified) — কিন্তু seller-side "Connect Facebook Page" flow-এ একটা "Can't load URL" error এখনো debug চলছে (App Domains + Valid OAuth Redirect URI দুটোই সঠিকভাবে সেভ করা সত্ত্বেও, সম্ভবত Meta-র propagation delay) — বিস্তারিত `facebook_integration_context.md` §3-এ।
+
+**Backend (সব লাইভ, migrated):**
+- `facebook_page_connections` + `facebook_leads` টেবিল (per-user, `page_access_token`/`fb_user_access_token` `encrypted` cast)
+- `app/Services/Facebook/FacebookGraphClient.php` — OAuth code↔token exchange, long-lived token exchange, page listing, webhook subscribe/unsubscribe, `X-Hub-Signature-256` HMAC verification
+- `app/Services/Facebook/FacebookLeadCaptureService.php` — webhook payload → `FacebookLead` (dedupe key `(channel, fb_event_id)`), BD-phone regex-detect থেকে `Customer` auto-link
+- `FacebookConnectController` (per-seller OAuth connect/callback/page-picker/disconnect — signed `state` param, কারণ Meta-র redirect callback browser-এর full-page navigation, Sanctum bearer token বহন করে না), `FacebookWebhookController` (public, GET verify handshake + POST receive), `FacebookLeadController` (list/read/ignore/convert-to-customer)
+- Webhook processing **synchronous**, queue job না — কারণ deploy করার সময় ধরা পড়েছে এই deployment-এ **কোনো queue worker consumer নেই** (নিচে §17-এ নতুন critical finding হিসেবে যোগ করা হলো, এটা `SendAutomationSmsJob`-কেও প্রভাবিত করে)
+- `platform_facebook_settings` টেবিল (singleton row) + `PlatformFacebookSetting` মডেল — App ID/Secret/Webhook-verify-token DB-তে (encrypted cast) admin UI দিয়ে সেট করা যায়, `.env`-এর `FACEBOOK_*` শুধু fallback (DB খালি থাকলে ব্যবহৃত হয়)। `Api\Admin\PlatformFacebookSettingsController` (`GET/PUT /api/admin/settings/facebook`, `is_admin` gated) — secret কখনো plaintext ফেরত পাঠায় না, শুধু `{app_id, app_secret_set, webhook_verify_token_set}`
+- Verification: rollback-wrapped tinker test (dedupe on redelivery, phone auto-link, signature accept/reject, DB-config resolver + masked() hides secret) + live route/webhook smoke test (`curl` — 403 on bad signature/token, 401 on anonymous connect/admin endpoints) সব pass
+
+**Frontend (লাইভ, deploy করা হয়েছে):** `/dashboard/settings/facebook` (seller: connect/disconnect + multi-page picker), `/dashboard/leads` (seller: inbox, channel/status filter, convert-to-customer form), `/admin/settings/facebook` (super-admin: App ID/Secret/Webhook-token ফর্ম + webhook URL copy + setup checklist) — `user-shell.tsx` ও `admin-menu.ts` দুটোতেই মেনু যোগ করা হয়েছে
+
+**Go-live-এর আগে যা বাকি (external, কোড নয়) — বিস্তারিত `facebook_integration_context.md` §3:**
+1. ~~Meta App তৈরি + configure করা~~ — ✅ DONE (App ID `1900768904642203`, webhook verified)
+2. Seller OAuth connect flow-এর "Can't load URL" issue resolve/confirm করা (propagation delay সন্দেহ করা হচ্ছে, নিশ্চিত না)
+3. App Review-এর জন্য বাকি ৩টা field পূরণ করা: App icon (1024×1024), Privacy Policy URL, Category
+4. `pages_messaging` + `pages_manage_engagement` scope-এর জন্য App Review পাস করা (admin/tester অ্যাকাউন্ট দিয়ে আগে টেস্ট করা যাবে, review ছাড়া বাকি সব seller-এর জন্য কাজ করবে না)
 
 ---
 
@@ -730,10 +756,10 @@ backend/app/
 - `CourierController.php` 1138 → 692 lines; `book()`/`bookBulk()`/`trackOrder()` dispatch through the factory
 - Remaining follow-ups (not part of this refactor, still open): Carrybee bulk-booking + `cancel()` route wiring (§17.3), RedX/Carrybee test-connection endpoints
 
-### 16.3 Facebook/Meta-native ফিচার (সবচেয়ে বড় strategic gap)
-- **কেন:** Product vision-এ explicitly "ফেসবুকে বিক্রি করা ব্যবসায়ী" target audience, কিন্তু কোনো real FB integration নেই — এটাই আসল differentiator হতে পারতো
-- **সুপারিশকৃত স্কোপ (MVP):** Meta Graph API webhook দিয়ে Page comment/inbox lead capture → `customers` টেবিলে auto-save → seller-কে notify
-- **কোথায় শুরু:** নতুন `FacebookWebhookController` + webhook verification middleware (zyro-এর pattern reference হিসেবে দেখা যেতে পারে, CONTEXT.md §23 guardrails মেনে concept-adapt করে, copy-paste না করে)
+### 16.3 Facebook/Meta-native ফিচার (সবচেয়ে বড় strategic gap) — 🟡 কোড DONE, Meta App setup বাকি (২০২৬-০৮-০২)
+- **কেন:** Product vision-এ explicitly "ফেসবুকে বিক্রি করা ব্যবসায়ী" target audience, কিন্তু কোনো real FB integration ছিল না — এটাই আসল differentiator
+- **যা হয়েছে:** MVP scope (per-seller Page comment + Messenger inbox lead capture → phone পাওয়া গেলে `customers` auto-save, নাহলে `/dashboard/leads`-এ manual-convert lead) সম্পূর্ণ implement + deploy — বিস্তারিত §15.11-এ
+- **যা বাকি (external, কোড নয়):** Meta for Developers App তৈরি + App Review — §15.11-এর checklist অনুসরণ করুন
 
 ### 16.4 Payment Gateway অটোমেশন
 - **কেন:** দুই জায়গায় দরকার — (ক) কাস্টমার অর্ডারে অনলাইন পেমেন্ট কালেকশন (বর্তমানে সব manual/COD), (খ) নিজের subscription billing অটোমেট করা (বর্তমানে manual trx-ID + admin approval)
@@ -761,7 +787,7 @@ backend/app/
 ### Suggested execution order
 1. ~~Analytics (16.1)~~ — ✅ DONE (2026-08-02)
 2. ~~Courier abstraction hardening (16.2)~~ — ✅ DONE (2026-08-02, commit `0fdc3ab`)
-3. **Facebook/Meta MVP (16.3) — এখন পরবর্তী priority** — strategic differentiator, product vision-এর core target audience
+3. ~~Facebook/Meta MVP (16.3)~~ — 🟡 কোড DONE (2026-08-02), Meta App setup (external) বাকি — §15.11 দেখুন
 4. Payment gateway automation (16.4) — unblocks real revenue + better customer conversion
 5. Staff/Team roles (16.6), Invoice PDF (16.7), CSV import (16.8), PWA (16.9) — parallel-track, lower urgency
 
@@ -797,6 +823,7 @@ backend/app/
 | 9 | Order edit (shipping/discount বদলালে) courier charge ছাড়া accounting ledger refresh হয় না — pending/delivered order-এর ledger amount order-এর real total-এর সাথে stale হয়ে যেতে পারে | `OrderController.php:379-393` | 🟠 REAL BUG | ✅ FIXED |
 | 10 | `AdminController::deleteUser` — permanent hard delete (`User` model-এ `SoftDeletes` নেই), কোনো confirmation/undo/export ছাড়া একজন seller-এর সব order/product/transaction/landing-page/SMS history cascade delete হয়ে যায় | `AdminController.php:111-118` | 🔴 CRITICAL | ✅ FIXED |
 | 11 | Courier credential (Steadfast/Pathao/RedX/Carrybee/Paperfly-এর password fields) এবং email SMTP password — কোনো encryption cast ছাড়া plaintext-এ DB-তে store হয়, অথচ SMS gateway credential-এ ঠিকমতো `encrypted` cast আছে — inconsistent standard | `CourierSetting.php`, `EmailConfiguration.php` (`$hidden` আছে কিন্তু cast নেই) | 🔴 CRITICAL (data-at-rest exposure যদি DB কখনো compromise হয়) | ✅ FIXED |
+| 12 | **কোনো queue worker consumer নেই** এই deployment-এ (`QUEUE_CONNECTION=redis`, কিন্তু কোনো systemd/supervisor/cron `queue:work` নেই) — যেকোনো `delay_minutes > 0` SMS automation rule silently কখনো fire হয় না, Redis-এ চিরস্থায়ী জমা থাকে। Immediate-trigger (delay=0) rule প্রভাবিত না (sync path)। আবিষ্কৃত Facebook lead-capture webhook feature build করার সময় — বিস্তারিত §17.5-এ | কোনো `hybrid-queue-worker.service` নেই, `routes/console.php`-এ শুধু `app:expire-subscriptions` scheduled, `queue:work` কোথাও নেই | 🔴 CRITICAL (silent data/feature loss, delayed SMS automation broken) | ⛔ NOT FIXED — নতুন systemd service লাগবে |
 
 ### 17.1 Order + Product + Customer (Core Commerce)
 
@@ -877,9 +904,10 @@ backend/app/
 ### 17.5 SMS + Notification System
 
 - ✅ Data scoping architecture নিখুঁত: SMS automation rules per-user, SMS gateway/credit/notification template/email config সব সঠিকভাবে `adminScopeUserIds()` pattern মেনে admin-shared — CONTEXT.md §25-এর সাথে ১০০% সামঞ্জস্যপূর্ণ, কোনো scoping-উল্টো finding নেই
-- 🟠 Duplicate-send race + credit-deduction ignored-return (§17.0)
-- 🟠 `SendAutomationSmsJob`-এ `backoff()`/`failed()` handler নেই (contrast: `DispatchNotificationJob`-এ আছে) — নেটওয়ার্ক-লেভেল ব্যর্থতায় কোনো log-ই তৈরি হয় না, seller কিছুই দেখে না
-- 🔧 Delayed SMS-এ orphaned "queued" log row থেকে যায় (কখনো sent/failed-এ transition হয় না)
+- 🟠 Duplicate-send race + credit-deduction ignored-return (§17.0, ✅ ফিক্স হয়ে গেছে)
+- ~~`SendAutomationSmsJob`-এ `backoff()`/`failed()` handler নেই~~ — ✅ §17.9 fix #5-এ যোগ করা হয়েছে
+- 🔴 **নতুন CRITICAL finding (আবিষ্কৃত 2026-08-02, Facebook feature deploy করার সময়):** এই deployment-এ কোনো queue worker consumer নেই — `QUEUE_CONNECTION=redis` কিন্তু কোনো systemd/supervisor service বা cron `queue:work` নেই (শুধু `schedule:run` প্রতি মিনিটে চলে, যা নিজে queue consume করে না)। **Immediate-trigger (`delay_minutes=0`) SMS automation নিরাপদ** — `SmsAutomationService::handleOrderStatusChanged()` সেই path-এ সরাসরি sync `dispatchNow()` কল করে, queue ছোঁয় না (verified: `SmsAutomationService.php`)। কিন্তু **`delay_minutes > 0` সেট করা যেকোনো automation rule সম্পূর্ণভাবে silently ভাঙা** — `SendAutomationSmsJob::dispatch(...)->delay(...)` Redis-এ জমা হয়ে থাকে, কখনো process হয় না, কোনো error/log ছাড়াই SMS আর পাঠানো হয় না। `DispatchNotificationJob` ক্লাসটাও `ShouldQueue` কিন্তু grep-এ কোনো `::dispatch()` call site পাওয়া যায়নি (OTP/password-reset flow `NotificationDispatchService` সরাসরি sync কল করে) — সম্ভবত dead/unused code, প্রভাব নেই। Fix: `hybrid-queue-worker.service`-এর মতো একটা systemd service যোগ করে `php artisan queue:work --tries=3` persistent রাখা (courier/frontend systemd pattern অনুসরণ করে) — production-impacting, উচ্চ priority
+- 🔧 Delayed SMS-এ orphaned "queued" log row থেকে যায় (কখনো sent/failed-এ transition হয় না) — উপরের queue-worker gap-এর কারণে সম্ভবত আরও বেশি ঘটছে
 - 🔧 UI-তে `payment_due`/`failed_delivery_retry` trigger-type সিলেক্ট করা যায় কিন্তু কোনো কোড path সেগুলো কখনো fire করে না — dead UI option
 - ✅ Generic Notification Dispatch system **আসলে ব্যবহার হচ্ছে** (orphaned না) — OTP, password-reset, subscription-expiry flow-এ সরাসরি wired; এখানকার failure handling (backoff + `failed()`) SMS automation-এর চেয়ে বেশি robust
 - 🔴 SMTP password encryption-cast অনুপস্থিত (§17.0)

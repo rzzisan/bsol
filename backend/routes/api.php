@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\LandingTemplateController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
+use App\Http\Controllers\Api\Admin\PlatformFacebookSettingsController;
 use App\Http\Controllers\Api\Admin\PlatformSettingsController;
 use App\Http\Controllers\Api\Admin\LandingTemplateController as AdminLandingTemplateController;
 use App\Http\Controllers\Api\Admin\LandingPageAdminController;
@@ -381,6 +382,8 @@ Route::middleware('active_subscription')->group(function () {
         // Platform branding: attribution footer + public terms page content
         Route::get('/settings/platform-branding', [PlatformSettingsController::class, 'show']);
         Route::put('/settings/platform-branding', [PlatformSettingsController::class, 'update']);
+        Route::get('/settings/facebook', [PlatformFacebookSettingsController::class, 'show']);
+        Route::put('/settings/facebook', [PlatformFacebookSettingsController::class, 'update']);
 
         // Landing page templates — authored by converting a seller's landing
         // page into a reusable template (replaces the old CartFlows/Elementor

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\FacebookPageConnection;
+use App\Models\PlatformFacebookSetting;
 use App\Services\Facebook\FacebookGraphClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -45,7 +46,7 @@ class FacebookConnectController extends Controller
 
     public function redirect(): JsonResponse
     {
-        if (! config('services.facebook.app_id')) {
+        if (! PlatformFacebookSetting::resolvedAppId()) {
             return response()->json(['success' => false, 'message' => 'Facebook App is not configured on the server yet.'], 422);
         }
 
