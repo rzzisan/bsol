@@ -1,6 +1,6 @@
 # F-Commerce SaaS — Module Context
 
-Last updated: 2026-08-02 — Added §15 (full codebase feature audit, ground-truth scanned), §16 (prioritized recommendations), and §17 (deep line-by-line code review with specific file:line bugs/risks, 6-pass independent review covering every controller/service). Sections 12–14 below are the **original Phase 1/2 plan and are now stale** (last accurate as of 2026-05-04) — কোডবেস অনেক এগিয়ে গেছে তার পরে। **§15-কে "কী আছে" এবং §17-কে "কতটা ভালো/নিরাপদ" প্রশ্নের single source of truth হিসেবে ব্যবহার করো**, sections 12–14 শুধু historical record হিসেবে রাখা হয়েছে।
+Last updated: 2026-08-02 — Added §15 (full codebase feature audit, ground-truth scanned), §16 (prioritized recommendations), and §17 (deep line-by-line code review with specific file:line bugs/risks, 6-pass independent review covering every controller/service). Sections 12–14 below are the **original Phase 1/2 plan and are now stale** (last accurate as of 2026-05-04) — কোডবেস অনেক এগিয়ে গেছে তার পরে। **§15-কে "কী আছে" এবং §17-কে "কতটা ভালো/নিরাপদ" প্রশ্নের single source of truth হিসেবে ব্যবহার করো**, sections 12–14 শুধু historical record হিসেবে রাখা হয়েছে। **Courier provider abstraction (§16.2) commit `0fdc3ab`-এ সম্পন্ন — §16 suggested execution order-এ এখন Facebook/Meta MVP (16.3) পরবর্তী priority।**
 Status: Phase 1 complete; Phase 2 mostly complete (SMS automation, accounting, courier — 4 providers — all live); Analytics (sales/customer/courier — §15.7) এখন **DONE**; Shop Settings + payment-gateway automation + Facebook/Meta integration (incl. Ads ROI, যেটা Facebook-নির্ভর) still not started (§15/§16)। **§17-এর ১১টা 🔴/🟠 critical finding সবগুলো ফিক্স করা হয়েছে এবং deploy করা হয়েছে (২০২৬-০৮-০২, একই সেশনে) — বিস্তারিত §17.9-এ, implementation log-সহ।** Backend সব migrate/live; frontend XSS fix `npm run deploy:prod:safe` দিয়ে সফলভাবে deploy হয়েছে (৮/৮ ধাপ pass, `hybrid-frontend.service` active)। **নন-variant stock deduction + bulkStatus inventory gap (§17.9-এর শেষে) এখনো একই দিনে ফিক্স হয়েছে।** Analytics module (§16.1) একই দিনে শেষ — বিস্তারিত §15.7-এ, deploy-এর সময় একটা self-caused frontend build/restart incident হয়েছিল যেটা সাথে সাথে ধরা পড়ে ও ফিক্স হয়েছে (details §15.7-এ)।
 
 ---
@@ -632,7 +632,7 @@ backend/app/
 | RedX | ✅ DONE (§14.1-এ "MVP only" লেখা ছিল, এখন stale) | areas, pickup-stores CRUD, charge calc |
 | Carrybee | ✅ DONE — **§14.1-এ উল্লেখই ছিল না, সম্পূর্ণ নতুন 4th provider** | cities/zones/areas hierarchy, area-suggestion, stores CRUD — commit `26dc6f6` "full CarryBee booking integration" |
 | Bulk booking | ✅ DONE | `POST /courier/book/bulk` route আছে |
-| 🔧 Common provider contract / `CourierFactory` abstraction | NEEDS HARDENING | `CourierController.php` একাই 49KB — ৪টা provider-এর logic এক controller-এ; §14.1-এ পরিকল্পিত `create()/track()/cancel()/price()` common interface abstraction এখনো হয়নি, future maintainability-র জন্য দরকার |
+| Common provider contract / `CourierFactory` abstraction | ✅ DONE (2026-08-02, commit `0fdc3ab`) | `app/Services/Courier/CourierProviderInterface.php` + `CourierFactory` + `AbstractCourierProvider` + 4 provider classes (Steadfast/Pathao/RedX/Carrybee); `CourierController::book/bookBulk/trackOrder` dispatch through `CourierFactory::make()` — controller cut 1138→692 lines. RedX now in frontend bulk-booking selector. Carrybee still excluded from bulk (needs per-order area-search UI, documented in code) and its `cancel()` method still has no route wired to it (dead capability persists) |
 | 🔧 Status sync scheduler/webhook | NEEDS VERIFICATION | Manual tracking lookup route আছে (`GET /courier/track/{order}`), কিন্তু automatic webhook/cron-based status sync হচ্ছে কিনা কোডে স্পষ্ট না — verify করা দরকার |
 
 ### 15.4 Landing Page, Checkout, Recovery — (বিস্তারিত: `landing_page_context.md`)
@@ -725,9 +725,10 @@ backend/app/
 - **কোথায় শুরু:** নতুন `Api/AnalyticsController.php` — sales funnel query (`orders` টেবিল থেকে `status` group-by), product performance (`order_items` join `products`), courier-wise delivery/return rate (`courier_fraud_stats` + `orders.courier_status`)
 - **Frontend:** ৪টা existing placeholder page (`analytics/sales`, `/courier`, `/intelligence`, `/ads-roi`) replace করা
 
-### 16.2 Courier provider abstraction hardening
-- **কেন:** ৪টা provider (Steadfast/Pathao/RedX/Carrybee) সব একই 49KB `CourierController.php`-এ — maintainability risk, নতুন provider যোগ করা কঠিন হয়ে যাচ্ছে
-- **কোথায় শুরু:** `CourierFactory` + common interface (`create()/track()/cancel()/price()`) — §14.1-এ originally planned pattern-এ ফিরে গিয়ে refactor করা
+### 16.2 Courier provider abstraction hardening — ✅ DONE (2026-08-02, commit `0fdc3ab`)
+- `app/Services/Courier/` — `CourierProviderInterface` (`book/bookBulk/track/cancel`), `CourierFactory::make()`, `AbstractCourierProvider` (shared `bookBulk` default + `cancel` no-op fallback), 4 concrete providers
+- `CourierController.php` 1138 → 692 lines; `book()`/`bookBulk()`/`trackOrder()` dispatch through the factory
+- Remaining follow-ups (not part of this refactor, still open): Carrybee bulk-booking + `cancel()` route wiring (§17.3), RedX/Carrybee test-connection endpoints
 
 ### 16.3 Facebook/Meta-native ফিচার (সবচেয়ে বড় strategic gap)
 - **কেন:** Product vision-এ explicitly "ফেসবুকে বিক্রি করা ব্যবসায়ী" target audience, কিন্তু কোনো real FB integration নেই — এটাই আসল differentiator হতে পারতো
@@ -758,11 +759,13 @@ backend/app/
 - **কোথায় শুরু:** `next-pwa` বা native manifest.json + service worker যোগ করা — তুলনামূলক কম effort, existing responsive layout-এর উপর বসানো যায়
 
 ### Suggested execution order
-1. Analytics (16.1) — data already exists, fastest ROI
-2. Courier abstraction hardening (16.2) — technical debt, do before adding more providers
-3. Facebook/Meta MVP (16.3) — strategic differentiator
+1. ~~Analytics (16.1)~~ — ✅ DONE (2026-08-02)
+2. ~~Courier abstraction hardening (16.2)~~ — ✅ DONE (2026-08-02, commit `0fdc3ab`)
+3. **Facebook/Meta MVP (16.3) — এখন পরবর্তী priority** — strategic differentiator, product vision-এর core target audience
 4. Payment gateway automation (16.4) — unblocks real revenue + better customer conversion
 5. Staff/Team roles (16.6), Invoice PDF (16.7), CSV import (16.8), PWA (16.9) — parallel-track, lower urgency
+
+**Smaller open follow-ups (not full modules, can slot in anytime):** Carrybee bulk-booking + `cancel()` route wiring, RedX/Carrybee test-connection endpoints, Paperfly provider completion or removal, `FraudController::computeScore()` ↔ courier-fraud-data merge (§17.8 items 9/10).
 
 ---
 
@@ -846,15 +849,15 @@ backend/app/
 
 | Provider | মূল সমস্যা |
 |---|---|
-| Steadfast | 🟠 `courier_charge`-এ status string বসে (§17.0), 🟡 bulk booking response index-based correlation (invoice cross-check নেই, response reorder/drop হলে ভুল order-এ tracking ID লেগে যেতে পারে) |
-| Pathao | ✅ OAuth token refresh সঠিকভাবে implement করা (একমাত্র provider যেখানে expiry ঠিকমতো হ্যান্ডেল হয়), কিন্তু 🔧 `PathaoService` আর `PathaoLocationService`-এ দুটো আলাদা, ডাইভার্জড token-fetch implementation আছে (একটা DB-persisted, একটা শুধু cache) — maintenance trap |
-| RedX | ✅ backend সলিড (JWT column-width bug আগেই ফিক্স হয়েছে), কিন্তু 🟠 bulk booking + tracking-refresh backend-এ থাকলেও frontend-এ exposed না, no test-connection endpoint |
-| Carrybee | কাজ করে বুকিং-এ, কিন্তু 🟠 no test-connection, bulk-booking থেকে ইচ্ছাকৃতভাবে বাদ (documented), tracking-refresh UI-তে নেই, এবং `cancelOrder()` service method আছে কিন্তু কোনো route/controller call করে না — dead capability |
+| Steadfast | 🟠 `courier_charge`-এ status string বসে (§17.0, ফিক্স হয়ে গেছে), 🟡 bulk booking response index-based correlation (invoice cross-check নেই, response reorder/drop হলে ভুল order-এ tracking ID লেগে যেতে পারে) — এখনো open |
+| Pathao | ✅ OAuth token refresh সঠিকভাবে implement করা (একমাত্র provider যেখানে expiry ঠিকমতো হ্যান্ডেল হয়), কিন্তু 🔧 `PathaoService` আর `PathaoLocationService`-এ দুটো আলাদা, ডাইভার্জড token-fetch implementation আছে (একটা DB-persisted, একটা শুধু cache) — maintenance trap, এখনো open |
+| RedX | ✅ backend সলিড, ✅ bulk booking + frontend selector এখন exposed (২০২৬-০৮-০২ courier-abstraction কাজে) — 🔧 test-connection endpoint এখনো নেই |
+| Carrybee | কাজ করে বুকিং-এ, 🟠 bulk-booking থেকে এখনো ইচ্ছাকৃতভাবে বাদ (per-order area-search UI দরকার, কোডে documented), tracking-refresh UI-তে নেই, `cancel()` provider method-এ আছে কিন্তু কোনো route/controller call করে না — dead capability এখনো open, no test-connection endpoint |
 
-**Shared architecture — verdict: 🔧 fragile / high maintainability risk**
-- কোনো common `CourierProviderInterface` (`create()/track()/cancel()/price()`) নেই — ৪টা provider-এর logic পুরোপুরি bespoke, ১১৩৮-লাইনের `CourierController.php`-এ hand-written if/elseif chain
-- **প্রমাণ যে এই ঝুঁকি বাস্তব:** `courier_settings` টেবিলে `paperfly_username`/`paperfly_password` কলাম আগে থেকেই আছে, কিন্তু কোনো `PaperflyService`/controller/route নেই — ৫ম provider schema-লেভেলে শুরু হয়ে মাঝপথে ছেড়ে দেওয়া হয়েছে, এই architecture-এর খরচ ইতিমধ্যে একবার দেখা গেছে
-- কোথাও কোনো retry/backoff নেই; status sync সব provider-এ purely on-demand (কোনো webhook/scheduled job নেই)
+**Shared architecture — ✅ DONE (2026-08-02, commit `0fdc3ab`) — আগে 🔧 fragile ছিল, এখন resolved**
+- `app/Services/Courier/CourierProviderInterface.php` (`book()/bookBulk()/track()/cancel()`) + `CourierFactory::make()` + `AbstractCourierProvider` — ৪টা provider এখন একটা common contract মেনে চলে, `CourierController.php` (1138→692 লাইন) hand-written if/elseif chain বাদ দিয়ে factory-dispatch করে
+- **এখনো open:** `courier_settings` টেবিলে `paperfly_username`/`paperfly_password` কলাম আগে থেকেই আছে, কিন্তু কোনো `PaperflyService`/provider class/route নেই — ৫ম provider schema-লেভেলে শুরু হয়ে মাঝপথে ছেড়ে দেওয়া অবস্থাতেই আছে (নতুন abstraction-এ যোগ করা এখনো বাকি)
+- কোথাও কোনো retry/backoff নেই; status sync সব provider-এ purely on-demand (কোনো webhook/scheduled job নেই) — এই গ্যাপ অপরিবর্তিত
 
 ### 17.4 Landing Page + Checkout + Abandoned Checkout (Public-facing)
 
@@ -923,9 +926,9 @@ backend/app/
 5. **Courier credential + email SMTP password encryption cast** যোগ করা (`CourierSetting`, `EmailConfiguration` মডেলে `SmsGateway`-এর প্যাটার্ন অনুসরণ করে)
 6. **SMS credit deduction race ফিক্স** — `deduct()`-এর return value চেক করে log/alert করা, ideally SMS পাঠানোর আগে atomic reserve-then-confirm প্যাটার্নে যাওয়া
 7. **`AdminController::deleteUser`-এ soft-delete/confirmation** যোগ করা — accidental/malicious data loss ঠেকাতে
-8. **`CourierProviderInterface` abstraction** — Analytics/নতুন provider যোগ করার আগে এটা করলে ভবিষ্যতের cost অনেক কমবে (§16.2-এর সম্প্রসারণ)
-9. **RedX/Carrybee bulk-booking ও tracking-refresh UI-তে expose করা** — backend already সাপোর্ট করে, শুধু frontend gap
-10. **`FraudController::computeScore()` আর courier fraud data merge করা** — documented "+20 courier return" সিগন্যাল বাস্তবে score-এ যোগ করা, অথবা doc আপডেট করে honest রাখা যে এই দুটো আলাদা সিস্টেম
+8. ~~**`CourierProviderInterface` abstraction**~~ — ✅ DONE (2026-08-02, commit `0fdc3ab`) — বিস্তারিত §16.2/§17.3
+9. **RedX/Carrybee bulk-booking ও tracking-refresh UI-তে expose করা** — 🟡 আংশিক: RedX bulk-booking + selector এখন frontend-এ exposed (commit `0fdc3ab`-এর অংশ); Carrybee bulk-booking এখনো বাদ (area-search UI দরকার), tracking-refresh UI এখনো কোনো provider-এই নেই, Carrybee `cancel()` এখনো route-লেস
+10. **`FraudController::computeScore()` আর courier fraud data merge করা** — documented "+20 courier return" সিগন্যাল বাস্তবে score-এ যোগ করা, অথবা doc আপডেট করে honest রাখা যে এই দুটো আলাদা সিস্টেম — এখনো open
 
 ### 17.9 §17.0-এর ১১টা CRITICAL fix implementation log (2026-08-02, একই সেশনে সব প্রয়োগ করা হয়েছে)
 
