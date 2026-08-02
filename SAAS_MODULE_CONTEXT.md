@@ -1,7 +1,7 @@
 # F-Commerce SaaS — Module Context
 
-Last updated: 2026-05-04
-Status: **Phase 1 COMPLETE ✅** — All 6 modules implemented and deployed.
+Last updated: 2026-08-02 — Added §15 (full codebase feature audit, ground-truth scanned), §16 (prioritized recommendations), and §17 (deep line-by-line code review with specific file:line bugs/risks, 6-pass independent review covering every controller/service). Sections 12–14 below are the **original Phase 1/2 plan and are now stale** (last accurate as of 2026-05-04) — কোডবেস অনেক এগিয়ে গেছে তার পরে। **§15-কে "কী আছে" এবং §17-কে "কতটা ভালো/নিরাপদ" প্রশ্নের single source of truth হিসেবে ব্যবহার করো**, sections 12–14 শুধু historical record হিসেবে রাখা হয়েছে।
+Status: Phase 1 complete; Phase 2 mostly complete (SMS automation, accounting, courier — 4 providers — all live); Analytics + Shop Settings + payment-gateway automation + Facebook/Meta integration still not started (§15/§16)। **§17-এর ১১টা 🔴/🟠 critical finding সবগুলো ফিক্স করা হয়েছে এবং deploy করা হয়েছে (২০২৬-০৮-০২, একই সেশনে) — বিস্তারিত §17.9-এ, implementation log-সহ।** Backend সব migrate/live; frontend XSS fix `npm run deploy:prod:safe` দিয়ে সফলভাবে deploy হয়েছে (৮/৮ ধাপ pass, `hybrid-frontend.service` active)।
 
 ---
 
@@ -593,3 +593,352 @@ backend/app/
 2. [x] Accounting
 3. [ ] Analytics
 4. [ ] Courier hardening + RedX completion (parallel track)
+
+---
+
+## 15. প্রকৃত কোডবেস অবস্থা — Feature Audit (স্ক্যান করা: 2026-08-02)
+
+এই section সরাসরি কোডবেস স্ক্যান (controllers, routes/api.php, migrations, frontend page tree) করে বানানো — অনুমান নয়। ভবিষ্যতের যেকোনো AI agent/engineer নতুন কাজ শুরুর আগে এই section থেকে module-এর real status verify করবে, উপরের §12–§14 (2026-05-04-এর প্ল্যান, stale) থেকে না।
+
+**Status legend:**
+- ✅ **DONE** — backend + frontend দুটোই আছে, production route wired
+- 🟡 **PARTIAL** — কাজ করে কিন্তু গুরুত্বপূর্ণ অংশ বাকি/manual workaround
+- 🔧 **NEEDS HARDENING** — functionally আছে কিন্তু quality/reliability/UX gap আছে বলে চিহ্নিত
+- ⛔ **NOT STARTED** — কোনো backend controller/route নেই, বা শুধু placeholder UI
+
+### 15.1 Core Commerce
+
+| Module | Status | কোথায় (ground truth) | নোট |
+|---|---|---|---|
+| Auth & Onboarding | ✅ DONE | `AuthController`, `OtpController`, `EmailOtpController`, `PasswordResetController` | Register/login, mobile+email OTP verification, password reset flow — সবই live |
+| Order Management | ✅ DONE | `OrderController.php` (CRUD, stats, bulk-status, create-bootstrap), `OrderStatusService.php` | Status change একটা centralized service দিয়ে হয় যেটা SMS automation + accounting + fraud check তিনটাই trigger করে — এটা §14.2-এর "Event/Listener" আইটেমের কার্যকর বিকল্প (আলাদা Laravel Event/Listener লেখা হয়নি, কিন্তু একই কাজ হচ্ছে) |
+| Product Management | ✅ DONE (originally-planned scope ছাড়িয়ে গেছে) | `ProductController`, `ProductCategoryController`, `ProductMediaController`, `ProductVariantController` (21.6KB) | পূর্ণ **variant/SKU system** আছে (options, values, variant combinations, bulk update, auto-generate) — এটা original module plan-এ ছিলই না, বড় undocumented addition। Frontend: `variant-picker-modal.tsx`, `variant-table.tsx`, `variants-tab.tsx` |
+| Customer CRM | ✅ DONE | `CustomerController.php` | lookup-by-phone, stats, sync-all, toggle-block, VIP/risky auto-tag pages সব লাইভ |
+| Order source = "facebook_inbox" | 🟡 লেবেল-only | `StoreOrderRequest.php:26`, `order-intake-form.tsx` | এটা শুধু একটা dropdown ট্যাগ ("এই অর্ডার কোথা থেকে এসেছে" রেকর্ড করার জন্য) — কোনো Facebook API/webhook connectivity নেই। §15.4-এ "Facebook/Meta integration ⛔" এন্ট্রির সাথে গুলিয়ে ফেলা যাবে না |
+
+### 15.2 Fraud & Risk
+
+| Module | Status | কোথায় | নোট |
+|---|---|---|---|
+| Internal Fraud Check + Blacklist | ✅ DONE | `FraudController.php` (5 routes), `customer_fraud_profiles` + `customer_blacklist` tables | Phone-history ভিত্তিক scoring, manual blacklist |
+| Courier-based Fraud/Delivery-history Check | ✅ DONE — **undocumented বড় addition** | `CourierFraudCheckController.php` + `CourierFraudCheckService` + provider-specific services: `SteadfastFraudCheckService`, `PathaoFraudCheckService`, `RedxFraudCheckService`, `CarrybeeFraudCheckService`, `PaperflyFraudCheckService`, `courier_fraud_stats` table | কোনো ফোন নাম্বার একাধিক courier-এর delivery/return history-তে চেক করে (cross-courier), ফলাফল shared cache-এ (§ CONTEXT.md commit `25a0095` "share courier fraud-check cache across all sellers")। এই পুরো module মূল `SAAS_MODULE_CONTEXT.md`-এ কখনো ডকুমেন্ট হয়নি |
+
+### 15.3 Courier Integration
+
+| Provider | Status | নোট |
+|---|---|---|
+| Steadfast | ✅ DONE | Booking, status (consignment/invoice/tracking), balance, return-requests CRUD, payments, police-stations — সবচেয়ে সম্পূর্ণ |
+| Pathao | ✅ DONE (§14.1-এ "not started" লেখা ছিল, এখন stale) | stores CRUD, price calc, location hierarchy (cities/zones/areas), OAuth token flow (`courier_settings`-এ token fields) |
+| RedX | ✅ DONE (§14.1-এ "MVP only" লেখা ছিল, এখন stale) | areas, pickup-stores CRUD, charge calc |
+| Carrybee | ✅ DONE — **§14.1-এ উল্লেখই ছিল না, সম্পূর্ণ নতুন 4th provider** | cities/zones/areas hierarchy, area-suggestion, stores CRUD — commit `26dc6f6` "full CarryBee booking integration" |
+| Bulk booking | ✅ DONE | `POST /courier/book/bulk` route আছে |
+| 🔧 Common provider contract / `CourierFactory` abstraction | NEEDS HARDENING | `CourierController.php` একাই 49KB — ৪টা provider-এর logic এক controller-এ; §14.1-এ পরিকল্পিত `create()/track()/cancel()/price()` common interface abstraction এখনো হয়নি, future maintainability-র জন্য দরকার |
+| 🔧 Status sync scheduler/webhook | NEEDS VERIFICATION | Manual tracking lookup route আছে (`GET /courier/track/{order}`), কিন্তু automatic webhook/cron-based status sync হচ্ছে কিনা কোডে স্পষ্ট না — verify করা দরকার |
+
+### 15.4 Landing Page, Checkout, Recovery — (বিস্তারিত: `landing_page_context.md`)
+
+| Module | Status | নোট |
+|---|---|---|
+| Landing Page Builder (bn/en bilingual) | ✅ DONE | পূর্ণ page builder, editor drafts/versions, elements — আলাদা deep-reference ফাইল আছে |
+| Landing Page Templates (seller→template conversion) | ✅ DONE | commit `8ff57c1` — পুরনো CartFlows/Elementor importer বাদ দিয়ে নতুন pattern |
+| Landing Page Analytics | ✅ DONE | visits, by-country, by-referrer, link-visit-to-order — `LandingPageAnalyticsService` |
+| Media Library | ✅ DONE | `LandingMediaLibraryController` |
+| Checkout OTP verification | ✅ DONE | `CheckoutOtpController/Service` — public checkout phone verify |
+| **Abandoned Checkout Recovery** | ✅ DONE — **সম্পূর্ণ নতুন module, original plan-এ ছিলই না** | `AbandonedCheckoutController/Service`, resume flow, stats + CSV export, frontend `/dashboard/abandoned-checkouts` |
+| Admin moderation (lock/unlock/publish) | ✅ DONE | commit `8d78ab2` |
+
+### 15.5 Communication (SMS / Email / Notification)
+
+| Module | Status | নোট |
+|---|---|---|
+| Manual SMS send + gateway assignment | ✅ DONE | multi-gateway, admin-scoped |
+| SMS Credit system | ✅ DONE | admin recharge, per-user balance, history |
+| SMS Automation rules + trigger | ✅ DONE | Order status change → `OrderStatusService` → `SmsAutomationService` → `SendAutomationSmsJob` (delay + idempotency guard) |
+| Generic Notification Template + Dispatch system (admin-shared) | ✅ DONE — **§SAAS_MODULE_CONTEXT.md-এ কখনো documented হয়নি** | `NotificationTemplateController`, `NotificationUseCaseBindingController`, `NotificationDispatchController/Service`, `DispatchNotificationJob`, `EmailConfigurationController` — SMS+Email দুটো channel-ই cover করে, `adminScopeUserIds()` pattern (CONTEXT.md §25) মেনে চলে |
+| 🔧 Retry + failure-reason log pipeline | NEEDS HARDENING | §14.2-তে unchecked ছিল, এখনো নিশ্চিত না যে failed SMS auto-retry হয় |
+
+### 15.6 Accounting
+
+| Module | Status | নোট |
+|---|---|---|
+| Auto-ledger (order created/delivered, courier charge) | ✅ DONE | |
+| Manual transaction CRUD | ✅ DONE | |
+| Summary / Expenses / Profit pages | ✅ DONE | |
+
+### 15.7 Analytics (seller-facing)
+
+| Module | Status | নোট |
+|---|---|---|
+| Sales funnel, Product performance, Customer intelligence, Ads ROI, Courier analytics | ⛔ **NOT STARTED** | চারটা frontend page (`analytics/sales`, `/courier`, `/intelligence`, `/ads-roi`) সব **pure `ModulePlaceholder`** — কোনো backend controller নেই। §14.4-এর checklist যেমন ছিল ঠিক তেমনই আছে, ৩ মাসে অগ্রগতি হয়নি। **এটা এখন সবচেয়ে বড়/সবচেয়ে পুরনো unfinished-known-gap।** |
+
+### 15.8 Subscription & Billing
+
+| Module | Status | নোট |
+|---|---|---|
+| Subscription packages, plan display | ✅ DONE | `SubscriptionController::plans/mySubscription` |
+| Manual bKash payment submission + admin approve/reject | ✅ DONE | `submitPayment` (sender number + trx ID) → `AdminSubscriptionController::approvePayment/rejectPayment` |
+| `active_subscription` middleware gating | ✅ DONE | Landing-page ও অন্যান্য premium route এই middleware-এ gated |
+| **Automated payment gateway (bKash/Nagad/SSLCommerz API auto-verify)** | ⛔ NOT STARTED | বর্তমান flow পুরোপুরি manual — কাস্টমার নিজে bKash নাম্বারে পাঠায়, trx ID লিখে জমা দেয়, admin manually approve করে। এটা §16-এর top recommendation |
+| **Customer-order-এর জন্য অনলাইন পেমেন্ট কালেকশন** | ⛔ NOT STARTED | `payment_method: bkash/online` অর্ডারে শুধু একটা label — বাস্তবে কোনো gateway charge/callback হয় না, effectively সব COD |
+
+### 15.9 Admin Panel
+
+| Module | Status | নোট |
+|---|---|---|
+| User management, Package management, Registration defaults | ✅ DONE | |
+| Billing settings + payment approval queue | ✅ DONE | |
+| SMS gateway + credit admin | ✅ DONE | |
+| Email configuration admin | ✅ DONE | |
+| Notification template + use-case binding | ✅ DONE | |
+| Landing template authoring + Landing page moderation | ✅ DONE | |
+| Platform branding + product-media settings | ✅ DONE | |
+
+### 15.10 সম্পূর্ণ অনুপস্থিত মডিউল (কোডবেসে কোনো trace নেই — grep-verified)
+
+| মডিউল | ভেরিফিকেশন মেথড | ফলাফল |
+|---|---|---|
+| Facebook Graph API / Comment-Inbox bot / Messenger CRM / WhatsApp | `grep -rli facebook\|messenger\|whatsapp\|capi` পুরো backend+frontend-এ | শুধু "facebook_inbox" order-source label + FB video-embed domain whitelist — কোনো real API integration নেই |
+| Automated payment gateway (bKash/Nagad/SSLCommerz API) | `grep -rli bkash\|sslcommerz\|nagad` | শুধু manual trx-ID entry ফর্ম, কোনো SDK/API call নেই |
+| Staff/Team/sub-account roles | `grep -rli staff\|team_member` + users migration পড়া | `users.role` শুধু `user`/`admin` — কোনো per-shop multi-staff concept নেই |
+| Shop Profile Settings | `/dashboard/settings/shop/page.tsx` | Pure `ModulePlaceholder`, কোনো backend controller নেই |
+| Invoice / Waybill PDF generation | `composer.json`-এ dompdf/barryvdh নেই, controller grep-এ কিছু নেই | কোনো PDF export নেই — courier booking-এর পর প্রিন্টেবল label/invoice ফিচার অনুপস্থিত |
+| Bulk/CSV order import | `OrderController.php`-এ import/csv grep শূন্য | শুধু abandoned-checkout-এর export আছে, order-এর দিকে bulk import নেই |
+| PWA / mobile app manifest | `frontend/public/manifest*`, `sw.js` কিছুই নেই | Dashboard শুধু responsive web, installable PWA না |
+
+---
+
+## 16. সুপারিশকৃত নতুন ফিচার ও উন্নয়ন (Prioritized Recommendations, 2026-08-02)
+
+§15-এর audit অনুযায়ী priority order — প্রতিটার সাথে "কেন" এবং "কোথায় শুরু করতে হবে" যোগ করা হলো যাতে ভবিষ্যতের agent সরাসরি কাজ শুরু করতে পারে।
+
+### 16.1 Analytics module শেষ করা (সর্বোচ্চ priority)
+- **কেন:** §14.4-এ ৩ মাস আগেই planned, এখনো ০% অগ্রগতি; ডেটা ইতিমধ্যে আছে (`orders`, `transactions`, `courier_fraud_stats`) — নতুন backend controller লিখলেই কাজ শুরু করা যায়, কম effort/high value
+- **কোথায় শুরু:** নতুন `Api/AnalyticsController.php` — sales funnel query (`orders` টেবিল থেকে `status` group-by), product performance (`order_items` join `products`), courier-wise delivery/return rate (`courier_fraud_stats` + `orders.courier_status`)
+- **Frontend:** ৪টা existing placeholder page (`analytics/sales`, `/courier`, `/intelligence`, `/ads-roi`) replace করা
+
+### 16.2 Courier provider abstraction hardening
+- **কেন:** ৪টা provider (Steadfast/Pathao/RedX/Carrybee) সব একই 49KB `CourierController.php`-এ — maintainability risk, নতুন provider যোগ করা কঠিন হয়ে যাচ্ছে
+- **কোথায় শুরু:** `CourierFactory` + common interface (`create()/track()/cancel()/price()`) — §14.1-এ originally planned pattern-এ ফিরে গিয়ে refactor করা
+
+### 16.3 Facebook/Meta-native ফিচার (সবচেয়ে বড় strategic gap)
+- **কেন:** Product vision-এ explicitly "ফেসবুকে বিক্রি করা ব্যবসায়ী" target audience, কিন্তু কোনো real FB integration নেই — এটাই আসল differentiator হতে পারতো
+- **সুপারিশকৃত স্কোপ (MVP):** Meta Graph API webhook দিয়ে Page comment/inbox lead capture → `customers` টেবিলে auto-save → seller-কে notify
+- **কোথায় শুরু:** নতুন `FacebookWebhookController` + webhook verification middleware (zyro-এর pattern reference হিসেবে দেখা যেতে পারে, CONTEXT.md §23 guardrails মেনে concept-adapt করে, copy-paste না করে)
+
+### 16.4 Payment Gateway অটোমেশন
+- **কেন:** দুই জায়গায় দরকার — (ক) কাস্টমার অর্ডারে অনলাইন পেমেন্ট কালেকশন (বর্তমানে সব manual/COD), (খ) নিজের subscription billing অটোমেট করা (বর্তমানে manual trx-ID + admin approval)
+- **কোথায় শুরু:** bKash PGW বা SSLCommerz sandbox integration — `SubscriptionController::submitPayment` flow-টাকে auto-verify করার মাধ্যমে শুরু করা সহজ (scope ছোট, existing manual flow পাশে রেখে গ্র্যাজুয়ালি migrate করা যায়)
+
+### 16.5 Multi-courier rate/ETA compare + bulk booking UX উন্নতি
+- **কেন:** Bulk booking backend route আগে থেকেই আছে (`/courier/book/bulk`) — কিন্তু booking-এর আগে ৪টা provider-এর rate/ETA পাশাপাশি compare করার UI আছে কিনা যাচাই করা দরকার; না থাকলে যোগ করা তুলনামূলক কম effort (backend price API সব provider-এই আছে)
+
+### 16.6 Staff/Team role (multi-user per shop)
+- **কেন:** ছোট F-commerce বিজনেসেও সাধারণত ২-৩ জন অর্ডার প্রসেস করে; বর্তমানে `users.role` শুধু `user`/`admin`, per-shop sub-account নেই
+- **কোথায় শুরু:** `shop_staff` pivot/table (owner_user_id, staff_user_id, permissions jsonb) + সব controller-এ owner-scoping যোগ করা (CONTEXT.md §25-এর `adminScopeUserIds()` pattern-এর অনুরূপ কিন্তু shop-level)
+
+### 16.7 Invoice/Waybill PDF generation
+- **কেন:** Courier booking-এর পর printable label/invoice নেই — physical delivery workflow-এ এটা প্রায় mandatory বাংলাদেশি courier practice-এ
+- **কোথায় শুরু:** `barryvdh/laravel-dompdf` (composer) + booking response থেকে waybill template render
+
+### 16.8 Bulk/CSV order import
+- **কেন:** Facebook কমেন্ট থেকে কপি-পেস্ট করে bulk অর্ডার এন্ট্রির সুবিধা এখনো নেই, abandoned-checkout-এর মতো export আছে কিন্তু import নেই
+- **কোথায় শুরু:** `OrderController` এ নতুন `import` endpoint + CSV parser, existing `StoreOrderRequest` validation reuse করে
+
+### 16.9 Mobile experience (PWA)
+- **কেন:** টার্গেট ইউজারদের বড় অংশ মোবাইল-অনলি; বর্তমানে শুধু responsive web, installable/offline-capable না
+- **কোথায় শুরু:** `next-pwa` বা native manifest.json + service worker যোগ করা — তুলনামূলক কম effort, existing responsive layout-এর উপর বসানো যায়
+
+### Suggested execution order
+1. Analytics (16.1) — data already exists, fastest ROI
+2. Courier abstraction hardening (16.2) — technical debt, do before adding more providers
+3. Facebook/Meta MVP (16.3) — strategic differentiator
+4. Payment gateway automation (16.4) — unblocks real revenue + better customer conversion
+5. Staff/Team roles (16.6), Invoice PDF (16.7), CSV import (16.8), PWA (16.9) — parallel-track, lower urgency
+
+---
+
+## 17. গভীর কোড-লেভেল রিভিউ — নির্দিষ্ট বাগ/ঝুঁকি ফাইন্ডিংস (deep review: 2026-08-02)
+
+§15 শুধু "এই ফিচার আছে কিনা" (presence) যাচাই করেছিল। এই section-এ প্রতিটা core module-এর actual controller/service কোড লাইন-বাই-লাইন পড়ে (৬টা independent deep-review pass দিয়ে) correctness, per-user data isolation, race condition, error handling, এবং security যাচাই করা হয়েছে — অনুমান নয়, প্রতিটা finding নির্দিষ্ট file:line-এ verify করা।
+
+**Severity legend:**
+- 🔴 **CRITICAL** — security বা টাকা-সংক্রান্ত সঠিকতার বাগ, দ্রুত ফিক্স দরকার
+- 🟠 **REAL BUG** — নিশ্চিত functional correctness সমস্যা, প্রোডাকশনে প্রভাব ফেলে
+- 🟡 **RISK / RACE** — concurrency বা architectural ঝুঁকি — এখনো ক্ষতি না করলেও করবে scale-এ
+- 🔧 **HARDENING** — maintainability/robustness gap, break করছে না কিন্তু ভবিষ্যতে ব্যয়বহুল হবে
+- ✅ **VERIFIED SOLID** — deep-review করে নিশ্চিত হওয়া গেছে যে সঠিকভাবে implemented
+
+### 17.0 সবচেয়ে জরুরি (fix first)
+
+**সবগুলো ✅ FIXED এবং LIVE (2026-08-02, একই সেশনে) — বিস্তারিত §17.9-এ।** Backend fix সব migrate করা ও production DB-তে live। Frontend fix (#4)-ও `npm run deploy:prod:safe` দিয়ে deploy করা হয়েছে (৮/৮ ধাপ pass) — live site এখন sanitized কোড সার্ভ করছে।
+
+| # | Finding | কোথায় | Severity | Fix status |
+|---|---|---|---|---|
+| 1 | Subscription payment approval-এ `trx_id`-এর কোনো uniqueness check নেই — একই bKash trx_id একাধিকবার submit/approve করে subscription বিনামূল্যে extend করা সম্ভব | `SubscriptionController::submitPayment`, `subscription_payments` migration (কোনো unique index নেই), `AdminSubscriptionController::approvePayment` | 🔴 CRITICAL | ✅ FIXED |
+| 2 | Public landing-page checkout submit (`POST /public/landing-pages/{slug}/order`) এবং page view (`GET .../{slug}`) route-এ কোনো rate-limit/throttle নেই — বাকি সব public route-এ আছে | `routes/api.php:69-70` | 🔴 CRITICAL | ✅ FIXED |
+| 3 | `bootstrap/app.php`-এ `trustProxies(at: '*')` — client-supplied `X-Forwarded-For` blindly trust করা হয়, ফলে বাকি সব IP-based throttle (OTP verify/resend সহ) spoofed header দিয়ে bypass করা সম্ভব | `bootstrap/app.php:21` | 🔴 CRITICAL | ✅ FIXED |
+| 4 | Landing page builder-এর `content.html_sections[].html` raw HTML হিসেবে `dangerouslySetInnerHTML`-এ কোনো sanitization ছাড়াই render হয় — compromised/malicious seller account visitor browser-এ script inject করতে পারে (stored XSS) | `public-landing-page-view.tsx:1208`, backend কোনো sanitize করে না | 🔴 CRITICAL | ✅ FIXED + DEPLOYED |
+| 5 | SMS automation-এর duplicate-send guard একটা check-then-act race — কোনো DB unique constraint নেই `sms_automation_logs`-এ, concurrent status update হলে duplicate SMS + duplicate credit charge সম্ভব | `SmsAutomationService.php:36-56`, migration-এ unique index অনুপস্থিত | 🟠 REAL BUG | ✅ FIXED |
+| 6 | SMS credit deduction-এর return value ignore করা হয় automation path-এ — race-condition-এ SMS আসলে পাঠানো হয় (টাকা খরচ) কিন্তু credit deduct না হয়ে "sent" মার্ক হয়ে যায়, কোনো accounting mismatch log থাকে না | `SmsAutomationService.php:124-165`, একই প্যাটার্ন `AdminSmsGatewayController::send():508-514` | 🟠 REAL BUG | ✅ FIXED |
+| 7 | Steadfast courier booking-এ `courier_charge` কলামে ভুলবশত delivery fee-এর বদলে status string বসানো হয় — decimal cast silently `0.00`-তে coerce করে, প্রতিটা Steadfast booking-এর ফি ডেটা করাপ্ট | `CourierController.php:713` | 🟠 REAL BUG | ✅ FIXED |
+| 8 | `OrderStatusService`-এ variant stock decrement (`stock_qty`) কোনো row lock/floor check ছাড়া হয় — concurrent order confirm হলে stock negative-এ যেতে পারে (overselling); সাধারণ (non-variant) `track_stock` product-এ stock deduction path-ই নেই | `OrderStatusService.php:63`, `product_variants` migration-এ CHECK constraint নেই | 🟠 REAL BUG | ✅ FIXED (variant path; non-variant track_stock gap এখনো open, §16 নতুন item হিসেবে যোগ করা উচিত) |
+| 9 | Order edit (shipping/discount বদলালে) courier charge ছাড়া accounting ledger refresh হয় না — pending/delivered order-এর ledger amount order-এর real total-এর সাথে stale হয়ে যেতে পারে | `OrderController.php:379-393` | 🟠 REAL BUG | ✅ FIXED |
+| 10 | `AdminController::deleteUser` — permanent hard delete (`User` model-এ `SoftDeletes` নেই), কোনো confirmation/undo/export ছাড়া একজন seller-এর সব order/product/transaction/landing-page/SMS history cascade delete হয়ে যায় | `AdminController.php:111-118` | 🔴 CRITICAL | ✅ FIXED |
+| 11 | Courier credential (Steadfast/Pathao/RedX/Carrybee/Paperfly-এর password fields) এবং email SMTP password — কোনো encryption cast ছাড়া plaintext-এ DB-তে store হয়, অথচ SMS gateway credential-এ ঠিকমতো `encrypted` cast আছে — inconsistent standard | `CourierSetting.php`, `EmailConfiguration.php` (`$hidden` আছে কিন্তু cast নেই) | 🔴 CRITICAL (data-at-rest exposure যদি DB কখনো compromise হয়) | ✅ FIXED |
+
+### 17.1 Order + Product + Customer (Core Commerce)
+
+**Order (`OrderController.php`, `OrderStatusService.php`, `StoreOrderRequest.php`) — verdict: functional-with-gaps**
+- 🟠 `store()`-এ শুধু `product_variant_id` পাঠালে (কোনো `product_id` ছাড়া) ownership check bypass হয় — অন্য seller-এর variant নিজের অর্ডারে যোগ করা সম্ভব তাত্ত্বিকভাবে (low exploitability, কিন্তু per-user isolation policy-র সাথে সাংঘর্ষিক) (line 245-270)
+- 🟠 Stock check `store()`-এ (line 290) TOCTOU — creation-time-এ validate হয়, decrement হয় status-transition-এ, মাঝখানে দুটো concurrent order একই limited stock pass করতে পারে
+- 🟡 `Order::generateOrderNumber()` কোনো lock ছাড়া `orderByDesc('id')` — রেসে unique constraint violation-এ uncaught `QueryException` (500) হয়, data করাপ্ট হয় না কিন্তু ইউজার একটা raw error পায়
+- ✅ সব query (`index/stats/show/update/updateStatus/bulkStatus/destroy/createBootstrap`) সঠিকভাবে `user_id` scoped
+- ✅ `store()` `DB::transaction`-এ wrapped, ভালো error handling (`ValidationException::withMessages`)
+- 🔧 `bulkStatus` ইচ্ছাকৃতভাবে inventory adjustment skip করে (`adjustInventory: false`) — single vs bulk status-change আচরণে inconsistency
+
+**Product + Variants (`ProductController.php`, `ProductVariantController.php`, `ProductMediaController.php`, `ProductCategoryController.php`) — verdict: production-solid, কোডবেসের সবচেয়ে ভালো-লেখা অংশ**
+- ✅ প্রতিটা action-এ `authorizeProduct()` + nested resource ownership check (option/value/variant সব ID-substitution-প্রুফ)
+- ✅ Variant `generate()` race-safe: প্রতি-row `UniqueConstraintViolationException` catch করে ব্যাচ চালিয়ে যায় (contrast: `OrderStatusService`-এর মতো lock-less নয়)
+- ✅ Media upload MIME/size/dimension সার্ভার-সাইড enforce করা, primary-thumbnail invariant বজায় থাকে
+- ✅ Variant/SKU system পুরোপুরি end-to-end wired — backend generate/resolve/bulk-update, frontend `variant-picker-modal.tsx`/`variant-table.tsx`/`variants-tab.tsx` সবই আসলে ব্যবহার করছে (orphan না)
+- 🔧 SKU uniqueness global (per-user না) — এক seller-এর SKU অন্য seller-কে block করতে পারে
+
+**Customer (`CustomerController.php`) — verdict: functional-with-gaps**
+- ✅ Seller-facing query সব scoped; `lookupByPhone()` ইচ্ছাকৃতভাবে cross-tenant (comment-এ confirmed "shared lookup, cross-user safe") — design অনুযায়ী সঠিক কিন্তু মনে রাখা দরকার এক seller-এর customer-এর নাম/ঠিকানা আরেক seller দেখতে পায় যদি একই ফোন নাম্বার থেকে অর্ডার আসে
+- 🟡 `syncAll()` একজন seller-এর **সব** order মেমোরিতে লোড করে dedupe করে, কোনো chunking নেই — বড় seller-এ (হাজার হাজার order) memory/perf ঝুঁকি
+- 🔧 `Customer::orders()` relation define করা কিন্তু ব্যবহার হয় না (`show()` একই query manually লেখে) — dead code
+
+**Frontend bilingual/mobile-first compliance gap (CONTEXT.md §20/§22 লঙ্ঘন)**
+- 🟠 `order-intake-form.tsx` (highest-traffic order-creation form) সম্পূর্ণ English-only, কোনো `t()`/locale call নেই
+- 🟠 `variant-picker-modal.tsx`, `variant-table.tsx`, `option-editor.tsx` — English-only + hardcoded Tailwind color class (`bg-blue-600` ইত্যাদি) ব্যবহার করে, project-এর mandatory `--background`/`--border` design-token policy অনুসরণ করে না
+
+### 17.2 Fraud Detection (Internal + Courier-based)
+
+**Internal fraud score (`FraudController::computeScore`) — verdict: functional-with-gaps, ডকুমেন্টেশন stale**
+- 🟠 Documented algorithm (SAAS_MODULE_CONTEXT.md §4.2)-এর সাথে actual code বাস্তবে মেলে না:
+  - "+20 courier return >40%" — courier fraud data (`CourierFraudCheckService`) `computeScore()`-এর ভেতরে **কখনোই read হয় না**; internal score আর cross-courier check সম্পূর্ণ disconnected দুটো সিস্টেম
+  - "+10 name inconsistency" — কোনোভাবেই implement করা হয়নি, `Order.customer_name` থাকলেও কখনো read হয় না score-এ
+  - "+15 repeated cancels" আসলে code-এ "returned ≥ 2" চেক করে, cancel না
+  - Undocumented extra branches আছে: `sellerCount >= 3` → +10, `globalBlacklistCount > 0` → +40 — এগুলো doc-এ নেই
+- ✅ Risk-level threshold (0-30/31-60/61+) ঠিক doc-এর সাথে মেলে
+- 🟡 Global blacklist propagation (+40, `FraudController.php:248-250`) — যেকোনো এক seller ব্লকলিস্ট করলে সব seller-এর জন্য সেই ফোন সাথে সাথে "medium risk"-এ চলে যায়, কোনো validation/audit ছাড়া — abuse-able
+- ✅ Blacklist CRUD সঠিকভাবে per-user scoped, unique constraint আছে
+
+**Courier-based cross-provider fraud check — verdict: production-solid (architecture)**
+- ✅ `courier_fraud_stats` cache সত্যিকারের shared/global (`unique(['phone_number','courier_name'])`, কোনো `user_id` key-তে নেই) — commit `25a0095`-এর উদ্দেশ্য অনুযায়ী সঠিক
+- ✅ সব ৫টা provider service (Steadfast/Pathao/RedX/Carrybee/Paperfly) failure-কে "0 risk" না, "unknown/error" হিসেবে treat করে — ভালো design choice
+- 🟡 Steadfast/Pathao/RedX/Carrybee: production-solid; Paperfly: functional-with-gaps (status string-এর উপর `str_contains` heuristic parsing, fragile)
+- 🟡 `/fraud/courier-check` রুটে কোনো per-user throttle নেই, শুধু DB-cache-এর উপর নির্ভর করে abuse ঠেকাতে
+- 🔴 (§17.0-এ উল্লেখিত) courier credential plaintext storage
+
+### 17.3 Courier Integration (Steadfast / Pathao / RedX / Carrybee)
+
+সবগুলো provider individually **functional-with-gaps** — কোনোটাই stub না, কিন্তু প্রতিটাতে নির্দিষ্ট bug/gap আছে:
+
+| Provider | মূল সমস্যা |
+|---|---|
+| Steadfast | 🟠 `courier_charge`-এ status string বসে (§17.0), 🟡 bulk booking response index-based correlation (invoice cross-check নেই, response reorder/drop হলে ভুল order-এ tracking ID লেগে যেতে পারে) |
+| Pathao | ✅ OAuth token refresh সঠিকভাবে implement করা (একমাত্র provider যেখানে expiry ঠিকমতো হ্যান্ডেল হয়), কিন্তু 🔧 `PathaoService` আর `PathaoLocationService`-এ দুটো আলাদা, ডাইভার্জড token-fetch implementation আছে (একটা DB-persisted, একটা শুধু cache) — maintenance trap |
+| RedX | ✅ backend সলিড (JWT column-width bug আগেই ফিক্স হয়েছে), কিন্তু 🟠 bulk booking + tracking-refresh backend-এ থাকলেও frontend-এ exposed না, no test-connection endpoint |
+| Carrybee | কাজ করে বুকিং-এ, কিন্তু 🟠 no test-connection, bulk-booking থেকে ইচ্ছাকৃতভাবে বাদ (documented), tracking-refresh UI-তে নেই, এবং `cancelOrder()` service method আছে কিন্তু কোনো route/controller call করে না — dead capability |
+
+**Shared architecture — verdict: 🔧 fragile / high maintainability risk**
+- কোনো common `CourierProviderInterface` (`create()/track()/cancel()/price()`) নেই — ৪টা provider-এর logic পুরোপুরি bespoke, ১১৩৮-লাইনের `CourierController.php`-এ hand-written if/elseif chain
+- **প্রমাণ যে এই ঝুঁকি বাস্তব:** `courier_settings` টেবিলে `paperfly_username`/`paperfly_password` কলাম আগে থেকেই আছে, কিন্তু কোনো `PaperflyService`/controller/route নেই — ৫ম provider schema-লেভেলে শুরু হয়ে মাঝপথে ছেড়ে দেওয়া হয়েছে, এই architecture-এর খরচ ইতিমধ্যে একবার দেখা গেছে
+- কোথাও কোনো retry/backoff নেই; status sync সব provider-এ purely on-demand (কোনো webhook/scheduled job নেই)
+
+### 17.4 Landing Page + Checkout + Abandoned Checkout (Public-facing)
+
+এটা unauthenticated public surface, তাই security সবচেয়ে গুরুত্বপূর্ণ অংশ ছিল এই রিভিউতে:
+
+- 🔴 rate-limit অনুপস্থিত public order-submit/page-view-এ (§17.0)
+- 🔴 `trustProxies(at:'*')` বাকি সব IP-throttle-কে দুর্বল করে দেয় (§17.0)
+- 🔴 stored XSS সম্ভাবনা `html_sections`-এ (§17.0)
+- ✅ Order lookup token (`public_token`, `hash_equals` দিয়ে compare) — sequential-ID IDOR সম্ভব না
+- ✅ Pricing/variant resolution সবসময় server-side, client কখনো দাম spoof করতে পারে না
+- ✅ OTP verification: max attempt (5) + resend limit (২বার + ১ঘণ্টা block) server-side enforced, IP-throttle bypass হলেও এই layer অক্ষত থাকে
+- ✅ Admin lock/unlock — সত্যিকারের backend enforcement (`update()`/`publish()` উভয়েই `admin_locked` চেক করে), UI hide করাই যথেষ্ট না ধরে নিয়ে সঠিকভাবে server-side ব্লক করা হয়েছে; mass-assignment দিয়ে bypass করার path নেই
+- ✅ Media upload: Laravel-এর `image` rule SVG reject করে (classic SVG-XSS ভেক্টর বন্ধ), path traversal সম্ভব না (hashed filename)
+- ✅ bn/en `settings.language` সত্যিই backend-generated message পর্যন্ত পৌঁছায় (OTP message, validation error) — শুধু frontend static text না
+- 🔧 `LandingPageAnalyticsController::linkVisitToOrder` — `order_id` caller-এর নিজের order-এ scoped না (শুধু global `exists` চেক), analytics data pollution সম্ভব (কোনো data disclosure না, কম impact)
+
+### 17.5 SMS + Notification System
+
+- ✅ Data scoping architecture নিখুঁত: SMS automation rules per-user, SMS gateway/credit/notification template/email config সব সঠিকভাবে `adminScopeUserIds()` pattern মেনে admin-shared — CONTEXT.md §25-এর সাথে ১০০% সামঞ্জস্যপূর্ণ, কোনো scoping-উল্টো finding নেই
+- 🟠 Duplicate-send race + credit-deduction ignored-return (§17.0)
+- 🟠 `SendAutomationSmsJob`-এ `backoff()`/`failed()` handler নেই (contrast: `DispatchNotificationJob`-এ আছে) — নেটওয়ার্ক-লেভেল ব্যর্থতায় কোনো log-ই তৈরি হয় না, seller কিছুই দেখে না
+- 🔧 Delayed SMS-এ orphaned "queued" log row থেকে যায় (কখনো sent/failed-এ transition হয় না)
+- 🔧 UI-তে `payment_due`/`failed_delivery_retry` trigger-type সিলেক্ট করা যায় কিন্তু কোনো কোড path সেগুলো কখনো fire করে না — dead UI option
+- ✅ Generic Notification Dispatch system **আসলে ব্যবহার হচ্ছে** (orphaned না) — OTP, password-reset, subscription-expiry flow-এ সরাসরি wired; এখানকার failure handling (backoff + `failed()`) SMS automation-এর চেয়ে বেশি robust
+- 🔴 SMTP password encryption-cast অনুপস্থিত (§17.0)
+- শুধু `khudebarta` provider বাস্তবে supported — অন্য provider validation-লেভেলেই block হয়ে যায় (schema provider-agnostic কিন্তু বাস্তবে single-provider)
+
+### 17.6 Accounting + Subscription/Billing + Admin Panel
+
+- ✅ Auto-ledger dedup key (`user_id, reference_type, reference_id, type, category`) সঠিক, delivered→returned→delivered আবার হলে duplicate row হয় না
+- 🟡 কিন্তু dedup `updateOrCreate` (select-then-write), DB-তে কোনো unique constraint নেই — concurrent status change/retry হলে race সম্ভব
+- 🟠 Order edit (shipping/discount) ledger refresh না করা (§17.0)
+- 🟡 `OrderController::destroy` soft-delete করে কিন্তু accounting entry cleanup করে না — orphaned ledger row
+- ✅ Profit ফর্মুলা সঠিক: pending/undelivered COD "confirmed income" হিসেবে গণনা হয় না, শুধু delivered-এ
+- ✅ Subscription middleware (`active_subscription`) hard-cutoff সঠিক, GET/HEAD সবসময় allow, admin সঠিকভাবে exempt
+- 🟡 কিন্তু expired subscription-এ seller নিজের delivered COD order status update করতে পারে না → real cash delivered হয়েও accounting-এ confirm হয় না যতক্ষণ renew না করে (side-effect, প্রোডাক্ট সিদ্ধান্ত দরকার)
+- 🟡 কোনো default subscription package সেট না থাকলে নতুন user permanently unmetered/free থেকে যায় — config footgun, কোনো warning নেই admin panel-এ
+- 🔴 `trx_id` uniqueness অনুপস্থিত (§17.0) — এই পুরো রিভিউয়ের সবচেয়ে বড় ঝুঁকি
+- ✅ Subscription extension logic সঠিকভাবে additive (stack on remaining time, restart if lapsed না ভুলভাবে reset)
+- 🔴 `AdminController::deleteUser` hard-delete, কোনো soft-delete/undo নেই (§17.0)
+- 🟡 `customers` টেবিলের `user_id`-এ কোনো FK constraint নেই (অন্য সব টেবিলে আছে) — user delete হলে customer row orphan থেকে যায়, cascade/null হয় না
+- 🟡 Flat admin role (`admin`/`user` মাত্র দুইটা) — কোনো super-admin tier বা self-lockout protection নেই, যেকোনো admin অন্য যেকোনো admin-কে (এমনকি নিজেকেও) demote/delete করতে পারে
+
+### 17.7 এই রিভিউতে ভালোভাবে verify হওয়া শক্তিশালী অংশ (ব্যালেন্সের জন্য)
+
+শুধু বাগ-লিস্ট না — নিচের অংশগুলো deep-review করার পরেও genuinely production-solid প্রমাণিত হয়েছে:
+- Product + Variant system (authorization, race-safety, end-to-end wiring)
+- Courier-based cross-provider fraud cache architecture
+- Generic Notification Dispatch system (সক্রিয়ভাবে ব্যবহৃত, ভালো failure handling)
+- Checkout OTP verification flow (bypass-প্রুফ, server-side attempt/resend limit)
+- Abandoned checkout ownership/token scoping
+- Landing page admin lock/unlock enforcement (backend-level, না শুধু UI)
+- Media library upload validation (SVG-XSS বন্ধ, path traversal সম্ভব না)
+- Bilingual settings.language backend-message propagation
+- Accounting profit ফর্মুলা (pending COD সঠিকভাবে বাদ)
+- Data-scoping pattern (adminScopeUserIds) — SMS/Notification-এ ১০০% সামঞ্জস্যপূর্ণভাবে প্রয়োগ করা
+
+### 17.8 এই রিভিউ থেকে §16-এ যোগ করার নতুন recommendation
+
+§16-এর original তালিকার পাশাপাশি, deep review থেকে পাওয়া নিচের ফিক্সগুলো নতুন feature-এর আগে prioritize করা উচিত (এগুলো existing ব্যবহারকারীদের সরাসরি প্রভাবিত করতে পারে):
+
+1. **`trx_id` unique constraint + validation** যোগ করা — subscription payment duplicate-approval ঝুঁকি বন্ধ করতে (১ ঘণ্টার কাজ, বড় impact)
+2. **Public checkout route-এ throttle middleware** যোগ করা (§17.0 #2) — বাকি সব public route-এর প্যাটার্ন অনুসরণ করে
+3. **`trustProxies` config review** — নিশ্চিত করা edge-এ trusted reverse proxy XFF header strip/overwrite করছে, নাহলে `at: '*'` বাদ দিয়ে নির্দিষ্ট trusted proxy IP বসানো
+4. **`html_sections` sanitization** যোগ করা (backend `strip_tags`/allow-list অথবা frontend DOMPurify) — stored XSS বন্ধ করতে
+5. **Courier credential + email SMTP password encryption cast** যোগ করা (`CourierSetting`, `EmailConfiguration` মডেলে `SmsGateway`-এর প্যাটার্ন অনুসরণ করে)
+6. **SMS credit deduction race ফিক্স** — `deduct()`-এর return value চেক করে log/alert করা, ideally SMS পাঠানোর আগে atomic reserve-then-confirm প্যাটার্নে যাওয়া
+7. **`AdminController::deleteUser`-এ soft-delete/confirmation** যোগ করা — accidental/malicious data loss ঠেকাতে
+8. **`CourierProviderInterface` abstraction** — Analytics/নতুন provider যোগ করার আগে এটা করলে ভবিষ্যতের cost অনেক কমবে (§16.2-এর সম্প্রসারণ)
+9. **RedX/Carrybee bulk-booking ও tracking-refresh UI-তে expose করা** — backend already সাপোর্ট করে, শুধু frontend gap
+10. **`FraudController::computeScore()` আর courier fraud data merge করা** — documented "+20 courier return" সিগন্যাল বাস্তবে score-এ যোগ করা, অথবা doc আপডেট করে honest রাখা যে এই দুটো আলাদা সিস্টেম
+
+### 17.9 §17.0-এর ১১টা CRITICAL fix implementation log (2026-08-02, একই সেশনে সব প্রয়োগ করা হয়েছে)
+
+প্রতিটা fix live production DB-তে migrate করা হয়েছে ও tinker দিয়ে verify করা হয়েছে (আসল data নিয়ে, rollback করা transaction-এর ভেতর)। Backend fix সব **live**; frontend fix (#4) `npm run deploy:prod:safe` দিয়ে deploy করা হয়েছে — ৮/৮ ধাপ pass, `hybrid-frontend.service` active/running confirm করা হয়েছে, active CSS chunk `200 OK`।
+
+| # | কী পরিবর্তন হয়েছে | ফাইল | Migration |
+|---|---|---|---|
+| 1 | `trx_id`-এ DB-level unique constraint + `submitPayment()`-এ validation rule | `SubscriptionController.php` | `2026_08_02_072543_add_unique_constraint_to_subscription_payments_trx_id` |
+| 2 | `publicShow` (60/min), `publicSubmitOrder` (15/min) route-এ `throttle` middleware | `routes/api.php:69-70` | — |
+| 3 | `trustProxies(at: '*')` → শুধু private/loopback range trust করে (`127.0.0.1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) — native host-এ REMOTE_ADDR সবসময় সঠিক থাকে বলে কোনো range match করবে না (client XFF ignore হবে), Dokploy/Traefik-এর মতো internal-hop deployment-এ এখনো কাজ করবে | `bootstrap/app.php` | — |
+| 4 | `sanitizeHtml()` (isomorphic-dompurify) — rich-text block + `html_sections` উভয় `dangerouslySetInnerHTML`-এ প্রয়োগ; `sanitizeCustomCss()` — `</style` breakout strip | `public-landing-page-view.tsx`, নতুন dependency `isomorphic-dompurify` (`package.json`) | — (frontend, deploy আলাদা ধাপ) |
+| 5 | Check-then-act duplicate guard → atomic claim-then-update: partial unique index `(rule_id, order_id, trigger_event) WHERE status IN ('queued','sent')`, claim-insert catch করে `UniqueConstraintViolationException`-এ skip; `dispatchNow()`/job একই log row আপডেট করে (নতুন row বানায় না); job-এ `backoff()`/`failed()` যোগ করা হয়েছে যাতে network exception-এও log row 'failed'-এ resolve হয় | `SmsAutomationService.php`, `SendAutomationSmsJob.php` | `2026_08_02_073219_add_unique_active_claim_index_to_sms_automation_logs` |
+| 6 | `deduct()`-এর boolean return check করা হয় এখন — `false` হলে (SMS পাঠানো হয়ে গেছে কিন্তু charge fail) `error_message`-এ WARNING লেখা হয় + `Log::warning()`; একই fix `AdminSmsGatewayController::send()`-এও (নতুন `credit_deduction_failures` counter response-এ) | `SmsAutomationService.php`, `AdminSmsGatewayController.php` | — |
+| 7 | Steadfast booking-এ `'courier_charge' => data_get($result, 'consignment.current_status')` লাইন সরানো হয়েছে (delivery fee Steadfast API থেকে বুকিং সময়ে আসেই না — ভুল করে status string বসছিল) | `CourierController.php:713` (bookSteadfast) | — |
+| 8 | Variant stock decrement এখন `WHERE stock_qty >= quantity` guard সহ atomic conditional UPDATE — affected rows 0 হলে `ValidationException` (order status transition reject); পুরো `transition()` এখন `DB::transaction()`-এ wrapped যাতে multi-item order-এ partial-decrement-then-fail rollback হয় | `OrderStatusService.php` | — (schema change লাগেনি, শুধু query-level guard) |
+| 9 | নতুন `AccountingService::onOrderTotalUpdated()` — pending/confirmed COD income transaction-এর amount sync করে; `OrderController::update()`-এ `total` বদলালে call হয় | `AccountingService.php`, `OrderController.php` | — |
+| 10 | `User` model-এ `SoftDeletes` trait + `deleted_at` column — `deleteUser()`-এর কোড অপরিবর্তিত রেখেই এখন soft-delete হয় (data/order/product/transaction cascade আর হয় না); registration/admin-create uniqueness rule (`email`/`mobile`) `whereNull('deleted_at')` দিয়ে scoped — deleted account-এর email/mobile নতুন registration-এর জন্য মুক্ত হয়ে যায় | `User.php`, `OtpController.php`, `AdminController.php` | `2026_08_02_073851_add_soft_deletes_to_users_table` |
+| 11 | `CourierSetting`/`EmailConfiguration` মডেলে sensitive field-গুলোতে `'encrypted'` cast (SmsGateway-এর প্যাটার্ন) — column widen করা হয়েছে আগে (varchar→text, encrypted envelope ২৫৫ char-এর বেশি হয়) + **existing plaintext production data** raw `Crypt::encryptString()` দিয়ে migrate করা হয়েছে (model cast active হওয়ার আগে, নাহলে existing row read করতে গিয়ে `DecryptException` হতো) | `CourierSetting.php`, `EmailConfiguration.php` | `2026_08_02_074114_widen_courier_settings_secret_columns_for_encryption`, `2026_08_02_074208_encrypt_existing_courier_and_email_credentials` |
+
+**Verification method:** প্রতিটা fix-এ syntax check (`php -l`) + একটা tinker-based functional test চালানো হয়েছে (আসল/বাস্তব ডেটার উপর, কিন্তু সবসময় `DB::beginTransaction()`/`rollBack()`-এর ভেতরে যাতে কোনো test data persist না হয়) — race condition (#5, #8), validation rejection (#8), ledger sync (#9), soft-delete visibility (#10), encryption round-trip (#11) সবগুলো সরাসরি পরীক্ষা করে pass confirm করা হয়েছে। `php artisan route:list` (227 routes) ও `php artisan migrate:status` দিয়ে পুরো backend health verify করা হয়েছে।
+
+### নতুন gap যা এই fix pass-এ ধরা পড়েছে (§16/§17.0-এ ছিল না, ভবিষ্যতে track করা উচিত)
+
+- অ-variant (`track_stock`) product-এর জন্য stock deduction path এখনো নেই (§17.0 #8-এর ফিক্স শুধু variant-এর জন্য) — এটা আলাদা কাজ হিসেবে দরকার
+- `bulkStatus` (`adjustInventory: false`) এখনো inventory reserve/release completely skip করে — bulk আর single status-change-এর আচরণ এখনো inconsistent

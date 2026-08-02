@@ -57,6 +57,30 @@ class AccountingService
         );
     }
 
+    /**
+     * Keep the pending/confirmed COD income transaction's amount in sync
+     * when an order's total changes after creation (e.g. shipping_charge or
+     * discount edited). Previously only courier-charge edits refreshed the
+     * ledger, so editing shipping/discount left the income transaction
+     * amount stale against the order's real total. No-op if no income
+     * transaction exists yet for this order (nothing to refresh).
+     */
+    public function onOrderTotalUpdated(Order $order): void
+    {
+        if ($order->payment_method !== 'cod') {
+            return;
+        }
+
+        Transaction::where('user_id', $order->user_id)
+            ->where('reference_type', 'order')
+            ->where('reference_id', $order->id)
+            ->where('type', Transaction::TYPE_INCOME)
+            ->where('category', 'order_cod')
+            ->update([
+                'amount' => (float) $order->total,
+            ]);
+    }
+
     public function onOrderCancelledOrReturned(Order $order): void
     {
         Transaction::where('user_id', $order->user_id)

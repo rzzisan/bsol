@@ -18,7 +18,21 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->trustProxies(at: '*');
+        // Trust only private/loopback ranges as forwarding proxies — NOT '*'.
+        // nginx (this host's origin, connected via Unix socket to php-fpm)
+        // already sets REMOTE_ADDR to the real client IP itself, so it never
+        // matches these ranges and the raw client-supplied X-Forwarded-For
+        // header is correctly ignored here. This range only takes effect for
+        // deployments that sit behind a private-network hop (e.g. a
+        // Docker/Traefik proxy on the Dokploy branch), where it's needed to
+        // resolve the real client IP. Trusting '*' let any caller spoof
+        // X-Forwarded-For directly and defeat every IP-keyed rate limit.
+        $middleware->trustProxies(at: [
+            '127.0.0.1',
+            '10.0.0.0/8',
+            '172.16.0.0/12',
+            '192.168.0.0/16',
+        ]);
 
         $middleware->alias([
             'is_admin' => EnsureUserIsAdmin::class,

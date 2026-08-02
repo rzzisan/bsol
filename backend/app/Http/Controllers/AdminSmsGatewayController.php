@@ -10,6 +10,7 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use RuntimeException;
 
@@ -474,6 +475,7 @@ class AdminSmsGatewayController extends Controller
         $results = [];
         $successCount = 0;
         $failedCount = count($invalidRecipients);
+        $creditDeductionFailures = 0;
 
         foreach ($normalizedRecipients as $recipient) {
             $response = Http::asForm()
@@ -506,11 +508,23 @@ class AdminSmsGatewayController extends Controller
                 $successCount++;
 
                 if (! $isAdmin && $actorId) {
-                    $this->creditService->deduct(
+                    $deducted = $this->creditService->deduct(
                         userId: $actorId,
                         credits: $creditsPerSms,
                         note: "SMS sent to {$recipient} via {$gateway->name}",
                     );
+
+                    if (! $deducted) {
+                        // SMS already sent (charged by the gateway) — can't
+                        // be undone — but the wallet wasn't debited. Surface
+                        // it instead of silently under-charging the seller.
+                        $creditDeductionFailures++;
+                        Log::warning('sms_manual_send.credit_deduction_failed', [
+                            'user_id' => $actorId,
+                            'recipient' => $recipient,
+                            'credits_required' => $creditsPerSms,
+                        ]);
+                    }
                 }
             } else {
                 $failedCount++;
@@ -556,6 +570,7 @@ class AdminSmsGatewayController extends Controller
             'recipients_count' => count($normalizedRecipients),
             'credits_per_sms' => $creditsPerSms,
             'credits_used' => $creditsUsed,
+            'credit_deduction_failures' => $creditDeductionFailures,
             'invalid_numbers' => $invalidRecipients,
             'results' => $results,
         ], $statusCode);

@@ -20,6 +20,25 @@ class CourierSetting extends Model
         'paperfly_username', 'paperfly_password',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'steadfast_api_key' => 'encrypted',
+            'steadfast_secret_key' => 'encrypted',
+            'pathao_client_secret' => 'encrypted',
+            'pathao_password' => 'encrypted',
+            'pathao_access_token' => 'encrypted',
+            'pathao_refresh_token' => 'encrypted',
+            'redx_api_key' => 'encrypted',
+            'redx_password' => 'encrypted',
+            'carrybee_password' => 'encrypted',
+            'carrybee_client_secret' => 'encrypted',
+            'carrybee_client_context' => 'encrypted',
+            'paperfly_password' => 'encrypted',
+            'pathao_token_expires_at' => 'datetime',
+        ];
+    }
+
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class);

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import DOMPurify from "isomorphic-dompurify";
 import type { JSONContent } from "@tiptap/core";
 import { mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
@@ -10,6 +11,25 @@ import { renderTiptapJSON } from "@/lib/rich-text-render";
 import type { LayoutEntry } from "@/lib/landing-layout";
 import { getOrCreateCheckoutSessionToken, setCheckoutSessionToken } from "@/lib/checkout-session";
 import type { ProductOption } from "@/types/variant";
+
+// Seller-authored content (rich-text blocks, raw HTML sections) is rendered
+// via dangerouslySetInnerHTML on this public, unauthenticated checkout page —
+// sanitize it at the render boundary so a compromised/malicious seller
+// account can't inject a script or a javascript: link that runs in every
+// visitor's browser.
+function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, { ADD_ATTR: ["target"] });
+}
+
+// custom_css is injected as raw text inside a <style> element (see the
+// <style>{`...`}</style> block below) — it's never parsed as HTML by React,
+// but a seller-supplied "</style>" substring would still end that element
+// early in the browser's HTML parser and make whatever follows live markup.
+// Stripping any "</style" occurrence closes that escape without touching
+// legitimate CSS syntax.
+function sanitizeCustomCss(css: string): string {
+  return css.replace(/<\/\s*style/gi, "");
+}
 
 // Loose subset of App\Support\ProductVariantFormatter::format() — covers both
 // a merchant-pinned variant (item.variant) and a customer-resolved one
@@ -523,7 +543,7 @@ function RichTextBlockView({ block, theme }: { block: { title?: string | null; b
   return (
     <div className="lp-card rounded-3xl p-6 sm:p-8">
       {block.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{block.title}</h2> : null}
-      <div className="lp-html lp-rich-text max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: html }} />
+      <div className="lp-html lp-rich-text max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />
     </div>
   );
 }
@@ -1176,7 +1196,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         .lp-rich-text h2 { font-size: 1.25rem; font-weight: 700; color: #0f172a; margin-bottom: .5rem; }
         .lp-rich-text a { color: ${theme.primary}; text-decoration: underline; }
         .lp-rich-text strong { font-weight: 700; }
-        ${page.custom_css ?? ""}
+        ${sanitizeCustomCss(page.custom_css ?? "")}
       `}</style>
 
       <section
@@ -1205,7 +1225,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               return pickRun(htmlSections, run).map((section, index) => (
                 <div key={`${section.id ?? section.title ?? "section"}-${index}`} className="lp-card rounded-3xl p-6 sm:p-8">
                   {section.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{section.title}</h2> : null}
-                  <div className="lp-html max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: section.html ?? "" }} />
+                  <div className="lp-html max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: sanitizeHtml(section.html ?? "") }} />
                 </div>
               ));
             }

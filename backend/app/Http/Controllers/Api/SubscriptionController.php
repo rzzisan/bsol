@@ -57,8 +57,10 @@ class SubscriptionController extends Controller
         $validated = $request->validate([
             'package_id' => ['required', 'integer', 'exists:subscription_packages,id'],
             'sender_bkash_number' => ['required', 'string', 'max:20'],
-            'trx_id' => ['required', 'string', 'max:50'],
+            'trx_id' => ['required', 'string', 'max:50', 'unique:subscription_payments,trx_id'],
             'screenshot' => ['nullable', 'file', 'image', 'max:4096'],
+        ], [
+            'trx_id.unique' => 'This transaction ID has already been submitted. Each bKash transaction ID can only be used once.',
         ]);
 
         $package = SubscriptionPackage::findOrFail($validated['package_id']);

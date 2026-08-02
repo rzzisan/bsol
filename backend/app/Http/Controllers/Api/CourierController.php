@@ -710,7 +710,13 @@ class CourierController extends Controller
                 'courier_name'        => 'steadfast',
                 'courier_tracking_id' => (string) $consignmentId,
                 'courier_status'      => 'booked',
-                'courier_charge'      => data_get($result, 'consignment.current_status') ?? null,
+                // Steadfast's create_order response doesn't return a delivery
+                // fee (unlike Pathao/Carrybee) — this used to write the
+                // consignment's status string (e.g. "in_review") into this
+                // decimal column instead, which Laravel's decimal cast
+                // silently coerced to 0.00, corrupting fee data on every
+                // Steadfast booking. Leave it unset until a real fee source
+                // (e.g. the balance/payments API) is wired in.
                 'status'              => 'processing',
             ]);
             return response()->json(['success' => true, 'data' => $order, 'consignment_id' => $consignmentId]);

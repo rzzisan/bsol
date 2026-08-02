@@ -30,6 +30,13 @@ class EmailConfiguration extends Model
         'password', // Hide password from JSON responses
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'password' => 'encrypted',
+        ];
+    }
+
     /**
      * Get the user that owns this email configuration.
      */

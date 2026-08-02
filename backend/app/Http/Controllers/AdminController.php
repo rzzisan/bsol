@@ -56,8 +56,10 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'mobile' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s]{7,20}$/', 'unique:users,mobile'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            // whereNull('deleted_at') so a soft-deleted account's mobile/email
+            // frees up for reuse instead of being permanently unregistrable.
+            'mobile' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s]{7,20}$/', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->whereNull('deleted_at')],
             'password' => ['required', 'string', 'min:8'],
             'role' => ['required', Rule::in(['admin', 'user'])],
             'user_status' => ['sometimes', 'required', Rule::in(self::USER_STATUSES)],

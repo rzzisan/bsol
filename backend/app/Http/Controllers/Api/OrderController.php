@@ -392,6 +392,10 @@ class OrderController extends Controller
             $this->accountingService->onCourierChargeUpdated($order);
         }
 
+        if (array_key_exists('total', $data)) {
+            $this->accountingService->onOrderTotalUpdated($order);
+        }
+
         return response()->json(['success' => true, 'data' => $order]);
     }
 
