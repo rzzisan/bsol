@@ -19,6 +19,9 @@ use App\Http\Controllers\Api\CheckoutOtpController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\FacebookConnectController;
+use App\Http\Controllers\Api\FacebookLeadController;
+use App\Http\Controllers\Api\FacebookWebhookController;
 use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\LandingPageController;
 use App\Http\Controllers\Api\LandingMediaLibraryController;
@@ -100,6 +103,21 @@ Route::get('/public/landing-pages/{slug}/products/{productId}/options', [Landing
 Route::post('/public/landing-pages/{slug}/products/{productId}/variants/resolve', [LandingPageController::class, 'publicResolveVariant'])
     ->where('productId', '[0-9]+')
     ->middleware('throttle:60,1');
+
+// Meta webhook — called directly by Facebook, not by our frontend. Auth
+// boundary is the verify-token handshake (GET) / X-Hub-Signature-256 HMAC
+// (POST) inside the controller, not Sanctum. See §16.3 for Meta App setup.
+Route::get('/facebook/webhook', [FacebookWebhookController::class, 'verify'])
+    ->middleware('throttle:120,1');
+Route::post('/facebook/webhook', [FacebookWebhookController::class, 'receive'])
+    ->middleware('throttle:120,1');
+
+// Facebook OAuth callback — Meta redirects the seller's browser here directly
+// (full-page navigation), so it can't carry a Sanctum bearer token. Identity
+// is instead proven by the signed `state` param minted in the authenticated
+// /facebook/connect/redirect step. See FacebookConnectController::callback().
+Route::get('/facebook/connect/callback', [FacebookConnectController::class, 'callback'])
+    ->middleware('throttle:20,1');
 
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
@@ -268,6 +286,22 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/carrybee/area-suggestion', [CourierController::class, 'carrybeeAreaSuggestion']);
         Route::get('/carrybee/stores', [CourierController::class, 'carrybeeStores']);
         Route::post('/carrybee/stores', [CourierController::class, 'createCarrybeeStore']);
+    });
+
+    // ── Facebook Page connection + lead inbox ───────────────────────────────
+    Route::prefix('facebook/connect')->group(function () {
+        Route::get('/status', [FacebookConnectController::class, 'status']);
+        Route::get('/redirect', [FacebookConnectController::class, 'redirect']);
+        Route::get('/pending-pages', [FacebookConnectController::class, 'pendingPages']);
+        Route::post('/select', [FacebookConnectController::class, 'select']);
+        Route::delete('/', [FacebookConnectController::class, 'disconnect']);
+    });
+    Route::prefix('facebook/leads')->group(function () {
+        Route::get('/', [FacebookLeadController::class, 'index']);
+        Route::get('/unread-count', [FacebookLeadController::class, 'unreadCount']);
+        Route::put('/{id}/read', [FacebookLeadController::class, 'markRead'])->where('id', '[0-9]+');
+        Route::put('/{id}/ignore', [FacebookLeadController::class, 'ignore'])->where('id', '[0-9]+');
+        Route::post('/{id}/convert', [FacebookLeadController::class, 'convertToCustomer'])->where('id', '[0-9]+');
     });
 
     // ── Fraud Check ───────────────────────────────────────────────────────────

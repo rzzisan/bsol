@@ -73,10 +73,12 @@ const menuText = {
 
     landingPages: "ল্যান্ডিং পেজ",
     abandonedCheckouts: "অসম্পূর্ণ অর্ডার",
+    facebookLeads: "ফেসবুক লিডস",
 
     settings: "সেটিংস",
     shopProfile: "শপ প্রোফাইল",
     courierAccounts: "কুরিয়ার একাউন্ট",
+    facebookConnect: "ফেসবুক পেজ",
     subscription: "সাবস্ক্রিপশন",
   },
   en: {
@@ -128,10 +130,12 @@ const menuText = {
 
     landingPages: "Landing Pages",
     abandonedCheckouts: "Abandoned Checkouts",
+    facebookLeads: "Facebook Leads",
 
     settings: "Settings",
     shopProfile: "Shop Profile",
     courierAccounts: "Courier Accounts",
+    facebookConnect: "Facebook Page",
     subscription: "Subscription",
   },
 };
@@ -190,6 +194,12 @@ function buildMenu(t: typeof menuText.bn): ShellMenuItem[] {
       ],
     },
     {
+      key: "facebook-leads",
+      label: (t as any).facebookLeads ?? "ফেসবুক লিডস",
+      icon: "📨",
+      href: "/dashboard/leads",
+    },
+    {
       key: "courier",
       label: t.courier,
       icon: "🚚",
@@ -237,6 +247,7 @@ function buildMenu(t: typeof menuText.bn): ShellMenuItem[] {
       children: [
         { key: "shop-profile", label: t.shopProfile, href: "/dashboard/settings/shop" },
         { key: "courier-accounts", label: t.courierAccounts, href: "/dashboard/settings/courier" },
+        { key: "facebook-connect", label: (t as any).facebookConnect ?? "ফেসবুক পেজ", href: "/dashboard/settings/facebook" },
         { key: "subscription", label: t.subscription, href: "/dashboard/settings/subscription" },
       ],
     },
