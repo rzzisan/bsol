@@ -27,6 +27,12 @@ type Settings = {
   terms_title_en: string;
   terms_content_bn: JSONContent | undefined;
   terms_content_en: JSONContent | undefined;
+  privacy_link_label_bn: string;
+  privacy_link_label_en: string;
+  privacy_title_bn: string;
+  privacy_title_en: string;
+  privacy_content_bn: JSONContent | undefined;
+  privacy_content_en: JSONContent | undefined;
 };
 
 const EMPTY_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
@@ -55,6 +61,14 @@ const labels = {
     termsContentBn: "কনটেন্ট (বাংলা)",
     termsContentEn: "কনটেন্ট (ইংরেজি)",
     preview: "পাবলিক পেজ দেখুন",
+    privacySection: "পাবলিক গোপনীয়তা নীতি পেজ (/privacy)",
+    privacyLinkLabelBn: "গোপনীয়তা নীতির লিংক টেক্সট (বাংলা)",
+    privacyLinkLabelEn: "গোপনীয়তা নীতির লিংক টেক্সট (ইংরেজি)",
+    privacyTitleBn: "পেজ শিরোনাম (বাংলা)",
+    privacyTitleEn: "পেজ শিরোনাম (ইংরেজি)",
+    privacyContentBn: "কনটেন্ট (বাংলা)",
+    privacyContentEn: "কনটেন্ট (ইংরেজি)",
+    privacyPreview: "পাবলিক পেজ দেখুন",
     menu: {
       dashboard: "ড্যাশবোর্ড",
       customers: "গ্রাহক",
@@ -97,6 +111,14 @@ const labels = {
     termsContentBn: "Content (Bangla)",
     termsContentEn: "Content (English)",
     preview: "View public page",
+    privacySection: "Public Privacy Policy page (/privacy)",
+    privacyLinkLabelBn: "Privacy link text (Bangla)",
+    privacyLinkLabelEn: "Privacy link text (English)",
+    privacyTitleBn: "Page title (Bangla)",
+    privacyTitleEn: "Page title (English)",
+    privacyContentBn: "Content (Bangla)",
+    privacyContentEn: "Content (English)",
+    privacyPreview: "View public page",
     menu: {
       dashboard: "Dashboard",
       customers: "Customers",
@@ -134,6 +156,12 @@ export default function PlatformBrandingSettingsPage() {
     terms_title_en: "",
     terms_content_bn: EMPTY_DOC,
     terms_content_en: EMPTY_DOC,
+    privacy_link_label_bn: "",
+    privacy_link_label_en: "",
+    privacy_title_bn: "",
+    privacy_title_en: "",
+    privacy_content_bn: EMPTY_DOC,
+    privacy_content_en: EMPTY_DOC,
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -184,6 +212,12 @@ export default function PlatformBrandingSettingsPage() {
             terms_title_en: d.terms_title_en ?? "",
             terms_content_bn: d.terms_content_bn ?? EMPTY_DOC,
             terms_content_en: d.terms_content_en ?? EMPTY_DOC,
+            privacy_link_label_bn: d.privacy_link_label_bn ?? "",
+            privacy_link_label_en: d.privacy_link_label_en ?? "",
+            privacy_title_bn: d.privacy_title_bn ?? "",
+            privacy_title_en: d.privacy_title_en ?? "",
+            privacy_content_bn: d.privacy_content_bn ?? EMPTY_DOC,
+            privacy_content_en: d.privacy_content_en ?? EMPTY_DOC,
           });
           setMessage(t.loaded);
         }
@@ -307,6 +341,47 @@ export default function PlatformBrandingSettingsPage() {
             <div>
               <span className="mb-1 block text-xs text-[var(--muted)]">{t.termsContentEn}</span>
               <RichTextEditorField value={form.terms_content_en} onChange={(json) => update("terms_content_en", json)} />
+            </div>
+          </div>
+        </section>
+
+        <section className="catv-panel p-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-[var(--foreground)]">{t.privacySection}</h3>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--accent)] hover:underline">
+              {t.privacyPreview}
+            </a>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.privacyLinkLabelBn}</span>
+              <input value={form.privacy_link_label_bn} onChange={(e) => update("privacy_link_label_bn", e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.privacyLinkLabelEn}</span>
+              <input value={form.privacy_link_label_en} onChange={(e) => update("privacy_link_label_en", e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.privacyTitleBn}</span>
+              <input value={form.privacy_title_bn} onChange={(e) => update("privacy_title_bn", e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.privacyTitleEn}</span>
+              <input value={form.privacy_title_en} onChange={(e) => update("privacy_title_en", e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+            </label>
+          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.privacyContentBn}</span>
+              <RichTextEditorField value={form.privacy_content_bn} onChange={(json) => update("privacy_content_bn", json)} />
+            </div>
+            <div>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.privacyContentEn}</span>
+              <RichTextEditorField value={form.privacy_content_en} onChange={(json) => update("privacy_content_en", json)} />
             </div>
           </div>
         </section>

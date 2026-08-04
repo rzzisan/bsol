@@ -18,6 +18,7 @@ import {
 
 type Settings = {
   app_id: string;
+  login_config_id: string;
   app_secret_set: boolean;
   webhook_verify_token_set: boolean;
 };
@@ -36,6 +37,7 @@ const labels = {
     updated: "সেটিংস আপডেট হয়েছে",
     goHome: "হোমে যান",
     appId: "App ID",
+    loginConfigId: "Login Configuration ID",
     appSecret: "App Secret",
     webhookToken: "Webhook Verify Token",
     setPlaceholder: "সেট করা আছে — বদলাতে নতুন মান লিখুন",
@@ -45,9 +47,10 @@ const labels = {
     setupSteps: [
       "developers.facebook.com-এ একটা Business App তৈরি করুন",
       "\"Facebook Login for Business\" এবং \"Webhooks\" product যোগ করুন",
+      "Facebook Login for Business → Configurations → Create configuration ('User access token' বেছে নিন) — এই App classic scope-ভিত্তিক OAuth accept করে না, config_id ছাড়া \"Feature Unavailable\" error দেখায়",
       "Webhooks-এ \"page\" object subscribe করুন, fields: feed, messages",
       "উপরের Webhook Callback URL এবং একটা নিজের বানানো Verify Token বসান",
-      "নিচের ফর্মে App ID, App Secret, একই Verify Token বসিয়ে সংরক্ষণ করুন",
+      "নিচের ফর্মে App ID, Login Configuration ID, App Secret, একই Verify Token বসিয়ে সংরক্ষণ করুন",
       "pages_messaging + pages_manage_engagement permission-এর জন্য App Review জমা দিন",
     ],
     menu: {
@@ -83,6 +86,7 @@ const labels = {
     updated: "Settings updated",
     goHome: "Go Home",
     appId: "App ID",
+    loginConfigId: "Login Configuration ID",
     appSecret: "App Secret",
     webhookToken: "Webhook Verify Token",
     setPlaceholder: "Currently set — type a new value to change",
@@ -92,9 +96,10 @@ const labels = {
     setupSteps: [
       "Create a Business App at developers.facebook.com",
       "Add the \"Facebook Login for Business\" and \"Webhooks\" products",
+      "Facebook Login for Business → Configurations → Create configuration (choose \"User access token\") — this app rejects the classic scope-based OAuth dialog with a \"Feature Unavailable\" error without a config_id",
       "In Webhooks, subscribe to the \"page\" object, fields: feed, messages",
       "Enter the Webhook Callback URL above and a Verify Token you make up",
-      "Enter App ID, App Secret, and the same Verify Token below and save",
+      "Enter App ID, Login Configuration ID, App Secret, and the same Verify Token below and save",
       "Submit App Review for the pages_messaging + pages_manage_engagement permissions",
     ],
     menu: {
@@ -128,6 +133,7 @@ export default function AdminFacebookSettingsPage() {
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
   const [current, setCurrent] = useState<Settings | null>(null);
   const [appId, setAppId] = useState("");
+  const [loginConfigId, setLoginConfigId] = useState("");
   const [appSecret, setAppSecret] = useState("");
   const [webhookToken, setWebhookToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -171,6 +177,7 @@ export default function AdminFacebookSettingsPage() {
         if (res.ok && data?.data) {
           setCurrent(data.data);
           setAppId(data.data.app_id ?? "");
+          setLoginConfigId(data.data.login_config_id ?? "");
           setMessage(t.loaded);
         }
       } finally {
@@ -193,7 +200,12 @@ export default function AdminFacebookSettingsPage() {
       const res = await fetch(`${API}/admin/settings/facebook`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ app_id: appId, app_secret: appSecret, webhook_verify_token: webhookToken }),
+        body: JSON.stringify({
+          app_id: appId,
+          login_config_id: loginConfigId,
+          app_secret: appSecret,
+          webhook_verify_token: webhookToken,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -254,6 +266,14 @@ export default function AdminFacebookSettingsPage() {
               <input
                 value={appId}
                 onChange={(e) => setAppId(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+              />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.loginConfigId}</span>
+              <input
+                value={loginConfigId}
+                onChange={(e) => setLoginConfigId(e.target.value)}
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
               />
             </label>

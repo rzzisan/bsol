@@ -11,7 +11,7 @@ class FacebookLead extends Model
         'user_id', 'facebook_page_connection_id', 'channel', 'fb_event_id',
         'sender_fb_id', 'sender_name', 'message', 'post_id', 'thread_id',
         'detected_phone', 'customer_id', 'status', 'is_read', 'raw_payload',
-        'received_at',
+        'received_at', 'replied_at', 'reply_message',
     ];
 
     protected function casts(): array
@@ -20,6 +20,7 @@ class FacebookLead extends Model
             'raw_payload' => 'array',
             'is_read' => 'boolean',
             'received_at' => 'datetime',
+            'replied_at' => 'datetime',
         ];
     }
 

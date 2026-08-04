@@ -303,6 +303,7 @@ Route::middleware('active_subscription')->group(function () {
         Route::put('/{id}/read', [FacebookLeadController::class, 'markRead'])->where('id', '[0-9]+');
         Route::put('/{id}/ignore', [FacebookLeadController::class, 'ignore'])->where('id', '[0-9]+');
         Route::post('/{id}/convert', [FacebookLeadController::class, 'convertToCustomer'])->where('id', '[0-9]+');
+        Route::post('/{id}/reply', [FacebookLeadController::class, 'reply'])->where('id', '[0-9]+');
     });
 
     // ── Fraud Check ───────────────────────────────────────────────────────────

@@ -30,6 +30,12 @@ class PlatformSettingsController extends Controller
             'terms_title_en' => ['nullable', 'string', 'max:200'],
             'terms_content_bn' => ['nullable', 'array'],
             'terms_content_en' => ['nullable', 'array'],
+            'privacy_link_label_bn' => ['nullable', 'string', 'max:150'],
+            'privacy_link_label_en' => ['nullable', 'string', 'max:150'],
+            'privacy_title_bn' => ['nullable', 'string', 'max:200'],
+            'privacy_title_en' => ['nullable', 'string', 'max:200'],
+            'privacy_content_bn' => ['nullable', 'array'],
+            'privacy_content_en' => ['nullable', 'array'],
         ]);
 
         $setting = PlatformSetting::getSetting();

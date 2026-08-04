@@ -35,6 +35,12 @@ const t = {
     statusConverted: "কনভার্টেড",
     statusIgnored: "ইগনোর্ড",
     invalidPhone: "সঠিক মোবাইল নাম্বার দিন।",
+    replyBtn: "রিপ্লাই",
+    replyPlaceholder: "আপনার রিপ্লাই লিখুন...",
+    sendBtn: "পাঠান",
+    sending: "পাঠানো হচ্ছে...",
+    repliedLabel: "আপনার রিপ্লাই:",
+    replyGenericError: "রিপ্লাই পাঠানো যায়নি।",
   },
   en: {
     pageTitle: "Facebook Leads",
@@ -63,6 +69,12 @@ const t = {
     statusConverted: "Converted",
     statusIgnored: "Ignored",
     invalidPhone: "Enter a valid phone number.",
+    replyBtn: "Reply",
+    replyPlaceholder: "Write your reply...",
+    sendBtn: "Send",
+    sending: "Sending...",
+    repliedLabel: "Your reply:",
+    replyGenericError: "Could not send the reply.",
   },
 };
 
@@ -76,6 +88,8 @@ type Lead = {
   status: "new" | "converted" | "ignored";
   is_read: boolean;
   received_at: string;
+  replied_at: string | null;
+  reply_message: string | null;
   customer: { id: number; name: string | null; phone: string } | null;
 };
 
@@ -93,6 +107,10 @@ export default function Page() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [pageConnected, setPageConnected] = useState<boolean | null>(null);
+  const [replyingId, setReplyingId] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replySaving, setReplySaving] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
 
   const authHeaders = useCallback(() => ({ Authorization: `Bearer ${getStoredToken()}` }), []);
 
@@ -185,6 +203,36 @@ export default function Page() {
     }
   }
 
+  function startReply(lead: Lead) {
+    setReplyingId(lead.id);
+    setReplyText("");
+    setReplyError(null);
+  }
+
+  async function submitReply(id: number) {
+    if (!replyText.trim()) return;
+    setReplySaving(true);
+    setReplyError(null);
+    try {
+      const res = await fetch(`${API}/facebook/leads/${id}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ message: replyText }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setLeads((prev) => prev.map((l) => (l.id === id ? json.data : l)));
+        setReplyingId(null);
+      } else {
+        setReplyError(json.message ?? tr.replyGenericError);
+      }
+    } catch {
+      setReplyError(tr.replyGenericError);
+    } finally {
+      setReplySaving(false);
+    }
+  }
+
   const filterBtn = (active: boolean) =>
     `rounded-lg border px-3 py-1.5 text-xs font-medium ${
       active
@@ -235,7 +283,19 @@ export default function Page() {
                     <span className="rounded-full border border-[var(--border)] px-2 py-0.5">
                       {lead.channel === "comment" ? tr.channelComment : tr.channelMessage}
                     </span>
-                    <span>{lead.sender_name ?? lead.sender_fb_id}</span>
+                    {lead.channel === "comment" && lead.sender_fb_id ? (
+                      <a
+                        href={`https://www.facebook.com/${lead.sender_fb_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[var(--accent)] hover:underline"
+                      >
+                        {lead.sender_name ?? lead.sender_fb_id}
+                      </a>
+                    ) : (
+                      <span>{lead.sender_name ?? lead.sender_fb_id}</span>
+                    )}
                     <span>· {new Date(lead.received_at).toLocaleString()}</span>
                   </div>
                   <span className="text-xs text-[var(--muted)]">
@@ -244,6 +304,47 @@ export default function Page() {
                 </div>
 
                 <p className="mt-2 text-sm text-[var(--foreground)]">{lead.message}</p>
+
+                {lead.reply_message ? (
+                  <p className="mt-2 rounded-lg bg-[var(--background)] p-2 text-xs text-[var(--muted)]">
+                    <span className="font-medium text-[var(--foreground)]">{tr.repliedLabel}</span> {lead.reply_message}
+                  </p>
+                ) : replyingId === lead.id ? (
+                  <div className="mt-3 space-y-2 rounded-lg border border-[var(--border)] p-3" onClick={(e) => e.stopPropagation()}>
+                    <textarea
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder={tr.replyPlaceholder}
+                      rows={2}
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+                    />
+                    {replyError && <p className="text-xs text-red-600">{replyError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => void submitReply(lead.id)}
+                        disabled={replySaving}
+                        className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                      >
+                        {replySaving ? tr.sending : tr.sendBtn}
+                      </button>
+                      <button
+                        onClick={() => setReplyingId(null)}
+                        className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)]"
+                      >
+                        {tr.cancel}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => startReply(lead)}
+                      className="rounded-lg border border-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--accent)]"
+                    >
+                      {tr.replyBtn}
+                    </button>
+                  </div>
+                )}
 
                 {lead.customer ? (
                   <p className="mt-2 text-xs text-green-600">

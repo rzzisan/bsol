@@ -21,6 +21,8 @@ class FacebookLeadCaptureService
 {
     private const BD_PHONE_PATTERN = '/(?:\+?88)?01[3-9]\d{8}/';
 
+    public function __construct(private readonly FacebookGraphClient $graphClient) {}
+
     public function handle(array $payload): void
     {
         if (($payload['object'] ?? null) !== 'page') {
@@ -70,8 +72,8 @@ class FacebookLeadCaptureService
         $this->storeLead($connection, [
             'channel' => 'comment',
             'fb_event_id' => $commentId,
-            'sender_fb_id' => $value['sender_id'] ?? null,
-            'sender_name' => $value['sender_name'] ?? null,
+            'sender_fb_id' => $value['from']['id'] ?? null,
+            'sender_name' => $value['from']['name'] ?? null,
             'message' => $value['message'] ?? null,
             'post_id' => $value['post_id'] ?? null,
             'thread_id' => null,
@@ -96,7 +98,9 @@ class FacebookLeadCaptureService
             'channel' => 'message',
             'fb_event_id' => $mid,
             'sender_fb_id' => $senderId,
-            'sender_name' => null,
+            'sender_name' => $connection->page_access_token
+                ? $this->graphClient->getUserProfileName($senderId, $connection->page_access_token)
+                : null,
             'message' => $event['message']['text'],
             'post_id' => null,
             'thread_id' => $senderId,

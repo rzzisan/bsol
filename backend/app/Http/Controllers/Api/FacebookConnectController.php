@@ -46,7 +46,7 @@ class FacebookConnectController extends Controller
 
     public function redirect(): JsonResponse
     {
-        if (! PlatformFacebookSetting::resolvedAppId()) {
+        if (! PlatformFacebookSetting::resolvedAppId() || ! PlatformFacebookSetting::resolvedLoginConfigId()) {
             return response()->json(['success' => false, 'message' => 'Facebook App is not configured on the server yet.'], 422);
         }
 

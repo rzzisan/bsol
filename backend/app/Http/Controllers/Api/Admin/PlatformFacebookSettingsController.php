@@ -23,6 +23,7 @@ class PlatformFacebookSettingsController extends Controller
     {
         $data = $request->validate([
             'app_id' => ['nullable', 'string', 'max:100'],
+            'login_config_id' => ['nullable', 'string', 'max:100'],
             'app_secret' => ['nullable', 'string', 'max:255'],
             'webhook_verify_token' => ['nullable', 'string', 'max:255'],
         ]);
@@ -32,7 +33,10 @@ class PlatformFacebookSettingsController extends Controller
         // Blank app_secret/webhook_verify_token in the request means "leave
         // unchanged" (the frontend never receives the real value back to
         // re-submit) — only overwrite when a new value was actually typed.
-        $updates = ['app_id' => $data['app_id'] ?? null];
+        $updates = [
+            'app_id' => $data['app_id'] ?? null,
+            'login_config_id' => $data['login_config_id'] ?? null,
+        ];
         if (filled($data['app_secret'] ?? null)) {
             $updates['app_secret'] = $data['app_secret'];
         }

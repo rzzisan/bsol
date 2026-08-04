@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 class PlatformFacebookSetting extends Model
 {
     protected $fillable = [
-        'app_id', 'app_secret', 'webhook_verify_token',
+        'app_id', 'login_config_id', 'app_secret', 'webhook_verify_token',
     ];
 
     protected $hidden = [
@@ -39,6 +39,7 @@ class PlatformFacebookSetting extends Model
     {
         return [
             'app_id' => $this->app_id,
+            'login_config_id' => $this->login_config_id,
             'app_secret_set' => filled($this->app_secret),
             'webhook_verify_token_set' => filled($this->webhook_verify_token),
         ];
@@ -47,6 +48,18 @@ class PlatformFacebookSetting extends Model
     public static function resolvedAppId(): ?string
     {
         return static::getSetting()->app_id ?: config('services.facebook.app_id');
+    }
+
+    /**
+     * The seller-connect OAuth dialog is a Facebook Login for Business app
+     * (Meta requires this once a Business-Login-dependent use case like
+     * Messenger is added) — that flow is invoked with a Login Configuration
+     * ID instead of a `scope` param. Without it Meta serves a "Feature
+     * Unavailable" wall instead of the login dialog.
+     */
+    public static function resolvedLoginConfigId(): ?string
+    {
+        return static::getSetting()->login_config_id ?: config('services.facebook.login_config_id');
     }
 
     public static function resolvedAppSecret(): ?string
