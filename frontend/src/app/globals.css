@@ -43,6 +43,7 @@ html[data-theme="dark"] {
 
 html {
   background-color: var(--background);
+  scroll-behavior: smooth;
 }
 
 body {
