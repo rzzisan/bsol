@@ -16,7 +16,7 @@ class FacebookLeadController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = FacebookLead::where('user_id', auth()->id())->orderByDesc('received_at');
+        $query = FacebookLead::where('user_id', auth()->id());
 
         if ($request->filled('channel')) {
             $query->where('channel', $request->string('channel'));
@@ -24,6 +24,19 @@ class FacebookLeadController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
         }
+        if ($request->boolean('unread_only')) {
+            $query->where('is_read', false);
+        }
+        if ($request->filled('q')) {
+            $search = trim((string) $request->string('q'));
+            $query->where(function ($sub) use ($search) {
+                $sub->where('message', 'ilike', "%{$search}%")
+                    ->orWhere('sender_name', 'ilike', "%{$search}%")
+                    ->orWhere('detected_phone', 'ilike', "%{$search}%");
+            });
+        }
+
+        $query->orderBy('received_at', $request->string('sort') === 'oldest' ? 'asc' : 'desc');
 
         $perPage = min((int) ($request->per_page ?? 20), 100);
         $leads = $query->with('customer:id,name,phone')->paginate($perPage);

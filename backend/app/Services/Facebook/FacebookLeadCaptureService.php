@@ -69,6 +69,16 @@ class FacebookLeadCaptureService
             return;
         }
 
+        // Replying to a comment from the dashboard (FacebookGraphClient::replyToComment)
+        // posts a new comment as the Page — Meta re-delivers that as a normal
+        // feed/comment webhook event, with no echo flag to distinguish it (unlike
+        // Messenger). Without this check, every reply we send comes back as a
+        // brand-new lead authored by "ourselves". Anything from.id === the
+        // connected Page's own ID is our own reply, not an incoming lead.
+        if (($value['from']['id'] ?? null) === $connection->fb_page_id) {
+            return;
+        }
+
         $this->storeLead($connection, [
             'channel' => 'comment',
             'fb_event_id' => $commentId,
