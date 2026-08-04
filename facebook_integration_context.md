@@ -151,6 +151,17 @@ Seller can now reply to a lead directly from `/dashboard/leads` (`POST /api/face
   **Confirmed working end-to-end 2026-08-04** after the seller disconnected/reconnected: Page connect, comment + Messenger lead capture, and both reply types (comment reply, message reply) all verified live by the user. Code (`replyToComment()`, controller, frontend) never changed during this debugging — only Meta-side Login Configuration permissions needed fixing (see above).
 
 **Facebook lead-capture + reply feature is now fully functional in production for the connected test Page.** Still gated behind App Review (§3.1) before it works for sellers who aren't admin/developer/tester on the Meta app.
+
+### Tech Provider / Access Verification — submitted 2026-08-04
+
+Adding *any* permission to the App Review submission (not just `business_management`/`pages_manage_engagement` — confirmed this applies to the original 4 too) now requires the app to first register as a **Tech Provider**, an irreversible app-level classification for apps that access data belonging to businesses other than the app owner's own Business Portfolio — which fits BSOL's actual architecture (sellers connect their own Pages, outside our "Zareen Natural Foods" portfolio). Confirmed with the user this is the correct classification and registered.
+
+Three sub-requirements, checked live at Apps → Review → Verification:
+1. **Business verification** — already ✅ Verified (Zareen Natural Foods was verified separately, pre-existing — no new documents needed).
+2. **Access verification** — a short questionnaire (no document upload): business type (SaaS Platform), how Platform Data is used on behalf of clients, whether we manage multiple business portfolios (No), website URL. Filled in and **submitted** — status "In review", Meta says up to 5 days.
+3. **App Review** — not yet started; blocked until Access Verification clears, and still separately needs the screencast + real API test call requirements from §3.1.
+
+Next session: check Access Verification status (Apps → Review → Verification), and once "Verified", proceed to the App Review submission draft (pages_show_list/pages_manage_metadata/pages_messaging/public_profile/pages_manage_engagement/pages_read_user_content, `business_management` intentionally left out per §3.1 note) — still needs screencasts + real API test calls before "Submit for review" enables.
 - Needs re-adding to the App Review submission draft too (same as `business_management` — see §3.1 above) once that's resumed.
 
 ---
