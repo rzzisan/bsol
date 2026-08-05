@@ -2,12 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
-import { getStoredToken } from "@/lib/dashboard-client";
+import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
 import { useLocationDropdowns } from "@/lib/use-location-dropdowns";
 import { computeSellingPrice } from "@/lib/pricing";
 import OrderItemGrid from "@/components/orders/order-item-grid";
 import OrderSummarySticky from "@/components/orders/order-summary-sticky";
 import VariantPickerModal from "@/components/products/variant-picker-modal";
+import CourierDeliveryReportCard, {
+  type CourierCheckResult,
+} from "@/components/courier/courier-delivery-report";
 import type { ProductVariant } from "@/types/variant";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -69,6 +72,7 @@ const normalizePhone = (value: string): string => {
 
 export default function OrderIntakeForm({ initial }: { initial?: InitialOrderData } = {}) {
   const token = getStoredToken();
+  const [locale] = useState<Locale>(getStoredLocale);
   const router = useRouter();
   const loc = useLocationDropdowns();
 
@@ -91,6 +95,11 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [variantProduct, setVariantProduct] = useState<Product | null>(null);
+
+  const [courierData, setCourierData] = useState<CourierCheckResult | null>(null);
+  const [courierChecking, setCourierChecking] = useState(false);
+  const [courierErrorMsg, setCourierErrorMsg] = useState<string | null>(null);
+  const lastCourierPhoneRef = useRef<string | null>(null);
 
   const [favorites, setFavorites] = useState<Set<number>>(() => {
     try {
@@ -166,6 +175,46 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
     const t = setTimeout(() => void run(), 300);
     return () => clearTimeout(t);
   }, [customerPhone, token]);
+
+  // Courier delivery report: fires as soon as the customer phone reaches
+  // 11 digits (same source as dashboard/orders/fraud-check).
+  useEffect(() => {
+    const digits = normalizePhone(customerPhone);
+    if (digits.length !== 11) {
+      lastCourierPhoneRef.current = null;
+      setCourierData(null);
+      setCourierChecking(false);
+      setCourierErrorMsg(null);
+      return;
+    }
+    if (lastCourierPhoneRef.current === digits) return;
+
+    const t = setTimeout(() => {
+      lastCourierPhoneRef.current = digits;
+      setCourierChecking(true);
+      setCourierData(null);
+      setCourierErrorMsg(null);
+
+      void (async () => {
+        try {
+          const res = await fetch(`${API}/fraud/courier-check?phone=${encodeURIComponent(digits)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const d = await res.json();
+          if (res.ok && d.success) {
+            setCourierData(d.data);
+          } else {
+            setCourierErrorMsg(d.message ?? (locale === "bn" ? "ডেটা আনা যায়নি" : "Could not fetch data"));
+          }
+        } catch {
+          setCourierErrorMsg(locale === "bn" ? "ডেটা আনা যায়নি" : "Could not fetch data");
+        } finally {
+          setCourierChecking(false);
+        }
+      })();
+    }, 300);
+    return () => clearTimeout(t);
+  }, [customerPhone, token, locale]);
 
   const productSuggestions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -333,7 +382,19 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
     }
   };
 
+  const showCourierReport = courierChecking || !!courierData || !!courierErrorMsg;
+
   return (
+    <div className="space-y-4">
+      {showCourierReport && (
+        <CourierDeliveryReportCard
+          courierData={courierData}
+          courierChecking={courierChecking}
+          courierErrorMsg={courierErrorMsg}
+          locale={locale}
+        />
+      )}
+
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-4">
         {error ? <div className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
@@ -484,6 +545,7 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
           onClose={() => setVariantProduct(null)}
         />
       ) : null}
+    </div>
     </div>
   );
 }
