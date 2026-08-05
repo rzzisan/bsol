@@ -23,6 +23,7 @@ export type AdminMenuLabels = {
   landingPages?: string;
   platformBranding?: string;
   facebookSettings?: string;
+  courierCache?: string;
 };
 
 export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
@@ -102,6 +103,12 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
           href: "/admin/landing/templates",
         },
       ],
+    },
+    {
+      key: "courier-cache",
+      label: labels.courierCache ?? "Courier Cache",
+      icon: "🚚",
+      href: "/admin/courier-cache",
     },
     { key: "reports", label: labels.reports, icon: "📊" },
     {

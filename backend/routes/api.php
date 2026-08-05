@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\Admin\PlatformFacebookSettingsController;
 use App\Http\Controllers\Api\Admin\PlatformSettingsController;
 use App\Http\Controllers\Api\Admin\LandingTemplateController as AdminLandingTemplateController;
 use App\Http\Controllers\Api\Admin\LandingPageAdminController;
+use App\Http\Controllers\Api\Admin\CourierCacheController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductMediaController;
@@ -407,6 +408,9 @@ Route::middleware('active_subscription')->group(function () {
             Route::post('/{id}/lock', [LandingPageAdminController::class, 'lock'])->where('id', '[0-9]+');
             Route::post('/{id}/unlock', [LandingPageAdminController::class, 'unlock'])->where('id', '[0-9]+');
         });
+
+        // Courier delivery-history cache (courier_fraud_stats) — read-only view
+        Route::get('/courier-cache', [CourierCacheController::class, 'index']);
 
         // Notification Dispatch Routes
         Route::post('/notification-dispatch', [NotificationDispatchController::class, 'dispatch']);

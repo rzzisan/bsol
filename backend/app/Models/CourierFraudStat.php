@@ -16,4 +16,9 @@ class CourierFraudStat extends Model
         'last_checked_at' => 'datetime',
         'success_rate' => 'float',
     ];
+
+    public function fetchedBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'fetched_by_user_id');
+    }
 }
