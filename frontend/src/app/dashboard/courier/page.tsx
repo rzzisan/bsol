@@ -45,6 +45,10 @@ const t = {
     redxNoStoreWarning: "RedX Pickup Store পাওয়া যায়নি। Settings → Courier-এ তৈরি করুন।",
     carrybee: "CarryBee",
     carrybeeNoStoreWarning: "CarryBee Store পাওয়া যায়নি। Settings → Courier-এ তৈরি করুন।",
+    paperfly: "Paperfly",
+    paperflyStoreName: "Store Name",
+    paperflyNoStoreWarning: "Paperfly Store Name সেট করা নেই। Settings → Courier-এ ডিফল্ট Store Name দিন অথবা এখানে লিখুন।",
+    paperflyProductBrief: "পণ্যের সংক্ষিপ্ত বিবরণ (ঐচ্ছিক)",
     city: "City",
     zone: "Zone",
     area: "Area (ঐচ্ছিক)",
@@ -117,6 +121,10 @@ const t = {
     redxNoStoreWarning: "No RedX pickup store found. Create one in Settings → Courier.",
     carrybee: "CarryBee",
     carrybeeNoStoreWarning: "No CarryBee store found. Create one in Settings → Courier.",
+    paperfly: "Paperfly",
+    paperflyStoreName: "Store Name",
+    paperflyNoStoreWarning: "No Paperfly store name set. Set a default in Settings → Courier, or enter one here.",
+    paperflyProductBrief: "Product brief (optional)",
     city: "City",
     zone: "Zone",
     area: "Area (optional)",
@@ -168,7 +176,7 @@ type CarrybeeStore = { id: number; name: string; address: string; city_id: numbe
 type CarrybeeLocation = { id: number; name: string };
 
 type BookForm = {
-  courier: "steadfast" | "pathao" | "redx" | "carrybee" | "manual";
+  courier: "steadfast" | "pathao" | "redx" | "carrybee" | "paperfly" | "manual";
   cod_amount: string;
   note: string;
   tracking_id: string;
@@ -183,6 +191,8 @@ type BookForm = {
   carrybee_city_id: string;
   carrybee_zone_id: string;
   carrybee_area_id: string;
+  paperfly_store_name: string;
+  paperfly_product_brief: string;
 };
 
 type BulkForm = {
@@ -213,6 +223,7 @@ export default function BookParcelPage() {
     store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "",
     redx_value: "", redx_delivery_area_id: "", redx_delivery_area: "",
     carrybee_city_id: "", carrybee_zone_id: "", carrybee_area_id: "",
+    paperfly_store_name: "", paperfly_product_brief: "",
   });
   const [booking, setBooking] = useState(false);
   const [bookResult, setBookResult] = useState<{ success: boolean; msg: string } | null>(null);
@@ -242,6 +253,9 @@ export default function BookParcelPage() {
   const [carrybeeZones, setCarrybeeZones] = useState<CarrybeeLocation[]>([]);
   const [carrybeeAreas, setCarrybeeAreas] = useState<CarrybeeLocation[]>([]);
   const [carrybeeLocationLoading, setCarrybeeLocationLoading] = useState({ cities: false, zones: false, areas: false });
+
+  const [paperflySettingsFetched, setPaperflySettingsFetched] = useState(false);
+  const [paperflyDefaultStoreName, setPaperflyDefaultStoreName] = useState("");
 
   const [bulkForm, setBulkForm] = useState<BulkForm>({
     courier: "pathao", store_id: "", delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "", note: "",
@@ -323,6 +337,28 @@ export default function BookParcelPage() {
     }
   };
 
+  const fetchPaperflySettings = useCallback(async () => {
+    if (paperflySettingsFetched) {
+      if (paperflyDefaultStoreName) {
+        setForm(f => (f.courier === "paperfly" && !f.paperfly_store_name ? { ...f, paperfly_store_name: paperflyDefaultStoreName } : f));
+      }
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/courier/settings`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        const storeName: string = d.data?.paperfly_store_name ?? "";
+        setPaperflyDefaultStoreName(storeName);
+        if (storeName) {
+          setForm(f => (f.courier === "paperfly" ? { ...f, paperfly_store_name: storeName } : f));
+        }
+      }
+    } finally {
+      setPaperflySettingsFetched(true);
+    }
+  }, [paperflySettingsFetched, paperflyDefaultStoreName, token]);
+
   const fetchCarrybeeStores = useCallback(async () => {
     if (carrybeeStoresFetched) return;
     setLoadingCarrybeeStores(true);
@@ -392,6 +428,7 @@ export default function BookParcelPage() {
       delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "",
       redx_value: String(Math.round(Number(o.total))), redx_delivery_area_id: "", redx_delivery_area: "",
       carrybee_city_id: "", carrybee_zone_id: "", carrybee_area_id: "",
+      paperfly_store_name: "", paperfly_product_brief: "",
     });
     setBookResult(null);
     setPriceResult(null);
@@ -535,6 +572,10 @@ export default function BookParcelPage() {
         body.delivery_zone_id = Number(form.carrybee_zone_id);
         if (form.carrybee_area_id) body.delivery_area_id = Number(form.carrybee_area_id);
         body.parcel_weight_kg = Number(form.item_weight);
+      } else if (form.courier === "paperfly") {
+        if (form.paperfly_store_name) body.paperfly_store_name = form.paperfly_store_name;
+        if (form.paperfly_product_brief) body.product_brief = form.paperfly_product_brief;
+        body.parcel_weight_kg = Number(form.item_weight);
       }
 
       const res = await fetch(`${API}/courier/book/${modal.id}`, {
@@ -671,12 +712,14 @@ export default function BookParcelPage() {
                     if (courier === "pathao") void fetchPathaoStores();
                     if (courier === "redx") void fetchRedxStores();
                     if (courier === "carrybee") { void fetchCarrybeeStores(); void fetchCarrybeeCities(); }
+                    if (courier === "paperfly") void fetchPaperflySettings();
                   }}
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
                   <option value="pathao">{txt.pathao}</option>
                   <option value="steadfast">{txt.steadfast}</option>
                   <option value="redx">{txt.redx}</option>
                   <option value="carrybee">{txt.carrybee}</option>
+                  <option value="paperfly">{txt.paperfly}</option>
                   <option value="manual">{txt.manual}</option>
                 </select>
               </label>
@@ -889,6 +932,34 @@ export default function BookParcelPage() {
                 </>
               )}
 
+              {form.courier === "paperfly" && (
+                <>
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.paperflyStoreName}</span>
+                    <input value={form.paperfly_store_name}
+                      onChange={e => setForm(f => ({ ...f, paperfly_store_name: e.target.value }))}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                    {paperflySettingsFetched && !form.paperfly_store_name && (
+                      <p className="mt-1 text-xs text-amber-400">{txt.paperflyNoStoreWarning}</p>
+                    )}
+                  </label>
+
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.paperflyProductBrief}</span>
+                    <input value={form.paperfly_product_brief}
+                      onChange={e => setForm(f => ({ ...f, paperfly_product_brief: e.target.value }))}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                  </label>
+
+                  <label>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.itemWeight}</span>
+                    <input type="number" step="0.1" min="0.1" value={form.item_weight}
+                      onChange={e => setForm(f => ({ ...f, item_weight: e.target.value }))}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                  </label>
+                </>
+              )}
+
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.codAmount}</span>
                 <input type="number" value={form.cod_amount} onChange={e => setForm(f => ({ ...f, cod_amount: e.target.value }))}
@@ -910,7 +981,8 @@ export default function BookParcelPage() {
               <button onClick={() => void handleBook()}
                 disabled={booking
                   || (form.courier === "redx" && (!form.redx_delivery_area_id || !form.store_id))
-                  || (form.courier === "carrybee" && (!form.carrybee_city_id || !form.carrybee_zone_id || !form.store_id))}
+                  || (form.courier === "carrybee" && (!form.carrybee_city_id || !form.carrybee_zone_id || !form.store_id))
+                  || (form.courier === "paperfly" && !form.paperfly_store_name)}
                 className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
                 {booking ? txt.confirming : txt.confirm}
               </button>

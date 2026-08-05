@@ -150,7 +150,7 @@ export default function TrackPage() {
                   ) : "—"}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {(o.courier_name === "steadfast" || o.courier_name === "pathao") ? (
+                  {(o.courier_name === "steadfast" || o.courier_name === "pathao" || o.courier_name === "redx" || o.courier_name === "carrybee" || o.courier_name === "paperfly") ? (
                     <button onClick={() => void refreshOrder(o.id)} disabled={refreshing === o.id}
                       className="rounded-xl border border-[var(--border)] px-3 py-1 text-xs hover:bg-[var(--surface-soft)] disabled:opacity-50">
                       {refreshing === o.id ? txt.refreshing : txt.refresh}

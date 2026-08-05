@@ -96,9 +96,14 @@ const t = {
     carrybeeTitle: "CarryBee লগইন (Fraud Check)",
     carrybeePhone: "লগইন মোবাইল নাম্বার",
     carrybeePassword: "লগইন পাসওয়ার্ড",
-    paperflyTitle: "Paperfly লগইন (Fraud Check)",
+    paperflyBookingTitle: "Paperfly API (বুকিং)",
+    paperflyApiKey: "Paperfly Key (paperflykey হেডার)",
+    paperflyStoreName: "ডিফল্ট Store Name",
+    paperflyStoreNameHint: "Merchant Panel-এ কনফিগার করা store-এর নাম — Paperfly-এর কোনো store তৈরির API নেই।",
+    paperflyTitle: "Paperfly লগইন",
     paperflyUsername: "লগইন ইউজারনেম",
     paperflyPassword: "লগইন পাসওয়ার্ড",
+    paperflyAuthNote: "এই ইউজারনেম/পাসওয়ার্ড Fraud Checker এবং বুকিং API-এর Basic Auth — উভয় ক্ষেত্রে ব্যবহৃত হয়।",
     fraudCheckNote: "এই ক্রেডেনশিয়াল শুধু Fraud Checker ফিচারে ফোন নাম্বার দিয়ে ডেলিভারি হিস্টোরি চেক করতে ব্যবহৃত হয় — অর্ডার বুকিংয়ের সাথে সম্পর্কিত নয়।",
     saveSuccess: "সেটিং সেভ হয়েছে!",
     saveError: "সেভ ব্যর্থ হয়েছে।",
@@ -195,9 +200,14 @@ const t = {
     carrybeeTitle: "CarryBee Login (Fraud Check)",
     carrybeePhone: "Login Phone Number",
     carrybeePassword: "Login Password",
-    paperflyTitle: "Paperfly Login (Fraud Check)",
+    paperflyBookingTitle: "Paperfly API (Booking)",
+    paperflyApiKey: "Paperfly Key (paperflykey header)",
+    paperflyStoreName: "Default Store Name",
+    paperflyStoreNameHint: "The store name configured in your Merchant Panel — Paperfly has no store-creation API.",
+    paperflyTitle: "Paperfly Login",
     paperflyUsername: "Login Username",
     paperflyPassword: "Login Password",
+    paperflyAuthNote: "This username/password is used as Basic Auth for both the Fraud Checker and the booking API.",
     fraudCheckNote: "These credentials are only used by the Fraud Checker to look up delivery history by phone number — not related to order booking.",
     saveSuccess: "Settings saved!",
     saveError: "Failed to save.",
@@ -218,6 +228,7 @@ type Form = {
   carrybee_client_id: string; carrybee_client_secret: string; carrybee_client_context: string;
   carrybee_environment: string; carrybee_store_id: string;
   paperfly_username: string; paperfly_password: string;
+  paperfly_api_key: string; paperfly_store_name: string;
 };
 
 type PathaoStore = {
@@ -270,6 +281,7 @@ const EMPTY_FORM: Form = {
   carrybee_client_id: "", carrybee_client_secret: "", carrybee_client_context: "",
   carrybee_environment: "production", carrybee_store_id: "",
   paperfly_username: "", paperfly_password: "",
+  paperfly_api_key: "", paperfly_store_name: "",
 };
 
 export default function CourierSettingsPage() {
@@ -693,6 +705,8 @@ export default function CourierSettingsPage() {
               <option value="steadfast">Steadfast</option>
               <option value="pathao">Pathao</option>
               <option value="redx">RedX</option>
+              <option value="carrybee">CarryBee</option>
+              <option value="paperfly">Paperfly</option>
               <option value="manual">Manual</option>
             </select>
           </div>
@@ -1197,9 +1211,27 @@ export default function CourierSettingsPage() {
 
           {/* Paperfly */}
           {activeTab === "paperfly" && (
+          <>
+          <div className="catv-panel p-4" role="tabpanel">
+            <h3 className="mb-3 text-sm font-semibold">{txt.paperflyBookingTitle}</h3>
+            <div className="grid gap-3">
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.paperflyApiKey}</span>
+                <input type="password" value={form.paperfly_api_key} onChange={e => set("paperfly_api_key", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+              </label>
+              <label>
+                <span className="mb-1 block text-xs text-[var(--muted)]">{txt.paperflyStoreName}</span>
+                <input value={form.paperfly_store_name} onChange={e => set("paperfly_store_name", e.target.value)}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                <span className="mt-1 block text-xs text-[var(--muted)]">{txt.paperflyStoreNameHint}</span>
+              </label>
+            </div>
+          </div>
+
           <div className="catv-panel p-4" role="tabpanel">
             <h3 className="mb-1 text-sm font-semibold">{txt.paperflyTitle}</h3>
-            <p className="mb-3 text-xs text-[var(--muted)]">{txt.fraudCheckNote}</p>
+            <p className="mb-3 text-xs text-[var(--muted)]">{txt.paperflyAuthNote}</p>
             <div className="grid gap-3">
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.paperflyUsername}</span>
@@ -1213,6 +1245,7 @@ export default function CourierSettingsPage() {
               </label>
             </div>
           </div>
+          </>
           )}
 
           {/* Manual */}

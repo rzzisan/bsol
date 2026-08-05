@@ -168,7 +168,7 @@ class CourierController extends Controller
     public function saveSettings(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'default_courier'     => 'nullable|in:steadfast,pathao,redx,carrybee,manual',
+            'default_courier'     => 'nullable|in:steadfast,pathao,redx,carrybee,paperfly,manual',
             'steadfast_api_key'   => 'nullable|string|max:200',
             'steadfast_secret_key'=> 'nullable|string|max:200',
             'pathao_client_id'    => 'nullable|string|max:200',
@@ -190,6 +190,8 @@ class CourierController extends Controller
             'carrybee_store_id'       => 'nullable|string|max:100',
             'paperfly_username'   => 'nullable|string|max:200',
             'paperfly_password'   => 'nullable|string|max:200',
+            'paperfly_api_key'    => 'nullable|string|max:255',
+            'paperfly_store_name' => 'nullable|string|max:100',
         ]);
 
         // Only update keys that are actually sent (not masked placeholders)
@@ -461,7 +463,7 @@ class CourierController extends Controller
         $order = Order::where('user_id', auth()->id())->findOrFail($orderId);
 
         $data = $request->validate([
-            'courier'       => 'nullable|in:steadfast,pathao,redx,carrybee,manual',
+            'courier'       => 'nullable|in:steadfast,pathao,redx,carrybee,paperfly,manual',
             'cod_amount'    => 'nullable|numeric|min:0',
             'note'          => 'nullable|string|max:300',
             'tracking_id'   => 'nullable|string|max:100', // for manual entry
@@ -487,6 +489,9 @@ class CourierController extends Controller
             'delivery_city_id'     => 'nullable|integer',
             'delivery_zone_id'     => 'nullable|integer',
             'delivery_area_name'   => 'nullable|string|max:100',
+            // Paperfly-specific
+            'paperfly_store_name'  => 'nullable|string|max:100',
+            'product_brief'        => 'nullable|string|max:200',
         ]);
 
         $courier = $data['courier'] ?? 'steadfast';
@@ -541,7 +546,7 @@ class CourierController extends Controller
     public function bookBulk(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'courier'            => 'required|in:pathao,steadfast,redx',
+            'courier'            => 'required|in:pathao,steadfast,redx,paperfly',
             'order_ids'          => 'required|array|min:2|max:200',
             'order_ids.*'        => 'integer',
             'store_id'           => 'nullable|integer',
@@ -558,7 +563,8 @@ class CourierController extends Controller
         ]);
         // CarryBee is intentionally excluded from bulk booking — like RedX's area
         // pick, it needs a per-order location search that the bulk UI doesn't
-        // support yet.
+        // support yet. Paperfly needs no such per-order lookup (storeName comes
+        // from the seller's default in Settings → Courier), so it's bulk-eligible.
 
         $orders = Order::where('user_id', auth()->id())
             ->whereIn('id', $data['order_ids'])

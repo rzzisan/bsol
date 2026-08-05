@@ -12,6 +12,7 @@ class CourierFactory
         'pathao'    => PathaoCourierProvider::class,
         'redx'      => RedxCourierProvider::class,
         'carrybee'  => CarrybeeCourierProvider::class,
+        'paperfly'  => PaperflyCourierProvider::class,
     ];
 
     public static function make(?string $courier): ?CourierProviderInterface

@@ -18,6 +18,7 @@ class CourierSetting extends Model
         'carrybee_client_id', 'carrybee_client_secret', 'carrybee_client_context',
         'carrybee_environment', 'carrybee_store_id',
         'paperfly_username', 'paperfly_password',
+        'paperfly_api_key', 'paperfly_store_name',
     ];
 
     protected function casts(): array
@@ -35,6 +36,7 @@ class CourierSetting extends Model
             'carrybee_client_secret' => 'encrypted',
             'carrybee_client_context' => 'encrypted',
             'paperfly_password' => 'encrypted',
+            'paperfly_api_key' => 'encrypted',
             'pathao_token_expires_at' => 'datetime',
         ];
     }
@@ -48,7 +50,7 @@ class CourierSetting extends Model
     public function masked(): array
     {
         $data = $this->toArray();
-        foreach (['steadfast_api_key','steadfast_secret_key','pathao_client_secret','pathao_password','pathao_access_token','pathao_refresh_token','redx_api_key','redx_password','carrybee_password','carrybee_client_secret','carrybee_client_context','paperfly_password'] as $field) {
+        foreach (['steadfast_api_key','steadfast_secret_key','pathao_client_secret','pathao_password','pathao_access_token','pathao_refresh_token','redx_api_key','redx_password','carrybee_password','carrybee_client_secret','carrybee_client_context','paperfly_password','paperfly_api_key'] as $field) {
             if (!empty($data[$field])) {
                 $data[$field] = substr($data[$field], 0, 4) . str_repeat('*', max(0, strlen($data[$field]) - 4));
             }
