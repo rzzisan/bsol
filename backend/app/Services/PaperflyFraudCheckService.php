@@ -23,40 +23,47 @@ class PaperflyFraudCheckService implements CourierFraudCheckInterface
         }
 
         try {
+            $headers = ['Accept' => 'application/json, text/plain, */*'];
+            if (! empty($settings->paperfly_api_key)) {
+                $headers['paperflykey'] = $settings->paperfly_api_key;
+            }
+
+            // smart-check-v2.php — the old smart-check/list.php this used to call is dead:
+            // it returns a fixed {totalRecords: 1, records: []} stub for literally any
+            // phone number (verified live, including nonsense numbers). Reverse-engineered
+            // from the merchant panel's Smart Check V2 dashboard network traffic
+            // (2026-08-05); search_text is sent both as a query param and JSON body,
+            // matching what the real client does.
             $response = Http::timeout(config('fraud_checker.http_timeout', 15))
                 ->withToken($token)
-                ->withHeaders(['Accept' => 'application/json, text/plain, */*'])
-                ->post(self::BASE . '/smart-check/list.php', [
+                ->withHeaders($headers)
+                ->post(self::BASE . '/smart-check/smart-check-v2.php?search_text=' . urlencode($phone), [
                     'search_text' => $phone,
-                    'limit' => 50,
-                    'page' => 1,
                 ]);
 
             if (! $response->successful()) {
                 return $this->error('Paperfly stats request failed (HTTP ' . $response->status() . ').');
             }
 
-            $total = (int) ($response->json('totalRecords') ?? 0);
-            $records = $response->json('records') ?? [];
+            $total = (int) ($response->json('total') ?? 0);
+            $delivered = (int) ($response->json('delivered') ?? 0);
+            // Partial deliveries are folded into "cancelled" — our schema only tracks
+            // delivered vs. not-delivered, and a partial delivery is still a risk signal.
+            $cancelled = (int) ($response->json('returned') ?? 0) + (int) ($response->json('partial') ?? 0);
 
-            $delivered = 0;
-            $cancelled = 0;
-            foreach ($records as $record) {
-                $status = strtolower((string) ($record['status'] ?? ''));
-                if (str_contains($status, 'delivered') || str_contains($status, 'success')) {
-                    $delivered++;
-                } elseif (str_contains($status, 'return') || str_contains($status, 'cancel') || str_contains($status, 'fail')) {
-                    $cancelled++;
-                }
-            }
-
-            $parsed = $delivered + $cancelled;
+            // Paperfly's own delivery_rate is authoritative (their smart_check algorithm
+            // may weight things differently than a plain delivered/(delivered+cancelled)
+            // ratio) — fall back to computing it only if it's missing.
+            $deliveryRate = $response->json('smart_check.delivery_rate');
+            $successRate = $deliveryRate !== null
+                ? round((float) $deliveryRate, 2)
+                : (($delivered + $cancelled) > 0 ? round(($delivered / ($delivered + $cancelled)) * 100, 2) : 0);
 
             return [
                 'total' => $total,
                 'delivered' => $delivered,
                 'cancelled' => $cancelled,
-                'success_rate' => $parsed > 0 ? round(($delivered / $parsed) * 100, 2) : 0,
+                'success_rate' => $successRate,
                 'error' => null,
             ];
         } catch (\Throwable $e) {
