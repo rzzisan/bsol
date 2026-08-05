@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import CatvShell from "@/components/catv-shell";
 import { buildAdminMenu } from "@/lib/admin-menu";
+import { COURIER_META, ratingDisplay } from "@/components/courier/courier-delivery-report";
 import {
   getStoredLocale,
   getStoredTheme,
@@ -22,26 +23,8 @@ type CourierName = (typeof COURIERS)[number];
 type CourierFilter = "all" | CourierName;
 type StatusFilter = "all" | "ok" | "error";
 
-const COURIER_BADGE: Record<CourierName, string> = {
-  pathao: "bg-red-100 text-red-700",
-  steadfast: "bg-teal-100 text-teal-700",
-  redx: "bg-rose-100 text-rose-700",
-  carrybee: "bg-amber-100 text-amber-800",
-  paperfly: "bg-blue-100 text-blue-700",
-};
-
-const COURIER_LABEL: Record<CourierName, string> = {
-  pathao: "Pathao",
-  steadfast: "Steadfast",
-  redx: "RedX",
-  carrybee: "CarryBee",
-  paperfly: "Paperfly",
-};
-
-interface CacheRow {
+interface CourierCell {
   id: number;
-  phone_number: string;
-  courier_name: string;
   data_type: "delivery" | "rating";
   total_parcels: number;
   total_delivered: number;
@@ -53,7 +36,12 @@ interface CacheRow {
   fetched_by: { id: number; name: string; email: string } | null;
   last_checked_at: string | null;
   is_fresh: boolean;
-  created_at: string | null;
+}
+
+interface PhoneRow {
+  phone_number: string;
+  last_checked_at: string | null;
+  couriers: Partial<Record<CourierName, CourierCell | null>>;
 }
 
 interface CourierSummary {
@@ -97,7 +85,7 @@ const text = {
     totalCached: "মোট ক্যাশড এন্ট্রি",
     filters: {
       phone: "ফোন নম্বর দিয়ে খুঁজুন",
-      courier: "কুরিয়ার",
+      courier: "কুরিয়ার (শুধু এই কুরিয়ারে ক্যাশ আছে এমন ফোন)",
       courierAll: "সব কুরিয়ার",
       status: "স্ট্যাটাস",
       statusAll: "সব",
@@ -106,12 +94,7 @@ const text = {
     },
     table: {
       phone: "ফোন নম্বর",
-      courier: "কুরিয়ার",
-      stats: "ডেলিভারি ডেটা",
-      status: "স্ট্যাটাস",
-      freshness: "ক্যাশ অবস্থা",
-      fetchedBy: "যিনি ফেচ করেছেন",
-      lastChecked: "শেষ চেক করা হয়েছে",
+      lastChecked: "সর্বশেষ আপডেট",
     },
     statOk: "সফল",
     statError: "ব্যর্থ",
@@ -120,8 +103,8 @@ const text = {
     total: "মোট",
     delivered: "ডেলিভারি",
     cancelled: "বাতিল",
-    rate: "সাফল্যের হার",
-    ratingLabel: "রেটিং",
+    notCached: "ক্যাশ নেই",
+    fetchedByLabel: "ফেচ করেছেন",
     systemFetch: "সিস্টেম",
     loading: "লোড হচ্ছে...",
     empty: "কোনো ক্যাশড কুরিয়ার ডেটা পাওয়া যায়নি।",
@@ -157,7 +140,7 @@ const text = {
     totalCached: "Total Cached Entries",
     filters: {
       phone: "Search by phone number",
-      courier: "Courier",
+      courier: "Courier (only phones cached for this courier)",
       courierAll: "All Couriers",
       status: "Status",
       statusAll: "All",
@@ -166,12 +149,7 @@ const text = {
     },
     table: {
       phone: "Phone",
-      courier: "Courier",
-      stats: "Delivery Data",
-      status: "Status",
-      freshness: "Cache State",
-      fetchedBy: "Fetched By",
-      lastChecked: "Last Checked",
+      lastChecked: "Last Updated",
     },
     statOk: "OK",
     statError: "Error",
@@ -180,8 +158,8 @@ const text = {
     total: "Total",
     delivered: "Delivered",
     cancelled: "Cancelled",
-    rate: "Success Rate",
-    ratingLabel: "Rating",
+    notCached: "Not cached",
+    fetchedByLabel: "Fetched by",
     systemFetch: "System",
     loading: "Loading...",
     empty: "No cached courier data found.",
@@ -190,16 +168,77 @@ const text = {
   },
 };
 
+type Txt = (typeof text)["bn"];
+
 const inputCls =
   "w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]";
 const labelCls = "mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]";
+
+function CourierCellView({ cell, locale, t }: { cell: CourierCell | null | undefined; locale: Locale; t: Txt }) {
+  if (!cell) {
+    return <div className="py-2 text-center text-xs text-[var(--muted)]">{t.notCached}</div>;
+  }
+
+  const tooltip = [
+    cell.last_checked_at ? new Date(cell.last_checked_at).toLocaleString(locale === "bn" ? "bn-BD" : "en-GB") : null,
+    cell.fetched_by ? `${t.fetchedByLabel}: ${cell.fetched_by.name}` : `${t.fetchedByLabel}: ${t.systemFetch}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const freshnessDot = (
+    <span
+      title={cell.is_fresh ? t.fresh : t.stale}
+      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${cell.is_fresh ? "bg-emerald-500" : "bg-amber-500"}`}
+    />
+  );
+
+  if (cell.status === "error") {
+    return (
+      <div className="py-1 text-center" title={tooltip}>
+        <div className="flex items-center justify-center gap-1 text-xs font-semibold text-red-500">
+          {freshnessDot}
+          {t.statError}
+        </div>
+        {cell.error_message && (
+          <p className="mx-auto mt-0.5 max-w-[140px] truncate text-[9px] text-[var(--muted)]">{cell.error_message}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (cell.data_type === "rating" && cell.rating) {
+    const r = ratingDisplay(cell.rating, locale);
+    return (
+      <div className="py-1 text-center" title={tooltip}>
+        <div className="flex items-center justify-center gap-1">
+          {freshnessDot}
+          <span className={`text-xs font-bold ${r.color}`}>{r.label}</span>
+        </div>
+        {r.estimate && <p className="mt-0.5 text-[9px] text-[var(--muted)]">{r.estimate}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-1 text-center" title={tooltip}>
+      <div className="flex items-center justify-center gap-1">
+        {freshnessDot}
+        <span className="text-sm font-bold text-emerald-500">{cell.success_rate}%</span>
+      </div>
+      <p className="mt-0.5 text-[9px] text-[var(--muted)]">
+        {t.total}:{cell.total_parcels} · {t.delivered}:{cell.total_delivered} · {t.cancelled}:{cell.total_cancelled}
+      </p>
+    </div>
+  );
+}
 
 export default function AdminCourierCachePage() {
   const [locale, setLocale] = useState<Locale>("bn");
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
-  const [rows, setRows] = useState<CacheRow[]>([]);
+  const [rows, setRows] = useState<PhoneRow[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loadingRows, setLoadingRows] = useState(true);
   const [page, setPage] = useState(1);
@@ -269,7 +308,7 @@ export default function AdminCourierCachePage() {
     if (!token) return;
     setLoadingRows(true);
     try {
-      const params = new URLSearchParams({ page: String(page), per_page: "25" });
+      const params = new URLSearchParams({ page: String(page), per_page: "20" });
       if (phoneSearch.trim()) params.set("phone", phoneSearch.trim());
       if (courierFilter !== "all") params.set("courier", courierFilter);
       if (statusFilter !== "all") params.set("status", statusFilter);
@@ -278,7 +317,7 @@ export default function AdminCourierCachePage() {
         headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
       });
       const data = (await res.json()) as {
-        data?: CacheRow[];
+        data?: PhoneRow[];
         meta?: { last_page?: number };
         summary?: Summary;
       };
@@ -355,9 +394,10 @@ export default function AdminCourierCachePage() {
         </div>
         {COURIERS.map((courier) => {
           const s = summary?.by_courier?.[courier] ?? { total: 0, ok: 0, error: 0 };
+          const meta = COURIER_META[courier];
           return (
             <div key={courier} className="overflow-hidden rounded-2xl border border-[var(--border)]">
-              <div className={`px-3 py-2 text-sm font-bold ${COURIER_BADGE[courier]}`}>{COURIER_LABEL[courier]}</div>
+              <div className={`px-3 py-2 text-sm font-bold text-white ${meta.header}`}>{meta.label}</div>
               <div className="space-y-1 bg-[var(--surface)] px-3 py-2.5 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-[var(--muted)]">{t.total}</span>
@@ -396,7 +436,7 @@ export default function AdminCourierCachePage() {
               <option value="all">{t.filters.courierAll}</option>
               {COURIERS.map((c) => (
                 <option key={c} value={c}>
-                  {COURIER_LABEL[c]}
+                  {COURIER_META[c].label}
                 </option>
               ))}
             </select>
@@ -412,25 +452,25 @@ export default function AdminCourierCachePage() {
         </div>
       </section>
 
-      {/* Table */}
+      {/* Table: one row per phone, one column per courier */}
       <section className="catv-panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-sm">
-            <thead className="bg-[#2f7ec1] text-white">
+            <thead>
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.phone}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.courier}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.stats}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.status}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.freshness}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.fetchedBy}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.lastChecked}</th>
+                <th className="border border-[#d7e1ee] bg-[#2f7ec1] px-3 py-2 text-left font-semibold text-white">{t.table.phone}</th>
+                <th className="border border-[#d7e1ee] bg-[#2f7ec1] px-3 py-2 text-left font-semibold text-white">{t.table.lastChecked}</th>
+                {COURIERS.map((c) => (
+                  <th key={c} className={`border border-[#d7e1ee] px-3 py-2 text-center font-semibold text-white ${COURIER_META[c].header}`}>
+                    {COURIER_META[c].label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loadingRows && (
                 <tr>
-                  <td colSpan={7} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={2 + COURIERS.length} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
@@ -438,78 +478,26 @@ export default function AdminCourierCachePage() {
 
               {!loadingRows && rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={2 + COURIERS.length} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
               )}
 
               {!loadingRows &&
-                rows.map((row) => {
-                  const meta = row.courier_name in COURIER_BADGE ? (row.courier_name as CourierName) : null;
-                  return (
-                    <tr key={row.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff] align-top">
-                      <td className="border border-[#e5ebf5] px-3 py-2 font-mono">{row.phone_number}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">
-                        <span className={`rounded px-2 py-1 text-xs font-semibold ${meta ? COURIER_BADGE[meta] : "bg-slate-100 text-slate-700"}`}>
-                          {meta ? COURIER_LABEL[meta] : row.courier_name}
-                        </span>
+                rows.map((row) => (
+                  <tr key={row.phone_number} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff] align-middle">
+                    <td className="border border-[#e5ebf5] px-3 py-2 font-mono">{row.phone_number}</td>
+                    <td className="border border-[#e5ebf5] px-3 py-2 whitespace-nowrap text-xs text-[var(--muted)]">
+                      {formatDate(row.last_checked_at)}
+                    </td>
+                    {COURIERS.map((c) => (
+                      <td key={c} className="border border-[#e5ebf5] px-2 py-1">
+                        <CourierCellView cell={row.couriers[c]} locale={locale} t={t} />
                       </td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">
-                        {row.data_type === "rating" && row.rating ? (
-                          <span className="text-xs text-[var(--muted)]">
-                            {t.ratingLabel}: <span className="font-semibold text-[var(--foreground)]">{row.rating.replace(/_/g, " ")}</span>
-                          </span>
-                        ) : (
-                          <div className="text-xs text-[var(--muted)]">
-                            <div>
-                              {t.total}: <span className="font-semibold text-[var(--foreground)]">{row.total_parcels}</span>
-                              {" · "}
-                              {t.delivered}: <span className="font-semibold text-emerald-500">{row.total_delivered}</span>
-                              {" · "}
-                              {t.cancelled}: <span className="font-semibold text-red-500">{row.total_cancelled}</span>
-                            </div>
-                            <div className="mt-0.5">
-                              {t.rate}: <span className="font-semibold text-[var(--foreground)]">{row.success_rate}%</span>
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">
-                        <span
-                          className={`rounded px-2 py-1 text-xs font-semibold ${
-                            row.status === "ok" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-                          }`}
-                        >
-                          {row.status === "ok" ? t.statOk : t.statError}
-                        </span>
-                        {row.status === "error" && row.error_message && (
-                          <div className="mt-1 max-w-[220px] whitespace-pre-wrap break-words text-[10px] text-red-500">{row.error_message}</div>
-                        )}
-                      </td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">
-                        <span
-                          className={`rounded px-2 py-1 text-xs font-semibold ${
-                            row.is_fresh ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          {row.is_fresh ? t.fresh : t.stale}
-                        </span>
-                      </td>
-                      <td className="border border-[#e5ebf5] px-3 py-2 text-xs">
-                        {row.fetched_by ? (
-                          <>
-                            <div className="font-medium text-[var(--foreground)]">{row.fetched_by.name}</div>
-                            <div className="text-[var(--muted)]">{row.fetched_by.email}</div>
-                          </>
-                        ) : (
-                          <span className="text-[var(--muted)]">{t.systemFetch}</span>
-                        )}
-                      </td>
-                      <td className="border border-[#e5ebf5] px-3 py-2 whitespace-nowrap">{formatDate(row.last_checked_at)}</td>
-                    </tr>
-                  );
-                })}
+                    ))}
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

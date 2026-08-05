@@ -17,33 +17,62 @@ class CourierCacheController extends Controller
 {
     private const COURIERS = ['pathao', 'steadfast', 'redx', 'carrybee', 'paperfly'];
 
+    /**
+     * One row per phone number, one column per courier — matching how the
+     * seller-facing fraud-check page presents this same data. `courier`/
+     * `status` filters narrow which phones qualify, but every qualifying
+     * phone still shows all 5 courier columns (null where nothing is cached).
+     */
     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) ($request->per_page ?? 25), 100);
-
-        $rows = CourierFraudStat::query()
-            ->with('fetchedBy:id,name,email')
-            ->when($request->filled('courier'), fn ($q) => $q->where('courier_name', $request->string('courier')))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('phone'), function ($q) use ($request) {
-                $q->where('phone_number', 'like', '%'.$request->string('phone').'%');
-            })
-            ->orderByDesc('last_checked_at')
-            ->paginate($perPage);
-
+        $perPage = min((int) ($request->per_page ?? 20), 100);
         $ttlHours = (int) config('fraud_checker.cache_ttl_hours', 24);
         $errorCooldownMinutes = (int) config('fraud_checker.error_cooldown_minutes', 30);
 
-        $data = collect($rows->items())->map(fn (CourierFraudStat $row) => $this->format($row, $ttlHours, $errorCooldownMinutes))->values();
+        $phonePage = CourierFraudStat::query()
+            ->select('phone_number')
+            ->selectRaw('MAX(last_checked_at) as latest_checked_at')
+            ->when($request->filled('phone'), function ($q) use ($request) {
+                $q->where('phone_number', 'like', '%'.$request->string('phone').'%');
+            })
+            ->when($request->filled('courier'), fn ($q) => $q->where('courier_name', $request->string('courier')))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->groupBy('phone_number')
+            ->orderByDesc('latest_checked_at')
+            ->paginate($perPage);
+
+        $phones = collect($phonePage->items())->pluck('phone_number');
+
+        $rowsByPhone = CourierFraudStat::query()
+            ->whereIn('phone_number', $phones)
+            ->with('fetchedBy:id,name,email')
+            ->get()
+            ->groupBy('phone_number');
+
+        $data = $phones->map(function (string $phone) use ($rowsByPhone, $ttlHours, $errorCooldownMinutes) {
+            $forPhone = $rowsByPhone->get($phone, collect());
+
+            $couriers = [];
+            foreach (self::COURIERS as $courier) {
+                $row = $forPhone->firstWhere('courier_name', $courier);
+                $couriers[$courier] = $row ? $this->format($row, $ttlHours, $errorCooldownMinutes) : null;
+            }
+
+            return [
+                'phone_number' => $phone,
+                'last_checked_at' => $forPhone->max('last_checked_at')?->toISOString(),
+                'couriers' => $couriers,
+            ];
+        })->values();
 
         return response()->json([
             'success' => true,
             'data' => $data,
             'meta' => [
-                'total' => $rows->total(),
-                'current_page' => $rows->currentPage(),
-                'last_page' => $rows->lastPage(),
-                'per_page' => $rows->perPage(),
+                'total' => $phonePage->total(),
+                'current_page' => $phonePage->currentPage(),
+                'last_page' => $phonePage->lastPage(),
+                'per_page' => $phonePage->perPage(),
             ],
             'summary' => $this->buildSummary(),
         ]);

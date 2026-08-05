@@ -55,7 +55,7 @@ const TXT = {
 
 // Pathao's dashboard only exposes a qualitative rating label (e.g. "excellent_customer"),
 // not raw delivery counts — map known keywords to a display label + color, best-effort.
-function ratingDisplay(rating: string, locale: Locale): { label: string; color: string; estimate: string | null } {
+export function ratingDisplay(rating: string, locale: Locale): { label: string; color: string; estimate: string | null } {
   const r = rating.toLowerCase();
   if (r.includes("excellent")) return { label: locale === "bn" ? "চমৎকার গ্রাহক" : "Excellent Customer", color: "text-emerald-500", estimate: "~90-100%" };
   if (r.includes("good")) return { label: locale === "bn" ? "ভালো গ্রাহক" : "Good Customer", color: "text-emerald-400", estimate: "~70-89%" };
@@ -65,7 +65,7 @@ function ratingDisplay(rating: string, locale: Locale): { label: string; color: 
   return { label: rating.replace(/_/g, " "), color: "text-[var(--muted)]", estimate: null };
 }
 
-const COURIER_META: Record<string, { label: string; header: string }> = {
+export const COURIER_META: Record<string, { label: string; header: string }> = {
   pathao: { label: "Pathao", header: "bg-red-600" },
   steadfast: { label: "Steadfast", header: "bg-teal-600" },
   redx: { label: "RedX", header: "bg-rose-700" },
