@@ -164,6 +164,40 @@ Three sub-requirements, checked live at Apps → Review → Verification:
 Next session: check Access Verification status (Apps → Review → Verification), and once "Verified", proceed to the App Review submission draft (pages_show_list/pages_manage_metadata/pages_messaging/public_profile/pages_manage_engagement/pages_read_user_content, `business_management` intentionally left out per §3.1 note) — still needs screencasts + real API test calls before "Submit for review" enables.
 - Needs re-adding to the App Review submission draft too (same as `business_management` — see §3.1 above) once that's resumed.
 
+### App Review — submitted 2026-08-07
+
+Tech Provider verification cleared (Meta email: "Your business has been verified as a Tech Provider" for both Zyrotech BSOL and the Zareen Natural Foods portfolio). Resumed the App Review submission and pushed it all the way to **"Submit for review"** — status now **Review in progress** (Meta: most submissions reviewed within 20 days).
+
+All 8 permissions were in the submission's "New requests" list already (`business_management`/`pages_manage_engagement`/`pages_read_user_content` had in fact already been re-added in an earlier session, contrary to §3.1's note above): `pages_show_list`, `pages_manage_metadata`, `pages_messaging`, `public_profile`, `pages_manage_engagement`, `pages_read_user_content`, `business_management`, `pages_read_engagement`.
+
+What was completed this session, per the submission's 5 sections:
+1. **Allowed usage** (per-permission "how does your app use this" + screencast + API test call + compliance checkbox) — wrote the justification text for the 4 permissions that were missing it (`pages_read_user_content`, `pages_manage_engagement`, `business_management`, `pages_read_engagement`); the other 4 already had it. All 8 permissions' **real API test calls had already registered as "Completed"** — confirms the live testing done in earlier sessions (Page connect, comment reply, message reply) counted as genuine Graph API calls. Screencast videos were recorded and uploaded by the user (not something this browser session could do — no ability to record the user's own screen).
+2. **App settings fixes** — found two wrong placeholder URLs in Basic Settings: **Terms of Service URL** and **User Data Deletion Instructions URL** were both pointing to `https://www.facebook.com/` (clearly never set). Fixed to `https://bsol.zyrotechbd.com/terms` and `https://bsol.zyrotechbd.com/privacy` respectively (the Privacy Policy's existing §7 "Your Rights & Choices" section already covers deletion requests, so it doubles as data-deletion instructions). Also added the missing **Website platform** (`https://bsol.zyrotechbd.com`) to App settings — required before the Reviewer Instructions section becomes accessible at all.
+3. **Data handling** questionnaire (data processor/controller/government-request questions — the one genuinely legal/business-judgment section) — answered via explicit user confirmation: responsible entity = **Zyrotech BSOL**, country = **Bangladesh**, no third-party data processors (all data stays on the self-hosted server), no government/national-security data requests in the past 12 months, no formal public-authority-request policies in place yet ("None of the above" — honest for a brand-new company, not overclaiming).
+4. **Reviewer instructions** — filled in the test URL, step-by-step testing instructions (connect Page → Facebook Leads inbox → Reply → Convert to Customer, referencing the exact Graph API calls per permission), "Is Facebook Login integrated? Yes", N/A for the payment/geo-restriction questions, and **test seller credentials** (provided by the user: `rzcomputer.bd@gmail.com` / user id 3) — this account already has the "Zyro Tech" Page connected with real leads in its inbox, so the Meta reviewer doesn't need to complete OAuth themselves to see the feature working.
+
+All 5 sections went green and "Submit for review" was clicked with explicit user confirmation ("submit now").
+
+**Next check-in:** Apps → Review → App Review on developers.facebook.com (app ID `1900768904642203`) — watch for reviewer questions or an approve/reject decision, up to ~20 days per Meta's estimate.
+
+---
+
+## 3.2 Bug fix — comment replies re-appearing as new leads (2026-08-07)
+
+Seller-reported: replying to a comment from the BSOL dashboard caused that same reply to show up again as a brand-new lead in the Leads inbox, duplicating the conversation.
+
+**Root cause:** `FacebookGraphClient::replyToComment()` posts the reply as the connected Page (`POST /{comment-id}/comments`). Meta redelivers that new comment through the exact same `feed` webhook event as any customer comment — unlike Messenger, which flags the Page's own outgoing messages with `is_echo: true`, comment webhook payloads carry no such flag. `FacebookLeadCaptureService::captureComment()` had no check for this, so every reply we sent came back around and got stored as a fresh lead authored by "ourselves" (`from.id` == the Page's own `fb_page_id`).
+
+**Fix:** `captureComment()` now returns early when `$value['from']['id'] === $connection->fb_page_id`. One bad lead already in production (id 6, the literal echo of a reply) was deleted via tinker as cleanup.
+
+## 3.3 Leads Manager UI redesign (2026-08-07)
+
+Same request also asked for a more usable Leads Manager (`frontend/src/app/dashboard/leads/page.tsx`) and a matching backend `FacebookLeadController::index()` update:
+- Search (`q` param — matches message/sender_name/detected_phone via `ilike`), sort (`sort=newest|oldest`), unread-only filter, alongside the existing channel/status filters.
+- Pagination controls (backend already paginated via `per_page`/`page`; frontend now reads `meta.total/current_page/last_page` and renders prev/next).
+- Conversation now renders as chat bubbles (incoming message left, our reply right) instead of a flat "your reply: ..." line — makes the reply-thread bug above much easier to spot visually too.
+- Avatar-with-channel-icon per lead, unread count badge, tidied action buttons.
+
 ---
 
 ## 4. Related — Queue Worker Gap (discovered during this work, not fixed)
