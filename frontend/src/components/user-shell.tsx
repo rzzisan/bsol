@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import CatvShell, { type ShellMenuItem } from "@/components/catv-shell";
 import EmailVerificationBanner from "@/components/email-verification-banner";
 import SubscriptionBanner from "@/components/subscription-banner";
+import SupportChatWidget from "@/components/support-chat-widget";
 import {
   getStoredLocale,
   getStoredTheme,
@@ -470,7 +471,10 @@ export default function UserShell({
           />
         </div>
       )}
-      <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>
+      <LocaleContext.Provider value={locale}>
+        {children}
+        <SupportChatWidget />
+      </LocaleContext.Provider>
     </CatvShell>
   );
 }

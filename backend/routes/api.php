@@ -27,7 +27,9 @@ use App\Http\Controllers\Api\LandingPageController;
 use App\Http\Controllers\Api\LandingMediaLibraryController;
 use App\Http\Controllers\Api\LandingTemplateController;
 use App\Http\Controllers\Api\SmsAutomationController;
+use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\TransactionController;
+use App\Http\Controllers\Api\Admin\AdminSupportController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
 use App\Http\Controllers\Api\Admin\PlatformFacebookSettingsController;
 use App\Http\Controllers\Api\Admin\PlatformSettingsController;
@@ -145,6 +147,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
     Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
     Route::post('/subscription/payments', [SubscriptionController::class, 'submitPayment']);
+
+    // ── SaaS Support chat (seller ↔ admin team) — deliberately outside the
+    // active_subscription group: a seller with an expired subscription needs
+    // support access most of all.
+    Route::prefix('support')->group(function () {
+        Route::get('/conversation', [SupportController::class, 'conversation']);
+        Route::get('/messages', [SupportController::class, 'messages']);
+        Route::post('/messages', [SupportController::class, 'send']);
+        Route::post('/read', [SupportController::class, 'markRead']);
+        Route::get('/unread-count', [SupportController::class, 'unreadCount']);
+    });
 
 Route::middleware('active_subscription')->group(function () {
     // ── Landing Page Builder ────────────────────────────────────────────────
@@ -415,6 +428,16 @@ Route::middleware('active_subscription')->group(function () {
         // Notification Dispatch Routes
         Route::post('/notification-dispatch', [NotificationDispatchController::class, 'dispatch']);
         Route::get('/notification-dispatch/logs', [NotificationDispatchController::class, 'logs']);
+
+        // SaaS Support inbox — shared across the whole admin team
+        Route::prefix('support')->group(function () {
+            Route::get('/conversations', [AdminSupportController::class, 'index']);
+            Route::get('/conversations/{conversation}/messages', [AdminSupportController::class, 'messages']);
+            Route::post('/conversations/{conversation}/messages', [AdminSupportController::class, 'send']);
+            Route::post('/conversations/{conversation}/read', [AdminSupportController::class, 'markRead']);
+            Route::put('/conversations/{conversation}/status', [AdminSupportController::class, 'updateStatus']);
+            Route::get('/unread-count', [AdminSupportController::class, 'unreadCount']);
+        });
 
     });
 });

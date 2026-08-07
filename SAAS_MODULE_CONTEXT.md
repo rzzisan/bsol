@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-07 — Added §15.9a: SaaS Support chat (seller ↔ admin-team shared inbox), fully coded, migrated, deployed, and live-verified — see below. Older entries kept as-is:
+
 Last updated: 2026-08-02 — Added §15 (full codebase feature audit, ground-truth scanned), §16 (prioritized recommendations), and §17 (deep line-by-line code review with specific file:line bugs/risks, 6-pass independent review covering every controller/service). Sections 12–14 below are the **original Phase 1/2 plan and are now stale** (last accurate as of 2026-05-04) — কোডবেস অনেক এগিয়ে গেছে তার পরে। **§15-কে "কী আছে" এবং §17-কে "কতটা ভালো/নিরাপদ" প্রশ্নের single source of truth হিসেবে ব্যবহার করো**, sections 12–14 শুধু historical record হিসেবে রাখা হয়েছে। **Courier provider abstraction (§16.2) commit `0fdc3ab`-এ সম্পন্ন। Facebook/Meta lead-capture MVP (§16.3) কোড+deploy সম্পন্ন কিন্তু Meta App credentials না থাকায় এখনো live নয় — বিস্তারিত §15.11-এ। এই কাজের সময় একটা নতুন 🔴 CRITICAL finding ধরা পড়েছে: production-এ কোনো queue worker নেই, delayed SMS automation silently ভাঙা — §17.0 item #12 / §17.5-এ বিস্তারিত, এখনো ফিক্স করা হয়নি।**
 Status: Phase 1 complete; Phase 2 mostly complete (SMS automation, accounting, courier — 4 providers — all live); Analytics (sales/customer/courier — §15.7) এখন **DONE**; Shop Settings + payment-gateway automation + Facebook/Meta integration (incl. Ads ROI, যেটা Facebook-নির্ভর) still not started (§15/§16)। **§17-এর ১১টা 🔴/🟠 critical finding সবগুলো ফিক্স করা হয়েছে এবং deploy করা হয়েছে (২০২৬-০৮-০২, একই সেশনে) — বিস্তারিত §17.9-এ, implementation log-সহ।** Backend সব migrate/live; frontend XSS fix `npm run deploy:prod:safe` দিয়ে সফলভাবে deploy হয়েছে (৮/৮ ধাপ pass, `hybrid-frontend.service` active)। **নন-variant stock deduction + bulkStatus inventory gap (§17.9-এর শেষে) এখনো একই দিনে ফিক্স হয়েছে।** Analytics module (§16.1) একই দিনে শেষ — বিস্তারিত §15.7-এ, deploy-এর সময় একটা self-caused frontend build/restart incident হয়েছিল যেটা সাথে সাথে ধরা পড়ে ও ফিক্স হয়েছে (details §15.7-এ)।
 
@@ -691,6 +693,16 @@ backend/app/
 | `active_subscription` middleware gating | ✅ DONE | Landing-page ও অন্যান্য premium route এই middleware-এ gated |
 | **Automated payment gateway (bKash/Nagad/SSLCommerz API auto-verify)** | ⛔ NOT STARTED | বর্তমান flow পুরোপুরি manual — কাস্টমার নিজে bKash নাম্বারে পাঠায়, trx ID লিখে জমা দেয়, admin manually approve করে। এটা §16-এর top recommendation |
 | **Customer-order-এর জন্য অনলাইন পেমেন্ট কালেকশন** | ⛔ NOT STARTED | `payment_method: bkash/online` অর্ডারে শুধু একটা label — বাস্তবে কোনো gateway charge/callback হয় না, effectively সব COD |
+
+### 15.9a SaaS Support Chat (seller ↔ admin) — ✅ DONE (2026-08-07)
+
+Floating "Support" chat button on every seller dashboard page (bottom-right, rendered from `UserShell` so it's automatic on all `/dashboard/*` routes) → one persistent thread per seller, shared admin-team inbox at `/admin/support` (any admin can view/reply — no per-admin scoping, matches the flat `user`/`admin` role model, CONTEXT.md §25 "admin-shared resource" pattern).
+
+**No queue worker in this deployment (§17.0 #12) → delivery is plain sync DB writes + frontend polling, no jobs/broadcast.** Seller widget polls `/support/unread-count` every 20s when closed, `/support/messages?after_id=` every 4s when the panel is open. Admin inbox polls the conversation list every 15s and the open thread every 4s the same way.
+
+- **Backend:** `support_conversations` (`unique(user_id)` — one thread per seller, `status open/closed`, unread counters both directions, `last_message_*` preview cache) + `support_messages` (`sender_type user/admin`). `Api\SupportController` (seller: `GET conversation`, `GET/POST messages`, `POST read`, `GET unread-count`) and `Api\Admin\AdminSupportController` (admin: `GET conversations`, `GET/POST conversations/{id}/messages`, `POST conversations/{id}/read`, `PUT conversations/{id}/status`, `GET unread-count`). Seller routes sit in the `auth:sanctum` group *outside* `active_subscription` — an expired-subscription seller can still reach support.
+- **Frontend:** `components/support-chat-widget.tsx` (mounted once inside `UserShell`, gated to `role === "user"` only — admins get their own inbox, not the seller widget), `app/admin/support/page.tsx` (list + chat two-pane, `CatvShell`/`buildAdminMenu` pattern like `courier-cache`). Bilingual bn/en, design-token colors, mobile-first (list/chat panes stack on small screens).
+- **Verification:** rollback-wrapped tinker test (unread-count increment/reset both directions, unique-constraint dedupe) + live HTTP round-trip through nginx/Sanctum on `bsol.zyrotechbd.com` (seller send → admin sees unread+preview → admin reply → seller unread-count flips → mark-read clears it → close/reopen) + `npm run deploy:prod:safe` 8/8 pass.
 
 ### 15.9 Admin Panel
 
