@@ -101,6 +101,11 @@ class SupportController extends Controller
         return response()->json([
             'success' => true,
             'count' => $conversation?->user_unread_count ?? 0,
+            // Only meaningful when the last message was from admin — lets the
+            // minimized widget pop a "new message" toast with a preview.
+            'preview' => $conversation?->last_message_sender_type === 'admin'
+                ? $conversation->last_message_preview
+                : null,
         ]);
     }
 }

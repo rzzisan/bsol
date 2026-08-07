@@ -28,6 +28,7 @@ const text = {
     loading: "লোড হচ্ছে…",
     closedNotice: "এই কথোপকথনটি বন্ধ করা হয়েছে। নতুন মেসেজ পাঠালে এটি আবার খুলে যাবে।",
     sendError: "মেসেজ পাঠানো যায়নি, আবার চেষ্টা করুন।",
+    newMessage: "নতুন মেসেজ",
   },
   en: {
     button: "Support",
@@ -40,6 +41,7 @@ const text = {
     loading: "Loading…",
     closedNotice: "This conversation was closed. Sending a message will reopen it.",
     sendError: "Couldn't send the message — please try again.",
+    newMessage: "New message",
   },
 };
 
@@ -68,11 +70,14 @@ export default function SupportChatWidget() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [status, setStatus] = useState<string>("open");
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
   const lastIdRef = useRef<number>(0);
   const openRef = useRef(false);
   openRef.current = open;
+  const prevUnreadRef = useRef<number | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Only show for seller ("user") accounts — admins have their own inbox at /admin/support.
   useEffect(() => {
@@ -115,7 +120,15 @@ export default function SupportChatWidget() {
     }
   }, [authHeaders]);
 
-  // Lightweight unread-count poll, always running once visible (badge on the closed button).
+  const showToast = useCallback((preview: string) => {
+    setToast(preview);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 6000);
+  }, []);
+
+  // Lightweight unread-count poll, always running once visible — updates the
+  // notification badge on the minimized button, and pops a toast the moment
+  // a *new* admin reply arrives while the chat box is closed.
   useEffect(() => {
     if (!visible) return;
 
@@ -124,16 +137,24 @@ export default function SupportChatWidget() {
         const res = await fetch(`${API_BASE_URL}/support/unread-count`, { headers: authHeaders() });
         if (!res.ok) return;
         const data = await res.json();
-        if (!openRef.current) setUnreadCount(data.count ?? 0);
+        const count: number = data.count ?? 0;
+
+        if (!openRef.current) {
+          setUnreadCount(count);
+          if (prevUnreadRef.current !== null && count > prevUnreadRef.current && data.preview) {
+            showToast(data.preview);
+          }
+        }
+        prevUnreadRef.current = count;
       } catch {
         // silent
       }
     };
 
     void poll();
-    const interval = setInterval(poll, 20000);
+    const interval = setInterval(poll, 10000);
     return () => clearInterval(interval);
-  }, [visible, authHeaders]);
+  }, [visible, authHeaders, showToast]);
 
   // Load history + mark read when the panel opens; poll for new messages while it's open.
   useEffect(() => {
@@ -215,6 +236,23 @@ export default function SupportChatWidget() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+      {!open && toast && (
+        <button
+          type="button"
+          onClick={() => {
+            setToast(null);
+            setOpen(true);
+          }}
+          className="flex max-w-[calc(100vw-2rem)] items-start gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left shadow-2xl sm:max-w-xs"
+        >
+          <span aria-hidden className="mt-0.5">💬</span>
+          <span>
+            <span className="block text-xs font-semibold text-[var(--foreground)]">{t.newMessage}</span>
+            <span className="block truncate text-xs text-[var(--muted)]">{toast}</span>
+          </span>
+        </button>
+      )}
+
       {open && (
         <div className="flex h-[70vh] max-h-[32rem] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
           <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
@@ -308,14 +346,20 @@ export default function SupportChatWidget() {
 
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setToast(null);
+          setOpen((v) => !v);
+        }}
         className="relative flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white shadow-xl transition hover:opacity-90"
       >
         <span aria-hidden>💬</span>
         <span className="hidden sm:inline">{t.button}</span>
         {unreadCount > 0 && !open && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
-            {unreadCount > 9 ? "9+" : unreadCount}
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+            <span className="relative flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
           </span>
         )}
       </button>
