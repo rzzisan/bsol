@@ -861,9 +861,9 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 - 🟡 `syncAll()` একজন seller-এর **সব** order মেমোরিতে লোড করে dedupe করে, কোনো chunking নেই — বড় seller-এ (হাজার হাজার order) memory/perf ঝুঁকি
 - 🔧 `Customer::orders()` relation define করা কিন্তু ব্যবহার হয় না (`show()` একই query manually লেখে) — dead code
 
-**Frontend bilingual/mobile-first compliance gap (CONTEXT.md §20/§22 লঙ্ঘন)**
-- 🟠 `order-intake-form.tsx` (highest-traffic order-creation form) সম্পূর্ণ English-only, কোনো `t()`/locale call নেই
-- 🟠 `variant-picker-modal.tsx`, `variant-table.tsx`, `option-editor.tsx` — English-only + hardcoded Tailwind color class (`bg-blue-600` ইত্যাদি) ব্যবহার করে, project-এর mandatory `--background`/`--border` design-token policy অনুসরণ করে না
+**Frontend bilingual/mobile-first compliance gap (CONTEXT.md §20/§22 লঙ্ঘন)** — ✅ FIXED (2026-08-08, commit `c009fe8`)
+- ~~🟠 `order-intake-form.tsx` সম্পূর্ণ English-only~~ — bn/en text dict যোগ করা হয়েছে (locale state আগে থেকেই ছিল, UI text-এ ব্যবহার হতো না)
+- ~~🟠 `variant-picker-modal.tsx`, `variant-table.tsx`, `option-editor.tsx` — English-only + hardcoded Tailwind color~~ — সব ৪টা variant component (+ `variants-tab.tsx`) bn/en dict পেয়েছে, `bg-blue-600`/`gray-*`/`bg-white` → `var(--accent)`/`var(--surface)`/`var(--border)`/`var(--muted)` টোকেনে বদলানো হয়েছে — বিস্তারিত §17.11
 
 ### 17.2 Fraud Detection (Internal + Courier-based)
 
@@ -1019,4 +1019,12 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 
 **Verification method:** প্রতিটাতে rollback-wrapped tinker test (real DB row বানিয়ে, transaction rollback করে) — queue worker: `journalctl` দিয়ে dispatched job `RUNNING` হতে দেখা গেছে (worker সক্রিয়ভাবে redis থেকে consume করছে); admin lockout: last-admin demote/delete `422`, second-admin থাকলে সফল `200` — তিনটাই test করা হয়েছে; fraud merge: high-cancel-rate phone → +20 (score ≥20), low-cancel-rate phone → কোনো false positive না (score 0) — দুটোই pass; FK: pre-migration orphan-count 0 verify করে migrate; Steadfast correlation: `Http::fake()` দিয়ে **reversed-order** response simulate করে দেখানো হয়েছে প্রতিটা order সঠিক consignment_id পেয়েছে (আগের positional match হলে এটা fail করত); courier cancel: Carrybee-এর জন্য end-to-end (`Http::fake` cancel endpoint success → `order.courier_status` → `cancelled`), Steadfast-এর জন্য no-op fallback `422`, no-tracking-id order-এ `422` — সব pass।
 
-**এখনো open থাকা items (§16/§17.8 থেকে, এই session-এ touch করা হয়নি):** Pathao dual token-fetch implementation (🔧, বড় refactor), Carrybee bulk-booking UI + tracking-refresh UI (কোনো provider-এ নেই), Paperfly incomplete (schema আছে, service/route নেই — সম্পূর্ণ করা বা schema বাদ দেওয়া সিদ্ধান্ত দরকার), frontend bilingual/design-token violations (`order-intake-form.tsx`, variant UI কম্পোনেন্টগুলো) — এগুলো বড় স্কোপ/product decision লাগে, পরের session-এ prioritize করা উচিত।
+**এখনো open থাকা items (§16/§17.8 থেকে):** Pathao dual token-fetch implementation (🔧, বড় refactor), Carrybee bulk-booking UI + tracking-refresh UI (কোনো provider-এ নেই), Paperfly incomplete (schema আছে, service/route নেই — সম্পূর্ণ করা বা schema বাদ দেওয়া সিদ্ধান্ত দরকার) — এগুলো বড় স্কোপ/product decision লাগে।
+
+### 17.11 Frontend bilingual + design-token fix (2026-08-08, commit `c009fe8`)
+
+`order-intake-form.tsx` এবং variant UI (`variant-picker-modal.tsx`, `variant-table.tsx`, `option-editor.tsx`, `variants-tab.tsx`) — সব ৫টা ফাইলে bn/en text dict (codebase convention: `const text = { bn: {...}, en: {...} }`, `const t = text[locale]`, দেখো `support-chat-widget.tsx`) যোগ করা হয়েছে এবং hardcoded Tailwind color (`bg-blue-600`, `text-gray-*`, `border-gray-*`, `bg-white`) design token-এ বদলানো হয়েছে (`var(--accent)`/`var(--surface)`/`var(--surface-soft)`/`var(--border)`/`var(--muted)`/`var(--foreground)`)। Red/green/orange status color ইচ্ছাকৃতভাবে Tailwind-ই রাখা হয়েছে — globals.css-এ কোনো danger/success token নেই, `order-item-grid.tsx`-এর existing convention-এর সাথে সামঞ্জস্যপূর্ণ রাখা হয়েছে।
+
+**Locale prop threading:** `VariantsTab`/`OptionEditor`/`VariantTable` এখন `locale: Locale` (required) prop নেয়, `ProductDetailPage` (`dashboard/products/[id]/page.tsx`) থেকে থ্রেড হয়ে আসে (page-টা আগে থেকেই bilingual, `useState(getStoredLocale)` pattern ব্যবহার করে)। `VariantPickerModal` দুই জায়গা থেকে ব্যবহৃত হয় (`order-intake-form.tsx`, `landing-page-builder.tsx`) বলে `locale?: Locale` optional (default `"en"`) রাখা হয়েছে, দুই caller-ই নিজেদের `locale` pass করে। এই component গুলো `UserShell`-এর children হিসেবেই রেন্ডার হয় (§30-এর architectural rule অনুযায়ী প্রপ থ্রেডিং নিরাপদ, `useLocale()` context timing সমস্যা এখানে প্রযোজ্য না কারণ prop pass করা হয়েছে, নতুন context call না)।
+
+**Verification:** `tsc --noEmit` clean, `eslint` clean (অবশিষ্ট lint error/warning গুলো `git stash` দিয়ে যাচাই করে pre-existing/unrelated প্রমাণ করা হয়েছে — landing-page-builder.tsx-এর impure-function এবং setState-in-effect rule violation গুলো এই session-এর আগে থেকেই ছিল), `npm run build` clean, `systemctl restart hybrid-frontend.service` + live smoke check (`/`, `/dashboard`, `/api/health` সব `200`, active CSS chunk `200`)।
