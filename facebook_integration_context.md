@@ -2,7 +2,7 @@
 
 এই ফাইল `SAAS_MODULE_CONTEXT.md` §15.11 / §16.3-এর deep-reference — Facebook Page comment/inbox lead-capture ফিচারের সব বিস্তারিত টেকনিক্যাল তথ্য, Meta App setup log, এবং known issue এখানে। `landing_page_context.md`-এর মতোই একটা module-specific deep-dive ফাইল, `SAAS_MODULE_CONTEXT.md` শুধু summary + link রাখে।
 
-**Last updated:** 2026-08-08 — §4 queue-worker-gap note corrected (fixed), §5 stale uncommitted-changes note corrected (already committed), added §6 prioritized recommendations for future work, then implemented §6 items 9 and 5 (see §7), then items 1 and 4 (see §8). Sections 1-3, 3.2, 3.3 kept as-is (2026-08-02/07 work log).
+**Last updated:** 2026-08-08 — §4 queue-worker-gap note corrected (fixed), §5 stale uncommitted-changes note corrected (already committed), added §6 prioritized recommendations for future work, then implemented §6 items 9 and 5 (see §7), items 1 and 4 (see §8), and items 10/11/12 (see §9) — all of §6 now done except #2, #3, #7, #8 (real-traffic/demand-gated or bigger scope, left for later). Sections 1-3, 3.2, 3.3 kept as-is (2026-08-02/07 work log).
 
 ---
 
@@ -292,3 +292,19 @@ Deliberately **not** built on the existing Page-connect OAuth (`business_managem
 - [FacebookPixelSettingController](backend/app/Http/Controllers/Api/FacebookPixelSettingController.php) (`show`/`update`/`test-event`) + a new "Conversions API" panel on `dashboard/settings/facebook` — Pixel ID, Access Token (blank = leave unchanged, never round-trips, same masking pattern as `PlatformFacebookSettingsController`), optional Test Event Code, enable toggle, and a **self-serve "Send Test Event" button** (no App Review gate applies here, so unlike lead capture the seller can verify this works themselves immediately).
 
 **Deliberately out of scope this round:** `fbp`/`fbc` browser-ID passthrough for better Event Match Quality — the landing pages don't currently embed a client-side Meta Pixel at all (checked: no `fbq(`/`connect.facebook.net` anywhere in the frontend), so those cookies would almost always be empty today. Real follow-up would be "add an optional client-side Pixel base-code embed to landing pages" as its own piece of work, not bundled here. Match quality today relies on hashed phone + IP + user agent only, which Meta's CAPI docs treat as a valid (if not optimal) matching set.
+
+---
+
+## 9. §6 items 10 + 11 + 12 — implemented 2026-08-08
+
+### Item 10 — Funnel/stats card
+
+`FacebookLeadController::stats()` (`GET /facebook/leads/stats`) — unfiltered totals (total/new/converted/orders/unread), independent of whatever channel/status/search filter the inbox list currently has applied. `orders` reuses the same `source='facebook_inbox'` + `source_ref=<lead id>` attribution from §7 item 5, via a `whereIn` subquery (not a materialized id list) for the count. Rendered as 5 stat tiles above the leads toolbar in [leads/page.tsx](frontend/src/app/dashboard/leads/page.tsx); refreshed on mount and after convert/ignore actions.
+
+### Item 11 — Quick-reply templates
+
+New `facebook_reply_templates` table (per-user `title` + `message`), `FacebookReplyTemplateController` (index/store/update/destroy — `update` wired on the backend for completeness though the current UI only adds/deletes). Leads page gets a "Templates" toggle button in the toolbar opening a small manager panel (add with title+message, delete existing), and once a reply box is open, template titles render as chips above the textarea — clicking one fills the reply text (fully replaces, not appends, so the seller can still edit before sending).
+
+### Item 12 — Lead priority badge
+
+Leads with `detected_phone` set but no linked `customer` yet now get a distinct blue "Phone detected" badge next to the status pill — the previously-invisible distinction the doc called out (`detected_phone` existed in the data since the original MVP, just never surfaced visually). Once a lead is converted to a customer the existing green "Customer:" line already covers that state, so the phone badge only shows for the in-between "actionable but not yet converted" case — that's the one a seller actually needs a nudge to notice.
