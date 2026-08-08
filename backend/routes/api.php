@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\FacebookConnectController;
 use App\Http\Controllers\Api\FacebookLeadController;
+use App\Http\Controllers\Api\FacebookPixelSettingController;
 use App\Http\Controllers\Api\FacebookWebhookController;
 use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\LandingPageController;
@@ -310,7 +311,7 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/redirect', [FacebookConnectController::class, 'redirect']);
         Route::get('/pending-pages', [FacebookConnectController::class, 'pendingPages']);
         Route::post('/select', [FacebookConnectController::class, 'select']);
-        Route::delete('/', [FacebookConnectController::class, 'disconnect']);
+        Route::delete('/{id}', [FacebookConnectController::class, 'disconnect'])->where('id', '[0-9]+');
     });
     Route::prefix('facebook/leads')->group(function () {
         Route::get('/', [FacebookLeadController::class, 'index']);
@@ -320,6 +321,11 @@ Route::middleware('active_subscription')->group(function () {
         Route::put('/{id}/ignore', [FacebookLeadController::class, 'ignore'])->where('id', '[0-9]+');
         Route::post('/{id}/convert', [FacebookLeadController::class, 'convertToCustomer'])->where('id', '[0-9]+');
         Route::post('/{id}/reply', [FacebookLeadController::class, 'reply'])->where('id', '[0-9]+');
+    });
+    Route::prefix('facebook/pixel')->group(function () {
+        Route::get('/', [FacebookPixelSettingController::class, 'show']);
+        Route::put('/', [FacebookPixelSettingController::class, 'update']);
+        Route::post('/test-event', [FacebookPixelSettingController::class, 'testEvent']);
     });
 
     // ── Fraud Check ───────────────────────────────────────────────────────────

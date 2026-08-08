@@ -26,21 +26,21 @@ class FacebookConnectController extends Controller
 
     public function status(): JsonResponse
     {
-        $connection = FacebookPageConnection::where('user_id', auth()->id())->first();
-
-        if (! $connection || $connection->status !== 'connected') {
-            return response()->json(['success' => true, 'connected' => false]);
-        }
+        $connections = FacebookPageConnection::where('user_id', auth()->id())
+            ->where('status', 'connected')
+            ->orderByDesc('created_at')
+            ->get();
 
         return response()->json([
             'success' => true,
-            'connected' => true,
-            'data' => [
-                'page_name' => $connection->page_name,
-                'fb_page_id' => $connection->fb_page_id,
-                'connected_at' => $connection->created_at,
-                'webhook_subscribed' => $connection->webhook_subscribed_at !== null,
-            ],
+            'connected' => $connections->isNotEmpty(),
+            'data' => $connections->map(fn ($c) => [
+                'id' => $c->id,
+                'page_name' => $c->page_name,
+                'fb_page_id' => $c->fb_page_id,
+                'connected_at' => $c->created_at,
+                'webhook_subscribed' => $c->webhook_subscribed_at !== null,
+            ])->values(),
         ]);
     }
 
@@ -121,11 +121,17 @@ class FacebookConnectController extends Controller
         ]);
     }
 
+    /**
+     * Connects one or more of the Pages the seller picked from this OAuth
+     * session — a seller with several Pages/brands can select all of them
+     * in one go (§6 item 1: multi-page support).
+     */
     public function select(Request $request): JsonResponse
     {
         $data = $request->validate([
             'session' => 'required|string',
-            'page_id' => 'required|string',
+            'page_ids' => 'required|array|min:1',
+            'page_ids.*' => 'string',
         ]);
 
         $pending = $this->pendingSessionFor($data['session']);
@@ -133,22 +139,39 @@ class FacebookConnectController extends Controller
             return response()->json(['success' => false, 'message' => 'Selection session expired. Please reconnect.'], 422);
         }
 
-        $page = collect($pending['pages'])->firstWhere('id', $data['page_id']);
-        if (! $page) {
-            return response()->json(['success' => false, 'message' => 'Page not found in this session.'], 422);
+        $connected = 0;
+        $failed = [];
+
+        foreach ($data['page_ids'] as $pageId) {
+            $page = collect($pending['pages'])->firstWhere('id', $pageId);
+            if (! $page) {
+                continue;
+            }
+
+            if ($this->persistConnection($pending['user_id'], $page, ['access_token' => $pending['user_access_token']])) {
+                $connected++;
+            } else {
+                $failed[] = $page['name'] ?? $pageId;
+            }
         }
 
-        $ok = $this->persistConnection($pending['user_id'], $page, ['access_token' => $pending['user_access_token']]);
         Cache::forget("facebook_connect_pending:{$data['session']}");
 
-        return $ok
-            ? response()->json(['success' => true, 'message' => 'Page connected.'])
-            : response()->json(['success' => false, 'message' => 'That Page is already connected to another BSOL account.'], 422);
+        if ($connected === 0) {
+            return response()->json(['success' => false, 'message' => 'Selected Page(s) are already connected to another BSOL account.'], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $failed
+                ? "Connected {$connected} Page(s). Already connected elsewhere: " . implode(', ', $failed)
+                : 'Page(s) connected.',
+        ]);
     }
 
-    public function disconnect(): JsonResponse
+    public function disconnect(int $id): JsonResponse
     {
-        $connection = FacebookPageConnection::where('user_id', auth()->id())->first();
+        $connection = FacebookPageConnection::where('user_id', auth()->id())->find($id);
         if (! $connection) {
             return response()->json(['success' => true, 'message' => 'Nothing to disconnect.']);
         }
@@ -234,9 +257,8 @@ class FacebookConnectController extends Controller
         // final guard beyond the connected-only check above.
         try {
             $connection = FacebookPageConnection::updateOrCreate(
-                ['user_id' => $userId],
+                ['user_id' => $userId, 'fb_page_id' => $page['id']],
                 [
-                    'fb_page_id' => $page['id'],
                     'page_name' => $page['name'] ?? null,
                     'page_access_token' => $pageAccessToken,
                     'fb_user_access_token' => $userToken['access_token'],

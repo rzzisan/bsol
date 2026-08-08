@@ -132,6 +132,7 @@ type Lead = {
   customer: { id: number; name: string | null; phone: string } | null;
   order_count: number;
   latest_order_id: number | null;
+  page_connection: { id: number; page_name: string | null } | null;
 };
 
 type Meta = { total: number; current_page: number; last_page: number };
@@ -179,6 +180,7 @@ export default function Page() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [pageConnected, setPageConnected] = useState<boolean | null>(null);
+  const [connectedPageCount, setConnectedPageCount] = useState(0);
   const [replyingId, setReplyingId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
   const [replySaving, setReplySaving] = useState(false);
@@ -204,7 +206,10 @@ export default function Page() {
       try {
         const res = await fetch(`${API}/facebook/connect/status`, { headers: authHeaders() });
         const json = await res.json();
-        if (json.success) setPageConnected(json.connected);
+        if (json.success) {
+          setPageConnected(json.connected);
+          setConnectedPageCount(Array.isArray(json.data) ? json.data.length : 0);
+        }
       } catch {
         setPageConnected(false);
       }
@@ -456,6 +461,11 @@ export default function Page() {
                         <span className="shrink-0 text-xs text-[var(--muted)]" title={new Date(lead.received_at).toLocaleString()}>
                           · {relativeTime(lead.received_at, tr)}
                         </span>
+                        {connectedPageCount > 1 && lead.page_connection?.page_name && (
+                          <span className="shrink-0 truncate rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--muted)]">
+                            {lead.page_connection.page_name}
+                          </span>
+                        )}
                       </div>
                       <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass[lead.status]}`}>
                         {lead.status === "new" ? tr.statusNew : lead.status === "converted" ? tr.statusConverted : tr.statusIgnored}

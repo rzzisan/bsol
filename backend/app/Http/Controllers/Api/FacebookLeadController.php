@@ -40,7 +40,7 @@ class FacebookLeadController extends Controller
         $query->orderBy('received_at', $request->string('sort') === 'oldest' ? 'asc' : 'desc');
 
         $perPage = min((int) ($request->per_page ?? 20), 100);
-        $leads = $query->with('customer:id,name,phone')->paginate($perPage);
+        $leads = $query->with(['customer:id,name,phone', 'pageConnection:id,page_name'])->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -51,7 +51,7 @@ class FacebookLeadController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $lead = FacebookLead::where('user_id', auth()->id())->with('customer:id,name,phone')->findOrFail($id);
+        $lead = FacebookLead::where('user_id', auth()->id())->with(['customer:id,name,phone', 'pageConnection:id,page_name'])->findOrFail($id);
         [$lead] = $this->withOrderAttribution([$lead]);
 
         return response()->json(['success' => true, 'data' => $lead]);

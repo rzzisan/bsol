@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendFacebookCapiPurchaseEventJob;
 use App\Services\AbandonedCheckoutService;
 use App\Services\CheckoutOtpService;
 use App\Services\LandingPageOrderService;
@@ -102,6 +103,17 @@ class LandingPageController extends Controller
             $order,
             $request->input('checkout_session_id'),
             $validated['customer_phone'] ?? null
+        );
+
+        // Facebook Conversions API — §6 item 4. Only landing-page checkouts
+        // count as ad-attributable Purchase events; dashboard-entered orders
+        // don't fire this. No-ops for sellers who haven't set up CAPI (job
+        // checks facebook_pixel_settings.enabled and returns early).
+        SendFacebookCapiPurchaseEventJob::dispatch(
+            $order->id,
+            $request->ip(),
+            $request->userAgent(),
+            $this->publicUrlFor($page),
         );
 
         return response()->json([
