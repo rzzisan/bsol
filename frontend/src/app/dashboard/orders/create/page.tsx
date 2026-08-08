@@ -6,6 +6,8 @@ import OrderIntakeForm, { type InitialOrderData } from "@/components/orders/orde
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
 import { LANDING_API_BASE } from "@/lib/landing-pages";
 
+const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
+
 export default function CreateOrderPage() {
   const [locale] = useState<Locale>(getStoredLocale);
   const token = getStoredToken();
@@ -17,7 +19,29 @@ export default function CreateOrderPage() {
   const [resolvingInitial, setResolvingInitial] = useState(true);
 
   useEffect(() => {
-    const checkoutId = new URLSearchParams(window.location.search).get("from_abandoned_checkout");
+    const params = new URLSearchParams(window.location.search);
+    const checkoutId = params.get("from_abandoned_checkout");
+    const leadId = params.get("from_facebook_lead");
+
+    if (leadId) {
+      fetch(`${API}/facebook/leads/${leadId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json) => {
+          const lead = json?.data;
+          if (!lead) return;
+          setInitial({
+            facebookLeadId: lead.id,
+            customer_phone: lead.customer?.phone ?? lead.detected_phone ?? undefined,
+            customer_name: lead.customer?.name ?? lead.sender_name ?? undefined,
+          });
+        })
+        .catch(() => {})
+        .finally(() => setResolvingInitial(false));
+      return;
+    }
+
     if (!checkoutId) {
       setResolvingInitial(false);
       return;

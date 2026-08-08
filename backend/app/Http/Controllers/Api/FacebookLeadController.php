@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\FacebookLead;
+use App\Models\Order;
 use App\Services\Facebook\FacebookGraphClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,9 +44,51 @@ class FacebookLeadController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $leads->items(),
+            'data' => $this->withOrderAttribution($leads->items()),
             'meta' => ['total' => $leads->total(), 'current_page' => $leads->currentPage(), 'last_page' => $leads->lastPage()],
         ]);
+    }
+
+    public function show(int $id): JsonResponse
+    {
+        $lead = FacebookLead::where('user_id', auth()->id())->with('customer:id,name,phone')->findOrFail($id);
+        [$lead] = $this->withOrderAttribution([$lead]);
+
+        return response()->json(['success' => true, 'data' => $lead]);
+    }
+
+    /**
+     * Attaches order_count/latest_order_id to each lead — lead → order
+     * attribution via orders.source='facebook_inbox' + source_ref=lead id.
+     * No schema change: mirrors the existing landing_page source/source_ref
+     * pattern (see LandingPageController) rather than adding a new FK.
+     *
+     * @param  array<int, FacebookLead>  $leads
+     * @return array<int, FacebookLead>
+     */
+    private function withOrderAttribution(array $leads): array
+    {
+        if (empty($leads)) {
+            return $leads;
+        }
+
+        $leadIds = collect($leads)->pluck('id')->map(fn ($id) => (string) $id);
+
+        $stats = Order::where('user_id', auth()->id())
+            ->where('source', 'facebook_inbox')
+            ->whereIn('source_ref', $leadIds)
+            ->selectRaw('source_ref, COUNT(*) as order_count, MAX(id) as latest_order_id')
+            ->groupBy('source_ref')
+            ->get()
+            ->keyBy('source_ref');
+
+        foreach ($leads as $lead) {
+            $stat = $stats->get((string) $lead->id);
+            $lead->setAttribute('order_count', (int) ($stat->order_count ?? 0));
+            $lead->setAttribute('latest_order_id', $stat->latest_order_id ?? null);
+        }
+
+        return $leads;
     }
 
     public function unreadCount(): JsonResponse

@@ -315,6 +315,7 @@ Route::middleware('active_subscription')->group(function () {
     Route::prefix('facebook/leads')->group(function () {
         Route::get('/', [FacebookLeadController::class, 'index']);
         Route::get('/unread-count', [FacebookLeadController::class, 'unreadCount']);
+        Route::get('/{id}', [FacebookLeadController::class, 'show'])->where('id', '[0-9]+');
         Route::put('/{id}/read', [FacebookLeadController::class, 'markRead'])->where('id', '[0-9]+');
         Route::put('/{id}/ignore', [FacebookLeadController::class, 'ignore'])->where('id', '[0-9]+');
         Route::post('/{id}/convert', [FacebookLeadController::class, 'convertToCustomer'])->where('id', '[0-9]+');

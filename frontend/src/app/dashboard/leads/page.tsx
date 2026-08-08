@@ -11,6 +11,7 @@ import {
   MessagesSquare,
   Search,
   Send,
+  ShoppingCart,
   UserPlus,
   X,
 } from "lucide-react";
@@ -58,6 +59,8 @@ const t = {
     sending: "পাঠানো হচ্ছে...",
     repliedLabel: "আপনি",
     replyGenericError: "রিপ্লাই পাঠানো যায়নি।",
+    createOrderBtn: "অর্ডার তৈরি করুন",
+    orderCreatedLabel: "অর্ডার তৈরি হয়েছে",
     totalLeads: (n: number) => `মোট ${n}টি লিড`,
     pageInfo: (cur: number, last: number) => `পৃষ্ঠা ${cur} / ${last}`,
     justNow: "এইমাত্র",
@@ -103,6 +106,8 @@ const t = {
     sending: "Sending...",
     repliedLabel: "You",
     replyGenericError: "Could not send the reply.",
+    createOrderBtn: "Create Order",
+    orderCreatedLabel: "Order created",
     totalLeads: (n: number) => `${n} lead${n === 1 ? "" : "s"} total`,
     pageInfo: (cur: number, last: number) => `Page ${cur} of ${last}`,
     justNow: "just now",
@@ -125,6 +130,8 @@ type Lead = {
   replied_at: string | null;
   reply_message: string | null;
   customer: { id: number; name: string | null; phone: string } | null;
+  order_count: number;
+  latest_order_id: number | null;
 };
 
 type Meta = { total: number; current_page: number; last_page: number };
@@ -566,6 +573,28 @@ export default function Page() {
                         </div>
                       )
                     ) : null}
+
+                    {(lead.customer || lead.detected_phone) && (
+                      <div className="mt-2.5" onClick={(e) => e.stopPropagation()}>
+                        {lead.order_count > 0 && lead.latest_order_id ? (
+                          <Link
+                            href={`/dashboard/orders/${lead.latest_order_id}`}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-green-600 hover:underline"
+                          >
+                            <ShoppingCart size={12} />
+                            {tr.orderCreatedLabel}
+                          </Link>
+                        ) : (
+                          <Link
+                            href={`/dashboard/orders/create?from_facebook_lead=${lead.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10"
+                          >
+                            <ShoppingCart size={12} />
+                            {tr.createOrderBtn}
+                          </Link>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

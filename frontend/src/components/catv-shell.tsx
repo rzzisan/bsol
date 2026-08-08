@@ -18,6 +18,7 @@ export type ShellMenuItem = {
   label: string;
   href?: string;
   icon?: string;
+  badge?: number;
   children?: Array<{ key: string; label: string; href?: string }>;
 };
 
@@ -355,11 +356,17 @@ export default function CatvShell({
                 >
                   <span className="catv-nav-icon">{item.icon ?? "•"}</span>
                   <span className="catv-nav-label">{item.label}</span>
+                  {Boolean(item.badge) && (
+                    <span className="catv-nav-badge">{item.badge! > 9 ? "9+" : item.badge}</span>
+                  )}
                 </Link>
               ) : (
                 <button key={item.key} type="button" className={`catv-nav-link ${isActive ? "active" : ""}`}>
                   <span className="catv-nav-icon">{item.icon ?? "•"}</span>
                   <span className="catv-nav-label">{item.label}</span>
+                  {Boolean(item.badge) && (
+                    <span className="catv-nav-badge">{item.badge! > 9 ? "9+" : item.badge}</span>
+                  )}
                 </button>
               );
             }

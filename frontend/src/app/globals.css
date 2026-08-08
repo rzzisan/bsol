@@ -192,6 +192,37 @@ a {
   text-align: center;
 }
 
+.catv-nav-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.catv-shell.is-collapsed .catv-nav-link {
+  position: relative;
+}
+
+.catv-shell.is-collapsed .catv-nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 8px;
+  height: 8px;
+  padding: 0;
+  font-size: 0;
+}
+
 .catv-nav-caret {
   margin-left: auto;
   font-size: 0.7rem;

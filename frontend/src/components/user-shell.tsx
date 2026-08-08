@@ -143,7 +143,7 @@ const menuText = {
 
 // ─── Build menu from labels ───────────────────────────────────────────────────
 
-function buildMenu(t: typeof menuText.bn): ShellMenuItem[] {
+function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMenuItem[] {
   return [
     {
       key: "dashboard",
@@ -199,6 +199,7 @@ function buildMenu(t: typeof menuText.bn): ShellMenuItem[] {
       label: (t as any).facebookLeads ?? "ফেসবুক লিডস",
       icon: "📨",
       href: "/dashboard/leads",
+      badge: facebookLeadsUnread,
     },
     {
       key: "courier",
@@ -284,6 +285,7 @@ export default function UserShell({
   const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
   const [subscription, setSubscription] = useState<{ status: string; days_left: number | null; is_expired: boolean } | null>(null);
+  const [facebookLeadsUnread, setFacebookLeadsUnread] = useState(0);
 
   useEffect(() => {
     setLocale(getStoredLocale());
@@ -372,8 +374,33 @@ export default function UserShell({
     void loadSubscription();
   }, []);
 
+  // Facebook Leads sidebar badge — light poll, keeps the seller aware of new
+  // leads without needing to open /dashboard/leads. Same pattern as the
+  // support-chat-widget unread badge (see commit bd3bb08).
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/facebook/leads/unread-count", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setFacebookLeadsUnread(data.count ?? 0);
+      } catch {
+        // silent — badge just stays at its last known value
+      }
+    };
+
+    void poll();
+    const interval = setInterval(poll, 20000);
+    return () => clearInterval(interval);
+  }, []);
+
   const t = useMemo(() => menuText[locale], [locale]);
-  const menu = useMemo(() => buildMenu(t), [t]);
+  const menu = useMemo(() => buildMenu(t, facebookLeadsUnread), [t, facebookLeadsUnread]);
 
   const title = pageTitle ? pageTitle[locale] : t.sidebarTitle;
   const subtitle = pageSubtitle ? pageSubtitle[locale] : "";

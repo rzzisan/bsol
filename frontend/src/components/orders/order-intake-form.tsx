@@ -119,6 +119,10 @@ type OrderItem = {
 
 export type InitialOrderData = {
   abandonedCheckoutId?: number;
+  // "Create Order" from a Facebook lead — carries source attribution through
+  // to the order (source=facebook_inbox, source_ref=<lead id>). See
+  // facebook_integration_context.md §6 item 5.
+  facebookLeadId?: number;
   customer_phone?: string;
   customer_name?: string;
   customer_address?: string;
@@ -158,7 +162,7 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
   const [customerPhone, setCustomerPhone] = useState(initial?.customer_phone ?? "");
   const [customerName, setCustomerName] = useState(initial?.customer_name ?? "");
   const [customerAddress, setCustomerAddress] = useState(initial?.customer_address ?? "");
-  const [source, setSource] = useState<"manual" | "facebook_inbox">("manual");
+  const [source, setSource] = useState<"manual" | "facebook_inbox">(initial?.facebookLeadId ? "facebook_inbox" : "manual");
 
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "online" | "bkash">("cod");
   const [paymentStatus, setPaymentStatus] = useState<"due" | "partial" | "paid">("due");
@@ -414,6 +418,7 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
           pathao_zone_id: loc.zoneId || null,
           pathao_area_id: loc.areaId || null,
           source,
+          source_ref: source === "facebook_inbox" && initial?.facebookLeadId ? String(initial.facebookLeadId) : null,
           payment_method: paymentMethod,
           payment_status: paymentStatus,
           shipping_charge: shippingCharge,
