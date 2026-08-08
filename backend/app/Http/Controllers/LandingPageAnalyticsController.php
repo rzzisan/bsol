@@ -6,6 +6,7 @@ use App\Models\LandingPage;
 use App\Services\LandingPageAnalyticsService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 
 class LandingPageAnalyticsController extends Controller
 {
@@ -137,8 +138,18 @@ class LandingPageAnalyticsController extends Controller
         }
 
         $request->validate([
-            'visit_id' => 'required|exists:landing_page_visits,id',
-            'order_id' => 'required|exists:orders,id',
+            // Scoped to this landing page / this seller's own orders — an
+            // unscoped `exists` check would let a caller link an arbitrary
+            // visit or order (even another seller's) into this page's
+            // analytics (SAAS_MODULE_CONTEXT.md §17.4).
+            'visit_id' => [
+                'required',
+                Rule::exists('landing_page_visits', 'id')->where('landing_page_id', $landingPage->id),
+            ],
+            'order_id' => [
+                'required',
+                Rule::exists('orders', 'id')->where('user_id', auth()->id()),
+            ],
         ]);
 
         $this->analyticsService->linkVisitToOrder(
