@@ -2,7 +2,7 @@
 
 এই ফাইল `SAAS_MODULE_CONTEXT.md` §15.11 / §16.3-এর deep-reference — Facebook Page comment/inbox lead-capture ফিচারের সব বিস্তারিত টেকনিক্যাল তথ্য, Meta App setup log, এবং known issue এখানে। `landing_page_context.md`-এর মতোই একটা module-specific deep-dive ফাইল, `SAAS_MODULE_CONTEXT.md` শুধু summary + link রাখে।
 
-**Last updated:** 2026-08-08 — §4 queue-worker-gap note corrected (fixed), §5 stale uncommitted-changes note corrected (already committed), added §6 prioritized recommendations for future work. Sections 1-3, 3.2, 3.3 kept as-is (2026-08-02/07 work log).
+**Last updated:** 2026-08-08 — §4 queue-worker-gap note corrected (fixed), §5 stale uncommitted-changes note corrected (already committed), added §6 prioritized recommendations for future work, then implemented §6 items 9 and 5 (see §7). Sections 1-3, 3.2, 3.3 kept as-is (2026-08-02/07 work log).
 
 ---
 
@@ -245,3 +245,23 @@ App Review approve না হওয়া পর্যন্ত non-admin seller
 
 ### Suggested execution order
 App Review approve হওয়ার পরে বাস্তব ট্রাফিক দেখে re-prioritize করা ভালো, তবে এখনকার best-guess order: **#9 (কম effort, ready backend) → #5/#4 (Ads ROI আনলক করে) → #1 (বড় seller ব্লকার) → বাকিগুলো।**
+
+---
+
+## 7. §6 items 9 + 5 — implemented 2026-08-08
+
+### Item 9 — Sidebar unread badge
+
+- `ShellMenuItem` ([catv-shell.tsx](frontend/src/components/catv-shell.tsx)) gained an optional `badge?: number`, rendered as a red pill next to the label (a small dot instead, in collapsed-sidebar mode).
+- [user-shell.tsx](frontend/src/components/user-shell.tsx) polls `GET /facebook/leads/unread-count` every 20s and feeds the count into the `facebook-leads` menu entry — same polling shape as `support-chat-widget.tsx`'s badge (commit `bd3bb08`), no new backend endpoint needed (`FacebookLeadController::unreadCount()` already existed, just wasn't called from the frontend).
+
+### Item 5 — Lead → order conversion attribution
+
+No schema change. Reused the `orders.source` / `orders.source_ref` columns that already exist for landing-page attribution (`source='landing_page'`, `source_ref=<landing page id>`) and for the pre-existing (until now unwired) `source='facebook_inbox'` option in the order-intake form's source dropdown:
+
+- [leads/page.tsx](frontend/src/app/dashboard/leads/page.tsx): any lead with a phone (`detected_phone` or a linked `customer`) gets a **"অর্ডার তৈরি করুন" (Create Order)** action → `/dashboard/orders/create?from_facebook_lead=<lead id>`. Once an order exists for that lead it switches to an **"অর্ডার তৈরি হয়েছে" (Order created)** link straight to the order.
+- [orders/create/page.tsx](frontend/src/app/dashboard/orders/create/page.tsx) resolves `from_facebook_lead` the same way it already resolved `from_abandoned_checkout` (fetch by id, prefill `InitialOrderData`) — new `GET /api/facebook/leads/{id}` route/`FacebookLeadController::show()`.
+- [order-intake-form.tsx](frontend/src/components/orders/order-intake-form.tsx): when opened from a lead, `source` defaults to `facebook_inbox` and the submit now sends `source_ref=<lead id>` (previously the `facebook_inbox` option existed but never set `source_ref` — no real attribution was possible before this).
+- `FacebookLeadController::index()`/`show()` now attach `order_count`/`latest_order_id` per lead via a single grouped query (`orders WHERE source='facebook_inbox' AND source_ref IN (...lead ids...)`) — deliberately not an Eloquent relation, since `source_ref` is `varchar` and `leads.id` is `bigint`; Postgres won't implicitly compare those types across a real join, so it's a manual keyed lookup instead.
+
+**Not done (left for later, per §6):** no funnel/stats card yet (§6 item 10) — this only makes per-lead attribution queryable and visible, not aggregated. Ads ROI (§6 item 4) can now build on this.
