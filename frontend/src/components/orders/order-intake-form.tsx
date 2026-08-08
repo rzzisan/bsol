@@ -15,6 +15,79 @@ import type { ProductVariant } from "@/types/variant";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
+const text = {
+  bn: {
+    phoneRequired: "কাস্টমারের ফোন নাম্বার আবশ্যক",
+    addAtLeastOne: "কমপক্ষে একটি পণ্য যোগ করুন",
+    createFailed: "অর্ডার তৈরি করা যায়নি",
+    fetchFailed: "ডেটা আনা যায়নি",
+    customerDelivery: "কাস্টমার ও ডেলিভারি",
+    phone: "ফোন *",
+    name: "নাম",
+    address: "ঠিকানা",
+    capturedLocation: "সংরক্ষিত লোকেশন (নিচে মিলে যাওয়া ভ্যালু বাছাই করুন):",
+    district: "জেলা",
+    thana: "থানা",
+    area: "এলাকা",
+    manual: "ম্যানুয়াল",
+    facebookInbox: "ফেসবুক ইনবক্স",
+    productsItems: "পণ্য ও আইটেম",
+    searchPlaceholder: "নাম/SKU দিয়ে পণ্য খুঁজুন",
+    noImage: "ছবি নেই",
+    sku: "SKU:",
+    stock: "স্টক:",
+    noProductMatched: "কোনো পণ্য মিলেনি।",
+    noProductsAvailable: "কোনো পণ্য নেই।",
+    paymentNotes: "পেমেন্ট ও নোট",
+    cod: "COD",
+    online: "অনলাইন",
+    bkash: "বিকাশ",
+    due: "বাকি",
+    partial: "আংশিক",
+    paid: "পরিশোধিত",
+    shippingCharge: "শিপিং চার্জ",
+    discount: "ছাড়",
+    internalNotes: "অভ্যন্তরীণ নোট",
+    favoriteRemove: "প্রিয় তালিকা থেকে সরান",
+    favoriteAdd: "প্রিয় তালিকায় যোগ করুন",
+  },
+  en: {
+    phoneRequired: "Customer phone is required",
+    addAtLeastOne: "Add at least one product",
+    createFailed: "Failed to create order",
+    fetchFailed: "Could not fetch data",
+    customerDelivery: "Customer & Delivery",
+    phone: "Phone *",
+    name: "Name",
+    address: "Address",
+    capturedLocation: "Captured location (pick the matching values below):",
+    district: "District",
+    thana: "Thana",
+    area: "Area",
+    manual: "Manual",
+    facebookInbox: "Facebook Inbox",
+    productsItems: "Products & Items",
+    searchPlaceholder: "Search product by name/SKU",
+    noImage: "No Image",
+    sku: "SKU:",
+    stock: "Stock:",
+    noProductMatched: "No product matched.",
+    noProductsAvailable: "No products available.",
+    paymentNotes: "Payment & Notes",
+    cod: "COD",
+    online: "Online",
+    bkash: "Bkash",
+    due: "Due",
+    partial: "Partial",
+    paid: "Paid",
+    shippingCharge: "Shipping charge",
+    discount: "Discount",
+    internalNotes: "Internal notes",
+    favoriteRemove: "Remove from favorites",
+    favoriteAdd: "Add to favorites",
+  },
+};
+
 type Product = {
   id: number;
   name: string;
@@ -73,6 +146,7 @@ const normalizePhone = (value: string): string => {
 export default function OrderIntakeForm({ initial }: { initial?: InitialOrderData } = {}) {
   const token = getStoredToken();
   const [locale] = useState<Locale>(getStoredLocale);
+  const t = text[locale];
   const router = useRouter();
   const loc = useLocationDropdowns();
 
@@ -189,7 +263,7 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
     }
     if (lastCourierPhoneRef.current === digits) return;
 
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       lastCourierPhoneRef.current = digits;
       setCourierChecking(true);
       setCourierData(null);
@@ -204,17 +278,17 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
           if (res.ok && d.success) {
             setCourierData(d.data);
           } else {
-            setCourierErrorMsg(d.message ?? (locale === "bn" ? "ডেটা আনা যায়নি" : "Could not fetch data"));
+            setCourierErrorMsg(d.message ?? t.fetchFailed);
           }
         } catch {
-          setCourierErrorMsg(locale === "bn" ? "ডেটা আনা যায়নি" : "Could not fetch data");
+          setCourierErrorMsg(t.fetchFailed);
         } finally {
           setCourierChecking(false);
         }
       })();
     }, 300);
-    return () => clearTimeout(t);
-  }, [customerPhone, token, locale]);
+    return () => clearTimeout(timer);
+  }, [customerPhone, token, t.fetchFailed]);
 
   const productSuggestions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -316,11 +390,11 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
   const submit = async () => {
     setError("");
     if (!customerPhone.trim()) {
-      setError("Customer phone is required");
+      setError(t.phoneRequired);
       return;
     }
     if (items.length === 0) {
-      setError("Add at least one product");
+      setError(t.addAtLeastOne);
       return;
     }
 
@@ -362,7 +436,7 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
 
       const data = await res.json();
       if (!res.ok) {
-        const msg = data?.message ?? Object.values(data?.errors ?? {})?.[0] ?? "Failed to create order";
+        const msg = data?.message ?? Object.values(data?.errors ?? {})?.[0] ?? t.createFailed;
         setError(Array.isArray(msg) ? String(msg[0]) : String(msg));
         return;
       }
@@ -400,45 +474,45 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
         {error ? <div className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
 
         <section className="catv-panel p-4">
-          <h3 className="mb-3 text-sm font-semibold">Customer & Delivery</h3>
+          <h3 className="mb-3 text-sm font-semibold">{t.customerDelivery}</h3>
           <div className="grid gap-3 sm:grid-cols-2">
-            <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Phone *"
+            <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder={t.phone}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
-            <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Name"
+            <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder={t.name}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
-            <textarea value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} placeholder="Address" rows={2}
+            <textarea value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} placeholder={t.address} rows={2}
               className="sm:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
             {initial?.capturedLocationHint ? (
               <p className="sm:col-span-2 -mt-1 text-xs text-[var(--muted)]">
-                Captured location (pick the matching values below): {initial.capturedLocationHint}
+                {t.capturedLocation} {initial.capturedLocationHint}
               </p>
             ) : null}
             <select value={loc.cityId} onChange={(e) => loc.setCity(e.target.value ? Number(e.target.value) : "")}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
-              <option value="">District</option>
+              <option value="">{t.district}</option>
               {loc.cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <select value={loc.zoneId} onChange={(e) => loc.setZone(e.target.value ? Number(e.target.value) : "")}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
-              <option value="">Thana</option>
+              <option value="">{t.thana}</option>
               {loc.zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
             </select>
             <select value={loc.areaId} onChange={(e) => loc.setArea(e.target.value ? Number(e.target.value) : "")}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
-              <option value="">Area</option>
+              <option value="">{t.area}</option>
               {loc.areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
             <select value={source} onChange={(e) => setSource(e.target.value as typeof source)}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
-              <option value="manual">Manual</option>
-              <option value="facebook_inbox">Facebook Inbox</option>
+              <option value="manual">{t.manual}</option>
+              <option value="facebook_inbox">{t.facebookInbox}</option>
             </select>
           </div>
         </section>
 
         <section className="catv-panel p-4">
-          <h3 className="mb-3 text-sm font-semibold">Products & Items</h3>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search product by name/SKU"
+          <h3 className="mb-3 text-sm font-semibold">{t.productsItems}</h3>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder}
             className="mb-2 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
           <div className="mb-3 max-h-64 overflow-auto rounded-xl border border-[var(--border)]">
             {productSuggestions.map((p) => (
@@ -456,14 +530,14 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
                     <img src={p.thumbnail} alt={p.name} className="h-11 w-11 shrink-0 rounded-lg object-cover" />
                   ) : (
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-soft)] text-[10px] text-[var(--muted)]">
-                      No Image
+                      {t.noImage}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{p.name}</p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
-                      {p.sku ? <span>SKU: {p.sku}</span> : null}
-                      {typeof p.stock === "number" ? <span>Stock: {p.stock}</span> : null}
+                      {p.sku ? <span>{t.sku} {p.sku}</span> : null}
+                      {typeof p.stock === "number" ? <span>{t.stock} {p.stock}</span> : null}
                     </div>
                   </div>
                 </button>
@@ -486,7 +560,7 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
                 <button
                   type="button"
                   onClick={(e) => toggleFavorite(e, p.id)}
-                  title={favorites.has(p.id) ? "Favorite থেকে সরান" : "Favorite যোগ করুন"}
+                  title={favorites.has(p.id) ? t.favoriteRemove : t.favoriteAdd}
                   className={`shrink-0 text-xl leading-none transition-colors ${
                     favorites.has(p.id)
                       ? "text-yellow-400 hover:text-yellow-500"
@@ -500,7 +574,7 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
 
             {productSuggestions.length === 0 ? (
               <p className="px-3 py-2 text-xs text-[var(--muted)]">
-                {search.trim() ? "No product matched." : "No products available."}
+                {search.trim() ? t.noProductMatched : t.noProductsAvailable}
               </p>
             ) : null}
           </div>
@@ -509,25 +583,25 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
         </section>
 
         <section className="catv-panel p-4">
-          <h3 className="mb-3 text-sm font-semibold">Payment & Notes</h3>
+          <h3 className="mb-3 text-sm font-semibold">{t.paymentNotes}</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
-              <option value="cod">COD</option>
-              <option value="online">Online</option>
-              <option value="bkash">Bkash</option>
+              <option value="cod">{t.cod}</option>
+              <option value="online">{t.online}</option>
+              <option value="bkash">{t.bkash}</option>
             </select>
             <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as typeof paymentStatus)}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
-              <option value="due">Due</option>
-              <option value="partial">Partial</option>
-              <option value="paid">Paid</option>
+              <option value="due">{t.due}</option>
+              <option value="partial">{t.partial}</option>
+              <option value="paid">{t.paid}</option>
             </select>
             <input type="number" min={0} value={shippingCharge} onChange={(e) => setShippingCharge(Number(e.target.value))}
-              placeholder="Shipping charge" className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+              placeholder={t.shippingCharge} className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
             <input type="number" min={0} value={discount} onChange={(e) => setDiscount(Number(e.target.value))}
-              placeholder="Discount" className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Internal notes"
+              placeholder={t.discount} className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder={t.internalNotes}
               className="sm:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
           </div>
         </section>
@@ -543,6 +617,7 @@ export default function OrderIntakeForm({ initial }: { initial?: InitialOrderDat
           apiBase={API}
           onSelect={(variant) => addVariantProduct(variantProduct, variant)}
           onClose={() => setVariantProduct(null)}
+          locale={locale}
         />
       ) : null}
     </div>

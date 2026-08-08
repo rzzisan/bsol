@@ -592,6 +592,7 @@ export default function ProductDetailPage() {
             defaultPrice={Number(product.regular_price ?? product.selling_price ?? 0)}
             token={token}
             apiBase={API}
+            locale={locale}
           />
         </section>
       </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ProductVariant } from "@/types/variant";
 import { computeSellingPrice } from "@/lib/pricing";
+import type { Locale } from "@/lib/dashboard-client";
 
 interface Props {
   variants: ProductVariant[];
@@ -11,9 +12,64 @@ interface Props {
   productId: number;
   productThumbnail?: string | null;
   onVariantsChange: (variants: ProductVariant[]) => void;
+  locale: Locale;
 }
 
-export default function VariantTable({ variants, token, apiBase, productId, productThumbnail = null, onVariantsChange }: Props) {
+const text = {
+  bn: {
+    empty: "এখনও কোনো ভেরিয়েন্ট নেই। উপরের অপশন থেকে কম্বিনেশন জেনারেট করুন অথবা ম্যানুয়ালি যোগ করুন।",
+    selected: (n: number) => `${n}টি নির্বাচিত`,
+    activate: "সক্রিয় করুন",
+    deactivate: "নিষ্ক্রিয় করুন",
+    clear: "মুছুন",
+    colAttributes: "বৈশিষ্ট্য",
+    colSku: "SKU",
+    colImage: "ছবি",
+    colPrice: "দাম",
+    colDiscount: "ছাড়",
+    colSelling: "বিক্রয় মূল্য",
+    colStock: "স্টক",
+    colActive: "সক্রিয়",
+    colActions: "অ্যাকশন",
+    noImage: "কোনো ছবি নেই",
+    save: "সেভ",
+    savingShort: "…",
+    cancel: "বাতিল",
+    edit: "এডিট",
+    del: "মুছুন",
+    saveFailed: "সেভ করা যায়নি",
+    confirmDelete: "এই ভেরিয়েন্টটি মুছবেন?",
+    variantCount: (n: number) => `${n}টি ভেরিয়েন্ট`,
+  },
+  en: {
+    empty: "No variants yet. Generate combinations from the options above or add manually.",
+    selected: (n: number) => `${n} selected`,
+    activate: "Activate",
+    deactivate: "Deactivate",
+    clear: "Clear",
+    colAttributes: "Attributes",
+    colSku: "SKU",
+    colImage: "Image",
+    colPrice: "Price",
+    colDiscount: "Discount",
+    colSelling: "Selling",
+    colStock: "Stock",
+    colActive: "Active",
+    colActions: "Actions",
+    noImage: "No image",
+    save: "Save",
+    savingShort: "…",
+    cancel: "Cancel",
+    edit: "Edit",
+    del: "Del",
+    saveFailed: "Save failed",
+    confirmDelete: "Delete this variant?",
+    variantCount: (n: number) => `${n} variant${n !== 1 ? "s" : ""}`,
+  },
+};
+
+export default function VariantTable({ variants, token, apiBase, productId, productThumbnail = null, onVariantsChange, locale }: Props) {
+  const t = text[locale];
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editRow, setEditRow] = useState<Partial<ProductVariant>>({});
   const [saving, setSaving] = useState(false);
@@ -47,7 +103,7 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
     });
     const json = await res.json();
     setSaving(false);
-    if (!res.ok) { alert(json.message ?? "Save failed"); return; }
+    if (!res.ok) { alert(json.message ?? t.saveFailed); return; }
 
     onVariantsChange(variants.map((v) => (v.id === editingId ? json.data : v)));
     setEditingId(null);
@@ -68,7 +124,7 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
   }
 
   async function deleteVariant(id: number) {
-    if (!confirm("Delete this variant?")) return;
+    if (!confirm(t.confirmDelete)) return;
     const res = await fetch(`${apiBase}/products/${productId}/variants/${id}`, {
       method: "DELETE",
       headers,
@@ -102,8 +158,8 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
 
   if (variants.length === 0) {
     return (
-      <p className="text-sm text-gray-500 text-center py-8">
-        No variants yet. Generate combinations from the options above or add manually.
+      <p className="text-sm text-[var(--muted)] text-center py-8">
+        {t.empty}
       </p>
     );
   }
@@ -112,17 +168,17 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
     <div className="space-y-2">
       {/* Bulk actions */}
       {bulkIds.size > 0 && (
-        <div className="flex gap-2 items-center bg-blue-50 border border-blue-200 rounded px-3 py-2">
-          <span className="text-xs text-blue-700 font-medium">{bulkIds.size} selected</span>
-          <button onClick={() => bulkToggleActive(true)} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">Activate</button>
-          <button onClick={() => bulkToggleActive(false)} className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600">Deactivate</button>
-          <button onClick={() => setBulkIds(new Set())} className="ml-auto text-xs text-gray-500 hover:text-gray-700">Clear</button>
+        <div className="flex gap-2 items-center bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded px-3 py-2">
+          <span className="text-xs text-[var(--accent)] font-medium">{t.selected(bulkIds.size)}</span>
+          <button onClick={() => bulkToggleActive(true)} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">{t.activate}</button>
+          <button onClick={() => bulkToggleActive(false)} className="text-xs bg-[var(--muted)] text-white px-2 py-1 rounded hover:opacity-90">{t.deactivate}</button>
+          <button onClick={() => setBulkIds(new Set())} className="ml-auto text-xs text-[var(--muted)] hover:text-[var(--foreground)]">{t.clear}</button>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+          <thead className="bg-[var(--surface-soft)] text-xs text-[var(--muted)] uppercase tracking-wide">
             <tr>
               <th className="px-3 py-3 w-8">
                 <input
@@ -132,25 +188,25 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                   className="rounded"
                 />
               </th>
-              <th className="px-3 py-3 text-left">Attributes</th>
-              <th className="px-3 py-3 text-left">SKU</th>
-              <th className="px-3 py-3 text-center">Image</th>
-              <th className="px-3 py-3 text-right">Price</th>
-              <th className="px-3 py-3 text-right">Discount</th>
-              <th className="px-3 py-3 text-right">Selling</th>
-              <th className="px-3 py-3 text-right">Stock</th>
-              <th className="px-3 py-3 text-center">Active</th>
-              <th className="px-3 py-3 text-center">Actions</th>
+              <th className="px-3 py-3 text-left">{t.colAttributes}</th>
+              <th className="px-3 py-3 text-left">{t.colSku}</th>
+              <th className="px-3 py-3 text-center">{t.colImage}</th>
+              <th className="px-3 py-3 text-right">{t.colPrice}</th>
+              <th className="px-3 py-3 text-right">{t.colDiscount}</th>
+              <th className="px-3 py-3 text-right">{t.colSelling}</th>
+              <th className="px-3 py-3 text-right">{t.colStock}</th>
+              <th className="px-3 py-3 text-center">{t.colActive}</th>
+              <th className="px-3 py-3 text-center">{t.colActions}</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-[var(--border)]">
             {variants.map((variant) => {
               const isEditing = editingId === variant.id;
               const optionDrivenImage = variant.options.find((opt) => !!opt.image_url)?.image_url ?? null;
               const effectiveImage = variant.image_url || optionDrivenImage || productThumbnail;
 
               return (
-                <tr key={variant.id} className={`hover:bg-gray-50 ${!variant.is_active ? "opacity-60" : ""}`}>
+                <tr key={variant.id} className={`hover:bg-[var(--surface-soft)] ${!variant.is_active ? "opacity-60" : ""}`}>
                   {/* Checkbox */}
                   <td className="px-3 py-3">
                     <input
@@ -171,7 +227,7 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                       {variant.options.map((opt) => (
                         <span
                           key={opt.option_value_id}
-                          className="inline-flex items-center gap-1 text-gray-700 text-xs px-2 py-0.5 rounded-full border"
+                          className="inline-flex items-center gap-1 text-[var(--foreground)] text-xs px-2 py-0.5 rounded-full border border-[var(--border)]"
                           style={opt.option_type === "color_swatch" && opt.color_hex
                             ? { borderColor: opt.color_hex, backgroundColor: `${opt.color_hex}22` }
                             : undefined}
@@ -179,12 +235,12 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                         >
                           {opt.option_type === "color_swatch" && opt.color_hex && (
                             <span
-                              className="w-2.5 h-2.5 rounded-full inline-block border border-gray-300"
+                              className="w-2.5 h-2.5 rounded-full inline-block border border-[var(--border)]"
                               style={{ backgroundColor: opt.color_hex }}
                               aria-label={`${opt.label || opt.value} swatch`}
                             />
                           )}
-                          <span className="text-gray-400 mr-0.5">{opt.option_name}:</span>
+                          <span className="text-[var(--muted)] mr-0.5">{opt.option_name}:</span>
                           {opt.label || opt.value}
                         </span>
                       ))}
@@ -195,12 +251,12 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                   <td className="px-3 py-3">
                     {isEditing ? (
                       <input
-                        className="border rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="border border-[var(--border)] bg-[var(--background)] rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
                         value={editRow.sku ?? ""}
                         onChange={(e) => setEditRow({ ...editRow, sku: e.target.value })}
                       />
                     ) : (
-                      <span className="font-mono text-xs text-gray-600">{variant.sku}</span>
+                      <span className="font-mono text-xs text-[var(--muted)]">{variant.sku}</span>
                     )}
                   </td>
 
@@ -210,11 +266,11 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                       <img
                         src={effectiveImage}
                         alt={variant.sku}
-                        className="inline-block h-9 w-9 rounded object-cover border border-gray-200"
+                        className="inline-block h-9 w-9 rounded object-cover border border-[var(--border)]"
                         title="Variant image (fallback: variant → option value → product thumbnail)"
                       />
                     ) : (
-                      <span className="inline-block h-9 w-9 rounded bg-gray-100 border border-gray-200" title="No image" />
+                      <span className="inline-block h-9 w-9 rounded bg-[var(--surface-soft)] border border-[var(--border)]" title={t.noImage} />
                     )}
                   </td>
 
@@ -223,7 +279,7 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                     {isEditing ? (
                       <input
                         type="number"
-                        className="border rounded px-2 py-1 text-xs w-24 text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="border border-[var(--border)] bg-[var(--background)] rounded px-2 py-1 text-xs w-24 text-right focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
                         value={editRow.regular_price ?? ""}
                         onChange={(e) => setEditRow({ ...editRow, regular_price: e.target.value as unknown as string })}
                       />
@@ -238,12 +294,12 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                       <div className="flex gap-1 justify-end">
                         <input
                           type="number"
-                          className="border rounded px-2 py-1 text-xs w-16 text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="border border-[var(--border)] bg-[var(--background)] rounded px-2 py-1 text-xs w-16 text-right focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
                           value={editRow.discount ?? ""}
                           onChange={(e) => setEditRow({ ...editRow, discount: e.target.value as unknown as string })}
                         />
                         <select
-                          className="border rounded px-1 py-1 text-xs focus:outline-none"
+                          className="border border-[var(--border)] bg-[var(--background)] rounded px-1 py-1 text-xs focus:outline-none"
                           value={editRow.discount_type ?? "amount"}
                           onChange={(e) => setEditRow({ ...editRow, discount_type: e.target.value as "amount" | "percent" })}
                         >
@@ -252,7 +308,7 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                         </select>
                       </div>
                     ) : (
-                      <span className="text-gray-500">
+                      <span className="text-[var(--muted)]">
                         {parseFloat(variant.discount) > 0
                           ? `${parseFloat(variant.discount)}${variant.discount_type === "percent" ? "%" : "৳"}`
                           : "—"}
@@ -272,7 +328,7 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                     {isEditing ? (
                       <input
                         type="number"
-                        className="border rounded px-2 py-1 text-xs w-16 text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="border border-[var(--border)] bg-[var(--background)] rounded px-2 py-1 text-xs w-16 text-right focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40"
                         value={editRow.stock_qty ?? ""}
                         onChange={(e) => setEditRow({ ...editRow, stock_qty: parseInt(e.target.value) || 0 })}
                       />
@@ -288,7 +344,7 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                   <td className="px-3 py-3 text-center">
                     <button
                       onClick={() => toggleActive(variant)}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${variant.is_active ? "bg-green-500" : "bg-gray-300"}`}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${variant.is_active ? "bg-green-500" : "bg-[var(--border)]"}`}
                     >
                       <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform ${variant.is_active ? "translate-x-4.5" : "translate-x-0.5"}`} />
                     </button>
@@ -301,21 +357,21 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
                         <button
                           onClick={saveEdit}
                           disabled={saving}
-                          className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                          className="text-xs bg-[var(--accent)] text-white px-2 py-1 rounded hover:opacity-90 disabled:opacity-50"
                         >
-                          {saving ? "…" : "Save"}
+                          {saving ? t.savingShort : t.save}
                         </button>
                         <button
                           onClick={() => setEditingId(null)}
-                          className="text-xs text-gray-500 px-2 py-1 rounded border hover:bg-gray-100"
+                          className="text-xs text-[var(--muted)] px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--surface-soft)]"
                         >
-                          Cancel
+                          {t.cancel}
                         </button>
                       </div>
                     ) : (
                       <div className="flex gap-1 justify-center">
-                        <button onClick={() => startEdit(variant)} className="text-xs text-blue-600 hover:text-blue-800 px-1">Edit</button>
-                        <button onClick={() => deleteVariant(variant.id)} className="text-xs text-red-500 hover:text-red-700 px-1">Del</button>
+                        <button onClick={() => startEdit(variant)} className="text-xs text-[var(--accent)] hover:opacity-80 px-1">{t.edit}</button>
+                        <button onClick={() => deleteVariant(variant.id)} className="text-xs text-red-500 hover:text-red-700 px-1">{t.del}</button>
                       </div>
                     )}
                   </td>
@@ -326,7 +382,7 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
         </table>
       </div>
 
-      <p className="text-xs text-gray-400 text-right">{variants.length} variant{variants.length !== 1 ? "s" : ""}</p>
+      <p className="text-xs text-[var(--muted)] text-right">{t.variantCount(variants.length)}</p>
     </div>
   );
 }

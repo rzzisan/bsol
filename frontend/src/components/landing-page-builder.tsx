@@ -1984,6 +1984,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           onSelect={(variant) => handleVariantPicked(variant)}
           onSelectWhole={() => handleVariantPicked(null)}
           onClose={() => setVariantPicker(null)}
+          locale={locale}
         />
       ) : null}
     </section>
