@@ -2,7 +2,7 @@
 
 এই ফাইল `SAAS_MODULE_CONTEXT.md` §15.11 / §16.3-এর deep-reference — Facebook Page comment/inbox lead-capture ফিচারের সব বিস্তারিত টেকনিক্যাল তথ্য, Meta App setup log, এবং known issue এখানে। `landing_page_context.md`-এর মতোই একটা module-specific deep-dive ফাইল, `SAAS_MODULE_CONTEXT.md` শুধু summary + link রাখে।
 
-**Last updated:** 2026-08-02
+**Last updated:** 2026-08-08 — §4 queue-worker-gap note corrected (fixed), §5 stale uncommitted-changes note corrected (already committed), added §6 prioritized recommendations for future work. Sections 1-3, 3.2, 3.3 kept as-is (2026-08-02/07 work log).
 
 ---
 
@@ -200,9 +200,11 @@ Same request also asked for a more usable Leads Manager (`frontend/src/app/dashb
 
 ---
 
-## 4. Related — Queue Worker Gap (discovered during this work, not fixed)
+## 4. Related — Queue Worker Gap — ✅ FIXED 2026-08-08 (was: discovered during this work, not fixed)
 
-Building the webhook receiver surfaced that this deployment has **no queue worker process** at all — `QUEUE_CONNECTION=redis` but nothing runs `php artisan queue:work` (checked: no systemd service, no supervisor, no cron entry beyond `schedule:run`). This means any `ShouldQueue` job dispatched with `->delay()` (specifically `SendAutomationSmsJob` for `delay_minutes > 0` SMS automation rules) silently never executes. Full detail in `SAAS_MODULE_CONTEXT.md` §17.0 finding #12 and §17.5. Not fixed as part of this Facebook work — flagged as a separate critical, unfixed finding.
+Building the webhook receiver surfaced that this deployment has **no queue worker process** at all — `QUEUE_CONNECTION=redis` but nothing runs `php artisan queue:work` (checked: no systemd service, no supervisor, no cron entry beyond `schedule:run`). This means any `ShouldQueue` job dispatched with `->delay()` (specifically `SendAutomationSmsJob` for `delay_minutes > 0` SMS automation rules) silently never executes. Full detail in `SAAS_MODULE_CONTEXT.md` §17.0 finding #12 / §17.5 / §17.10.
+
+**Update:** fixed 2026-08-08 — `hybrid-queue-worker.service` (systemd, `queue:work redis`) now runs persistently. The Facebook webhook receiver itself is **still sync by design** (light DB-only work, well within Meta's response budget — see §1 above), but the queue being available now is a real option for §6 item 6 below if async processing is ever wanted.
 
 ---
 
@@ -211,4 +213,35 @@ Building the webhook receiver surfaced that this deployment has **no queue worke
 - Real credentials (App ID/Secret/Webhook verify token) are in `platform_facebook_settings` (DB, encrypted) — check via `/admin/settings/facebook` (masked) or `php artisan tinker` → `App\Models\PlatformFacebookSetting::getSetting()->masked()`. Never re-print the raw secret into a doc or commit.
 - To test the webhook handshake without Meta: `curl "https://bsol.zyrotechbd.com/api/facebook/webhook?hub.mode=subscribe&hub.verify_token=<token>&hub.challenge=test"` should echo `test` with `200`.
 - To test lead capture without a real Page: rollback-wrapped tinker test pattern is in the session history — construct a synthetic `entry[].changes[]` (comment) or `entry[].messaging[]` (message) payload and call `app(FacebookLeadCaptureService::class)->handle($payload)` inside `DB::beginTransaction()/rollBack()`.
-- The uncommitted `platform_facebook_settings` admin-config-UI changes should be committed together (migration + model + controller + route + admin page + the 3 call-site edits in `FacebookGraphClient`/`FacebookWebhookController`/`FacebookConnectController` that switched from `config('services.facebook.*')` to `PlatformFacebookSetting::resolved*()`).
+- ~~The uncommitted `platform_facebook_settings` admin-config-UI changes should be committed together~~ — stale note, this was already committed (`28d4623`, `03e8b1a`) before this correction was made; `git status`/`git log` confirmed clean as of 2026-08-08.
+
+---
+
+## 6. সুপারিশকৃত ভবিষ্যৎ কাজ (Recommendations, added 2026-08-08 — owner: "পরবর্তীতে এই কাজগুলো করব")
+
+App Review approve না হওয়া পর্যন্ত non-admin seller-দের জন্য ফিচারটা কাজ করবে না, কিন্তু approve হওয়ার আগেই নিচের কাজগুলো প্ল্যান/prioritize করে রাখা যায়। Priority অনুযায়ী সাজানো।
+
+### 6.1 লজিক/ব্যাকএন্ড
+
+| # | সুপারিশ | বিস্তারিত |
+|---|---|---|
+| 1 | Multi-page support | `facebook_page_connections`-এ `unique('user_id')` — এক seller = এক Page। Multi-page picker UI আছে শুধু "কোনটা কানেক্ট করব" বাছাইয়ের জন্য, একসাথে একাধিক রাখার জন্য না। একাধিক ব্র্যান্ড/পেজ চালানো বড় seller-দের জন্য ব্লকার |
+| 2 | Keyword-triggered auto-reply | এখন শুধু manual reply (dashboard থেকে ক্লিক করে)। Original vision-এ ছিল "keyword detection → auto-reply", MVP-তে ইচ্ছাকৃতভাবে বাদ গেছে |
+| 3 | Facebook Lead Ads form integration | আলাদা webhook field (`leadgen`) — organic comment/Messenger থেকে সম্পূর্ণ ভিন্ন, এখনো implement হয়নি। পেইড lead-gen ক্যাম্পেইন চালানো seller-দের জন্য দরকার |
+| 4 | CAPI (Conversions API) Purchase event | মূল SaaS vision-এর "Ads ROI Tracker" অংশ ছিল, Lead-capture MVP-তে বাদ। ল্যান্ডিং পেজ checkout থেকে server-side Purchase event পাঠালে seller-এর ad campaign নিজে থেকে optimize হবে |
+| 5 | Lead → Order conversion attribution | কোন লিড শেষে অর্ডারে কনভার্ট হলো তার ট্র্যাকিং নেই — Analytics-এর Ads ROI placeholder খোলার prerequisite |
+| 6 | Webhook processing async-এ move করা | queue worker এখন সচল (§4-এর আপডেট দেখো) — sync থেকে queued job-এ সরালে Meta timeout risk কমবে; আগে queue না থাকায় sync বাধ্যতামূলক ছিল, এখন optional upgrade |
+| 7 | Comment webhook বাস্তব ট্রাফিকে পর্যবেক্ষণ | App Review-এর জন্য synthetic payload দিয়ে verify হয়েছিল, real production comment volume-এ এখনো observe করা হয়নি |
+| 8 | `business_management` non-portfolio seller-এ টেস্ট | শুধু ১টা admin-owned (Business-Portfolio) Page দিয়ে verify হয়েছে (§3 "Third issue")— সাধারণ ব্যক্তিগত Page-ওয়ালা seller-এ কাজ করবে কিনা confirm বাকি |
+
+### 6.2 ডিজাইন/UX
+
+| # | সুপারিশ | বিস্তারিত |
+|---|---|---|
+| 9 | Sidebar unread badge | ব্যাকএন্ডে `GET /facebook/leads/unread-count` route আগে থেকেই আছে (`FacebookLeadController::unreadCount`) কিন্তু frontend কোথাও ব্যবহার করে না। ঠিক এই প্যাটার্নেই support-chat-widget-এ pulsing badge + toast বানানো হয়েছিল (commit `bd3bb08`) — একই প্যাটার্ন এখানে বসালে seller প্যাসিভলি নতুন লিড জানতে পারবে, এখন ম্যানুয়ালি পেজ চেক করতে হয় |
+| 10 | Conversion funnel/stats card | Leads inbox এখন শুধু list+filter — লিড কাউন্ট vs customer-conversion কাউন্ট এমন summary card নেই |
+| 11 | Quick-reply template | Common প্রশ্নের জন্য প্রি-সেট reply টেমপ্লেট |
+| 12 | Lead priority/visual badge | phone-detected lead vs শুধু নাম-পাওয়া lead — backend `detected_phone` দিয়ে distinguish করে কিন্তু UI-তে জোরালো visual cue নেই |
+
+### Suggested execution order
+App Review approve হওয়ার পরে বাস্তব ট্রাফিক দেখে re-prioritize করা ভালো, তবে এখনকার best-guess order: **#9 (কম effort, ready backend) → #5/#4 (Ads ROI আনলক করে) → #1 (বড় seller ব্লকার) → বাকিগুলো।**
