@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\FacebookConnectController;
 use App\Http\Controllers\Api\FacebookLeadController;
 use App\Http\Controllers\Api\FacebookPixelSettingController;
+use App\Http\Controllers\Api\FacebookReplyTemplateController;
 use App\Http\Controllers\Api\FacebookWebhookController;
 use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\LandingPageController;
@@ -316,6 +317,7 @@ Route::middleware('active_subscription')->group(function () {
     Route::prefix('facebook/leads')->group(function () {
         Route::get('/', [FacebookLeadController::class, 'index']);
         Route::get('/unread-count', [FacebookLeadController::class, 'unreadCount']);
+        Route::get('/stats', [FacebookLeadController::class, 'stats']);
         Route::get('/{id}', [FacebookLeadController::class, 'show'])->where('id', '[0-9]+');
         Route::put('/{id}/read', [FacebookLeadController::class, 'markRead'])->where('id', '[0-9]+');
         Route::put('/{id}/ignore', [FacebookLeadController::class, 'ignore'])->where('id', '[0-9]+');
@@ -326,6 +328,12 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/', [FacebookPixelSettingController::class, 'show']);
         Route::put('/', [FacebookPixelSettingController::class, 'update']);
         Route::post('/test-event', [FacebookPixelSettingController::class, 'testEvent']);
+    });
+    Route::prefix('facebook/reply-templates')->group(function () {
+        Route::get('/', [FacebookReplyTemplateController::class, 'index']);
+        Route::post('/', [FacebookReplyTemplateController::class, 'store']);
+        Route::put('/{id}', [FacebookReplyTemplateController::class, 'update'])->where('id', '[0-9]+');
+        Route::delete('/{id}', [FacebookReplyTemplateController::class, 'destroy'])->where('id', '[0-9]+');
     });
 
     // ── Fraud Check ───────────────────────────────────────────────────────────

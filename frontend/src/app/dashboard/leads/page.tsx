@@ -9,9 +9,12 @@ import {
   ChevronRight,
   MessageCircle,
   MessagesSquare,
+  Phone,
+  Plus,
   Search,
   Send,
   ShoppingCart,
+  Trash2,
   UserPlus,
   X,
 } from "lucide-react";
@@ -67,6 +70,20 @@ const t = {
     minutesAgo: (n: number) => `${n} মিনিট আগে`,
     hoursAgo: (n: number) => `${n} ঘণ্টা আগে`,
     daysAgo: (n: number) => `${n} দিন আগে`,
+    phoneDetectedLabel: "ফোন পাওয়া গেছে",
+    statTotal: "মোট লিড",
+    statNew: "নতুন",
+    statConverted: "কাস্টমার হয়েছে",
+    statOrders: "অর্ডার হয়েছে",
+    statUnread: "আনরিড",
+    templatesBtn: "টেমপ্লেট",
+    templatesTitle: "রিপ্লাই টেমপ্লেট",
+    templatesEmpty: "কোনো টেমপ্লেট নেই। নিচে থেকে একটি যোগ করুন।",
+    templateTitlePlaceholder: "শিরোনাম (যেমন: দাম)",
+    templateMessagePlaceholder: "রিপ্লাই মেসেজ লিখুন...",
+    addTemplateBtn: "যোগ করুন",
+    adding: "যোগ হচ্ছে...",
+    closeBtn: "বন্ধ করুন",
   },
   en: {
     pageTitle: "Facebook Leads",
@@ -114,6 +131,20 @@ const t = {
     minutesAgo: (n: number) => `${n}m ago`,
     hoursAgo: (n: number) => `${n}h ago`,
     daysAgo: (n: number) => `${n}d ago`,
+    phoneDetectedLabel: "Phone detected",
+    statTotal: "Total leads",
+    statNew: "New",
+    statConverted: "Converted",
+    statOrders: "Orders",
+    statUnread: "Unread",
+    templatesBtn: "Templates",
+    templatesTitle: "Reply Templates",
+    templatesEmpty: "No templates yet. Add one below.",
+    templateTitlePlaceholder: "Title (e.g. Price)",
+    templateMessagePlaceholder: "Write the reply message...",
+    addTemplateBtn: "Add",
+    adding: "Adding...",
+    closeBtn: "Close",
   },
 };
 
@@ -136,6 +167,10 @@ type Lead = {
 };
 
 type Meta = { total: number; current_page: number; last_page: number };
+
+type Stats = { total: number; new: number; converted: number; ignored: number; unread: number; orders: number };
+
+type ReplyTemplate = { id: number; title: string; message: string };
 
 function relativeTime(iso: string, tr: (typeof t)["bn"]): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -185,6 +220,14 @@ export default function Page() {
   const [replyText, setReplyText] = useState("");
   const [replySaving, setReplySaving] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
+
+  const [stats, setStats] = useState<Stats | null>(null);
+
+  const [templates, setTemplates] = useState<ReplyTemplate[]>([]);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [newTemplateTitle, setNewTemplateTitle] = useState("");
+  const [newTemplateMessage, setNewTemplateMessage] = useState("");
+  const [addingTemplate, setAddingTemplate] = useState(false);
 
   const authHeaders = useCallback(() => ({ Authorization: `Bearer ${getStoredToken()}` }), []);
 
@@ -243,6 +286,65 @@ export default function Page() {
     void loadLeads();
   }, [loadLeads]);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/facebook/leads/stats`, { headers: authHeaders() });
+      const json = await res.json();
+      if (json.success) setStats(json.data);
+    } catch {
+      // non-critical — funnel card just stays at its last known values
+    }
+  }, [authHeaders]);
+
+  useEffect(() => {
+    void loadStats();
+  }, [loadStats]);
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/facebook/reply-templates`, { headers: authHeaders() });
+      const json = await res.json();
+      if (json.success) setTemplates(json.data);
+    } catch {
+      // non-critical — templates panel just stays empty
+    }
+  }, [authHeaders]);
+
+  useEffect(() => {
+    void loadTemplates();
+  }, [loadTemplates]);
+
+  async function addTemplate() {
+    if (!newTemplateTitle.trim() || !newTemplateMessage.trim()) return;
+    setAddingTemplate(true);
+    try {
+      const res = await fetch(`${API}/facebook/reply-templates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ title: newTemplateTitle.trim(), message: newTemplateMessage.trim() }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTemplates((prev) => [...prev, json.data]);
+        setNewTemplateTitle("");
+        setNewTemplateMessage("");
+      }
+    } catch {
+      // no-op — seller can retry
+    } finally {
+      setAddingTemplate(false);
+    }
+  }
+
+  async function deleteTemplate(id: number) {
+    setTemplates((prev) => prev.filter((tpl) => tpl.id !== id));
+    try {
+      await fetch(`${API}/facebook/reply-templates/${id}`, { method: "DELETE", headers: authHeaders() });
+    } catch {
+      // no-op — worst case it reappears on next loadTemplates()
+    }
+  }
+
   // Any filter/sort/search change should reset back to page 1.
   function resetToFirstPage() {
     setPage(1);
@@ -263,6 +365,7 @@ export default function Page() {
       const json = await res.json();
       if (json.success) {
         setLeads((prev) => prev.map((l) => (l.id === id ? json.data : l)));
+        void loadStats();
       }
     } catch {
       // no-op — seller can retry the action
@@ -293,6 +396,7 @@ export default function Page() {
       if (json.success) {
         setLeads((prev) => prev.map((l) => (l.id === id ? json.data.lead : l)));
         setConvertingId(null);
+        void loadStats();
       } else {
         setFormError(json.message ?? tr.invalidPhone);
       }
@@ -345,6 +449,24 @@ export default function Page() {
   return (
     <UserShell activeKey="facebook-leads" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
       <div className="space-y-4">
+        {/* Funnel summary */}
+        {stats && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {[
+              { label: tr.statTotal, value: stats.total },
+              { label: tr.statNew, value: stats.new },
+              { label: tr.statConverted, value: stats.converted },
+              { label: tr.statOrders, value: stats.orders },
+              { label: tr.statUnread, value: stats.unread },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-center">
+                <p className="text-xl font-semibold text-[var(--foreground)]">{stat.value}</p>
+                <p className="mt-0.5 text-[11px] text-[var(--muted)]">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -378,6 +500,13 @@ export default function Page() {
             >
               {tr.unreadOnly}
             </button>
+            <button
+              type="button"
+              onClick={() => setTemplatesOpen((v) => !v)}
+              className={filterChip(templatesOpen)}
+            >
+              {tr.templatesBtn}
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -398,6 +527,63 @@ export default function Page() {
             </span>
           </div>
         </div>
+
+        {templatesOpen && (
+          <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">{tr.templatesTitle}</h3>
+              <button type="button" onClick={() => setTemplatesOpen(false)} className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]">
+                {tr.closeBtn}
+              </button>
+            </div>
+
+            {templates.length === 0 ? (
+              <p className="text-xs text-[var(--muted)]">{tr.templatesEmpty}</p>
+            ) : (
+              <div className="space-y-2">
+                {templates.map((tpl) => (
+                  <div key={tpl.id} className="flex items-start justify-between gap-2 rounded-lg border border-[var(--border)] p-2.5">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-[var(--foreground)]">{tpl.title}</p>
+                      <p className="truncate text-xs text-[var(--muted)]">{tpl.message}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void deleteTemplate(tpl.id)}
+                      className="shrink-0 rounded-lg p-1.5 text-[var(--muted)] hover:bg-red-500/10 hover:text-red-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                value={newTemplateTitle}
+                onChange={(e) => setNewTemplateTitle(e.target.value)}
+                placeholder={tr.templateTitlePlaceholder}
+                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] sm:w-40"
+              />
+              <input
+                value={newTemplateMessage}
+                onChange={(e) => setNewTemplateMessage(e.target.value)}
+                placeholder={tr.templateMessagePlaceholder}
+                className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              />
+              <button
+                type="button"
+                onClick={() => void addTemplate()}
+                disabled={addingTemplate || !newTemplateTitle.trim() || !newTemplateMessage.trim()}
+                className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
+              >
+                <Plus size={14} />
+                {addingTemplate ? tr.adding : tr.addTemplateBtn}
+              </button>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <p className="py-8 text-center text-sm text-[var(--muted)]">{tr.loading}</p>
@@ -467,9 +653,17 @@ export default function Page() {
                           </span>
                         )}
                       </div>
-                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass[lead.status]}`}>
-                        {lead.status === "new" ? tr.statusNew : lead.status === "converted" ? tr.statusConverted : tr.statusIgnored}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {lead.detected_phone && !lead.customer && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-600">
+                            <Phone size={10} />
+                            {tr.phoneDetectedLabel}
+                          </span>
+                        )}
+                        <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${statusBadgeClass[lead.status]}`}>
+                          {lead.status === "new" ? tr.statusNew : lead.status === "converted" ? tr.statusConverted : tr.statusIgnored}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Conversation thread: incoming message + our reply (if any), chat-bubble style */}
@@ -487,29 +681,45 @@ export default function Page() {
 
                     {!lead.reply_message && (
                       replyingId === lead.id ? (
-                        <div className="mt-2.5 flex items-end gap-2" onClick={(e) => e.stopPropagation()}>
-                          <textarea
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            placeholder={tr.replyPlaceholder}
-                            rows={1}
-                            className="flex-1 resize-none rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-                          />
-                          <button
-                            onClick={() => void submitReply(lead.id)}
-                            disabled={replySaving}
-                            title={tr.sendBtn}
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-white disabled:opacity-60"
-                          >
-                            <Send size={15} />
-                          </button>
-                          <button
-                            onClick={() => setReplyingId(null)}
-                            title={tr.cancel}
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--foreground)]"
-                          >
-                            <X size={15} />
-                          </button>
+                        <div className="mt-2.5 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                          {templates.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {templates.map((tpl) => (
+                                <button
+                                  key={tpl.id}
+                                  type="button"
+                                  onClick={() => setReplyText(tpl.message)}
+                                  className="rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                >
+                                  {tpl.title}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex items-end gap-2">
+                            <textarea
+                              value={replyText}
+                              onChange={(e) => setReplyText(e.target.value)}
+                              placeholder={tr.replyPlaceholder}
+                              rows={1}
+                              className="flex-1 resize-none rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                            />
+                            <button
+                              onClick={() => void submitReply(lead.id)}
+                              disabled={replySaving}
+                              title={tr.sendBtn}
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-white disabled:opacity-60"
+                            >
+                              <Send size={15} />
+                            </button>
+                            <button
+                              onClick={() => setReplyingId(null)}
+                              title={tr.cancel}
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--foreground)]"
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="mt-2.5" onClick={(e) => e.stopPropagation()}>

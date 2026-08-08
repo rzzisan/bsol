@@ -98,6 +98,47 @@ class FacebookLeadController extends Controller
         return response()->json(['success' => true, 'count' => $count]);
     }
 
+    /**
+     * Funnel summary for the leads inbox (§6 item 10) — unfiltered totals,
+     * independent of whatever channel/status/search filter is currently
+     * applied to index(). Orders count reuses the same source='facebook_inbox'
+     * + source_ref=lead-id attribution as withOrderAttribution().
+     */
+    public function stats(): JsonResponse
+    {
+        $userId = auth()->id();
+
+        $counts = FacebookLead::where('user_id', $userId)
+            ->selectRaw("
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'new') as new_count,
+                COUNT(*) FILTER (WHERE status = 'converted') as converted_count,
+                COUNT(*) FILTER (WHERE status = 'ignored') as ignored_count,
+                COUNT(*) FILTER (WHERE is_read = false) as unread_count
+            ")
+            ->first();
+
+        $ordersCount = Order::where('user_id', $userId)
+            ->where('source', 'facebook_inbox')
+            ->whereIn('source_ref', function ($q) use ($userId) {
+                $q->select(DB::raw('id::text'))->from('facebook_leads')->where('user_id', $userId);
+            })
+            ->distinct()
+            ->count('source_ref');
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total' => (int) $counts->total,
+                'new' => (int) $counts->new_count,
+                'converted' => (int) $counts->converted_count,
+                'ignored' => (int) $counts->ignored_count,
+                'unread' => (int) $counts->unread_count,
+                'orders' => $ordersCount,
+            ],
+        ]);
+    }
+
     public function markRead(int $id): JsonResponse
     {
         $lead = FacebookLead::where('user_id', auth()->id())->findOrFail($id);
