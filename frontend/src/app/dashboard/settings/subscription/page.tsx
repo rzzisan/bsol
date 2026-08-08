@@ -153,6 +153,15 @@ export default function Page() {
 
       setPlans((plansData?.data ?? []) as Package[]);
       setSubscription(subData?.data as MySubscription);
+
+      // Pre-select the currently active plan — but only if the seller
+      // hasn't already picked something in this session (e.g. right before
+      // being redirected to bKash and back, which remounts this page and
+      // would otherwise wipe the selection).
+      const activePackageId = subData?.data?.package?.id;
+      if (activePackageId) {
+        setForm((f) => (f.package_id ? f : { ...f, package_id: String(activePackageId) }));
+      }
     } catch {
       setError(t.error);
     } finally {
