@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'user_id', 'package_id', 'amount', 'payment_method', 'sender_bkash_number',
-    'trx_id', 'screenshot_path', 'status', 'admin_note', 'reviewed_by', 'reviewed_at',
+    'trx_id', 'bkash_payment_id', 'screenshot_path', 'status', 'admin_note', 'reviewed_by', 'reviewed_at',
 ])]
 class SubscriptionPayment extends Model
 {
