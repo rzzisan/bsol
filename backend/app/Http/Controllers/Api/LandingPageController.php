@@ -264,7 +264,7 @@ class LandingPageController extends Controller
                 'published_at' => $page->published_at,
                 'product_count' => $page->products->count(),
                 'template' => $page->template,
-                'public_url' => route('landing-pages.show', ['slug' => $page->slug]),
+                'public_url' => $this->publicUrlFor($page),
                 'created_at' => $page->created_at,
                 'updated_at' => $page->updated_at,
             ];
