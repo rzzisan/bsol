@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-08 — Added §17.10: five more open findings from §17 fixed (queue worker, admin self-lockout, fraud-score↔courier merge, customers FK, Steadfast bulk-correlation, courier cancel() route) — see below. Older entries kept as-is:
+
 Last updated: 2026-08-07 — Added §15.9a: SaaS Support chat (seller ↔ admin-team shared inbox), fully coded, migrated, deployed, and live-verified — see below. Older entries kept as-is:
 
 Last updated: 2026-08-02 — Added §15 (full codebase feature audit, ground-truth scanned), §16 (prioritized recommendations), and §17 (deep line-by-line code review with specific file:line bugs/risks, 6-pass independent review covering every controller/service). Sections 12–14 below are the **original Phase 1/2 plan and are now stale** (last accurate as of 2026-05-04) — কোডবেস অনেক এগিয়ে গেছে তার পরে। **§15-কে "কী আছে" এবং §17-কে "কতটা ভালো/নিরাপদ" প্রশ্নের single source of truth হিসেবে ব্যবহার করো**, sections 12–14 শুধু historical record হিসেবে রাখা হয়েছে। **Courier provider abstraction (§16.2) commit `0fdc3ab`-এ সম্পন্ন। Facebook/Meta lead-capture MVP (§16.3) কোড+deploy সম্পন্ন কিন্তু Meta App credentials না থাকায় এখনো live নয় — বিস্তারিত §15.11-এ। এই কাজের সময় একটা নতুন 🔴 CRITICAL finding ধরা পড়েছে: production-এ কোনো queue worker নেই, delayed SMS automation silently ভাঙা — §17.0 item #12 / §17.5-এ বিস্তারিত, এখনো ফিক্স করা হয়নি।**
@@ -835,7 +837,7 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 | 9 | Order edit (shipping/discount বদলালে) courier charge ছাড়া accounting ledger refresh হয় না — pending/delivered order-এর ledger amount order-এর real total-এর সাথে stale হয়ে যেতে পারে | `OrderController.php:379-393` | 🟠 REAL BUG | ✅ FIXED |
 | 10 | `AdminController::deleteUser` — permanent hard delete (`User` model-এ `SoftDeletes` নেই), কোনো confirmation/undo/export ছাড়া একজন seller-এর সব order/product/transaction/landing-page/SMS history cascade delete হয়ে যায় | `AdminController.php:111-118` | 🔴 CRITICAL | ✅ FIXED |
 | 11 | Courier credential (Steadfast/Pathao/RedX/Carrybee/Paperfly-এর password fields) এবং email SMTP password — কোনো encryption cast ছাড়া plaintext-এ DB-তে store হয়, অথচ SMS gateway credential-এ ঠিকমতো `encrypted` cast আছে — inconsistent standard | `CourierSetting.php`, `EmailConfiguration.php` (`$hidden` আছে কিন্তু cast নেই) | 🔴 CRITICAL (data-at-rest exposure যদি DB কখনো compromise হয়) | ✅ FIXED |
-| 12 | **কোনো queue worker consumer নেই** এই deployment-এ (`QUEUE_CONNECTION=redis`, কিন্তু কোনো systemd/supervisor/cron `queue:work` নেই) — যেকোনো `delay_minutes > 0` SMS automation rule silently কখনো fire হয় না, Redis-এ চিরস্থায়ী জমা থাকে। Immediate-trigger (delay=0) rule প্রভাবিত না (sync path)। আবিষ্কৃত Facebook lead-capture webhook feature build করার সময় — বিস্তারিত §17.5-এ | কোনো `hybrid-queue-worker.service` নেই, `routes/console.php`-এ শুধু `app:expire-subscriptions` scheduled, `queue:work` কোথাও নেই | 🔴 CRITICAL (silent data/feature loss, delayed SMS automation broken) | ⛔ NOT FIXED — নতুন systemd service লাগবে |
+| 12 | **কোনো queue worker consumer নেই** এই deployment-এ (`QUEUE_CONNECTION=redis`, কিন্তু কোনো systemd/supervisor/cron `queue:work` নেই) — যেকোনো `delay_minutes > 0` SMS automation rule silently কখনো fire হয় না, Redis-এ চিরস্থায়ী জমা থাকে। Immediate-trigger (delay=0) rule প্রভাবিত না (sync path)। আবিষ্কৃত Facebook lead-capture webhook feature build করার সময় — বিস্তারিত §17.5-এ | কোনো `hybrid-queue-worker.service` নেই, `routes/console.php`-এ শুধু `app:expire-subscriptions` scheduled, `queue:work` কোথাও নেই | 🔴 CRITICAL (silent data/feature loss, delayed SMS automation broken) | ✅ FIXED (2026-08-08) — বিস্তারিত §17.10 |
 
 ### 17.1 Order + Product + Customer (Core Commerce)
 
@@ -873,6 +875,7 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
   - Undocumented extra branches আছে: `sellerCount >= 3` → +10, `globalBlacklistCount > 0` → +40 — এগুলো doc-এ নেই
 - ✅ Risk-level threshold (0-30/31-60/61+) ঠিক doc-এর সাথে মেলে
 - 🟡 Global blacklist propagation (+40, `FraudController.php:248-250`) — যেকোনো এক seller ব্লকলিস্ট করলে সব seller-এর জন্য সেই ফোন সাথে সাথে "medium risk"-এ চলে যায়, কোনো validation/audit ছাড়া — abuse-able
+- ~~"+20 courier return >40%" কখনো read হয় না~~ — ✅ FIXED (2026-08-08): `computeScore()` এখন `courier_fraud_stats`-এর cached cross-courier data read করে (নতুন call করে না, শুধু existing cache পড়ে) — §17.10
 - ✅ Blacklist CRUD সঠিকভাবে per-user scoped, unique constraint আছে
 
 **Courier-based cross-provider fraud check — verdict: production-solid (architecture)**
@@ -888,10 +891,10 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 
 | Provider | মূল সমস্যা |
 |---|---|
-| Steadfast | 🟠 `courier_charge`-এ status string বসে (§17.0, ফিক্স হয়ে গেছে), 🟡 bulk booking response index-based correlation (invoice cross-check নেই, response reorder/drop হলে ভুল order-এ tracking ID লেগে যেতে পারে) — এখনো open |
+| Steadfast | 🟠 `courier_charge`-এ status string বসে (§17.0, ফিক্স হয়ে গেছে); ~~🟡 bulk booking response index-based correlation~~ — ✅ FIXED (2026-08-08): এখন invoice/order_number দিয়ে correlate করে, positional fallback হলে log warning — §17.10 |
 | Pathao | ✅ OAuth token refresh সঠিকভাবে implement করা (একমাত্র provider যেখানে expiry ঠিকমতো হ্যান্ডেল হয়), কিন্তু 🔧 `PathaoService` আর `PathaoLocationService`-এ দুটো আলাদা, ডাইভার্জড token-fetch implementation আছে (একটা DB-persisted, একটা শুধু cache) — maintenance trap, এখনো open |
 | RedX | ✅ backend সলিড, ✅ bulk booking + frontend selector এখন exposed (২০২৬-০৮-০২ courier-abstraction কাজে) — 🔧 test-connection endpoint এখনো নেই |
-| Carrybee | কাজ করে বুকিং-এ, 🟠 bulk-booking থেকে এখনো ইচ্ছাকৃতভাবে বাদ (per-order area-search UI দরকার, কোডে documented), tracking-refresh UI-তে নেই, `cancel()` provider method-এ আছে কিন্তু কোনো route/controller call করে না — dead capability এখনো open, no test-connection endpoint |
+| Carrybee | কাজ করে বুকিং-এ, 🟠 bulk-booking থেকে এখনো ইচ্ছাকৃতভাবে বাদ (per-order area-search UI দরকার, কোডে documented), tracking-refresh UI-তে নেই, no test-connection endpoint; ~~`cancel()` route-লেস~~ — ✅ FIXED (2026-08-08): generic `POST /api/courier/cancel/{order}` যোগ হয়েছে, `CourierFactory` দিয়ে dispatch করে (Carrybee/Paperfly real cancel, বাকি provider-এ `AbstractCourierProvider`-এর no-op 422 fallback) — §17.10 |
 
 **Shared architecture — ✅ DONE (2026-08-02, commit `0fdc3ab`) — আগে 🔧 fragile ছিল, এখন resolved**
 - `app/Services/Courier/CourierProviderInterface.php` (`book()/bookBulk()/track()/cancel()`) + `CourierFactory::make()` + `AbstractCourierProvider` — ৪টা provider এখন একটা common contract মেনে চলে, `CourierController.php` (1138→692 লাইন) hand-written if/elseif chain বাদ দিয়ে factory-dispatch করে
@@ -938,8 +941,8 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 - 🔴 `trx_id` uniqueness অনুপস্থিত (§17.0) — এই পুরো রিভিউয়ের সবচেয়ে বড় ঝুঁকি
 - ✅ Subscription extension logic সঠিকভাবে additive (stack on remaining time, restart if lapsed না ভুলভাবে reset)
 - 🔴 `AdminController::deleteUser` hard-delete, কোনো soft-delete/undo নেই (§17.0)
-- 🟡 `customers` টেবিলের `user_id`-এ কোনো FK constraint নেই (অন্য সব টেবিলে আছে) — user delete হলে customer row orphan থেকে যায়, cascade/null হয় না
-- 🟡 Flat admin role (`admin`/`user` মাত্র দুইটা) — কোনো super-admin tier বা self-lockout protection নেই, যেকোনো admin অন্য যেকোনো admin-কে (এমনকি নিজেকেও) demote/delete করতে পারে
+- ~~🟡 `customers` টেবিলের `user_id`-এ কোনো FK constraint নেই~~ — ✅ FIXED (2026-08-08): `foreignId('user_id')->constrained()->cascadeOnDelete()` যোগ হয়েছে, `products`/`orders`-এর প্যাটার্ন অনুসরণ করে — §17.10
+- ~~🟡 Flat admin role ... self-lockout protection নেই~~ — ✅ FIXED (2026-08-08): এখনো কোনো super-admin tier নেই (unchanged, বড় স্কোপ), কিন্তু last-remaining-admin demote/delete এখন `AdminController::updateUser/deleteUser`-এ ব্লক করা হয় — §17.10
 
 ### 17.7 এই রিভিউতে ভালোভাবে verify হওয়া শক্তিশালী অংশ (ব্যালেন্সের জন্য)
 
@@ -998,3 +1001,22 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 **পরিবর্তিত ফাইল:** `backend/app/Services/OrderStatusService.php` (`adjustInventoryForStatusTransition` — variant + product দুটোই হ্যান্ডল করে), `backend/app/Http/Controllers/Api/OrderController.php::bulkStatus`
 
 **Verification:** rollback-wrapped tinker test — reserve/reject/release/untracked-no-op সবগুলো scenario আর bulk partial-failure (2 succeed + 1 skip, stock/response সঠিক) pass করেছে। কোনো migration লাগেনি (schema অপরিবর্তিত, শুধু query-level guard)। `php -l` clean, কোনো ব্রেকিং caller নেই (`transition()`-এর একমাত্র positional/named caller ছিল `bulkStatus`, বাকি সব caller ইতিমধ্যে default ব্যবহার করত)।
+
+---
+
+### 17.10 §17-এর আরও ৫টা open finding fix (2026-08-08, commit `d48c22a`)
+
+`git log`-এ commit reference: `d48c22a`। সব fix rollback-wrapped tinker দিয়ে verify করা হয়েছে, backend-only (কোনো frontend deploy লাগেনি), `php-fpm reload` করে opcache picked up নিশ্চিত করা হয়েছে, `/api/health` 200 confirm করা হয়েছে।
+
+| # | কী পরিবর্তন হয়েছে | ফাইল | Migration |
+|---|---|---|---|
+| 1 | নতুন `hybrid-queue-worker.service` (systemd, `User=www-data`, `Restart=always`) — `php artisan queue:work redis --tries=3 --backoff=10 --max-time=3600 --sleep=3` চালায়, enabled+active। এতদিন কোনো queue consumer ছিলই না, তাই `delay_minutes > 0` SMS automation rule silently কখনো fire হতো না (§17.0 #12) | `/etc/systemd/system/hybrid-queue-worker.service` (server config, repo-তে নেই) | — |
+| 2 | `AdminController::updateUser`/`deleteUser`-এ নতুন `hasAnotherActiveAdmin()` guard — শেষ admin-কে demote (role→user) বা delete করার চেষ্টা করলে `422` রিটার্ন করে | `AdminController.php` | — |
+| 3 | `FraudController::computeScore()`-এ নতুন `courier_fraud_stats`-read ব্লক — phone-এর সব provider-এর cached `total_parcels`/`total_cancelled` sum করে, aggregate return-rate ≥3 parcel এবং >40% হলে ডকুমেন্টেড "+20" যোগ করে (`PhoneIntelCache::remember`-এর মাধ্যমে cached, কোনো নতুন courier API call ট্রিগার করে না) | `Api/FraudController.php` | — |
+| 4 | `customers.user_id`-এ FK constraint (`constrained()->cascadeOnDelete()`), `products`/`orders`-এর প্যাটার্ন মিলিয়ে — migrate করার আগে orphan-row check (0 পাওয়া গেছে) করা হয়েছে | `database/migrations/...add_foreign_key_to_customers_user_id.php` | `2026_08_08_072119_add_foreign_key_to_customers_user_id` |
+| 5 | `SteadfastCourierProvider::bookBulk()` — response item-কে array position-এর বদলে `invoice` (= `order_number`) দিয়ে match করে; invoice না মিললে positional fallback + `Log::warning()` | `Services/Courier/SteadfastCourierProvider.php` | — |
+| 6 | নতুন `POST /api/courier/cancel/{order}` route + `CourierController::cancelBooking()` — `CourierFactory::make()` দিয়ে dispatch করে `cancel()` কল করে; Carrybee/Paperfly-এর already-written `cancel()` method finally একটা route পেল, বাকি provider `AbstractCourierProvider`-এর no-op-এ সঠিকভাবে `422` দেয় | `Api/CourierController.php`, `routes/api.php` | — |
+
+**Verification method:** প্রতিটাতে rollback-wrapped tinker test (real DB row বানিয়ে, transaction rollback করে) — queue worker: `journalctl` দিয়ে dispatched job `RUNNING` হতে দেখা গেছে (worker সক্রিয়ভাবে redis থেকে consume করছে); admin lockout: last-admin demote/delete `422`, second-admin থাকলে সফল `200` — তিনটাই test করা হয়েছে; fraud merge: high-cancel-rate phone → +20 (score ≥20), low-cancel-rate phone → কোনো false positive না (score 0) — দুটোই pass; FK: pre-migration orphan-count 0 verify করে migrate; Steadfast correlation: `Http::fake()` দিয়ে **reversed-order** response simulate করে দেখানো হয়েছে প্রতিটা order সঠিক consignment_id পেয়েছে (আগের positional match হলে এটা fail করত); courier cancel: Carrybee-এর জন্য end-to-end (`Http::fake` cancel endpoint success → `order.courier_status` → `cancelled`), Steadfast-এর জন্য no-op fallback `422`, no-tracking-id order-এ `422` — সব pass।
+
+**এখনো open থাকা items (§16/§17.8 থেকে, এই session-এ touch করা হয়নি):** Pathao dual token-fetch implementation (🔧, বড় refactor), Carrybee bulk-booking UI + tracking-refresh UI (কোনো provider-এ নেই), Paperfly incomplete (schema আছে, service/route নেই — সম্পূর্ণ করা বা schema বাদ দেওয়া সিদ্ধান্ত দরকার), frontend bilingual/design-token violations (`order-intake-form.tsx`, variant UI কম্পোনেন্টগুলো) — এগুলো বড় স্কোপ/product decision লাগে, পরের session-এ prioritize করা উচিত।
