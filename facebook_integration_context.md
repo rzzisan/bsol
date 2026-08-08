@@ -4,6 +4,8 @@
 
 **Last updated:** 2026-08-08 — §4 queue-worker-gap note corrected (fixed), §5 stale uncommitted-changes note corrected (already committed), added §6 prioritized recommendations for future work, then implemented §6 items 9 and 5 (see §7), items 1 and 4 (see §8), and items 10/11/12 (see §9) — all of §6 now done except #2, #3, #7, #8 (real-traffic/demand-gated or bigger scope, left for later). Sections 1-3, 3.2, 3.3 kept as-is (2026-08-02/07 work log).
 
+**Unrelated regression found + fixed same session:** seller's landing-pages list (`/dashboard/landing-pages`) was returning empty — a pre-existing bug from an earlier landing-page cleanup commit (`36fab21`), not caused by any Facebook work here. Full writeup + fix in `landing_page_context.md` §22.
+
 ---
 
 ## 1. Architecture Summary

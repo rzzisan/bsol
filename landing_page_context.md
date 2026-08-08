@@ -1,6 +1,6 @@
 # ল্যান্ডিং পেজ বিল্ডার — মাস্টার কনটেক্সট ফাইল
 
-> এই ফাইলটা AI agent-দের জন্য: landing page builder ফিচার নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-08-08 (§২১ — cleanup/hardening pass)। কোনো বড় পরিবর্তন করলে (নতুন ফাইল/মডেল/রুট/কলাম) এই ফাইলটাও আপডেট করে দিও।
+> এই ফাইলটা AI agent-দের জন্য: landing page builder ফিচার নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-08-08 (§২২ — §২১-এর regression ফিক্স)। কোনো বড় পরিবর্তন করলে (নতুন ফাইল/মডেল/রুট/কলাম) এই ফাইলটাও আপডেট করে দিও।
 >
 > স্ট্যাক: Laravel backend (`/var/www/hybrid-stack/backend`) + Next.js/TypeScript frontend (`/var/www/hybrid-stack/frontend`)। `zyro/` ও `catv/` ডিরেক্টরি আলাদা/অসম্পর্কিত প্রজেক্ট — এই ফিচারের সাথে সম্পর্কিত না।
 
@@ -414,3 +414,13 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 
 ### Verification
 `php -l` + `composer dump-autoload -o` clean, `php artisan route:list` count 264→262 (দুটো সরানো web route), `php artisan migrate:status` সব `Ran`, `tsc --noEmit` clean, `npm run build` clean, backend `php-fpm reload` + frontend `systemctl restart hybrid-frontend.service` — দুটোই smoke-check pass (`/`, `/api/health` 200, live CSS chunk 200)।
+
+## ২২. §২১-এর regression ফিক্স — seller-এর landing pages list খালি দেখাচ্ছিল (2026-08-08)
+
+§২১-এ `/lp/{slug}` Blade fallback রুট (`routes/web.php`, named `landing-pages.show`) dead code হিসেবে ডিলিট হয়েছিল — কিন্তু [`LandingPageController::index()`](backend/app/Http/Controllers/Api/LandingPageController.php:267) (seller dashboard-এর `GET /landing/pages` লিস্ট, `dashboard/landing-pages/page.tsx` যেটা কল করে) প্রতিটা পেজের `public_url` বানানোর জন্য এখনো `route('landing-pages.show', ['slug' => $page->slug])` কল করত। ফলে সেই named route না থাকায় প্রতিটা list request `RouteNotFoundException` ছুঁড়ে 500 দিত, আর frontend সেটাকে খালি লিস্ট হিসেবে দেখাত — seller-এর তৈরি করা কোনো landing page-ই দেখা যাচ্ছিল না।
+
+§২১-এর verification checklist-এ `route:list` count চেক ছিল (কতগুলো রুট *define* করা আছে), কিন্তু কোনো controller ভেতরে `route()` হেল্পার দিয়ে যে নাম *reference* করছে সেটা কখনো চালিয়ে দেখা হয়নি — তাই এই ব্রেকেজ ধরা পড়েনি।
+
+**ফিক্স:** `route('landing-pages.show', ...)` বদলে একই ফাইলে already আগে থেকে থাকা `$this->publicUrlFor($page)` হেল্পার ব্যবহার করা হয়েছে (এই একই ফাইলে বাকি সব জায়গায় `public_url` এভাবেই বানানো হয় — `publicShow()`, `publicSubmitOrder()`, ইত্যাদি)। Rollback দরকার হয়নি, one-line ফিক্স। Tinker দিয়ে সরাসরি `index()` কল করে verify করা হয়েছে — 200 + real page data ফেরত আসছে।
+
+**শেখা:** dead-code cleanup-এর পর শুধু `route:list`/`php -l` না, actual runtime endpoint hit করে (বিশেষ করে `route()`/`view()`/named-reference ব্যবহার করা controller method-গুলো) smoke-test করা উচিত।
