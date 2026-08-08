@@ -88,6 +88,17 @@ class AdminController extends Controller
             'sms_gateway_id' => ['nullable', 'integer', 'exists:sms_gateways,id'],
         ]);
 
+        if (
+            $user->role === 'admin'
+            && array_key_exists('role', $validated)
+            && $validated['role'] !== 'admin'
+            && ! $this->hasAnotherActiveAdmin($user)
+        ) {
+            return response()->json([
+                'message' => 'Cannot demote the last remaining admin.',
+            ], 422);
+        }
+
         $originalEmail = $user->email;
         $emailChanged = array_key_exists('email', $validated) && $validated['email'] !== $originalEmail;
 
@@ -112,11 +123,22 @@ class AdminController extends Controller
 
     public function deleteUser(User $user): JsonResponse
     {
+        if ($user->role === 'admin' && ! $this->hasAnotherActiveAdmin($user)) {
+            return response()->json([
+                'message' => 'Cannot delete the last remaining admin.',
+            ], 422);
+        }
+
         $user->delete();
 
         return response()->json([
             'message' => 'User deleted successfully.',
         ]);
+    }
+
+    private function hasAnotherActiveAdmin(User $excluding): bool
+    {
+        return User::where('role', 'admin')->where('id', '!=', $excluding->id)->exists();
     }
 
     public function listPackages(): JsonResponse

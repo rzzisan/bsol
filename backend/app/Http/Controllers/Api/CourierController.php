@@ -646,6 +646,42 @@ class CourierController extends Controller
         ], $result['success'] ? 200 : 422);
     }
 
+    public function cancelBooking(Request $request, int $orderId): JsonResponse
+    {
+        $order = Order::where('user_id', auth()->id())->findOrFail($orderId);
+
+        if (! $order->courier_tracking_id) {
+            return response()->json(['success' => false, 'message' => 'No courier booking to cancel.'], 422);
+        }
+
+        $data = $request->validate([
+            'reason' => 'nullable|string|max:300',
+        ]);
+
+        $provider = CourierFactory::make($order->courier_name);
+        if (! $provider) {
+            return response()->json(['success' => false, 'message' => 'Manual/unsupported courier tracking cannot be cancelled via API.'], 422);
+        }
+
+        $result = $provider->cancel($order, $data['reason'] ?? '');
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? ucfirst($order->courier_name) . ' cancellation failed.',
+                'raw'     => $result['raw'] ?? null,
+            ], 422);
+        }
+
+        $order->update(['courier_status' => 'cancelled']);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $order->fresh(),
+            'message' => $result['message'] ?? 'Courier booking cancelled.',
+        ]);
+    }
+
     // ── Booked orders (with tracking) ─────────────────────────────────────────
 
     public function booked(Request $request): JsonResponse

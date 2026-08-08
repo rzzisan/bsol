@@ -249,6 +249,32 @@ class FraudController extends Controller
             $score += 40;
         }
 
+        // Cross-courier delivery-history signal (previously computed by
+        // CourierFraudCheckService into courier_fraud_stats but never read
+        // here — the two fraud systems were disconnected; see
+        // SAAS_MODULE_CONTEXT.md §17.2/§17.8 item 10). Read-only: uses
+        // whatever is already cached, does not trigger new courier API calls.
+        $courierStats = PhoneIntelCache::remember('fraud-courier-stats', $match10, 180, function () use ($phone) {
+            $row = DB::table('courier_fraud_stats')
+                ->where('phone_number', $phone)
+                ->where('status', 'ok')
+                ->selectRaw('COALESCE(SUM(total_parcels), 0) as total_parcels, COALESCE(SUM(total_cancelled), 0) as total_cancelled')
+                ->first();
+
+            return [
+                'total_parcels'   => (int) ($row->total_parcels ?? 0),
+                'total_cancelled' => (int) ($row->total_cancelled ?? 0),
+            ];
+        });
+
+        $courierTotal      = (int) ($courierStats['total_parcels'] ?? 0);
+        $courierCancelled  = (int) ($courierStats['total_cancelled'] ?? 0);
+        $courierReturnRate = $courierTotal > 0 ? ($courierCancelled / $courierTotal) : 0;
+
+        if ($courierTotal >= 3 && $courierReturnRate > 0.40) {
+            $score += 20;
+        }
+
         $score = max(0, min(100, $score));
 
         $riskLevel = match (true) {

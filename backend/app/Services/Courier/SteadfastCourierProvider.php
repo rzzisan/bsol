@@ -96,9 +96,31 @@ class SteadfastCourierProvider extends AbstractCourierProvider
         $resultItems = $result['data'] ?? $result['result'] ?? $result;
         $resultItems = is_array($resultItems) ? array_values(array_filter($resultItems, fn ($item) => is_array($item))) : [];
 
+        // Correlate by invoice (= order_number, which we send in each bulk
+        // item) instead of array position — a purely positional match would
+        // silently mis-assign tracking IDs to the wrong order if Steadfast's
+        // bulk response ever reorders or drops an item.
+        // (SAAS_MODULE_CONTEXT.md §17.3/§17.9.)
+        $byInvoice = [];
+        foreach ($resultItems as $item) {
+            if (! empty($item['invoice'])) {
+                $byInvoice[(string) $item['invoice']] = $item;
+            }
+        }
+
         $rows = [];
         foreach ($orders as $index => $order) {
-            $item = $resultItems[$index] ?? [];
+            $item = $byInvoice[$order->order_number] ?? null;
+            if ($item === null && ! empty($resultItems)) {
+                // Response didn't echo a matching invoice — fall back to
+                // positional match but flag it, since that's the risky path.
+                $item = $resultItems[$index] ?? [];
+                \Illuminate\Support\Facades\Log::warning('Steadfast bulk booking: invoice not found in response, used positional fallback match', [
+                    'order_id'     => $order->id,
+                    'order_number' => $order->order_number,
+                ]);
+            }
+            $item ??= [];
             $consignmentId = $service->extractSteadfastConsignment($item);
             $message = $item['message'] ?? $item['status'] ?? null;
             $success = $consignmentId !== null || (isset($item['status']) && (string) $item['status'] === 'success');
