@@ -802,7 +802,7 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 1. ~~Analytics (16.1)~~ — ✅ DONE (2026-08-02)
 2. ~~Courier abstraction hardening (16.2)~~ — ✅ DONE (2026-08-02, commit `0fdc3ab`)
 3. ~~Facebook/Meta MVP (16.3)~~ — 🟡 কোড DONE (2026-08-02), Meta App setup (external) বাকি — §15.11 দেখুন
-4. Payment gateway automation (16.4) — unblocks real revenue + better customer conversion
+4. ~~Payment gateway automation (16.4)~~ — 🟡 কোড DONE (2026-08-08, subscription billing only — bKash PGW, §18), real merchant credentials + live sandbox test বাকি। Customer-facing landing-page checkout online payment এখনো শুরু হয়নি
 5. Staff/Team roles (16.6), Invoice PDF (16.7), CSV import (16.8), PWA (16.9) — parallel-track, lower urgency
 
 **Smaller open follow-ups (not full modules, can slot in anytime):** Carrybee bulk-booking + `cancel()` route wiring, RedX/Carrybee test-connection endpoints, Paperfly provider completion or removal, `FraudController::computeScore()` ↔ courier-fraud-data merge (§17.8 items 9/10).
@@ -1028,3 +1028,22 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 **Locale prop threading:** `VariantsTab`/`OptionEditor`/`VariantTable` এখন `locale: Locale` (required) prop নেয়, `ProductDetailPage` (`dashboard/products/[id]/page.tsx`) থেকে থ্রেড হয়ে আসে (page-টা আগে থেকেই bilingual, `useState(getStoredLocale)` pattern ব্যবহার করে)। `VariantPickerModal` দুই জায়গা থেকে ব্যবহৃত হয় (`order-intake-form.tsx`, `landing-page-builder.tsx`) বলে `locale?: Locale` optional (default `"en"`) রাখা হয়েছে, দুই caller-ই নিজেদের `locale` pass করে। এই component গুলো `UserShell`-এর children হিসেবেই রেন্ডার হয় (§30-এর architectural rule অনুযায়ী প্রপ থ্রেডিং নিরাপদ, `useLocale()` context timing সমস্যা এখানে প্রযোজ্য না কারণ prop pass করা হয়েছে, নতুন context call না)।
 
 **Verification:** `tsc --noEmit` clean, `eslint` clean (অবশিষ্ট lint error/warning গুলো `git stash` দিয়ে যাচাই করে pre-existing/unrelated প্রমাণ করা হয়েছে — landing-page-builder.tsx-এর impure-function এবং setState-in-effect rule violation গুলো এই session-এর আগে থেকেই ছিল), `npm run build` clean, `systemctl restart hybrid-frontend.service` + live smoke check (`/`, `/dashboard`, `/api/health` সব `200`, active CSS chunk `200`)।
+
+## 18. bKash Payment Gateway — subscription billing অটোমেশন (2026-08-08, commit `5aaa7c7`)
+
+§16.4-এর suggested scope অনুযায়ী শুরু: **শুধু platform-এর নিজের subscription billing** অটোমেট করা হয়েছে (customer-facing landing-page checkout online payment না — সেটা আলাদা, বড় স্কোপ, এখনো শুরু হয়নি)। বিদ্যমান manual flow (seller নিজে bKash-এ Send Money করে TrxID সাবমিট করে, admin ম্যানুয়ালি approve করে) পাশে অক্ষত রাখা হয়েছে fallback হিসেবে — নতুন গেটওয়ে flow শুধু আরেকটা অপশন।
+
+**Architecture (Facebook integration-এর মতোই platform-level credential resolution pattern):**
+- `platform_billing_settings`-এ bKash Tokenized Checkout credential যোগ (`bkash_app_key`/`bkash_app_secret`(encrypted)/`bkash_username`/`bkash_password`(encrypted)/`bkash_sandbox`) — single merchant account (platform-এর নিজের, per-seller না), DB→`.env` fallback (`PlatformFacebookSetting`-এর resolved*() pattern-এর অনুরূপ)।
+- `BkashPaymentGatewayClient` (`app/Services/Payment/`) — grant/refresh token (platform-wide cache), createPayment/executePayment/queryPayment, sandbox/live base URL resolve করে।
+- `SubscriptionActivationService` — `AdminSubscriptionController::approvePayment()`-এর inline activation logic বের করে আনা হয়েছে, যাতে manual admin-approve আর bKash auto-approve দুটোই একই ভাবে subscription extend করে (running subscription-এর বাকি দিন যোগ হয়, ওভাররাইট হয় না)।
+- `BkashPaymentController`: `POST /subscription/pay/bkash/initiate` (auth, pending `SubscriptionPayment` বানিয়ে bKash-এ createPayment কল করে `bkashURL` রিটার্ন করে) + `GET /subscription/pay/bkash/callback` (**public route** — bKash সরাসরি ব্রাউজার রিডাইরেক্ট করে, `FacebookConnectController::callback()`-এর মতোই কোনো Sanctum token থাকে না; `bkash_payment_id`-দিয়ে সঠিক payment row খুঁজে বের করে)। Double-redirect/replay-এর বিরুদ্ধে idempotent (payment আগে থেকে `pending` না থাকলে re-execute করে না)।
+- Admin (`/admin/billing`): bKash credential ফর্ম (blank secret/password = অপরিবর্তিত, Facebook admin settings-এর মতোই masking)। Seller (`/dashboard/settings/subscription`): "bKash দিয়ে সাথে সাথে পে করুন" বাটন (শুধু gateway configured থাকলে দেখা যায়), `?bkash_status=` রিডাইরেক্ট প্যারামিটার হ্যান্ডল করে success/failed/cancelled দেখায়।
+
+**Verification:** সব নতুন controller/service tinker দিয়ে সরাসরি কল করে verify করা হয়েছে — `initiate()` unconfigured অবস্থায় সঠিক `422` দেয়, fake sandbox credential দিয়ে gracefully `502` + payment row `rejected` মার্ক হয় (কোনো crash/dangling state না), admin settings-এর blank-secret round-trip পুরনো মান ধরে রাখে। `tsc --noEmit` + `npm run build` clean, `php -l` clean সব ফাইলে। টেস্ট ডেটা (fake credentials, test payment row) সেশন শেষে DB থেকে মুছে ফেলা হয়েছে।
+
+**⚠️ এখনো বাকি — real bKash merchant account ছাড়া live-test করা যায়নি:**
+1. bKash Merchant/Developer পোর্টাল (developer.bka.sh বা merchant-এর নিজের bKash account) থেকে sandbox app_key/app_secret/username/password সংগ্রহ করা — Facebook App setup-এর মতো এটাও owner-এর নিজের account লাগবে, পরের সেশনে লাইভ ব্রাউজার সেশনে করা যেতে পারে।
+2. Sandbox credential বসিয়ে `/admin/billing`-এ configure করে একটা real end-to-end test payment (`initiate` → bKash sandbox checkout page → `execute` → subscription activate) verify করা।
+3. bKash API contract (base URL `tokenized.sandbox.bka.sh`/`tokenized.pay.bka.sh`, path `/v1.2.0-beta/tokenized/checkout/*`, request/response field নাম) well-documented/stable পাবলিক API ধরে নিয়ে লেখা হয়েছে, কিন্তু কোনো live call দিয়ে confirm করা হয়নি এই সেশনে — প্রথম real sandbox টেস্টে যদি কোনো field/path mismatch পাওয়া যায়, `BkashPaymentGatewayClient`-এ ফিক্স করতে হবে।
+4. Production-এ যাওয়ার আগে `bkash_sandbox` টগল off করে live credential বসাতে হবে।
