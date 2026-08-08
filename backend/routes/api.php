@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\CheckoutOtpController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\BkashPaymentController;
 use App\Http\Controllers\Api\FacebookConnectController;
 use App\Http\Controllers\Api\FacebookLeadController;
 use App\Http\Controllers\Api\FacebookPixelSettingController;
@@ -125,6 +126,14 @@ Route::post('/facebook/webhook', [FacebookWebhookController::class, 'receive'])
 Route::get('/facebook/connect/callback', [FacebookConnectController::class, 'callback'])
     ->middleware('throttle:20,1');
 
+// bKash Payment Gateway callback — bKash redirects the payer's browser here
+// directly after checkout, so (like the Facebook callback above) it can't
+// carry a Sanctum bearer token. The unguessable paymentID from the earlier
+// authenticated /subscription/pay/bkash/initiate call is what ties this
+// back to the right SubscriptionPayment row. See §16.4, BkashPaymentController.
+Route::get('/subscription/pay/bkash/callback', [BkashPaymentController::class, 'callback'])
+    ->middleware('throttle:20,1');
+
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
     Route::post('/email/send-verification', [EmailOtpController::class, 'sendVerificationEmail']);
@@ -149,6 +158,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
     Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
     Route::post('/subscription/payments', [SubscriptionController::class, 'submitPayment']);
+    Route::post('/subscription/pay/bkash/initiate', [BkashPaymentController::class, 'initiate']);
 
     // ── SaaS Support chat (seller ↔ admin team) — deliberately outside the
     // active_subscription group: a seller with an expired subscription needs

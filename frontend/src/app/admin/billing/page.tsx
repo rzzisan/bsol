@@ -23,6 +23,12 @@ type BkashType = "Personal" | "Merchant" | "Agent";
 interface BillingSettings {
   bkash_number: string | null;
   bkash_type: BkashType;
+  bkash_app_key: string | null;
+  bkash_app_secret_set: boolean;
+  bkash_username: string | null;
+  bkash_password_set: boolean;
+  bkash_sandbox: boolean;
+  bkash_gateway_configured: boolean;
 }
 
 interface SubscriptionPayment {
@@ -58,6 +64,18 @@ const text = {
     saveSettings: "সংরক্ষণ করুন",
     savingSettings: "সংরক্ষণ হচ্ছে...",
     settingsSaved: "বিলিং সেটিংস সংরক্ষণ হয়েছে।",
+    gatewayTitle: "bKash Payment Gateway (স্বয়ংক্রিয় ভেরিফিকেশন)",
+    gatewayDesc: "সেট করলে seller-রা bKash-এ ক্লিক করে সাথে সাথে পেমেন্ট করতে পারবে, ম্যানুয়াল TrxID যাচাই ছাড়াই সাবস্ক্রিপশন সক্রিয় হবে। bKash Merchant/Developer পোর্টাল থেকে App Key/Secret ও Username/Password সংগ্রহ করুন।",
+    gatewayStatus: "স্ট্যাটাস",
+    gatewayConfigured: "কনফিগার করা আছে",
+    gatewayNotConfigured: "কনফিগার করা নেই",
+    appKey: "App Key",
+    appSecret: "App Secret",
+    appSecretSetHint: "সেট করা আছে — পরিবর্তন করতে নতুন মান লিখুন",
+    username: "bKash Username",
+    password: "bKash Password",
+    passwordSetHint: "সেট করা আছে — পরিবর্তন করতে নতুন মান লিখুন",
+    sandboxMode: "Sandbox মোড (টেস্টিং)",
     tabs: { pending: "পেন্ডিং", approved: "অনুমোদিত", rejected: "বাতিল", all: "সব" } as Record<string, string>,
     table: { user: "মার্চেন্ট", package: "প্যাকেজ", amount: "পরিমাণ", trxId: "TrxID", sender: "প্রেরকের নম্বর", date: "তারিখ", status: "স্ট্যাটাস", actions: "অ্যাকশন" },
     approve: "অনুমোদন করুন",
@@ -86,6 +104,18 @@ const text = {
     saveSettings: "Save Settings",
     savingSettings: "Saving...",
     settingsSaved: "Billing settings saved.",
+    gatewayTitle: "bKash Payment Gateway (auto-verified)",
+    gatewayDesc: "When set, sellers can pay instantly via bKash and get activated without manual TrxID review. Get the App Key/Secret and Username/Password from bKash's Merchant/Developer portal.",
+    gatewayStatus: "Status",
+    gatewayConfigured: "Configured",
+    gatewayNotConfigured: "Not configured",
+    appKey: "App Key",
+    appSecret: "App Secret",
+    appSecretSetHint: "Already set — enter a new value to change it",
+    username: "bKash Username",
+    password: "bKash Password",
+    passwordSetHint: "Already set — enter a new value to change it",
+    sandboxMode: "Sandbox mode (testing)",
     tabs: { pending: "Pending", approved: "Approved", rejected: "Rejected", all: "All" } as Record<string, string>,
     table: { user: "Merchant", package: "Package", amount: "Amount", trxId: "TrxID", sender: "Sender Number", date: "Date", status: "Status", actions: "Actions" },
     approve: "Approve",
@@ -110,7 +140,18 @@ export default function AdminBillingPage() {
   const [error, setError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<number | null>(null);
 
-  const [settings, setSettings] = useState<BillingSettings>({ bkash_number: "", bkash_type: "Personal" });
+  const [settings, setSettings] = useState<BillingSettings>({
+    bkash_number: "",
+    bkash_type: "Personal",
+    bkash_app_key: "",
+    bkash_app_secret_set: false,
+    bkash_username: "",
+    bkash_password_set: false,
+    bkash_sandbox: true,
+    bkash_gateway_configured: false,
+  });
+  const [bkashAppSecretInput, setBkashAppSecretInput] = useState("");
+  const [bkashPasswordInput, setBkashPasswordInput] = useState("");
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
 
@@ -202,6 +243,12 @@ export default function AdminBillingPage() {
         setSettings({
           bkash_number: data.data.bkash_number ?? "",
           bkash_type: data.data.bkash_type ?? "Personal",
+          bkash_app_key: data.data.bkash_app_key ?? "",
+          bkash_app_secret_set: Boolean(data.data.bkash_app_secret_set),
+          bkash_username: data.data.bkash_username ?? "",
+          bkash_password_set: Boolean(data.data.bkash_password_set),
+          bkash_sandbox: data.data.bkash_sandbox ?? true,
+          bkash_gateway_configured: Boolean(data.data.bkash_gateway_configured),
         });
       }
     } catch {
@@ -233,6 +280,11 @@ export default function AdminBillingPage() {
         body: JSON.stringify({
           bkash_number: settings.bkash_number || null,
           bkash_type: settings.bkash_type,
+          bkash_app_key: settings.bkash_app_key || null,
+          bkash_app_secret: bkashAppSecretInput || undefined,
+          bkash_username: settings.bkash_username || null,
+          bkash_password: bkashPasswordInput || undefined,
+          bkash_sandbox: settings.bkash_sandbox,
         }),
       });
       const data = await res.json();
@@ -241,6 +293,8 @@ export default function AdminBillingPage() {
         return;
       }
       setSettingsMessage(t.settingsSaved);
+      setBkashAppSecretInput("");
+      setBkashPasswordInput("");
       await loadSettings();
     } catch {
       setError(t.error);
@@ -352,15 +406,68 @@ export default function AdminBillingPage() {
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
-          <button
-            type="button"
-            disabled={settingsSaving}
-            onClick={() => void saveSettings()}
-            className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-70"
-          >
-            {settingsSaving ? t.savingSettings : t.saveSettings}
-          </button>
         </div>
+
+        <div className="mt-6 border-t border-[var(--border)] pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-[var(--foreground)]">{t.gatewayTitle}</h3>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                settings.bkash_gateway_configured ? "bg-emerald-100 text-emerald-700" : "bg-[var(--surface-soft)] text-[var(--muted)]"
+              }`}
+            >
+              {t.gatewayStatus}: {settings.bkash_gateway_configured ? t.gatewayConfigured : t.gatewayNotConfigured}
+            </span>
+          </div>
+          <p className="mt-1 mb-3 text-xs text-[var(--muted)]">{t.gatewayDesc}</p>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <input
+              placeholder={t.appKey}
+              value={settings.bkash_app_key ?? ""}
+              onChange={(e) => setSettings((s) => ({ ...s, bkash_app_key: e.target.value }))}
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+            />
+            <input
+              type="password"
+              placeholder={settings.bkash_app_secret_set ? t.appSecretSetHint : t.appSecret}
+              value={bkashAppSecretInput}
+              onChange={(e) => setBkashAppSecretInput(e.target.value)}
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+            />
+            <input
+              placeholder={t.username}
+              value={settings.bkash_username ?? ""}
+              onChange={(e) => setSettings((s) => ({ ...s, bkash_username: e.target.value }))}
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+            />
+            <input
+              type="password"
+              placeholder={settings.bkash_password_set ? t.passwordSetHint : t.password}
+              value={bkashPasswordInput}
+              onChange={(e) => setBkashPasswordInput(e.target.value)}
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+            />
+          </div>
+          <label className="mt-3 flex items-center gap-2 text-sm text-[var(--foreground)]">
+            <input
+              type="checkbox"
+              checked={settings.bkash_sandbox}
+              onChange={(e) => setSettings((s) => ({ ...s, bkash_sandbox: e.target.checked }))}
+              className="h-4 w-4 accent-[var(--accent)]"
+            />
+            {t.sandboxMode}
+          </label>
+        </div>
+
+        <button
+          type="button"
+          disabled={settingsSaving}
+          onClick={() => void saveSettings()}
+          className="mt-4 rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-70"
+        >
+          {settingsSaving ? t.savingSettings : t.saveSettings}
+        </button>
         {settingsMessage ? <p className="mt-2 text-sm text-emerald-600">{settingsMessage}</p> : null}
       </section>
 

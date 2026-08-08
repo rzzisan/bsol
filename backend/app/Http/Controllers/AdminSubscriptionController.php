@@ -4,20 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\PlatformBillingSetting;
 use App\Models\SubscriptionPayment;
-use App\Services\NotificationDispatchService;
+use App\Services\SubscriptionActivationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class AdminSubscriptionController extends Controller
 {
-    public function __construct(private readonly NotificationDispatchService $notificationDispatchService) {}
+    public function __construct(private readonly SubscriptionActivationService $activationService) {}
 
     public function getBillingSettings(): JsonResponse
     {
         return response()->json([
             'success' => true,
-            'data' => PlatformBillingSetting::getSetting(),
+            'data' => PlatformBillingSetting::getSetting()->masked(),
         ]);
     }
 
@@ -26,15 +26,31 @@ class AdminSubscriptionController extends Controller
         $validated = $request->validate([
             'bkash_number' => ['nullable', 'string', 'max:20', 'regex:/^[0-9]{11}$/'],
             'bkash_type' => ['required', Rule::in(['Personal', 'Merchant', 'Agent'])],
+            'bkash_app_key' => ['nullable', 'string', 'max:255'],
+            'bkash_app_secret' => ['nullable', 'string', 'max:255'],
+            'bkash_username' => ['nullable', 'string', 'max:255'],
+            'bkash_password' => ['nullable', 'string', 'max:255'],
+            'bkash_sandbox' => ['nullable', 'boolean'],
         ]);
 
         $setting = PlatformBillingSetting::getSetting();
+
+        // Blank app_secret/password = "leave unchanged" — the real value
+        // never round-trips to the frontend (same pattern as
+        // PlatformFacebookSettingsController::update()).
+        if (! filled($validated['bkash_app_secret'] ?? null)) {
+            unset($validated['bkash_app_secret']);
+        }
+        if (! filled($validated['bkash_password'] ?? null)) {
+            unset($validated['bkash_password']);
+        }
+
         $setting->update($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Billing settings updated successfully.',
-            'data' => $setting,
+            'data' => $setting->fresh()->masked(),
         ]);
     }
 
@@ -69,34 +85,13 @@ class AdminSubscriptionController extends Controller
             ], 422);
         }
 
-        $user = $payment->user;
-        $package = $payment->package;
-
-        $base = ($user->subscription_ends_at && $user->subscription_ends_at->isFuture())
-            ? $user->subscription_ends_at
-            : now();
-
-        $user->update([
-            'subscription_package_id' => $package->id,
-            'subscription_status' => 'active',
-            'subscription_started_at' => $user->subscription_started_at ?? now(),
-            'subscription_ends_at' => $base->copy()->addDays($package->duration_days),
-        ]);
-
         $payment->update([
             'status' => 'approved',
             'reviewed_by' => auth()->id(),
             'reviewed_at' => now(),
         ]);
 
-        try {
-            $this->notificationDispatchService->dispatch($user, 'subscription_payment_approved', $user->mobile, $user->email, [
-                'package_name' => $package->name,
-                'ends_at' => $user->subscription_ends_at?->toDateString(),
-            ]);
-        } catch (\Throwable) {
-            // Notification is best-effort; approval must not fail because of it.
-        }
+        $this->activationService->activate($payment);
 
         return response()->json([
             'success' => true,

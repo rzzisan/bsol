@@ -43,6 +43,7 @@ class SubscriptionController extends Controller
                     'bkash_number' => $billingSettings->bkash_number,
                     'bkash_type' => $billingSettings->bkash_type,
                 ],
+                'bkash_gateway_enabled' => $billingSettings->hasBkashGateway(),
                 'recent_payments' => $user->subscriptionPayments()
                     ->with('package:id,name,slug')
                     ->latest()

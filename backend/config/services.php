@@ -53,4 +53,16 @@ return [
         'graph_version' => env('FACEBOOK_GRAPH_VERSION', 'v21.0'),
     ],
 
+    // bKash Payment Gateway (Tokenized Checkout) — platform's own merchant
+    // account, used to auto-verify subscription billing payments
+    // (SAAS_MODULE_CONTEXT.md §16.4). DB value in platform_billing_settings
+    // wins when set (admin UI), falls back here — same pattern as 'facebook'.
+    'bkash' => [
+        'app_key' => env('BKASH_APP_KEY'),
+        'app_secret' => env('BKASH_APP_SECRET'),
+        'username' => env('BKASH_USERNAME'),
+        'password' => env('BKASH_PASSWORD'),
+        'sandbox' => env('BKASH_SANDBOX', true),
+    ],
+
 ];
