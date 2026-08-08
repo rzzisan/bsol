@@ -1043,7 +1043,19 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 **Verification:** সব নতুন controller/service tinker দিয়ে সরাসরি কল করে verify করা হয়েছে — `initiate()` unconfigured অবস্থায় সঠিক `422` দেয়, fake sandbox credential দিয়ে gracefully `502` + payment row `rejected` মার্ক হয় (কোনো crash/dangling state না), admin settings-এর blank-secret round-trip পুরনো মান ধরে রাখে। `tsc --noEmit` + `npm run build` clean, `php -l` clean সব ফাইলে। টেস্ট ডেটা (fake credentials, test payment row) সেশন শেষে DB থেকে মুছে ফেলা হয়েছে।
 
 **⚠️ এখনো বাকি — real bKash merchant account ছাড়া live-test করা যায়নি:**
-1. bKash Merchant/Developer পোর্টাল (developer.bka.sh বা merchant-এর নিজের bKash account) থেকে sandbox app_key/app_secret/username/password সংগ্রহ করা — Facebook App setup-এর মতো এটাও owner-এর নিজের account লাগবে, পরের সেশনে লাইভ ব্রাউজার সেশনে করা যেতে পারে।
-2. Sandbox credential বসিয়ে `/admin/billing`-এ configure করে একটা real end-to-end test payment (`initiate` → bKash sandbox checkout page → `execute` → subscription activate) verify করা।
-3. bKash API contract (base URL `tokenized.sandbox.bka.sh`/`tokenized.pay.bka.sh`, path `/v1.2.0-beta/tokenized/checkout/*`, request/response field নাম) well-documented/stable পাবলিক API ধরে নিয়ে লেখা হয়েছে, কিন্তু কোনো live call দিয়ে confirm করা হয়নি এই সেশনে — প্রথম real sandbox টেস্টে যদি কোনো field/path mismatch পাওয়া যায়, `BkashPaymentGatewayClient`-এ ফিক্স করতে হবে।
-4. Production-এ যাওয়ার আগে `bkash_sandbox` টগল off করে live credential বসাতে হবে।
+1. ~~bKash Merchant/Developer পোর্টাল থেকে sandbox credential সংগ্রহ~~ — ✅ resolved same session: bKash-এর নিজস্ব sandbox credential (username/password/app_key/app_secret) কোনো registration ছাড়াই publicly published (একাধিক independent source/blog/GitHub package-এ একই মান বহুদিন ধরে ব্যবহৃত হচ্ছে দেখা গেছে — developer.bka.sh নিজে বলে "sandbox is open for everyone", credential merchant-onboarding-এর সময় শেয়ার হওয়ার কথা কিন্তু এই publicly known set দিয়েই কাজ করেছে)।
+2. ~~Sandbox credential বসিয়ে end-to-end test~~ — ✅ DONE, user নিজে `/admin/billing`-এ credential বসিয়ে test করেছে।
+3. `tokenized.sandbox.bka.sh`/`v1.2.0-beta`/`tokenized/checkout/*` API contract — ✅ live call দিয়ে confirm হয়েছে, কোনো mismatch পাওয়া যায়নি (`createPayment()` সঠিক `bkashURL` রিটার্ন করেছে)।
+4. Production-এ যাওয়ার আগে `bkash_sandbox` টগল off করে live credential বসাতে হবে — এখনো বাকি (business-এর real bKash merchant account লাগবে)।
+
+### 18.1 Bug fix — bKash payment সফল হলেও "Pending" দেখাচ্ছিল (2026-08-08, commit `bac21cd`)
+
+User real sandbox credential দিয়ে test করে bKash-এর নিজের checkout page-এ payment সফলভাবে সম্পন্ন করেছিল, কিন্তু `/dashboard/settings/subscription`-এর Payment History-তে সেটা `Pending` অবস্থায় আটকে ছিল, TrxID `-` (খালি)।
+
+**Root cause:** `SubscriptionPayment` মডেলের `#[Fillable([...])]` attribute-এ `bkash_payment_id` কখনো যোগ করা হয়নি (migration কলামটা যোগ করেছিল, কিন্তু model-এর Fillable list আপডেট করা হয়নি)। ফলে `BkashPaymentController::initiate()`-এ `$payment->update(['bkash_payment_id' => $result['paymentID']])` কল silently no-op হয়ে যেত — কোনো exception/log ছাড়াই, কারণ এই অ্যাপে `Model::preventSilentlyDiscardingAttributes()` চালু নেই। bKash সরাসরি real paymentID+bkashURL দিয়ে সাড়া দিয়েছিল (checkout page ঠিকই কাজ করেছে), কিন্তু DB-তে `bkash_payment_id` কখনো সেভ হয়নি। bKash পরে `?paymentID=...&status=success` দিয়ে আমাদের callback route-এ ব্রাউজার রিডাইরেক্ট করলে, `SubscriptionPayment::where('bkash_payment_id', $paymentId)->first()` কিছুই খুঁজে পায়নি (কারণ DB-তে ওই কলাম null-ই ছিল) — `callback()` "payment not found" ব্রাঞ্চে পড়ে গিয়ে `?bkash_status=error`-এ রিডাইরেক্ট করত, row চিরকালের জন্য `pending`-এ আটকে থাকত।
+
+**Debug trail:** nginx access log-এ callback hit স্পষ্ট দেখা গেছে (`GET /api/subscription/pay/bkash/callback?paymentID=...&status=success` → `302` → `?bkash_status=error`), তখনই নিশ্চিত হয় সমস্যা callback logic-এ না, row lookup-এ। `SubscriptionPayment::latest()->first()` দিয়ে DB-তে সরাসরি চেক করে `bkash_payment_id: null` পাওয়া যায় যদিও `initiate()` সফলভাবে real `bkashURL` রিটার্ন করেছিল — এখান থেকেই Fillable-এর সন্দেহ, এবং তাতেই নিশ্চিত হয়।
+
+**ফিক্স:** `bkash_payment_id` যোগ করা হয়েছে `SubscriptionPayment`-এর Fillable list-এ। Live curl দিয়ে verify করা হয়েছে — `initiate()` কল করার পর row-এ এখন সঠিকভাবে `bkash_payment_id` সেভ হয়। টেস্ট payment row/token cleanup করা হয়েছে।
+
+**শেখা:** নতুন column যোগ করার migration লিখলে model-এর Fillable list-ও একই কমিটে আপডেট করা — নাহলে silent data-loss (কোনো error লগ ছাড়াই) হতে পারে, বিশেষ করে এই কোডবেসে যেখানে `preventSilentlyDiscardingAttributes()` চালু নেই।
