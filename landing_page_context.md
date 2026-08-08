@@ -1,6 +1,6 @@
 # ল্যান্ডিং পেজ বিল্ডার — মাস্টার কনটেক্সট ফাইল
 
-> এই ফাইলটা AI agent-দের জন্য: landing page builder ফিচার নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-07-28। কোনো বড় পরিবর্তন করলে (নতুন ফাইল/মডেল/রুট/কলাম) এই ফাইলটাও আপডেট করে দিও।
+> এই ফাইলটা AI agent-দের জন্য: landing page builder ফিচার নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-08-08 (§২১ — cleanup/hardening pass)। কোনো বড় পরিবর্তন করলে (নতুন ফাইল/মডেল/রুট/কলাম) এই ফাইলটাও আপডেট করে দিও।
 >
 > স্ট্যাক: Laravel backend (`/var/www/hybrid-stack/backend`) + Next.js/TypeScript frontend (`/var/www/hybrid-stack/frontend`)। `zyro/` ও `catv/` ডিরেক্টরি আলাদা/অসম্পর্কিত প্রজেক্ট — এই ফিচারের সাথে সম্পর্কিত না।
 
@@ -21,7 +21,7 @@
 - **`landing_page_statistics`**: `id, landing_page_id, date, total_visits, unique_visitors, orders_placed`. Unique `[landing_page_id, date]`.
 - **`landing_page_visit_orders`**: pivot `landing_page_visit_id ↔ order_id`, unique pair.
 - **`landing_media_assets`**: `id, user_id, url, file_path, file_name, mime_type, file_size_bytes, width, height`.
-- **`landing_page_editor_drafts`**, **`landing_page_versions`**, **`landing_page_elements`**: GrapesJS-era tables — **GrapesJS UI ডিলিট হয়ে গেছে কিন্তু এই টেবিলগুলো এখনো schema-তে আছে**, বর্তমান builder এগুলো ব্যবহার করে না (dead tables, cleanup candidate but not urgent).
+- ~~`landing_page_editor_drafts`, `landing_page_versions`, `landing_page_elements`~~ — GrapesJS-era dead tables, **2026-08-08-এ ড্রপ করা হয়েছে** (migration `2026_08_08_074656_drop_grapesjs_landing_page_tables`, §২১ দেখো)।
 - `landing_pages` তে dedicated `thank_you` কলাম নেই — এটা পুরোপুরি `content` JSON-এর ভেতরে থাকে।
 
 ### OTP-সম্পর্কিত টেবিল
@@ -54,8 +54,8 @@
 ### `app/Http/Controllers/Api/LandingMediaLibraryController.php` (144 lines)
 - `index()` L14, `store(Request)` L27 (bulk upload → `storage/app/public/landing-media/{user_id}`), `policy()` L97, `effectivePolicy()`/`passesDimensionPolicy()` private।
 
-### `app/Http/Controllers/LandingPageAnalyticsController.php` (151 lines, non-Api namespace)
-- `getStatistics` L22, `getVisitors` L48, `getByCountry` L78, `getByReferrer` L104, `linkVisitToOrder` L130। প্রতিটা মেথডে manual `$landingPage->user_id !== auth()->id()` ownership check (policy class নেই)।
+### `app/Http/Controllers/LandingPageAnalyticsController.php` (~155 lines, non-Api namespace)
+- `getStatistics` L22, `getVisitors` L48, `getByCountry` L78, `getByReferrer` L104, `linkVisitToOrder` L130। প্রতিটা মেথডে manual `$landingPage->user_id !== auth()->id()` ownership check (policy class নেই)। `linkVisitToOrder`-এ `visit_id`/`order_id` এখন `Rule::exists()->where(...)` দিয়ে যথাক্রমে এই landing page এবং caller-এর নিজের ownership-এ scoped (§২১, আগে unscoped ছিল — IDOR)।
 
 ### `app/Http/Controllers/LandingPageViewController.php` (68 lines)
 - Legacy server-rendered Blade fallback (`resources/views/landing-pages/show.blade.php`)। `show($slug)` L13, `submitOrder(Request,$slug)` L26 — form-post redirect-based, OTP/custom-fields সাপোর্ট নেই।
@@ -270,12 +270,13 @@ text_color: '#0f172a', button_text_color: '#ffffff', font_family: 'Hind Siliguri
 | আইকন লাইব্রেরি (Feature/Trust Badge) | `block-icons.ts::BLOCK_ICON_MAP` (§১৮) |
 | Feature Grid/Trust Badges স্টাইল ভ্যারিয়েন্ট | `content.features_layout`/`content.trust_badges_layout` (§১৮) |
 
-## ১৫. Dead/legacy code (ভুলবশত এডিট না করার জন্য)
+## ১৫. Dead/legacy code — ✅ সব ২০২৬-০৮-০৮-এ সরানো হয়েছে (§২১ দেখো)
 
-- `landing-page-form.tsx` — orphaned frontend কম্পোনেন্ট।
-- `LandingPageViewController.php` + `resources/views/landing-pages/show.blade.php` — legacy Blade-rendered fallback (non-JS পাথ, OTP/custom fields সাপোর্ট করে না)।
-- `landing_page_editor_drafts`, `landing_page_versions`, `landing_page_elements` টেবিল — GrapesJS visual editor-এর অবশিষ্টাংশ, GrapesJS UI ডিলিট হয়ে গেছে কিন্তু টেবিল আছে।
-- `.plan/landing_page_studio.md` — historical planning doc, স্টেল ফাইল-রেফারেন্স আছে (উপরে ⚠️ দেখো)।
+এই সেকশনে আগে যা dead/legacy হিসেবে লিস্টেড ছিল, সবগুলো এখন codebase থেকে সম্পূর্ণ সরানো হয়েছে — নিচে শুধু historical record হিসেবে রাখা হলো (কোনো নতুন এজেন্ট যেন এই নাম দিয়ে ফাইল খুঁজে বিভ্রান্ত না হয়):
+- ~~`landing-page-form.tsx`~~ — ডিলিট
+- ~~`LandingPageViewController.php` + `resources/views/landing-pages/show.blade.php` + `routes/web.php`-এর `/lp/{slug}` রুট~~ — ডিলিট
+- ~~`landing_page_editor_drafts`, `landing_page_versions`, `landing_page_elements` টেবিল + `LandingPageEditorDraft` model + `LandingPageElementSeeder`~~ — ড্রপ/ডিলিট
+- ~~`.plan/landing_page_studio.md`~~ — ডিলিট (ফাইলটা untracked ছিল, git history-তে কোনো ট্রেস নেই)
 
 ## ১৬. পাবলিক পেজের ভাষা (`content.settings.language`) — 2026-07-28 যোগ হয়েছে
 
@@ -396,3 +397,20 @@ Owner স্পষ্টভাবে বলেছে এই ডেলিভা�
 
 ### Abandoned-cart স্ন্যাপশটে ছবি + ভ্যারিয়েন্ট
 `AbandonedCheckoutService::snapshotItems()` এখন merchant-pinned variant (মোড ২) কে সবসময় priority দেয়; না থাকলে কাস্টমারের নিজের সিলেকশন (মোড ১, `item.product_variant_id`) resolve+validate করে ব্যবহার করে। স্ন্যাপশটে যোগ হয়েছে: `product_variant_id`, `variant_label` (option values থেকে বানানো, যেমন "Red / XL"), `image` (variant-এর `image_url` ?: product-এর `thumbnail`), `sku`। Dashboard list/detail page-এ এখন এই ছবি+লেবেল দেখানো হয়।
+
+## ২১. Cleanup/hardening pass (2026-08-08, commit `36fab21`)
+
+SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া একমাত্র open landing-page finding + পুরনো §১৫-এ লিস্টেড সব dead/legacy code একই সেশনে সাফ করা হয়েছে।
+
+### IDOR ফিক্স: `LandingPageAnalyticsController::linkVisitToOrder`
+আগে `visit_id`/`order_id` শুধু unscoped `exists:table,id` দিয়ে validate হতো — landing page ownership check ছিল (`$landingPage->user_id !== auth()->id()`) কিন্তু `visit_id` ওই landing page-এর কিনা, বা `order_id` caller-এর নিজের কিনা — কোনোটাই চেক হতো না। ফলে seller A তার নিজের পেজের analytics-এ seller B-এর visit/order জুড়ে দিতে পারত (data pollution)। ফিক্স: `Rule::exists('landing_page_visits','id')->where('landing_page_id', $landingPage->id)` এবং `Rule::exists('orders','id')->where('user_id', auth()->id())`। Rollback-wrapped tinker test — cross-page visit, cross-tenant order দুটোই reject, legit combination কাজ করে — সব verify করা হয়েছে।
+
+### Dead code সরানো
+- `landing_page_editor_drafts`/`landing_page_versions`/`landing_page_elements` টেবিল ড্রপ (migration `2026_08_08_074656_drop_grapesjs_landing_page_tables`, `down()`-এ রিভার্সিবল রিক্রিয়েট আছে) — ড্রপের আগে zero incoming FK + zero live code reference verify করা হয়েছে
+- `LandingPageEditorDraft` model, `LandingPageElementSeeder` (orphaned — অস্তিত্বহীন `LandingPageElement` মডেল import করত, কখনো `DatabaseSeeder`-এ registered ছিল না) ডিলিট
+- `LandingPageViewController.php` + `resources/views/landing-pages/show.blade.php` + `routes/web.php`-এর `/lp/{slug}` GET/POST রুট ডিলিট — production-এ nginx (`/etc/nginx/sites-available/default`) `/` (তাই `/lp/*`-ও) সবসময় Next.js-এ proxy করে, এই Laravel route কখনোই reachable ছিল না
+- `frontend/src/components/landing-page-form.tsx` ডিলিট — কোথাও import হতো না
+- `.plan/landing_page_studio.md` ডিলিট — historical plan doc, বর্তমান কোডবেসের সাথে মেলে না এমন ফাইল-রেফারেন্স ছিল (স্টেল)
+
+### Verification
+`php -l` + `composer dump-autoload -o` clean, `php artisan route:list` count 264→262 (দুটো সরানো web route), `php artisan migrate:status` সব `Ran`, `tsc --noEmit` clean, `npm run build` clean, backend `php-fpm reload` + frontend `systemctl restart hybrid-frontend.service` — দুটোই smoke-check pass (`/`, `/api/health` 200, live CSS chunk 200)।
