@@ -7,20 +7,53 @@ use App\Models\PlatformBillingSetting;
 use App\Models\SubscriptionPackage;
 use App\Models\SubscriptionPayment;
 use App\Services\Payment\BkashPgwPaymentGatewayClient;
+use App\Services\SubscriptionInvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SubscriptionController extends Controller
 {
-    public function __construct(private readonly BkashPgwPaymentGatewayClient $bkashPgw) {}
+    public function __construct(
+        private readonly BkashPgwPaymentGatewayClient $bkashPgw,
+        private readonly SubscriptionInvoiceService $invoiceService,
+    ) {}
 
     public function plans(): JsonResponse
     {
+        $user = auth()->user();
+        $packages = SubscriptionPackage::where('is_active', true)
+            ->orderBy('price')
+            ->get();
+
+        $data = $packages->map(function (SubscriptionPackage $package) use ($user) {
+            $invoice = $this->invoiceService->compute($user, $package);
+
+            return array_merge($package->toArray(), [
+                'is_current' => $invoice['is_current'],
+                'is_upgrade' => $invoice['is_upgrade'],
+                'is_downgrade_blocked' => $invoice['is_downgrade_blocked'],
+                'payable_amount' => $invoice['payable_amount'],
+            ]);
+        });
+
         return response()->json([
             'success' => true,
-            'data' => SubscriptionPackage::where('is_active', true)
-                ->orderBy('price')
-                ->get(),
+            'data' => $data,
+        ]);
+    }
+
+    public function invoicePreview(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'package_id' => ['required', 'integer', 'exists:subscription_packages,id'],
+        ]);
+
+        $package = SubscriptionPackage::findOrFail($validated['package_id']);
+        $invoice = $this->invoiceService->compute(auth()->user(), $package);
+
+        return response()->json([
+            'success' => true,
+            'data' => $invoice,
         ]);
     }
 
@@ -33,6 +66,17 @@ class SubscriptionController extends Controller
             ? max(0, now()->diffInDays($user->subscription_ends_at, false))
             : null;
 
+        $remaining = null;
+        if ($user->subscription_ends_at && ! $user->isSubscriptionExpired()) {
+            $remainingSeconds = max(0, now()->diffInSeconds($user->subscription_ends_at, false));
+            $remaining = [
+                'days' => (int) floor($remainingSeconds / 86400),
+                'hours' => (int) floor(($remainingSeconds % 86400) / 3600),
+                'minutes' => (int) floor(($remainingSeconds % 3600) / 60),
+                'total_seconds' => $remainingSeconds,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -41,6 +85,7 @@ class SubscriptionController extends Controller
                 'started_at' => $user->subscription_started_at,
                 'ends_at' => $user->subscription_ends_at,
                 'days_left' => $daysLeft,
+                'remaining' => $remaining,
                 'is_expired' => $user->isSubscriptionExpired(),
                 'payment_instructions' => [
                     'bkash_number' => $billingSettings->bkash_number,
@@ -70,6 +115,16 @@ class SubscriptionController extends Controller
         ]);
 
         $package = SubscriptionPackage::findOrFail($validated['package_id']);
+        $user = auth()->user();
+
+        $invoice = $this->invoiceService->compute($user, $package);
+
+        if ($invoice['is_downgrade_blocked']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'বর্তমান প্যাকেজের মেয়াদ শেষ না হওয়া পর্যন্ত এর চেয়ে ছোট প্যাকেজে যাওয়া যাবে না।',
+            ], 422);
+        }
 
         $screenshotPath = null;
         if ($request->hasFile('screenshot')) {
@@ -79,7 +134,11 @@ class SubscriptionController extends Controller
         $payment = SubscriptionPayment::create([
             'user_id' => auth()->id(),
             'package_id' => $package->id,
-            'amount' => $package->price,
+            'previous_package_id' => $invoice['is_upgrade'] ? $invoice['previous_package']['id'] : null,
+            'amount' => $invoice['payable_amount'],
+            'base_amount' => $invoice['base_amount'],
+            'proration_credit' => $invoice['proration_credit'],
+            'invoice_breakdown' => $invoice,
             'payment_method' => 'bkash_manual',
             'sender_bkash_number' => $validated['sender_bkash_number'],
             'trx_id' => $validated['trx_id'],

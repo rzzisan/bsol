@@ -26,6 +26,10 @@ interface Package {
   duration_days: number;
   max_orders: number | null;
   features: string[] | null;
+  is_current: boolean;
+  is_upgrade: boolean;
+  is_downgrade_blocked: boolean;
+  payable_amount: number;
 }
 
 interface Payment {
@@ -38,11 +42,32 @@ interface Payment {
   package?: { name: string };
 }
 
+interface RemainingTime {
+  days: number;
+  hours: number;
+  minutes: number;
+  total_seconds: number;
+}
+
+interface InvoicePreview {
+  target_package: { id: number; name: string; price: number; duration_days: number };
+  previous_package: { id: number; name: string; price: number } | null;
+  is_current: boolean;
+  is_upgrade: boolean;
+  is_downgrade_blocked: boolean;
+  base_amount: number;
+  proration_credit: number;
+  payable_amount: number;
+  current_remaining: RemainingTime | null;
+  new_ends_at_preview: string;
+}
+
 interface MySubscription {
   package: Package | null;
   status: string;
   ends_at: string | null;
   days_left: number | null;
+  remaining: RemainingTime | null;
   is_expired: boolean;
   payment_instructions: { bkash_number: string | null; bkash_type: string | null };
   bkash_gateway_enabled: boolean;
@@ -64,6 +89,22 @@ const text = {
     perMonth: "/মাস",
     orders: "অর্ডার/মাস",
     unlimited: "সীমাহীন",
+    remainingTitle: "মেয়াদ বাকি",
+    remainingDays: "দিন",
+    remainingHours: "ঘণ্টা",
+    remainingMinutes: "মিনিট",
+    features: "সুবিধাসমূহ",
+    currentBadge: "বর্তমান প্ল্যান",
+    upgradeBadge: "আপগ্রেড",
+    downgradeLocked: "মেয়াদ শেষ না হওয়া পর্যন্ত এই প্যাকেজে যাওয়া যাবে না",
+    invoiceTitle: "ইনভয়েস",
+    invoiceLoading: "হিসাব করা হচ্ছে...",
+    invoiceBase: "প্যাকেজ মূল্য",
+    invoiceProration: "বাকি মেয়াদের ছাড়",
+    invoicePayable: "পরিশোধযোগ্য মূল্য",
+    invoiceNewExpiry: "নতুন মেয়াদ শেষ হবে",
+    invoiceUpgradeNote: "আপগ্রেড — বর্তমান প্যাকেজের বাকি মেয়াদের মূল্য এই ইনভয়েস থেকে বাদ দেওয়া হয়েছে।",
+    invoiceRenewalNote: "একই প্যাকেজ রিনিউ — বর্তমান মেয়াদের সাথে নতুন মেয়াদ যোগ হবে।",
     payWithBkash: "bKash দিয়ে সাথে সাথে পে করুন",
     payingWithBkash: "bKash-এ পাঠানো হচ্ছে...",
     pgwLoading: "bKash পেমেন্ট লোড হচ্ছে...",
@@ -103,6 +144,22 @@ const text = {
     perMonth: "/mo",
     orders: "orders/mo",
     unlimited: "Unlimited",
+    remainingTitle: "Time Remaining",
+    remainingDays: "d",
+    remainingHours: "h",
+    remainingMinutes: "m",
+    features: "Features",
+    currentBadge: "Current Plan",
+    upgradeBadge: "Upgrade",
+    downgradeLocked: "You can't switch to this plan until your current plan expires",
+    invoiceTitle: "Invoice",
+    invoiceLoading: "Calculating...",
+    invoiceBase: "Package price",
+    invoiceProration: "Remaining-time credit",
+    invoicePayable: "Payable amount",
+    invoiceNewExpiry: "New plan expires",
+    invoiceUpgradeNote: "Upgrade — the unused value of your current plan has been deducted from this invoice.",
+    invoiceRenewalNote: "Same-plan renewal — the new period will be added to your current plan.",
     payWithBkash: "Pay Instantly with bKash",
     payingWithBkash: "Redirecting to bKash...",
     pgwLoading: "Loading bKash payment...",
@@ -146,6 +203,9 @@ export default function Page() {
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [bkashPaying, setBkashPaying] = useState(false);
   const [pgwScriptLoaded, setPgwScriptLoaded] = useState(false);
+  const [invoice, setInvoice] = useState<InvoicePreview | null>(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [liveRemainingSeconds, setLiveRemainingSeconds] = useState<number | null>(null);
 
   const load = async () => {
     const token = getStoredToken();
@@ -207,6 +267,54 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reset the live countdown whenever a fresh `remaining` snapshot arrives
+  // from the API (initial load, or after a payment refreshes subscription).
+  useEffect(() => {
+    setLiveRemainingSeconds(subscription?.remaining?.total_seconds ?? null);
+  }, [subscription?.remaining?.total_seconds]);
+
+  // Tick the countdown down every second — a single interval mounted once;
+  // functional updates avoid needing `liveRemainingSeconds` as a dependency.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setLiveRemainingSeconds((s) => (s !== null && s > 0 ? s - 1 : s));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Fetch a server-computed invoice preview (base price, proration credit,
+  // payable amount, new expiry) whenever the seller selects a package — the
+  // actual charge is always recomputed server-side at payment time too, this
+  // is just what's shown before they commit. See SubscriptionInvoiceService.
+  useEffect(() => {
+    if (!form.package_id) {
+      setInvoice(null);
+      return;
+    }
+    const token = getStoredToken();
+    if (!token) return;
+
+    let cancelled = false;
+    setInvoiceLoading(true);
+    fetch(`${API}/subscription/invoice/preview?package_id=${form.package_id}`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setInvoice((data?.data ?? null) as InvoicePreview | null);
+      })
+      .catch(() => {
+        if (!cancelled) setInvoice(null);
+      })
+      .finally(() => {
+        if (!cancelled) setInvoiceLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.package_id]);
+
   // Load bKash's classic Checkout widget script when the platform is set
   // to the PGW api type — see SAAS_MODULE_CONTEXT.md §18.
   useEffect(() => {
@@ -230,12 +338,21 @@ export default function Page() {
   }, [subscription?.bkash_api_type, subscription?.bkash_pgw_script_url]);
 
   // (Re-)initialize the bKash widget into #bKash-button whenever the script
-  // is ready or the selected package/amount changes.
+  // is ready or the selected package/invoice changes. Waits for the invoice
+  // preview so the amount shown in bKash's own popup always matches what the
+  // backend will actually charge (server-computed, proration-aware).
   useEffect(() => {
-    if (!pgwScriptLoaded || subscription?.bkash_api_type !== "pgw" || !form.package_id || !window.bKash) return;
+    if (
+      !pgwScriptLoaded ||
+      subscription?.bkash_api_type !== "pgw" ||
+      !form.package_id ||
+      !window.bKash ||
+      !invoice ||
+      invoice.is_downgrade_blocked
+    )
+      return;
 
-    const selectedPackage = plans.find((p) => String(p.id) === form.package_id);
-    const amount = selectedPackage ? Number(selectedPackage.price).toFixed(2) : "0.00";
+    const amount = invoice.payable_amount.toFixed(2);
     const packageId = form.package_id;
     let currentPaymentId: string | null = null;
 
@@ -301,7 +418,7 @@ export default function Page() {
       setError(`bKash widget init failed: ${e instanceof Error ? e.message : String(e)}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pgwScriptLoaded, subscription?.bkash_api_type, form.package_id, plans]);
+  }, [pgwScriptLoaded, subscription?.bkash_api_type, form.package_id, invoice]);
 
   const payWithBkash = async () => {
     const token = getStoredToken();
@@ -372,6 +489,14 @@ export default function Page() {
   const statusLabel = subscription?.status ? (t.status[subscription.status] ?? subscription.status) : t.status.none;
   const bkashNumber = subscription?.payment_instructions?.bkash_number ?? "";
   const bkashType = subscription?.payment_instructions?.bkash_type ?? "Personal";
+  const liveRemaining =
+    liveRemainingSeconds !== null
+      ? {
+          days: Math.floor(liveRemainingSeconds / 86400),
+          hours: Math.floor((liveRemainingSeconds % 86400) / 3600),
+          minutes: Math.floor((liveRemainingSeconds % 3600) / 60),
+        }
+      : null;
 
   return (
     <UserShell
@@ -397,9 +522,10 @@ export default function Page() {
               >
                 {statusLabel}
               </span>
-              {subscription?.days_left !== null && subscription?.days_left !== undefined && !subscription.is_expired ? (
-                <span className="text-sm text-[var(--muted)]">
-                  {subscription.days_left} {t.daysLeft}
+              {liveRemaining && !subscription?.is_expired ? (
+                <span className="rounded-full bg-[var(--surface-soft)] px-3 py-1 text-sm text-[var(--foreground)]">
+                  {t.remainingTitle}: <b>{liveRemaining.days}</b>{t.remainingDays} <b>{liveRemaining.hours}</b>{t.remainingHours}{" "}
+                  <b>{liveRemaining.minutes}</b>{t.remainingMinutes}
                 </span>
               ) : null}
               {subscription?.is_expired ? (
@@ -411,34 +537,102 @@ export default function Page() {
           <section className="catv-panel mx-4 mb-4 p-4">
             <h3 className="mb-3 text-sm font-semibold text-[var(--muted)]">{t.plans}</h3>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              {plans.map((p) => (
-                <label
-                  key={p.id}
-                  className={`cursor-pointer rounded-xl border p-3 text-sm transition ${
-                    String(p.id) === form.package_id
-                      ? "border-[var(--accent)] bg-[var(--surface-soft)]"
-                      : "border-[var(--border)]"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="package_id"
-                    className="mr-2"
-                    checked={String(p.id) === form.package_id}
-                    onChange={() => setForm((f) => ({ ...f, package_id: String(p.id) }))}
-                  />
-                  <span className="font-semibold">{p.name}</span>
-                  <div className="mt-1 text-lg font-bold">
-                    ৳{Number(p.price).toLocaleString()}
-                    <span className="text-xs font-normal text-[var(--muted)]">{t.perMonth}</span>
-                  </div>
-                  <div className="text-xs text-[var(--muted)]">
-                    {p.max_orders ? `${p.max_orders} ${t.orders}` : `${t.unlimited} ${t.orders}`}
-                  </div>
-                </label>
-              ))}
+              {plans.map((p) => {
+                const selected = String(p.id) === form.package_id;
+                const locked = p.is_downgrade_blocked;
+                return (
+                  <label
+                    key={p.id}
+                    title={locked ? t.downgradeLocked : undefined}
+                    className={`relative flex flex-col rounded-xl border p-3 text-sm transition ${
+                      locked
+                        ? "cursor-not-allowed border-[var(--border)] opacity-50"
+                        : selected
+                        ? "cursor-pointer border-[var(--accent)] bg-[var(--surface-soft)] ring-1 ring-[var(--accent)]"
+                        : p.is_current
+                        ? "cursor-pointer border-[var(--accent)]"
+                        : "cursor-pointer border-[var(--border)]"
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <input
+                        type="radio"
+                        name="package_id"
+                        disabled={locked}
+                        checked={selected}
+                        onChange={() => setForm((f) => ({ ...f, package_id: String(p.id) }))}
+                      />
+                      {p.is_current ? (
+                        <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                          {t.currentBadge}
+                        </span>
+                      ) : p.is_upgrade ? (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                          {t.upgradeBadge}
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="font-semibold">{p.name}</span>
+                    <div className="mt-1 text-lg font-bold">
+                      ৳{Number(p.price).toLocaleString()}
+                      <span className="text-xs font-normal text-[var(--muted)]">{t.perMonth}</span>
+                    </div>
+                    <div className="text-xs text-[var(--muted)]">
+                      {p.max_orders ? `${p.max_orders} ${t.orders}` : `${t.unlimited} ${t.orders}`}
+                    </div>
+                    {p.features && p.features.length > 0 ? (
+                      <ul className="mt-2 space-y-0.5 text-xs text-[var(--muted)]">
+                        {p.features.map((f, i) => (
+                          <li key={i} className="flex gap-1">
+                            <span className="text-[var(--accent)]">✓</span>
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {locked ? (
+                      <p className="mt-2 text-[11px] font-medium text-rose-600">{t.downgradeLocked}</p>
+                    ) : null}
+                  </label>
+                );
+              })}
             </div>
           </section>
+
+          {form.package_id && (
+            <section className="catv-panel mx-4 mb-4 p-4">
+              <h3 className="mb-2 text-sm font-semibold text-[var(--muted)]">{t.invoiceTitle}</h3>
+              {invoiceLoading || !invoice ? (
+                <p className="text-xs text-[var(--muted)]">{t.invoiceLoading}</p>
+              ) : invoice.is_downgrade_blocked ? (
+                <p className="text-sm font-medium text-rose-600">{t.downgradeLocked}</p>
+              ) : (
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-[var(--muted)]">{t.invoiceBase}</span>
+                    <span>৳{invoice.base_amount.toLocaleString()}</span>
+                  </div>
+                  {invoice.is_upgrade && invoice.proration_credit > 0 ? (
+                    <div className="flex justify-between text-emerald-600">
+                      <span>{t.invoiceProration}</span>
+                      <span>−৳{invoice.proration_credit.toLocaleString()}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between border-t border-[var(--border)] pt-1 text-base font-bold">
+                    <span>{t.invoicePayable}</span>
+                    <span>৳{invoice.payable_amount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-[var(--muted)]">
+                    <span>{t.invoiceNewExpiry}</span>
+                    <span>{new Date(invoice.new_ends_at_preview).toLocaleString()}</span>
+                  </div>
+                  <p className="pt-1 text-xs text-[var(--muted)]">
+                    {invoice.is_upgrade ? t.invoiceUpgradeNote : t.invoiceRenewalNote}
+                  </p>
+                </div>
+              )}
+            </section>
+          )}
 
           {subscription?.bkash_gateway_enabled && subscription.bkash_api_type === "pgw" && (
             <section className="catv-panel mx-4 mb-4 p-4">
@@ -455,7 +649,7 @@ export default function Page() {
               <button
                 type="button"
                 id="bKash_button"
-                disabled={!form.package_id || !pgwScriptLoaded}
+                disabled={!form.package_id || !pgwScriptLoaded || !invoice || invoice.is_downgrade_blocked}
                 className="w-full rounded-xl bg-[#E2136E] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {t.payWithBkash}
@@ -468,7 +662,7 @@ export default function Page() {
               <button
                 type="button"
                 onClick={() => void payWithBkash()}
-                disabled={bkashPaying || !form.package_id}
+                disabled={bkashPaying || !form.package_id || !invoice || invoice.is_downgrade_blocked}
                 className="w-full rounded-xl bg-[#E2136E] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {bkashPaying ? t.payingWithBkash : t.payWithBkash}
@@ -509,7 +703,7 @@ export default function Page() {
               />
               <button
                 type="submit"
-                disabled={saving || !form.package_id || !bkashNumber}
+                disabled={saving || !form.package_id || !bkashNumber || !invoice || invoice.is_downgrade_blocked}
                 className="md:col-span-3 rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-70"
               >
                 {saving ? t.submitting : t.submit}

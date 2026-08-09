@@ -158,6 +158,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ── Subscription (self-service — must stay reachable even when expired) ───
     Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
     Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
+    Route::get('/subscription/invoice/preview', [SubscriptionController::class, 'invoicePreview']);
     Route::post('/subscription/payments', [SubscriptionController::class, 'submitPayment']);
     Route::post('/subscription/pay/bkash/initiate', [BkashPaymentController::class, 'initiate']);
 

@@ -1,0 +1,225 @@
+# Subscription + Billing + SMS Credit — Work Context
+
+এই ফাইলে এই কনভারসেশনে সাবস্ক্রিপশন/বিলিং ফিচার উন্নয়ন এবং SMS credit কেনার ফিচার প্ল্যানিং সংক্রান্ত সব কাজের context লিপিবদ্ধ থাকবে (user-এর বাধ্যতামূলক নির্দেশনা অনুযায়ী)। Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (product/feature — subscription §15.8/§18, SMS §15.5)।
+
+Last updated: 2026-08-09 — **Phase 1 (subscription upgrade/downgrade/proration/invoice) কোড সম্পন্ন, migrate + deploy + live-verify করা হয়েছে।** নিচে §5-এ implementation log।
+
+---
+
+## 0. Scope (user request, সংক্ষেপে)
+
+1. **সাবস্ক্রিপশন পেজ উন্নতি** (`/dashboard/settings/subscription`):
+   - সব প্যাকেজ card-style-এ দেখাবে: নাম, দাম, মেয়াদ, ফিচার লিস্ট
+   - বর্তমান active প্যাকেজ highlight থাকবে + বাকি মেয়াদ (দিন, ঘণ্টা, মিনিট) দেখাবে
+   - **Upgrade** করা যাবে (দামে বড় প্যাকেজে) — যেকোনো সময়
+   - **Downgrade** করা যাবে না যতক্ষণ না বর্তমান প্যাকেজের মেয়াদ শেষ হয়
+   - Upgrade করলে বর্তমান প্যাকেজের অবশিষ্ট মেয়াদের টাকা (unused value) নতুন প্যাকেজের দামের সাথে সমন্বয় (prorate) হবে
+   - পেমেন্টের আগে **ইনভয়েস জেনারেট** হবে — প্যাকেজ, মেয়াদ, দাম সমন্বয়ের হিসাব বিস্তারিতভাবে দেখাবে
+   - ইনভয়েস পরিশোধ হলে প্যাকেজ active হবে
+2. **SMS credit কেনা** (Phase 2, এই মুহূর্তে শুধু প্ল্যানিং) — পুরনো `zyro` প্রজেক্টের SMS credit purchase ধারণা থেকে adapt করে প্ল্যান করা।
+
+---
+
+## 1. বর্তমান কোডবেস অডিট (আগে থেকেই যা আছে)
+
+### 1.1 Subscription — বর্তমান অবস্থা
+
+| Layer | ফাইল | বর্তমান আচরণ |
+|---|---|---|
+| Package model | `backend/app/Models/SubscriptionPackage.php` | `name, slug, price, duration_days, max_orders, features(json), is_active` |
+| Payment record | `backend/app/Models/SubscriptionPayment.php` + migration `2026_07_23_174146_create_subscription_payments_table.php` | `user_id, package_id, amount, payment_method, sender_bkash_number, trx_id, screenshot_path, status(pending/approved/rejected), bkash_payment_id, admin_note, reviewed_by, reviewed_at` — **কোনো proration/invoice field নেই** |
+| User lifecycle fields | `backend/app/Models/User.php` | `subscription_package_id, subscription_status, subscription_started_at, subscription_ends_at` |
+| Activation | `backend/app/Services/SubscriptionActivationService.php` | সবসময় **শুধু extend** করে: `base = (ends_at future) ? ends_at : now(); ends_at = base->addDays(package.duration_days)`. **কোনো package-switch/upgrade বিশেষ লজিক নেই** — manual approve ও bKash auto-approve দুটোই একই ভাবে চলে, প্যাকেজ বদলে গেলেও পুরনো বাকি মেয়াদ হিসেব ছাড়াই নতুন প্যাকেজের পুরো `duration_days` যোগ হয়ে যায় (proration নেই) |
+| Seller-facing API | `backend/app/Http/Controllers/Api/SubscriptionController.php` | `plans()` (active প্যাকেজ লিস্ট, price অনুযায়ী sorted), `mySubscription()` (`days_left` = শুধু দিন, ঘণ্টা/মিনিট নেই; upgrade/downgrade flag কিছুই নেই), `submitPayment()` (manual trx_id submit — `amount = package.price` সরাসরি, কোনো proration নেই) |
+| Payment gateway | `BkashPaymentController` (Tokenized, redirect flow) + `BkashPgwPaymentController` (classic PGW, widget flow) — দুটোই `SubscriptionActivationService::activate()` কল করে | কোনোটাই upgrade-aware না; `amount` সবসময় `package.price` |
+| Admin approve | `AdminSubscriptionController::approvePayment/rejectPayment` | approve হলে `SubscriptionActivationService::activate()` কল করে |
+| Frontend | `frontend/src/app/dashboard/settings/subscription/page.tsx` | প্যাকেজ radio-card list (নাম, দাম, `max_orders` দেখায়, কিন্তু **features বুলেট লিস্ট দেখায় না যদিও DB-তে আছে**), current package highlight নেই (শুধু উপরে টেক্সটে নাম+status+days_left), কোনো downgrade-lock UI নেই, কোনো invoice preview নেই |
+
+**সিদ্ধান্ত নেওয়ার মতো gap:** downgrade-block, proration calculation, invoice generation/preview — **কিছুই backend বা frontend কোথাও implement করা নেই**। সম্পূর্ণ নতুন কাজ।
+
+### 1.2 SMS Credit — বর্তমান অবস্থা
+
+| Layer | ফাইল | বর্তমান আচরণ |
+|---|---|---|
+| Wallet | `backend/app/Models/SmsCredit.php` | `user_id, balance` — `walletFor()` দিয়ে lazy-create |
+| History | `backend/app/Models/SmsCreditHistory.php` | `user_id, type(recharge/deduct), credits, balance_before, balance_after, note, recharged_by` |
+| Rate setting | `backend/app/Models/SmsCreditSetting.php` | সিঙ্গেল সেটিংস রো: `rate_per_credit`(default ৳0.35), `chars_per_credit_english`(160), `chars_per_credit_unicode`(70), `currency` |
+| Service | `backend/app/Services/SmsCreditService.php` | `calculateCreditsRequired(message)`, `getBalance()`, **`recharge()`** (transaction-safe, history লেখে), `deduct()` |
+| Admin controller | `backend/app/Http/Controllers/AdminSmsCreditController.php` | `getSettings/updateSettings`, `listUserCredits`, **`recharge()` — admin manually অন্য user-কে credit দেয়**, `creditHistory` |
+| Routes | `routes/api.php:397-401` | সবগুলো `/admin/sms/credit/*` — **admin-only**, seller নিজে কিনতে পারে না |
+
+**Gap:** পুরো infrastructure (wallet, history, rate setting, recharge service) already আছে এবং reusable — শুধু **seller-facing self-service purchase flow (payment → auto-recharge)** টা নেই। এটাই বানাতে হবে, রেট/হিস্ট্রি সিস্টেম পুনরায় বানানোর দরকার নেই।
+
+### 1.3 `zyro` reference — SMS credit purchase pattern (adapt করার জন্য পড়া হয়েছে)
+
+- `zyro/models/SmsCredit.php` — সহজ balance CRUD (hybrid-stack-এর `SmsCreditService`-এ ইতিমধ্যে equivalent/উন্নত ভার্সন আছে)।
+- `zyro/core/CreditService.php::calculateSmsCredits()` — GSM(160)/Unicode(70) char-count থেকে credit হিসাব — hybrid-stack-এ `SmsCreditService::calculateCreditsRequired()` হিসেবে **ইতিমধ্যে পোর্ট করা আছে** (settings-driven, আরও ভালো)।
+- `zyro/controllers/PaymentController.php` — মূল reusable আইডিয়া:
+  - একটাই generic `payments` টেবিল + `payment_type` কলাম (`sms_credit` / `subscription` / `add_fund`) দিয়ে polymorphic payment tracking।
+  - `initiatePayment($userId, $amount, $gateway, $paymentType, $planId)` — gateway-তে redirect করার আগে `metadata`-তে `payment_type` + context বসিয়ে pending payment row রাখে।
+  - `verifyAndProcessPayment($invoiceId)` — gateway callback/webhook থেকে verify করে, `payment_type` অনুযায়ী branch করে (`addSmsCredits()` / `activateSubscription()` / `addWalletFunds()`) — idempotent (আগে থেকে COMPLETED থাকলে no-op)।
+  - `zyro/views/dashboard/billing.php` — wallet balance card + "Add Funds" modal + invoice/payment history টেবিল — UI ধারণা হিসেবে useful।
+- **hybrid-stack-এ কীভাবে adapt হবে (copy না, concept):** hybrid-stack-এর বর্তমান আর্কিটেকচার ইতিমধ্যে zyro-র generic `payments`+`payment_type` idea-র বদলে **প্রতি-ফিচার আলাদা টেবিল** (`subscription_payments`, ভবিষ্যতে `sms_credit_purchases`) প্যাটার্ন follow করে — এটাই এই কোডবেসের established convention (§18-এর bKash gateway কাজেও তাই হয়েছে), তাই generic polymorphic টেবিলে না গিয়ে subscription_payments-এর বোনভাবে একটা সমান্তরাল `sms_credit_purchases` টেবিল বানানোই সামঞ্জস্যপূর্ণ। zyro থেকে শুধু **flow ধারণা** (initiate → gateway → verify/callback → auto-grant, idempotent) নেওয়া হচ্ছে, টেবিল ডিজাইন না।
+
+---
+
+## 2. Phase 1 প্ল্যান — Subscription upgrade/downgrade + proration + invoice
+
+### 2.1 Package "বড়/ছোট" নির্ধারণ
+`price` অনুযায়ী তুলনা (ইতিমধ্যে `plans()` এ `orderBy('price')` আছে) — আলাদা `tier`/`rank` কলাম দরকার নেই যতক্ষণ না দুইটা প্যাকেজের দাম সমান হয়ে অন্য কোনো বৈশিষ্ট্যে পার্থক্য দরকার হয়।
+
+### 2.2 Downgrade lock (server-side — mandatory, শুধু frontend disable যথেষ্ট না)
+প্রতিটা purchase entry point (`submitPayment`, `BkashPaymentController::initiate`, `BkashPgwPaymentController::create`)-এ নতুন guard:
+```
+if (user has active, non-expired subscription
+    && target_package.price < current_package.price) {
+    reject 422 "মেয়াদ শেষ না হওয়া পর্যন্ত নিচের প্যাকেজে যাওয়া যাবে না"
+}
+```
+
+### 2.3 Proration হিসাব (নতুন `SubscriptionInvoiceService`)
+```
+remaining_days   = max(0, now()->diffInSeconds(current.ends_at) / 86400)   // fractional
+current_daily_rate = current_package.price / current_package.duration_days
+unused_credit    = round(remaining_days * current_daily_rate, 2)
+payable_amount   = max(0, target_package.price - unused_credit)
+```
+- শুধু **upgrade** (target.price > current active package.price, subscription এখনো active/non-expired) হলে proration apply হবে।
+- মেয়াদ শেষ হওয়ার পর নতুন প্যাকেজ কেনা (renewal/fresh purchase) → proration নেই, `payable_amount = target_package.price`।
+- একই প্যাকেজ renewal (target === current) → proration নেই, `payable_amount = target_package.price`, বর্তমান আচরণ (extend from `ends_at`) অপরিবর্তিত থাকবে।
+
+### 2.4 Upgrade-এর পর নতুন মেয়াদ কীভাবে সেট হবে — ✅ কনফার্ম করা হয়েছে (user, 2026-08-09)
+নতুন `ends_at = now() + target_package.duration_days` (fresh full cycle আজ থেকে শুরু) — কারণ বাকি মেয়াদের টাকা ইতিমধ্যে দামে ছাড় (credit) হিসেবে সমন্বয় হয়ে গেছে, তাই আলাদা করে দিন যোগ করলে double-benefit হয়ে যাবে। `SubscriptionActivationService`-এ upgrade case আলাদা branch হিসেবে implement হবে।
+
+### 2.5 DB পরিবর্তন
+`subscription_payments` টেবিলে নতুন কলাম (migration, existing row-এ backward compatible nullable/default):
+```php
+$table->decimal('base_amount', 10, 2)->nullable();       // target package-এর মূল দাম
+$table->decimal('proration_credit', 10, 2)->default(0);  // বাকি মেয়াদের ছাড়
+$table->foreignId('previous_package_id')->nullable()->constrained('subscription_packages')->nullOnDelete();
+$table->json('invoice_breakdown')->nullable();            // পুরো হিসাব (UI-তে দেখানোর জন্য স্ন্যাপশট)
+```
+`amount` কলামটাই final payable amount থাকবে (backward compatible — বাকি সব জায়গায় `amount` দিয়ে দাম দেখানো হয়, বদলাতে হবে না)।
+
+### 2.6 নতুন/পরিবর্তিত backend endpoint
+| Method+Path | কাজ |
+|---|---|
+| `GET /subscription/invoice/preview?package_id=X` (নতুন) | পেমেন্টের আগে breakdown দেখানোর জন্য — DB-তে কিছু লেখে না, শুধু হিসাব রিটার্ন করে (`base_amount, proration_credit, payable_amount, is_upgrade, is_downgrade_blocked, new_ends_at_preview`) |
+| `submitPayment`, `bkash/initiate`, `bkash-pgw/create` (পরিবর্তন) | ভেতরে `SubscriptionInvoiceService::compute()` কল করে সার্ভার-সাইডে amount নির্ধারণ (client থেকে amount trust করা যাবে না), `base_amount/proration_credit/previous_package_id/invoice_breakdown` সেভ করবে |
+| `SubscriptionActivationService::activate()` (পরিবর্তন) | `payment.previous_package_id !== null && payment.package_id !== previous` হলে upgrade branch (§2.4-A), নাহলে বর্তমান extend behavior অপরিবর্তিত |
+| `mySubscription()` (পরিবর্তন) | `days_left` এর বদলে/পাশাপাশি `remaining: {days, hours, minutes, total_seconds}` + প্রতিটা প্যাকেজে `is_current`, `is_downgrade_blocked` ফ্ল্যাগ (অথবা `plans()`-এ যোগ) |
+
+### 2.7 Frontend প্ল্যান (`subscription/page.tsx` redesign)
+- Package card: নাম, ৳দাম, মেয়াদ (দিন), **features বুলেট লিস্ট** (এখন `features` field আছে কিন্তু UI-তে render হয় না — এইটা যোগ করতে হবে), "বর্তমান প্ল্যান" badge।
+- Current package card highlight (accent border) + লাইভ countdown (দিন/ঘণ্টা/মিনিট, `setInterval` দিয়ে প্রতি মিনিটে আপডেট, `ends_at` থেকে client-side গণনা)।
+- দাম কম এমন card-এ disabled overlay + টুলটিপ: "মেয়াদ শেষ না হওয়া পর্যন্ত এই প্যাকেজে যাওয়া যাবে না"।
+- প্যাকেজ সিলেক্ট করলে (upgrade হলে) → **Invoice preview panel/modal**: বর্তমান প্যাকেজ, নতুন প্যাকেজ, মূল দাম, বাকি মেয়াদের ছাড় (টাকায়), পরিশোধযোগ্য অর্থ, নতুন মেয়াদ শেষের তারিখ — এরপর "ইনভয়েস পরিশোধ করুন" বাটনে existing bKash/manual flow চলবে (invoice preview-এর `package_id`-ই পাঠানো হবে, amount সবসময় সার্ভার recompute করবে)।
+- Design system rules (CONTEXT.md §22) মেনে চলা বাধ্যতামূলক — token color, bilingual, mobile-first, dark/light।
+
+### 2.8 Verification checklist (আগের bKash কাজের মতোই)
+- Tinker দিয়ে proration formula rollback-wrapped টেস্ট (কয়েকটা scenario: same-day upgrade, mid-cycle upgrade, expired-then-purchase, downgrade attempt reject)
+- `php artisan route:list` দিয়ে নতুন route/middleware ভেরিফাই
+- `npm run deploy:prod:safe` 8/8 pass + live smoke check
+
+---
+
+## 3. Phase 2 প্ল্যান — SMS Credit self-service purchase (zyro থেকে adapt, §1.3 দেখুন)
+
+**গুরুত্বপূর্ণ:** এই ফেজ **subscription upgrade/invoice কাজ শেষ হওয়ার পরে** শুরু হবে (user-এর নির্দেশনা অনুযায়ী ক্রম)। নিচে শুধু প্ল্যান — কোনো কোড এখনো লেখা হয়নি।
+
+### 3.1 নতুন DB টেবিল — `sms_credit_purchases` (subscription_payments-এর সমান্তরাল)
+```php
+Schema::create('sms_credit_purchases', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+    $table->unsignedInteger('credits');
+    $table->decimal('rate_used', 10, 4);     // purchase সময়ের SmsCreditSetting::rate_per_credit স্ন্যাপশট
+    $table->decimal('amount', 10, 2);        // credits * rate_used
+    $table->string('payment_method', 30)->default('bkash_manual'); // bkash_manual | bkash_gateway | bkash_pgw
+    $table->string('sender_bkash_number', 20)->nullable();
+    $table->string('trx_id', 50)->nullable()->unique();
+    $table->string('screenshot_path')->nullable();
+    $table->string('bkash_payment_id')->nullable();  // §18.1-এর bug মনে রেখে Fillable-এ যোগ করা বাধ্যতামূলক
+    $table->string('status', 20)->default('pending'); // pending|approved|rejected
+    $table->text('admin_note')->nullable();
+    $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
+    $table->timestamp('reviewed_at')->nullable();
+    $table->timestamps();
+    $table->index(['user_id', 'status']);
+});
+```
+
+### 3.2 Backend — নতুন ফাইল
+- `app/Models/SmsCreditPurchase.php`
+- `app/Http/Controllers/Api/SmsCreditPurchaseController.php` (seller-facing, `auth:sanctum` group-এ, admin middleware ছাড়া):
+  - `GET /sms/credit/rate` — `SmsCreditSetting::getSetting()` থেকে rate/currency + বর্তমান balance রিটার্ন (seller-facing read; admin-only settings route থেকে আলাদা)
+  - `POST /sms/credit/purchases` — manual bKash submit (credits, sender_bkash_number, trx_id, screenshot) → pending row, amount = credits * rate_per_credit (সার্ভার-সাইড হিসাব, client amount trust না)
+  - `GET /sms/credit/purchases` — নিজের history
+- Gateway flow — **কোড পুনরায় না লিখে existing bKash client (`BkashPaymentGatewayClient`/`BkashPgwPaymentGatewayClient`) reuse**:
+  - `POST /sms/credit/pay/bkash/initiate` (Tokenized) ও `POST /sms/credit/pay/bkash-pgw/{create,execute}` (PGW) — `BkashPaymentController`/`BkashPgwPaymentController`-এর প্যাটার্ন কপি করে SMS-credit-নির্দিষ্ট controller বানানো (অথবা রিফ্যাক্টর করে দুই controller-কে "purchase type" নেওয়ার মতো generalize করা — যদি সময় থাকে সেটা cleaner, নাহলে duplicate-but-consistent controller ঠিক আছে যেহেতু কোডবেস এখন পর্যন্ত এই প্যাটার্নই follow করে)
+  - Public callback route (Tokenized-এর জন্য) লাগবে subscription-এর মতোই: `GET /sms/credit/pay/bkash/callback` (bKash browser সরাসরি redirect করে, কোনো Sanctum token থাকে না — `bkash_payment_id` দিয়ে row খুঁজে বের করা, §18-এর pattern হুবহু)
+- Activation: gateway auto-success বা admin-approve — উভয় ক্ষেত্রে **`SmsCreditService::recharge($userId, $credits, rechargedBy: null|adminId, note: "Purchase #$id via bKash")`** কল (existing service reuse, নতুন কিছু লেখার দরকার নেই)।
+- Admin: `AdminSmsCreditController`-এ (অথবা নতুন `AdminSmsCreditPurchaseController`-এ) `listPurchases/approvePurchase/rejectPurchase` — `AdminSubscriptionController::approvePayment/rejectPayment`-এর প্যাটার্ন হুবহু অনুসরণ।
+
+### 3.3 Frontend — নতুন পেজ
+- নতুন route: `/dashboard/sms/credit` অথবা `/dashboard/sms/buy-credit` (মেনু: `sms` group-এর নিচে নতুন item, `activeKey: "sms-credit"`)
+- UI (subscription page-এর প্যাটার্ন অনুসরণ): balance card (বর্তমান credit ব্যালেন্স), quick-pick amount বাটন (৫০০/১০০০/২০০০/৫০০০ credit) + custom input, live দাম হিসাব (credits × rate), bKash pay বাটন (gateway configured থাকলে) + manual trx_id ফর্ম fallback, purchase history টেবিল। বাংলা/ইংরেজি, dark/light, mobile-first (CONTEXT.md §20/§22 বাধ্যতামূলক)।
+
+### 3.4 zyro থেকে যা নেওয়া হচ্ছে না (deliberately)
+- Generic `payments` + `payment_type` polymorphic টেবিল — hybrid-stack-এর per-feature টেবিল কনভেনশনের সাথে সামঞ্জস্যহীন
+- ZiniPay gateway — hybrid-stack-এ bKash (Tokenized+PGW) ইতিমধ্যে live, নতুন গেটওয়ে দরকার নেই
+- Wallet/"Add Funds" জেনারেল ব্যালেন্স কনসেপ্ট — scope-এ শুধু SMS credit, জেনারেল wallet না
+
+---
+
+## 4. Execution order (এই কনভারসেশনে)
+
+1. ✅ Audit + প্ল্যান লেখা (এই ফাইল) — সম্পন্ন
+2. ✅ Phase 1: Subscription upgrade/downgrade/proration/invoice — backend migration + service + controller changes, frontend card redesign + invoice preview + countdown — সম্পন্ন (§5)
+3. ✅ Phase 1 deploy + live verify (`npm run deploy:prod:safe`) — সম্পন্ন (§5)
+4. 🔲 Phase 2: SMS credit self-service purchase (§3) — এখন শুরু করা যাবে
+5. 🔲 Phase 2 deploy + live verify
+
+---
+
+## 5. Phase 1 — Implementation log (2026-08-09)
+
+### 5.1 Design decision কনফার্ম (user)
+Upgrade করলে নতুন `ends_at = now() + target_package.duration_days` (আজ থেকে fresh full cycle) — §2.4-এ এখন ✅ হিসেবে মার্ক করা আছে।
+
+### 5.2 Backend — নতুন/পরিবর্তিত ফাইল
+- **নতুন migration** `2026_08_09_184617_add_proration_fields_to_subscription_payments_table.php` — `subscription_payments`-এ `base_amount`, `proration_credit`(default 0), `previous_package_id`(FK, nullOnDelete), `invoice_breakdown`(json) — migrate করা হয়েছে (production DB)।
+- **নতুন** `app/Services/SubscriptionInvoiceService.php` — `compute(User, SubscriptionPackage): array` — §2.3/§2.4-এর প্রোরেশন ফর্মুলা + `is_current`/`is_upgrade`/`is_downgrade_blocked` ফ্ল্যাগ, single source of truth (preview endpoint + সবগুলো purchase entry point একই সার্ভিস কল করে, client amount কখনো trust করা হয় না)।
+- **পরিবর্তিত** `app/Services/SubscriptionActivationService.php` — `activate()`-এ upgrade-branch যোগ: `payment.previous_package_id` সেট থাকলে ও package বদলে গেলে fresh cycle (`now()+duration_days`); নাহলে legacy extend-from-ends_at আচরণ অপরিবর্তিত।
+- **পরিবর্তিত** `app/Http/Controllers/Api/SubscriptionController.php`:
+  - `plans()` — প্রতিটা প্যাকেজে `is_current/is_upgrade/is_downgrade_blocked/payable_amount` যোগ (InvoiceService দিয়ে)
+  - নতুন `invoicePreview()` — `GET /subscription/invoice/preview?package_id=X`
+  - `mySubscription()` — `remaining: {days,hours,minutes,total_seconds}` যোগ (আগের `days_left` অক্ষত রাখা হয়েছে, backward compatible)
+  - `submitPayment()` — downgrade guard (422) + InvoiceService দিয়ে amount/base_amount/proration_credit/previous_package_id/invoice_breakdown সেভ
+- **পরিবর্তিত** `app/Http/Controllers/Api/BkashPaymentController.php::initiate()` ও `app/Http/Controllers/Api/BkashPgwPaymentController.php::create()` — একই downgrade guard + InvoiceService-computed amount (bKash-কে payable_amount পাঠানো হয়, raw package price না)
+- **পরিবর্তিত** `app/Models/SubscriptionPayment.php` — Fillable + casts-এ নতুন কলাম যোগ, `previousPackage()` relation
+- **পরিবর্তিত** `routes/api.php` — `GET /subscription/invoice/preview` route যোগ
+
+### 5.3 Frontend — পরিবর্তিত ফাইল
+- `frontend/src/app/dashboard/settings/subscription/page.tsx` (single file, বড় redesign):
+  - Package card: features বুলেট লিস্ট, "বর্তমান প্ল্যান"/"আপগ্রেড" badge, downgrade-blocked card disabled+lock message (title tooltip + inline)
+  - Current plan section: লাইভ countdown (দিন/ঘণ্টা/মিনিট, ১ সেকেন্ড interval-এ tick করে, `subscription.remaining.total_seconds` থেকে init)
+  - প্যাকেজ সিলেক্ট করলে `GET /subscription/invoice/preview` কল হয়ে ইনভয়েস প্যানেল দেখায় (base price, proration credit যদি থাকে, payable amount, নতুন মেয়াদ শেষের তারিখ, upgrade/renewal note)
+  - bKash PGW widget-এর `paymentRequest.amount` এখন invoice preview-এর `payable_amount` থেকে আসে (আগে raw package price ছিল) — bKash-এর নিজের popup-এ দেখানো amount আর ব্যাকএন্ড charge সবসময় মিলবে
+  - সব পেমেন্ট বাটন (manual submit, bKash tokenized, bKash PGW) `invoice` লোড না হওয়া পর্যন্ত বা `is_downgrade_blocked` হলে disabled
+
+### 5.4 Verification (এই সেশনেই সম্পন্ন)
+- **Tinker, rollback-wrapped** (`DB::beginTransaction()`/`rollBack()`): `SubscriptionInvoiceService::compute()` ৪টা scenario (upgrade-প্রোরেশন, downgrade-block, same-package renewal, expired-then-fresh-purchase) — সব সঠিক হিসাব দিয়েছে। `SubscriptionActivationService::activate()` upgrade vs renewal branch আলাদাভাবে টেস্ট করে ends_at সঠিক প্রমাণিত।
+- **Backend:** `php -l` সব ফাইলে clean, `php artisan migrate --force` সফল, `php artisan route:list --path=subscription` দিয়ে নতুন route কনফার্ম।
+- **Frontend:** `npx tsc --noEmit` clean, `npm run deploy:prod:safe` — 8/8 ধাপ pass, `hybrid-frontend.service` active।
+- **Live HTTP round-trip** (`bsol.zyrotechbd.com`, nginx+Sanctum দিয়ে, test data session শেষে মুছে ফেলা হয়েছে):
+  - `GET /subscription/plans` — flags সঠিক দেখা গেছে (উপরে থাকা প্যাকেজে `is_upgrade:true, payable_amount` প্রোরেটেড; নিচের প্যাকেজে `is_downgrade_blocked:true`)
+  - `GET /subscription/invoice/preview?package_id=` — upgrade (৳400 base − ৳50 proration = ৳350 payable) ও same-package renewal (কোনো proration ছাড়া) দুটোই সঠিক
+  - `POST /subscription/payments` — downgrade attempt → `422` সঠিক reject; বৈধ upgrade → payment row-এ base_amount/proration_credit/invoice_breakdown সঠিকভাবে সেভ হয়েছে
+  - Admin `POST /admin/subscription-payments/{id}/approve` → `SubscriptionActivationService` কল হয়ে `subscription_package_id` বদলেছে এবং `subscription_ends_at` = approve-এর মুহূর্ত থেকে ঠিক ৩০ দিন পর (fresh cycle, §2.4 confirmed decision অনুযায়ী) — end-to-end pipeline (invoice → payment → admin approve → activation) পুরোপুরি কাজ করছে প্রমাণিত
+  - সব টেস্ট প্যাকেজ/ইউজার/পেমেন্ট/টোকেন সেশন শেষে DB থেকে মুছে ফেলা হয়েছে
+
+### 5.5 যা এই ফেজে করা হয়নি (out of scope, ভবিষ্যতে বিবেচনা করা যেতে পারে)
+- bKash gateway flow (Tokenized initiate / PGW create) live real-money টেস্ট করা হয়নি এই সেশনে (শুধু manual submit + admin approve path লাইভ টেস্ট হয়েছে) — কোড path একই `SubscriptionInvoiceService`/guard ব্যবহার করে বলে ঝুঁকি কম, কিন্তু বাস্তব bKash checkout দিয়ে upgrade একবার verify করা ভালো হবে যখন সুযোগ হবে
+- PDF ইনভয়েস ডাউনলোড/প্রিন্ট (§16.7-এর broader "Invoice/Waybill PDF" scope-এর অংশ) — এই ফেজে শুধু on-screen ইনভয়েস প্রিভিউ, কোনো PDF জেনারেশন যোগ হয়নি
+- Admin subscription-payments লিস্টে নতুন proration কলাম (base_amount/proration_credit) দেখানো — admin UI (`/admin/billing` পেমেন্ট queue) এই সেশনে touch করা হয়নি, `invoice_breakdown` JSON ডেটাবেসে আছে কিন্তু admin frontend-এ render হয় না এখনো

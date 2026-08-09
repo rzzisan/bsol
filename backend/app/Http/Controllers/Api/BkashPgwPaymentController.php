@@ -8,6 +8,7 @@ use App\Models\SubscriptionPackage;
 use App\Models\SubscriptionPayment;
 use App\Services\Payment\BkashPgwPaymentGatewayClient;
 use App\Services\SubscriptionActivationService;
+use App\Services\SubscriptionInvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,6 +31,7 @@ class BkashPgwPaymentController extends Controller
     public function __construct(
         private readonly BkashPgwPaymentGatewayClient $bkash,
         private readonly SubscriptionActivationService $activationService,
+        private readonly SubscriptionInvoiceService $invoiceService,
     ) {}
 
     public function create(Request $request): JsonResponse
@@ -45,16 +47,29 @@ class BkashPgwPaymentController extends Controller
         $package = SubscriptionPackage::findOrFail($data['package_id']);
         $user = auth()->user();
 
+        $invoice = $this->invoiceService->compute($user, $package);
+
+        if ($invoice['is_downgrade_blocked']) {
+            return response()->json([
+                'paymentID' => null,
+                'message' => 'বর্তমান প্যাকেজের মেয়াদ শেষ না হওয়া পর্যন্ত এর চেয়ে ছোট প্যাকেজে যাওয়া যাবে না।',
+            ], 422);
+        }
+
         $payment = SubscriptionPayment::create([
             'user_id' => $user->id,
             'package_id' => $package->id,
-            'amount' => $package->price,
+            'previous_package_id' => $invoice['is_upgrade'] ? $invoice['previous_package']['id'] : null,
+            'amount' => $invoice['payable_amount'],
+            'base_amount' => $invoice['base_amount'],
+            'proration_credit' => $invoice['proration_credit'],
+            'invoice_breakdown' => $invoice,
             'payment_method' => 'bkash_gateway_pgw',
             'status' => 'pending',
         ]);
 
         $result = $this->bkash->createPayment(
-            amount: number_format((float) $package->price, 2, '.', ''),
+            amount: number_format((float) $invoice['payable_amount'], 2, '.', ''),
             merchantInvoiceNumber: 'ZyroSub-' . $payment->id,
         );
 
