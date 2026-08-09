@@ -1,11 +1,13 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-09 — bKash subscription-billing gateway is now **live in production** with a real merchant account (§18.2): the credentials turned out to be for the classic PGW/Checkout API, not Tokenized Checkout, so that product was implemented too (config-toggleable, both kept in code) and verified with a real ৳5 transaction. See below. Older entries kept as-is:
+
 Last updated: 2026-08-08 — Added §17.10: five more open findings from §17 fixed (queue worker, admin self-lockout, fraud-score↔courier merge, customers FK, Steadfast bulk-correlation, courier cancel() route) — see below. Older entries kept as-is:
 
 Last updated: 2026-08-07 — Added §15.9a: SaaS Support chat (seller ↔ admin-team shared inbox), fully coded, migrated, deployed, and live-verified — see below. Older entries kept as-is:
 
 Last updated: 2026-08-02 — Added §15 (full codebase feature audit, ground-truth scanned), §16 (prioritized recommendations), and §17 (deep line-by-line code review with specific file:line bugs/risks, 6-pass independent review covering every controller/service). Sections 12–14 below are the **original Phase 1/2 plan and are now stale** (last accurate as of 2026-05-04) — কোডবেস অনেক এগিয়ে গেছে তার পরে। **§15-কে "কী আছে" এবং §17-কে "কতটা ভালো/নিরাপদ" প্রশ্নের single source of truth হিসেবে ব্যবহার করো**, sections 12–14 শুধু historical record হিসেবে রাখা হয়েছে। **Courier provider abstraction (§16.2) commit `0fdc3ab`-এ সম্পন্ন। Facebook/Meta lead-capture MVP (§16.3) কোড+deploy সম্পন্ন কিন্তু Meta App credentials না থাকায় এখনো live নয় — বিস্তারিত §15.11-এ। এই কাজের সময় একটা নতুন 🔴 CRITICAL finding ধরা পড়েছে: production-এ কোনো queue worker নেই, delayed SMS automation silently ভাঙা — §17.0 item #12 / §17.5-এ বিস্তারিত, এখনো ফিক্স করা হয়নি।**
-Status: Phase 1 complete; Phase 2 mostly complete (SMS automation, accounting, courier — 4 providers — all live); Analytics (sales/customer/courier — §15.7) এখন **DONE**; Shop Settings + payment-gateway automation + Facebook/Meta integration (incl. Ads ROI, যেটা Facebook-নির্ভর) still not started (§15/§16)। **§17-এর ১১টা 🔴/🟠 critical finding সবগুলো ফিক্স করা হয়েছে এবং deploy করা হয়েছে (২০২৬-০৮-০২, একই সেশনে) — বিস্তারিত §17.9-এ, implementation log-সহ।** Backend সব migrate/live; frontend XSS fix `npm run deploy:prod:safe` দিয়ে সফলভাবে deploy হয়েছে (৮/৮ ধাপ pass, `hybrid-frontend.service` active)। **নন-variant stock deduction + bulkStatus inventory gap (§17.9-এর শেষে) এখনো একই দিনে ফিক্স হয়েছে।** Analytics module (§16.1) একই দিনে শেষ — বিস্তারিত §15.7-এ, deploy-এর সময় একটা self-caused frontend build/restart incident হয়েছিল যেটা সাথে সাথে ধরা পড়ে ও ফিক্স হয়েছে (details §15.7-এ)।
+Status: Phase 1 complete; Phase 2 mostly complete (SMS automation, accounting, courier — 4 providers — all live); Analytics (sales/customer/courier — §15.7) এখন **DONE**; **নিজের subscription billing-এর জন্য bKash payment gateway (§18/§18.2) এখন real merchant credential দিয়ে production-এ live** (customer-facing landing-page checkout online payment এখনো শুরু হয়নি — সেটা ভিন্ন, বড় স্কোপ); Shop Settings + Facebook/Meta integration (incl. Ads ROI, যেটা Facebook-নির্ভর) still not started (§15/§16)। **§17-এর ১১টা 🔴/🟠 critical finding সবগুলো ফিক্স করা হয়েছে এবং deploy করা হয়েছে (২০২৬-০৮-০২, একই সেশনে) — বিস্তারিত §17.9-এ, implementation log-সহ।** Backend সব migrate/live; frontend XSS fix `npm run deploy:prod:safe` দিয়ে সফলভাবে deploy হয়েছে (৮/৮ ধাপ pass, `hybrid-frontend.service` active)। **নন-variant stock deduction + bulkStatus inventory gap (§17.9-এর শেষে) এখনো একই দিনে ফিক্স হয়েছে।** Analytics module (§16.1) একই দিনে শেষ — বিস্তারিত §15.7-এ, deploy-এর সময় একটা self-caused frontend build/restart incident হয়েছিল যেটা সাথে সাথে ধরা পড়ে ও ফিক্স হয়েছে (details §15.7-এ)।
 
 ---
 
@@ -693,7 +695,7 @@ backend/app/
 | Subscription packages, plan display | ✅ DONE | `SubscriptionController::plans/mySubscription` |
 | Manual bKash payment submission + admin approve/reject | ✅ DONE | `submitPayment` (sender number + trx ID) → `AdminSubscriptionController::approvePayment/rejectPayment` |
 | `active_subscription` middleware gating | ✅ DONE | Landing-page ও অন্যান্য premium route এই middleware-এ gated |
-| **Automated payment gateway (bKash/Nagad/SSLCommerz API auto-verify)** | ⛔ NOT STARTED | বর্তমান flow পুরোপুরি manual — কাস্টমার নিজে bKash নাম্বারে পাঠায়, trx ID লিখে জমা দেয়, admin manually approve করে। এটা §16-এর top recommendation |
+| **Automated payment gateway — subscription billing (bKash auto-verify)** | ✅ DONE — **live in production** (2026-08-09) | `BkashPaymentController` (Tokenized) + `BkashPgwPaymentController` (classic PGW, actually in use — real merchant credential is a PGW account, §18.2) — seller pays instantly via bKash, no manual TrxID review. পুরনো manual flow (trx ID submit + admin approve) fallback হিসেবে অক্ষত আছে |
 | **Customer-order-এর জন্য অনলাইন পেমেন্ট কালেকশন** | ⛔ NOT STARTED | `payment_method: bkash/online` অর্ডারে শুধু একটা label — বাস্তবে কোনো gateway charge/callback হয় না, effectively সব COD |
 
 ### 15.9a SaaS Support Chat (seller ↔ admin) — ✅ DONE (2026-08-07)
@@ -723,7 +725,7 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 | মডিউল | ভেরিফিকেশন মেথড | ফলাফল |
 |---|---|---|
 | ~~Facebook Graph API / Comment-Inbox bot / Messenger CRM~~ WhatsApp | — | WhatsApp এখনো সম্পূর্ণ অনুপস্থিত। Facebook/Messenger lead capture এখন §15.4-বহির্ভূত নতুন §15.11-এ move করা হলো — নিচে দেখুন |
-| Automated payment gateway (bKash/Nagad/SSLCommerz API) | `grep -rli bkash\|sslcommerz\|nagad` | শুধু manual trx-ID entry ফর্ম, কোনো SDK/API call নেই |
+| Automated payment gateway — Nagad/SSLCommerz | `grep -rli sslcommerz\|nagad` | কোনো trace নেই। bKash-এর জন্য এখন real API integration আছে (subscription billing-এ live, §18/§18.2) — এই row-টা এখন শুধু Nagad/SSLCommerz-এর জন্য প্রযোজ্য, bKash আর এখানে গণনা হবে না |
 | Staff/Team/sub-account roles | `grep -rli staff\|team_member` + users migration পড়া | `users.role` শুধু `user`/`admin` — কোনো per-shop multi-staff concept নেই |
 | Shop Profile Settings | `/dashboard/settings/shop/page.tsx` | Pure `ModulePlaceholder`, কোনো backend controller নেই |
 | Invoice / Waybill PDF generation | `composer.json`-এ dompdf/barryvdh নেই, controller grep-এ কিছু নেই | কোনো PDF export নেই — courier booking-এর পর প্রিন্টেবল label/invoice ফিচার অনুপস্থিত |
@@ -802,7 +804,7 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 1. ~~Analytics (16.1)~~ — ✅ DONE (2026-08-02)
 2. ~~Courier abstraction hardening (16.2)~~ — ✅ DONE (2026-08-02, commit `0fdc3ab`)
 3. ~~Facebook/Meta MVP (16.3)~~ — 🟡 কোড DONE (2026-08-02), Meta App setup (external) বাকি — §15.11 দেখুন
-4. ~~Payment gateway automation (16.4)~~ — 🟡 কোড DONE (2026-08-08, subscription billing only — bKash PGW, §18), real merchant credentials + live sandbox test বাকি। Customer-facing landing-page checkout online payment এখনো শুরু হয়নি
+4. ~~Payment gateway automation (16.4)~~ — ✅ subscription billing অংশ **live in production** (2026-08-09, real bKash merchant account + real transaction verified, §18/§18.2)। Customer-facing landing-page checkout online payment এখনো শুরু হয়নি — সেটা ভিন্ন, বড় স্কোপ
 5. Staff/Team roles (16.6), Invoice PDF (16.7), CSV import (16.8), PWA (16.9) — parallel-track, lower urgency
 
 **Smaller open follow-ups (not full modules, can slot in anytime):** Carrybee bulk-booking + `cancel()` route wiring, RedX/Carrybee test-connection endpoints, Paperfly provider completion or removal, `FraudController::computeScore()` ↔ courier-fraud-data merge (§17.8 items 9/10).
