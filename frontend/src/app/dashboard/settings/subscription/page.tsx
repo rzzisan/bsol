@@ -6,6 +6,18 @@ import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-cl
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
+// bKash classic Checkout API ("PGW") widget — loaded dynamically from
+// subscription.bkash_pgw_script_url, see SAAS_MODULE_CONTEXT.md §18.
+declare global {
+  interface Window {
+    bKash?: {
+      init: (config: Record<string, unknown>) => void;
+      create: () => { onSuccess: (data: unknown) => void; onError: () => void };
+      execute: () => { onSuccess: (data: unknown) => void; onError: () => void };
+    };
+  }
+}
+
 interface Package {
   id: number;
   name: string;
@@ -34,6 +46,8 @@ interface MySubscription {
   is_expired: boolean;
   payment_instructions: { bkash_number: string | null; bkash_type: string | null };
   bkash_gateway_enabled: boolean;
+  bkash_api_type: "tokenized" | "pgw";
+  bkash_pgw_script_url: string;
   recent_payments: Payment[];
 }
 
@@ -52,6 +66,8 @@ const text = {
     unlimited: "সীমাহীন",
     payWithBkash: "bKash দিয়ে সাথে সাথে পে করুন",
     payingWithBkash: "bKash-এ পাঠানো হচ্ছে...",
+    pgwLoading: "bKash পেমেন্ট লোড হচ্ছে...",
+    pgwSelectPlan: "উপর থেকে একটা প্ল্যান বেছে নিলে bKash বাটন সক্রিয় হবে।",
     orManual: "অথবা ম্যানুয়ালি পাঠান",
     bkashSuccess: "পেমেন্ট সফল হয়েছে — আপনার প্ল্যান সক্রিয় হয়ে গেছে।",
     bkashFailed: "পেমেন্ট সম্পন্ন হয়নি। আবার চেষ্টা করুন অথবা নিচের ম্যানুয়াল অপশন ব্যবহার করুন।",
@@ -89,6 +105,8 @@ const text = {
     unlimited: "Unlimited",
     payWithBkash: "Pay Instantly with bKash",
     payingWithBkash: "Redirecting to bKash...",
+    pgwLoading: "Loading bKash payment...",
+    pgwSelectPlan: "Select a plan above to activate the bKash button.",
     orManual: "Or send manually",
     bkashSuccess: "Payment successful — your plan is now active.",
     bkashFailed: "Payment did not complete. Please try again or use the manual option below.",
@@ -127,6 +145,7 @@ export default function Page() {
   const [form, setForm] = useState({ package_id: "", sender_bkash_number: "", trx_id: "" });
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [bkashPaying, setBkashPaying] = useState(false);
+  const [pgwScriptLoaded, setPgwScriptLoaded] = useState(false);
 
   const load = async () => {
     const token = getStoredToken();
@@ -187,6 +206,102 @@ export default function Page() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load bKash's classic Checkout widget script when the platform is set
+  // to the PGW api type — see SAAS_MODULE_CONTEXT.md §18.
+  useEffect(() => {
+    if (subscription?.bkash_api_type !== "pgw" || !subscription.bkash_pgw_script_url) return;
+
+    const existing = document.getElementById("bkash-pgw-script") as HTMLScriptElement | null;
+    if (existing) {
+      if (window.bKash) setPgwScriptLoaded(true);
+      else existing.addEventListener("load", () => setPgwScriptLoaded(true));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "bkash-pgw-script";
+    script.src = subscription.bkash_pgw_script_url;
+    script.async = true;
+    script.onload = () => setPgwScriptLoaded(true);
+    script.onerror = () => setError(t.bkashError);
+    document.body.appendChild(script);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscription?.bkash_api_type, subscription?.bkash_pgw_script_url]);
+
+  // (Re-)initialize the bKash widget into #bKash-button whenever the script
+  // is ready or the selected package/amount changes.
+  useEffect(() => {
+    if (!pgwScriptLoaded || subscription?.bkash_api_type !== "pgw" || !form.package_id || !window.bKash) return;
+
+    const selectedPackage = plans.find((p) => String(p.id) === form.package_id);
+    const amount = selectedPackage ? Number(selectedPackage.price).toFixed(2) : "0.00";
+    const packageId = form.package_id;
+    let currentPaymentId: string | null = null;
+
+    const bkashConfig = {
+      paymentMode: "checkout",
+      paymentRequest: { amount, intent: "sale", currency: "BDT" },
+
+      createRequest: () => {
+        const token = getStoredToken();
+        fetch(`${API}/subscription/pay/bkash-pgw/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ package_id: packageId }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && data.paymentID) {
+              currentPaymentId = data.paymentID as string;
+              window.bKash?.create().onSuccess(data);
+            } else {
+              window.bKash?.create().onError();
+              setError((data?.message as string) ?? t.bkashError);
+            }
+          })
+          .catch(() => {
+            window.bKash?.create().onError();
+            setError(t.bkashError);
+          });
+      },
+
+      executeRequestOnAuthorization: () => {
+        const token = getStoredToken();
+        fetch(`${API}/subscription/pay/bkash-pgw/execute/${currentPaymentId}`, {
+          method: "POST",
+          headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && data.paymentID) {
+              setSuccess(t.bkashSuccess);
+              setError(null);
+              void load();
+            } else {
+              window.bKash?.execute().onError();
+              setError((data?.message as string) ?? t.bkashFailed);
+            }
+          })
+          .catch(() => {
+            window.bKash?.execute().onError();
+            setError(t.bkashFailed);
+          });
+      },
+
+      onClose: () => {
+        // Seller closed the bKash popup without paying — no-op, they can retry.
+      },
+    };
+
+    try {
+      window.bKash.init(bkashConfig);
+    } catch (e) {
+      console.error("bKash PGW widget: init() threw", e);
+      setError(`bKash widget init failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pgwScriptLoaded, subscription?.bkash_api_type, form.package_id, plans]);
 
   const payWithBkash = async () => {
     const token = getStoredToken();
@@ -325,7 +440,30 @@ export default function Page() {
             </div>
           </section>
 
-          {subscription?.bkash_gateway_enabled && (
+          {subscription?.bkash_gateway_enabled && subscription.bkash_api_type === "pgw" && (
+            <section className="catv-panel mx-4 mb-4 p-4">
+              <p className="mb-2 text-sm font-semibold text-[var(--foreground)]">{t.payWithBkash}</p>
+              {!form.package_id ? (
+                <p className="text-xs text-[var(--muted)]">{t.pgwSelectPlan}</p>
+              ) : !pgwScriptLoaded ? (
+                <p className="text-xs text-[var(--muted)]">{t.pgwLoading}</p>
+              ) : null}
+              {/* bKash's classic Checkout ("PGW") SDK looks for this exact
+                  id (underscore, <button> tag) in the DOM and binds its own
+                  click handling to it once bKash.init() has run — it does
+                  NOT inject markup into a container div. See §18. */}
+              <button
+                type="button"
+                id="bKash_button"
+                disabled={!form.package_id || !pgwScriptLoaded}
+                className="w-full rounded-xl bg-[#E2136E] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {t.payWithBkash}
+              </button>
+            </section>
+          )}
+
+          {subscription?.bkash_gateway_enabled && subscription.bkash_api_type === "tokenized" && (
             <section className="catv-panel mx-4 mb-4 p-4">
               <button
                 type="button"

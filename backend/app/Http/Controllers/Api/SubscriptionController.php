@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\PlatformBillingSetting;
 use App\Models\SubscriptionPackage;
 use App\Models\SubscriptionPayment;
+use App\Services\Payment\BkashPgwPaymentGatewayClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SubscriptionController extends Controller
 {
+    public function __construct(private readonly BkashPgwPaymentGatewayClient $bkashPgw) {}
+
     public function plans(): JsonResponse
     {
         return response()->json([
@@ -44,6 +47,8 @@ class SubscriptionController extends Controller
                     'bkash_type' => $billingSettings->bkash_type,
                 ],
                 'bkash_gateway_enabled' => $billingSettings->hasBkashGateway(),
+                'bkash_api_type' => PlatformBillingSetting::resolvedBkashApiType(),
+                'bkash_pgw_script_url' => $this->bkashPgw->scriptUrl(),
                 'recent_payments' => $user->subscriptionPayments()
                     ->with('package:id,name,slug')
                     ->latest()

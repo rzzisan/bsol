@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\BkashPaymentController;
+use App\Http\Controllers\Api\BkashPgwPaymentController;
 use App\Http\Controllers\Api\FacebookConnectController;
 use App\Http\Controllers\Api\FacebookLeadController;
 use App\Http\Controllers\Api\FacebookPixelSettingController;
@@ -159,6 +160,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
     Route::post('/subscription/payments', [SubscriptionController::class, 'submitPayment']);
     Route::post('/subscription/pay/bkash/initiate', [BkashPaymentController::class, 'initiate']);
+
+    // bKash classic Checkout API ("PGW") — JS-widget flow, no redirect
+    // callback needed (widget calls these two directly while the seller
+    // stays authenticated on our page). See §18, BkashPgwPaymentController.
+    Route::post('/subscription/pay/bkash-pgw/create', [BkashPgwPaymentController::class, 'create']);
+    Route::post('/subscription/pay/bkash-pgw/execute/{paymentId}', [BkashPgwPaymentController::class, 'execute']);
 
     // ── SaaS Support chat (seller ↔ admin team) — deliberately outside the
     // active_subscription group: a seller with an expired subscription needs

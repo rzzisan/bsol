@@ -20,6 +20,8 @@ const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\
 type PaymentStatus = "pending" | "approved" | "rejected";
 type BkashType = "Personal" | "Merchant" | "Agent";
 
+type BkashApiType = "tokenized" | "pgw";
+
 interface BillingSettings {
   bkash_number: string | null;
   bkash_type: BkashType;
@@ -28,6 +30,7 @@ interface BillingSettings {
   bkash_username: string | null;
   bkash_password_set: boolean;
   bkash_sandbox: boolean;
+  bkash_api_type: BkashApiType;
   bkash_gateway_configured: boolean;
 }
 
@@ -76,6 +79,10 @@ const text = {
     password: "bKash Password",
     passwordSetHint: "সেট করা আছে — পরিবর্তন করতে নতুন মান লিখুন",
     sandboxMode: "Sandbox মোড (টেস্টিং)",
+    apiTypeLabel: "bKash API ধরন",
+    apiTypeTokenized: "Tokenized Checkout (নতুন, redirect-ভিত্তিক)",
+    apiTypePgw: "PGW / Checkout API (পুরনো, widget-ভিত্তিক)",
+    apiTypeHint: "bKash আপনাকে যে API ইস্যু করেছে সেটাই বেছে নিন — দুটো credential একে অপরের সাথে কাজ করে না। ইমেইলে \"Tokenized\" লেখা থাকলে প্রথমটা, \"PGW\"/\"Checkout\" লেখা থাকলে দ্বিতীয়টা বেছে নিন।",
     tabs: { pending: "পেন্ডিং", approved: "অনুমোদিত", rejected: "বাতিল", all: "সব" } as Record<string, string>,
     table: { user: "মার্চেন্ট", package: "প্যাকেজ", amount: "পরিমাণ", trxId: "TrxID", sender: "প্রেরকের নম্বর", date: "তারিখ", status: "স্ট্যাটাস", actions: "অ্যাকশন" },
     approve: "অনুমোদন করুন",
@@ -116,6 +123,10 @@ const text = {
     password: "bKash Password",
     passwordSetHint: "Already set — enter a new value to change it",
     sandboxMode: "Sandbox mode (testing)",
+    apiTypeLabel: "bKash API type",
+    apiTypeTokenized: "Tokenized Checkout (newer, redirect-based)",
+    apiTypePgw: "PGW / Checkout API (older, widget-based)",
+    apiTypeHint: "Pick whichever bKash actually issued you — the two credential sets are not interchangeable. If your onboarding email says \"Tokenized\", pick the first; if it says \"PGW\"/\"Checkout\", pick the second.",
     tabs: { pending: "Pending", approved: "Approved", rejected: "Rejected", all: "All" } as Record<string, string>,
     table: { user: "Merchant", package: "Package", amount: "Amount", trxId: "TrxID", sender: "Sender Number", date: "Date", status: "Status", actions: "Actions" },
     approve: "Approve",
@@ -148,6 +159,7 @@ export default function AdminBillingPage() {
     bkash_username: "",
     bkash_password_set: false,
     bkash_sandbox: true,
+    bkash_api_type: "tokenized",
     bkash_gateway_configured: false,
   });
   const [bkashAppSecretInput, setBkashAppSecretInput] = useState("");
@@ -248,6 +260,7 @@ export default function AdminBillingPage() {
           bkash_username: data.data.bkash_username ?? "",
           bkash_password_set: Boolean(data.data.bkash_password_set),
           bkash_sandbox: data.data.bkash_sandbox ?? true,
+          bkash_api_type: (data.data.bkash_api_type as BkashApiType) ?? "tokenized",
           bkash_gateway_configured: Boolean(data.data.bkash_gateway_configured),
         });
       }
@@ -285,6 +298,7 @@ export default function AdminBillingPage() {
           bkash_username: settings.bkash_username || null,
           bkash_password: bkashPasswordInput || undefined,
           bkash_sandbox: settings.bkash_sandbox,
+          bkash_api_type: settings.bkash_api_type,
         }),
       });
       const data = await res.json();
@@ -449,6 +463,20 @@ export default function AdminBillingPage() {
               className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
             />
           </div>
+
+          <div className="mt-3">
+            <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">{t.apiTypeLabel}</label>
+            <select
+              value={settings.bkash_api_type}
+              onChange={(e) => setSettings((s) => ({ ...s, bkash_api_type: e.target.value as BkashApiType }))}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm md:w-auto"
+            >
+              <option value="tokenized">{t.apiTypeTokenized}</option>
+              <option value="pgw">{t.apiTypePgw}</option>
+            </select>
+            <p className="mt-1 text-xs text-[var(--muted)]">{t.apiTypeHint}</p>
+          </div>
+
           <label className="mt-3 flex items-center gap-2 text-sm text-[var(--foreground)]">
             <input
               type="checkbox"

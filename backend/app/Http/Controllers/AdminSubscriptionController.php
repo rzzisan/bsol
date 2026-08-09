@@ -31,6 +31,7 @@ class AdminSubscriptionController extends Controller
             'bkash_username' => ['nullable', 'string', 'max:255'],
             'bkash_password' => ['nullable', 'string', 'max:255'],
             'bkash_sandbox' => ['nullable', 'boolean'],
+            'bkash_api_type' => ['nullable', Rule::in(['tokenized', 'pgw'])],
         ]);
 
         $setting = PlatformBillingSetting::getSetting();

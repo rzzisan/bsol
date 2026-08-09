@@ -14,6 +14,7 @@ class PlatformBillingSetting extends Model
         'bkash_username',
         'bkash_password',
         'bkash_sandbox',
+        'bkash_api_type',
     ];
 
     protected function casts(): array
@@ -50,6 +51,7 @@ class PlatformBillingSetting extends Model
             'bkash_username' => $this->bkash_username,
             'bkash_password_set' => filled($this->bkash_password),
             'bkash_sandbox' => $this->bkash_sandbox,
+            'bkash_api_type' => $this->bkash_api_type ?: 'tokenized',
             'bkash_gateway_configured' => $this->hasBkashGateway(),
         ];
     }
@@ -87,5 +89,11 @@ class PlatformBillingSetting extends Model
         $setting = static::getSetting();
 
         return $setting->bkash_app_key ? (bool) $setting->bkash_sandbox : config('services.bkash.sandbox', true);
+    }
+
+    /** 'tokenized' (Tokenized Checkout, v1.2.0-beta, tokenized.pay.bka.sh) or 'pgw' (classic Checkout API, checkout.pay.bka.sh). */
+    public static function resolvedBkashApiType(): string
+    {
+        return static::getSetting()->bkash_api_type ?: 'tokenized';
     }
 }
