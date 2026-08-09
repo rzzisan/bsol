@@ -21,6 +21,9 @@ use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\BkashPaymentController;
 use App\Http\Controllers\Api\BkashPgwPaymentController;
+use App\Http\Controllers\Api\SmsCreditBkashPaymentController;
+use App\Http\Controllers\Api\SmsCreditBkashPgwPaymentController;
+use App\Http\Controllers\Api\SmsCreditPurchaseController;
 use App\Http\Controllers\Api\FacebookConnectController;
 use App\Http\Controllers\Api\FacebookLeadController;
 use App\Http\Controllers\Api\FacebookPixelSettingController;
@@ -135,6 +138,11 @@ Route::get('/facebook/connect/callback', [FacebookConnectController::class, 'cal
 Route::get('/subscription/pay/bkash/callback', [BkashPaymentController::class, 'callback'])
     ->middleware('throttle:20,1');
 
+// Same rationale as the subscription bKash callback above — see
+// SmsCreditBkashPaymentController, subscription_billing_context.md §3.
+Route::get('/sms/credit/pay/bkash/callback', [SmsCreditBkashPaymentController::class, 'callback'])
+    ->middleware('throttle:20,1');
+
 Route::middleware('auth:sanctum')->group(function () {
     // Email OTP for verification (authenticated)
     Route::post('/email/send-verification', [EmailOtpController::class, 'sendVerificationEmail']);
@@ -154,6 +162,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/sms/automation/rules/{id}', [SmsAutomationController::class, 'update']);
     Route::delete('/sms/automation/rules/{id}', [SmsAutomationController::class, 'destroy']);
     Route::get('/sms/automation/logs', [SmsAutomationController::class, 'logs']);
+
+    // ── SMS credit self-service purchase — subscription_billing_context.md §3 ──
+    Route::get('/sms/credit/rate', [SmsCreditPurchaseController::class, 'rate']);
+    Route::get('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'myPurchases']);
+    Route::post('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'submitPayment']);
+    Route::post('/sms/credit/pay/bkash/initiate', [SmsCreditBkashPaymentController::class, 'initiate']);
+    Route::post('/sms/credit/pay/bkash-pgw/create', [SmsCreditBkashPgwPaymentController::class, 'create']);
+    Route::post('/sms/credit/pay/bkash-pgw/execute/{paymentId}', [SmsCreditBkashPgwPaymentController::class, 'execute']);
 
     // ── Subscription (self-service — must stay reachable even when expired) ───
     Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
@@ -400,6 +416,9 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/sms/credit/users', [AdminSmsCreditController::class, 'listUserCredits']);
         Route::post('/sms/credit/recharge', [AdminSmsCreditController::class, 'recharge']);
         Route::get('/sms/credit/history', [AdminSmsCreditController::class, 'creditHistory']);
+        Route::get('/sms/credit/purchases', [AdminSmsCreditController::class, 'listPurchases']);
+        Route::post('/sms/credit/purchases/{purchase}/approve', [AdminSmsCreditController::class, 'approvePurchase']);
+        Route::post('/sms/credit/purchases/{purchase}/reject', [AdminSmsCreditController::class, 'rejectPurchase']);
 
         // Email Configuration Routes
         Route::get('/email-configurations', [EmailConfigurationController::class, 'index']);

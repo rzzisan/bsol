@@ -35,6 +35,17 @@ interface UserCredit {
   sms_balance: number;
 }
 
+interface Purchase {
+  id: number;
+  credits: number;
+  amount: string;
+  status: "pending" | "approved" | "rejected";
+  trx_id: string | null;
+  payment_method: string;
+  created_at: string;
+  user?: { id: number; name: string; mobile: string | null };
+}
+
 interface CreditHistory {
   id: number;
   user_id: number;
@@ -109,6 +120,19 @@ const text = {
     costPreview: (credits: number, rate: number, currency: string) =>
       `${credits} ক্রেডিট = ${(credits * rate).toFixed(2)} ${currency}`,
     // history
+    purchasesTitle: "ক্রয় অনুরোধ (সেলফ-সার্ভিস)",
+    colCreditsAmt: "ক্রেডিট",
+    colAmount: "টাকা",
+    colTrx: "TrxID",
+    colStatus: "অবস্থা",
+    colActionsHeader: "কার্যক্রম",
+    approve: "অনুমোদন",
+    reject: "বাতিল",
+    rejectPrompt: "বাতিলের কারণ (ঐচ্ছিক):",
+    statusPending: "পেন্ডিং",
+    statusApproved: "অনুমোদিত",
+    statusRejected: "বাতিল",
+    noPurchases: "কোনো ক্রয় অনুরোধ নেই।",
     historyTitle: "ক্রেডিট লেনদেন ইতিহাস",
     colUser: "গ্রাহক",
     colType: "ধরন",
@@ -172,6 +196,19 @@ const text = {
     cancel: "Cancel",
     costPreview: (credits: number, rate: number, currency: string) =>
       `${credits} credits = ${(credits * rate).toFixed(2)} ${currency}`,
+    purchasesTitle: "Purchase Requests (Self-Service)",
+    colCreditsAmt: "Credits",
+    colAmount: "Amount",
+    colTrx: "TrxID",
+    colStatus: "Status",
+    colActionsHeader: "Actions",
+    approve: "Approve",
+    reject: "Reject",
+    rejectPrompt: "Rejection reason (optional):",
+    statusPending: "Pending",
+    statusApproved: "Approved",
+    statusRejected: "Rejected",
+    noPurchases: "No purchase requests found.",
     historyTitle: "Credit Transaction History",
     colUser: "Customer",
     colType: "Type",
@@ -226,6 +263,11 @@ export default function SmsCreditPage() {
   const [rechargeNote, setRechargeNote] = useState("");
   const [recharging, setRecharging] = useState(false);
   const [rechargeError, setRechargeError] = useState<string | null>(null);
+
+  // self-service purchase requests
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [purchasesLoading, setPurchasesLoading] = useState(true);
+  const [purchaseActioningId, setPurchaseActioningId] = useState<number | null>(null);
 
   // history
   const [history, setHistory] = useState<CreditHistory[]>([]);
@@ -284,6 +326,54 @@ export default function SmsCreditPage() {
     finally { setUsersLoading(false); }
   }, []);
 
+  const loadPurchases = useCallback(async () => {
+    const token = getStoredToken();
+    if (!token) return;
+    setPurchasesLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/sms/credit/purchases?status=pending&per_page=50`, {
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      });
+      const data = (await res.json()) as { data?: Purchase[] };
+      if (res.ok) setPurchases(data.data ?? []);
+    } catch { /* ignore */ }
+    finally { setPurchasesLoading(false); }
+  }, []);
+
+  const approvePurchase = useCallback(async (id: number) => {
+    const token = getStoredToken();
+    if (!token) return;
+    setPurchaseActioningId(id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/sms/credit/purchases/${id}/approve`, {
+        method: "POST",
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        await loadPurchases();
+        await loadHistory(1);
+      }
+    } catch { /* ignore */ }
+    finally { setPurchaseActioningId(null); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadPurchases]);
+
+  const rejectPurchase = useCallback(async (id: number, note: string) => {
+    const token = getStoredToken();
+    if (!token) return;
+    setPurchaseActioningId(id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/sms/credit/purchases/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ admin_note: note }),
+      });
+      if (res.ok) await loadPurchases();
+    } catch { /* ignore */ }
+    finally { setPurchaseActioningId(null); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadPurchases]);
+
   const loadHistory = useCallback(async (page: number) => {
     const token = getStoredToken();
     if (!token) return;
@@ -311,9 +401,10 @@ export default function SmsCreditPage() {
     if (authState === "ready") {
       void loadSettings();
       void loadUsers();
+      void loadPurchases();
       void loadHistory(1);
     }
-  }, [authState, loadSettings, loadUsers, loadHistory]);
+  }, [authState, loadSettings, loadUsers, loadPurchases, loadHistory]);
 
   useEffect(() => {
     if (authState === "ready") void loadHistory(historyPage);
@@ -685,6 +776,79 @@ export default function SmsCreditPage() {
                       >
                         {t.rechargeBtn}
                       </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Self-service purchase requests — subscription_billing_context.md §3 */}
+      <div className={sectionCls}>
+        <h2 className="mb-4 text-base font-bold text-[var(--foreground)]">{t.purchasesTitle}</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse text-sm">
+            <thead className="bg-[#2f7ec1] text-white">
+              <tr>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colUser}</th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colCreditsAmt}</th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colAmount}</th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colTrx}</th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colStatus}</th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colActionsHeader}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchasesLoading && (
+                <tr>
+                  <td colSpan={6} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                    {t.loading}
+                  </td>
+                </tr>
+              )}
+              {!purchasesLoading && purchases.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                    {t.noPurchases}
+                  </td>
+                </tr>
+              )}
+              {!purchasesLoading &&
+                purchases.map((p) => (
+                  <tr key={p.id}>
+                    <td className="border border-[#e5ebf5] px-3 py-2">
+                      {p.user?.name ?? "-"}
+                      {p.user?.mobile ? <span className="text-[var(--muted)]"> ({p.user.mobile})</span> : null}
+                    </td>
+                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">{p.credits.toLocaleString()}</td>
+                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">৳{Number(p.amount).toLocaleString()}</td>
+                    <td className="border border-[#e5ebf5] px-3 py-2">{p.trx_id ?? "-"}</td>
+                    <td className="border border-[#e5ebf5] px-3 py-2">
+                      {p.status === "pending" ? t.statusPending : p.status === "approved" ? t.statusApproved : t.statusRejected}
+                    </td>
+                    <td className="border border-[#e5ebf5] px-3 py-2">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={purchaseActioningId === p.id}
+                          onClick={() => void approvePurchase(p.id)}
+                          className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-60"
+                        >
+                          {t.approve}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={purchaseActioningId === p.id}
+                          onClick={() => {
+                            const note = window.prompt(t.rejectPrompt) ?? "";
+                            void rejectPurchase(p.id, note);
+                          }}
+                          className="rounded-lg bg-rose-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-60"
+                        >
+                          {t.reject}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

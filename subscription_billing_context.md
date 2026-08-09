@@ -2,7 +2,7 @@
 
 এই ফাইলে এই কনভারসেশনে সাবস্ক্রিপশন/বিলিং ফিচার উন্নয়ন এবং SMS credit কেনার ফিচার প্ল্যানিং সংক্রান্ত সব কাজের context লিপিবদ্ধ থাকবে (user-এর বাধ্যতামূলক নির্দেশনা অনুযায়ী)। Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (product/feature — subscription §15.8/§18, SMS §15.5)।
 
-Last updated: 2026-08-09 — **Phase 1 (subscription upgrade/downgrade/proration/invoice) কোড সম্পন্ন, migrate + deploy + live-verify করা হয়েছে।** নিচে §5-এ implementation log।
+Last updated: 2026-08-09 — **Phase 1 ও Phase 2 দুটোই কোড সম্পন্ন, migrate + deploy + live-verify করা হয়েছে।** Phase 1 (subscription upgrade/proration/invoice) user নিজে bKash gateway দিয়ে লাইভ টেস্ট করে সফল কনফার্ম করেছেন। Phase 2 (SMS credit self-service purchase) implementation log নিচে §6-এ।
 
 ---
 
@@ -177,8 +177,8 @@ Schema::create('sms_credit_purchases', function (Blueprint $table) {
 1. ✅ Audit + প্ল্যান লেখা (এই ফাইল) — সম্পন্ন
 2. ✅ Phase 1: Subscription upgrade/downgrade/proration/invoice — backend migration + service + controller changes, frontend card redesign + invoice preview + countdown — সম্পন্ন (§5)
 3. ✅ Phase 1 deploy + live verify (`npm run deploy:prod:safe`) — সম্পন্ন (§5)
-4. 🔲 Phase 2: SMS credit self-service purchase (§3) — এখন শুরু করা যাবে
-5. 🔲 Phase 2 deploy + live verify
+4. ✅ Phase 2: SMS credit self-service purchase (§3) — সম্পন্ন (§6)
+5. ✅ Phase 2 deploy + live verify — সম্পন্ন (§6)
 
 ---
 
@@ -220,6 +220,42 @@ Upgrade করলে নতুন `ends_at = now() + target_package.duration_day
   - সব টেস্ট প্যাকেজ/ইউজার/পেমেন্ট/টোকেন সেশন শেষে DB থেকে মুছে ফেলা হয়েছে
 
 ### 5.5 যা এই ফেজে করা হয়নি (out of scope, ভবিষ্যতে বিবেচনা করা যেতে পারে)
-- bKash gateway flow (Tokenized initiate / PGW create) live real-money টেস্ট করা হয়নি এই সেশনে (শুধু manual submit + admin approve path লাইভ টেস্ট হয়েছে) — কোড path একই `SubscriptionInvoiceService`/guard ব্যবহার করে বলে ঝুঁকি কম, কিন্তু বাস্তব bKash checkout দিয়ে upgrade একবার verify করা ভালো হবে যখন সুযোগ হবে
+- ~~bKash gateway flow real-money টেস্ট~~ — ✅ user নিজে টেস্ট করে সফল কনফার্ম করেছেন (2026-08-09, একই দিন)
 - PDF ইনভয়েস ডাউনলোড/প্রিন্ট (§16.7-এর broader "Invoice/Waybill PDF" scope-এর অংশ) — এই ফেজে শুধু on-screen ইনভয়েস প্রিভিউ, কোনো PDF জেনারেশন যোগ হয়নি
 - Admin subscription-payments লিস্টে নতুন proration কলাম (base_amount/proration_credit) দেখানো — admin UI (`/admin/billing` পেমেন্ট queue) এই সেশনে touch করা হয়নি, `invoice_breakdown` JSON ডেটাবেসে আছে কিন্তু admin frontend-এ render হয় না এখনো
+
+---
+
+## 6. Phase 2 — Implementation log (2026-08-09, SMS credit self-service purchase)
+
+§3-এর প্ল্যান অনুযায়ী, কোনো নতুন design decision লাগেনি (rate/wallet/history infra আগে থেকেই ছিল)।
+
+### 6.1 Backend — নতুন ফাইল
+- **নতুন migration** `2026_08_09_190412_create_sms_credit_purchases_table.php` — §3.1-এর ডিজাইন অনুযায়ী হুবহু (`user_id, credits, rate_used, amount, payment_method, sender_bkash_number, trx_id, screenshot_path, bkash_payment_id, status, admin_note, reviewed_by, reviewed_at`)
+- **নতুন** `app/Models/SmsCreditPurchase.php`
+- **নতুন** `app/Http/Controllers/Api/SmsCreditPurchaseController.php` — `rate()` (rate/balance/gateway-config/payment-instructions, seller-facing), `myPurchases()`, `submitPayment()` (manual bKash, min 100 credits, server-side amount = credits × rate)
+- **নতুন** `app/Http/Controllers/Api/SmsCreditBkashPaymentController.php` — `initiate()`+`callback()`, `BkashPaymentController`-এর হুবহু প্যাটার্ন (Tokenized Checkout), সফল হলে `SmsCreditService::recharge()` কল করে
+- **নতুন** `app/Http/Controllers/Api/SmsCreditBkashPgwPaymentController.php` — `create()`+`execute()`, `BkashPgwPaymentController`-এর হুবহু প্যাটার্ন (classic PGW widget flow)
+- **পরিবর্তিত** `app/Http/Controllers/AdminSmsCreditController.php` — `listPurchases()`/`approvePurchase()`/`rejectPurchase()` যোগ (AdminSubscriptionController-এর approve/reject প্যাটার্ন), approve হলে `SmsCreditService::recharge()` কল করে (existing service reuse, নতুন balance-update লজিক লেখা হয়নি)
+- **পরিবর্তিত** `routes/api.php` — public `GET /sms/credit/pay/bkash/callback`; auth:sanctum গ্রুপে `GET /sms/credit/rate`, `GET|POST /sms/credit/purchases`, `POST /sms/credit/pay/bkash/initiate`, `POST /sms/credit/pay/bkash-pgw/{create,execute/{id}}`; admin গ্রুপে `GET /admin/sms/credit/purchases`, `POST .../{purchase}/approve`, `POST .../{purchase}/reject`
+
+### 6.2 Frontend — নতুন/পরিবর্তিত ফাইল
+- **নতুন** `frontend/src/app/dashboard/sms/credit/page.tsx` — seller-facing purchase page: balance card, quick-pick credit বাটন (৫০০/১০০০/২০০০/৫০০০) + custom input, লাইভ দাম হিসাব (credits×rate), bKash pay বাটন (tokenized/pgw, subscription page-এর widget-integration প্যাটার্ন হুবহু পুনঃব্যবহার), manual fallback ফর্ম, purchase history টেবিল — বাংলা/ইংরেজি, dark/light, mobile-first
+- **পরিবর্তিত** `frontend/src/components/user-shell.tsx` — sidebar-এ `sms-credit` মেনু আইটেম যোগ (SMS গ্রুপের নিচে, "SMS পাঠান"/"হিস্টোরি"/"অটোমেশন"-এর পাশে "ক্রেডিট কিনুন")
+- **পরিবর্তিত** `frontend/src/app/admin/sms/credit/page.tsx` — নতুন "Purchase Requests (Self-Service)" প্যানেল (pending queue) Approve/Reject বাটনসহ, Credit History সেকশনের ঠিক উপরে — admin billing পেজের approve/reject প্যাটার্ন অনুসরণ করে
+
+### 6.3 Verification
+- `php -l` সব নতুন/পরিবর্তিত ফাইলে clean, `php artisan migrate --force` সফল, `php artisan route:list --path=sms/credit` দিয়ে ১৫টা নতুন route কনফার্ম
+- `npx tsc --noEmit` clean, `npm run deploy:prod:safe` 8/8 pass, `/dashboard/sms/credit` route static build-এ দেখা গেছে
+- **Live HTTP round-trip** (`bsol.zyrotechbd.com`, test data সেশন শেষে মুছে ফেলা হয়েছে):
+  - `GET /sms/credit/rate` — rate/balance/gateway config সঠিক
+  - `POST /sms/credit/purchases` (manual, 500 credits) — amount সঠিকভাবে সার্ভার-সাইড হিসাব হয়েছে (৫০০×৳0.35=৳175)
+  - `GET /admin/sms/credit/purchases?status=pending` — pending purchase দেখা গেছে
+  - `POST /admin/sms/credit/purchases/{id}/approve` — `SmsCreditService::recharge()` কল হয়ে ব্যালেন্স 0→500 আপডেট হয়েছে (`GET /sms/credit/rate` দিয়ে কনফার্ম)
+  - সব টেস্ট ইউজার/পারচেজ/হিস্টোরি/টোকেন সেশন শেষে DB থেকে মুছে ফেলা হয়েছে
+- bKash gateway path (initiate/create/execute) এই সেশনে শুধু কোড-লেভেলে subscription-এর verified pattern পুনঃব্যবহার করে বানানো হয়েছে, আলাদা করে real-money টেস্ট করা হয়নি — subscription-এর bKash flow ইতিমধ্যে user নিজে verify করেছেন এবং এই কোড হুবহু একই client/pattern ব্যবহার করে বলে ঝুঁকি কম, তবে সুযোগ হলে একবার সরাসরি verify করা ভালো
+
+### 6.4 যা এই ফেজে করা হয়নি (out of scope)
+- Bulk-discount credit pack pricing (§3.1-এ উল্লেখ করা হয়েছিল না করার সিদ্ধান্ত হিসেবে) — শুধু flat rate × credits
+- PDF রিসিট/ইনভয়েস
+- `bkash_payment_id` না থাকা অবস্থায় admin manually purchase-এর status "stuck" রিকভারি UI (§18.1-এর bug-এর মতো কোনো সমস্যা রিপ্রোডিউস করা যায়নি — `bkash_payment_id` Fillable-এ প্রথম থেকেই যোগ করা হয়েছে এই ফাইলে, §18.1-এর শিক্ষা মাথায় রেখে)

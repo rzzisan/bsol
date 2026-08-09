@@ -60,6 +60,7 @@ const menuText = {
     smsSend: "SMS পাঠান",
     smsHistory: "SMS হিস্টোরি",
     smsAutomation: "অটোমেশন",
+    smsCredit: "ক্রেডিট কিনুন",
 
     analytics: "অ্যানালিটিক্স",
     salesReport: "সেলস রিপোর্ট",
@@ -117,6 +118,7 @@ const menuText = {
     smsSend: "Send SMS",
     smsHistory: "SMS History",
     smsAutomation: "Automation",
+    smsCredit: "Buy Credit",
 
     analytics: "Analytics",
     salesReport: "Sales Report",
@@ -219,6 +221,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
         { key: "sms-send", label: t.smsSend, href: "/dashboard/sms/send" },
         { key: "sms-history", label: t.smsHistory, href: "/dashboard/sms/history" },
         { key: "sms-automation", label: t.smsAutomation, href: "/dashboard/sms/automation" },
+        { key: "sms-credit", label: t.smsCredit, href: "/dashboard/sms/credit" },
       ],
     },
     {

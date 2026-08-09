@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SmsCredit;
 use App\Models\SmsCreditHistory;
+use App\Models\SmsCreditPurchase;
 use App\Models\SmsCreditSetting;
 use App\Models\User;
 use App\Services\SmsCreditService;
@@ -163,6 +164,86 @@ class AdminSmsCreditController extends Controller
                 'current_page' => $histories->currentPage(),
                 'last_page' => $histories->lastPage(),
             ],
+        ]);
+    }
+
+    // ------------------------------------------------------------------ self-service purchase queue
+
+    public function listPurchases(Request $request): JsonResponse
+    {
+        $query = SmsCreditPurchase::query()
+            ->with(['user:id,name,mobile,email', 'reviewer:id,name']);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $purchases = $query->latest()->paginate(min((int) ($request->per_page ?? 20), 100));
+
+        return response()->json([
+            'success' => true,
+            'data' => $purchases->items(),
+            'meta' => [
+                'total' => $purchases->total(),
+                'current_page' => $purchases->currentPage(),
+                'last_page' => $purchases->lastPage(),
+            ],
+        ]);
+    }
+
+    public function approvePurchase(SmsCreditPurchase $purchase): JsonResponse
+    {
+        if ($purchase->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pending purchases can be approved.',
+            ], 422);
+        }
+
+        $purchase->update([
+            'status' => 'approved',
+            'reviewed_by' => auth()->id(),
+            'reviewed_at' => now(),
+        ]);
+
+        $this->creditService->recharge(
+            userId: $purchase->user_id,
+            credits: $purchase->credits,
+            rechargedBy: auth()->id(),
+            note: "Self-purchase approved (purchase #{$purchase->id})",
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Purchase approved and credits granted.',
+            'data' => $purchase->fresh(['user', 'reviewer']),
+        ]);
+    }
+
+    public function rejectPurchase(Request $request, SmsCreditPurchase $purchase): JsonResponse
+    {
+        if ($purchase->status !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pending purchases can be rejected.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'admin_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $purchase->update([
+            'status' => 'rejected',
+            'admin_note' => $validated['admin_note'] ?? null,
+            'reviewed_by' => auth()->id(),
+            'reviewed_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Purchase rejected.',
+            'data' => $purchase->fresh(['user', 'reviewer']),
         ]);
     }
 }
