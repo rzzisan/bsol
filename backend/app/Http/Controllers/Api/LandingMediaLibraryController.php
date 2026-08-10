@@ -14,7 +14,7 @@ class LandingMediaLibraryController extends Controller
     public function index(): JsonResponse
     {
         $assets = LandingMediaAsset::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->latest('id')
             ->get();
 

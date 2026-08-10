@@ -15,7 +15,7 @@ class FacebookReplyTemplateController extends Controller
 {
     public function index(): JsonResponse
     {
-        $templates = FacebookReplyTemplate::where('user_id', auth()->id())
+        $templates = FacebookReplyTemplate::whereIn('user_id', auth()->user()->shopUserIds())
             ->orderBy('created_at')
             ->get(['id', 'title', 'message']);
 
@@ -40,7 +40,7 @@ class FacebookReplyTemplateController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $template = FacebookReplyTemplate::where('user_id', auth()->id())->findOrFail($id);
+        $template = FacebookReplyTemplate::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:100'],
@@ -54,7 +54,7 @@ class FacebookReplyTemplateController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        FacebookReplyTemplate::where('user_id', auth()->id())->where('id', $id)->delete();
+        FacebookReplyTemplate::whereIn('user_id', auth()->user()->shopUserIds())->where('id', $id)->delete();
 
         return response()->json(['success' => true]);
     }

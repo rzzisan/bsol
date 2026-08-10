@@ -86,11 +86,11 @@ class AbandonedCheckoutController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
         $perPage = min((int) ($request->per_page ?? 20), 100);
 
         $query = AbandonedCheckout::query()
-            ->where('user_id', $userId)
+            ->whereIn('user_id', $shopUserIds)
             ->with('landingPage:id,title,slug')
             ->with('order:id,order_number,status');
 
@@ -113,7 +113,7 @@ class AbandonedCheckoutController extends Controller
 
         $rows = $query->orderByDesc('last_activity_at')->paginate($perPage);
 
-        $data = $this->attachCustomerValue(collect($rows->items()), $userId);
+        $data = $this->attachCustomerValue(collect($rows->items()), auth()->user()->shopOwnerId());
 
         return response()->json([
             'success' => true,
@@ -130,18 +130,18 @@ class AbandonedCheckoutController extends Controller
     public function show(int $id): JsonResponse
     {
         $checkout = AbandonedCheckout::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->with(['landingPage:id,title,slug', 'order:id,order_number,status'])
             ->findOrFail($id);
 
-        $data = $this->attachCustomerValue(collect([$checkout]), auth()->id())->first();
+        $data = $this->attachCustomerValue(collect([$checkout]), auth()->user()->shopOwnerId())->first();
 
         return response()->json(['success' => true, 'data' => $data]);
     }
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $checkout = AbandonedCheckout::query()->where('user_id', auth()->id())->findOrFail($id);
+        $checkout = AbandonedCheckout::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         $validated = $request->validate([
             'status' => ['nullable', Rule::in(['active', 'dismissed', 'converted'])],
@@ -160,7 +160,7 @@ class AbandonedCheckoutController extends Controller
             'items.*.quantity' => ['required_with:items', 'integer', 'min:1', 'max:100'],
             // Only meaningful together with status=converted — links this checkout
             // to an order created via the "Convert to Order" flow (order-intake-form).
-            'order_id' => ['nullable', 'integer', Rule::exists('orders', 'id')->where('user_id', auth()->id())],
+            'order_id' => ['nullable', 'integer', Rule::exists('orders', 'id')->where('user_id', auth()->user()->shopOwnerId())],
         ]);
 
         if (array_key_exists('items', $validated)) {
@@ -174,7 +174,7 @@ class AbandonedCheckoutController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        $checkout = AbandonedCheckout::query()->where('user_id', auth()->id())->findOrFail($id);
+        $checkout = AbandonedCheckout::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
         $checkout->delete();
 
         return response()->json(['success' => true, 'message' => 'Abandoned checkout deleted.']);
@@ -182,9 +182,9 @@ class AbandonedCheckoutController extends Controller
 
     public function stats(): JsonResponse
     {
-        $userId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
 
-        $counts = AbandonedCheckout::where('user_id', $userId)
+        $counts = AbandonedCheckout::whereIn('user_id', $shopUserIds)
             ->selectRaw("
                 COUNT(*) FILTER (WHERE status = 'active') AS active,
                 COUNT(*) FILTER (WHERE status = 'active' AND last_activity_at < ?) AS abandoned,
@@ -206,10 +206,10 @@ class AbandonedCheckoutController extends Controller
 
     public function export(Request $request): Response
     {
-        $userId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
 
         $rows = AbandonedCheckout::query()
-            ->where('user_id', $userId)
+            ->whereIn('user_id', $shopUserIds)
             ->with('landingPage:id,title')
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->orderByDesc('last_activity_at')

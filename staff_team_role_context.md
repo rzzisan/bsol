@@ -4,7 +4,7 @@
 
 > **ফাইলের নাম নোট:** ইউজার অনুরোধ করা ফাইলনেম (`StaffÑTeamÑsub-account role.md`) filesystem-এ ব্যবহারযোগ্য না (`/` এনকোডিং সমস্যায় করাপ্ট হয়ে `Ñ` হয়ে গিয়েছিল, এবং `/` ফাইলনেমে বৈধ না)। প্রজেক্টের বাকি context ফাইলের কনভেনশন (`subscription_billing_context.md`, `landing_page_context.md`) অনুসরণ করে `staff_team_role_context.md` নামে রাখা হলো।
 
-Last updated: 2026-08-10 — **Phase 1 সম্পূর্ণ (backend + frontend), deploy করা হয়েছে এবং live browser + live HTTP round-trip দিয়ে verify করা হয়েছে** (দেখো §7 backend, §8 frontend)। Implementation-এর সময় §3.3-এর Pattern A/B ভাগ একটা গুরুত্বপূর্ণ জায়গায় সংশোধন করতে হয়েছে (Order/Customer keying, §3.3 ⚠️ নোট + §7.1), এবং একটা middleware path-matching bug ধরা পড়ে সাথে সাথে ফিক্স হয়েছে (§8.3)।
+Last updated: 2026-08-10 — **Phase 1 + Phase 2 উভয়ই সম্পূর্ণ (backend + frontend), deploy করা হয়েছে এবং live browser + live HTTP round-trip দিয়ে verify করা হয়েছে** (Phase 1: §7-৮, Phase 2: §9)। মডিউল কভারেজ এখন সম্পূর্ণ: orders/products/customers/courier/sms/accounting/analytics/landing_pages/fraud/facebook। Implementation-এর সময় Order.user_id owner-keying আবিষ্কারের (§3.3 ⚠️/§7.1) downstream প্রভাব LandingPage/Fraud-এও ছড়িয়ে পড়ে ধরা পড়ে এবং ঠিক করা হয়েছে (§9.3) — এখন এটা একটা সাধারণ নিয়ম হিসেবে ডকুমেন্টেড। Support chat threading সিদ্ধান্ত (প্রতি-staff আলাদা থ্রেড) নেওয়া হয়েছে, কোনো কোড পরিবর্তন লাগেনি (§9.1)। বাকি: Phase 2-এর কোনো নতুন follow-up আইটেম নেই, শুধু mobile viewport visual QA এখনো tool-সীমাবদ্ধতার কারণে বাকি (§9.7)।
 
 ---
 
@@ -189,16 +189,15 @@ Staff suspend/remove করলে শুধু `staff_status` ফ্ল্যা
 3. `UserShell` — মেনু আইটেম `permissions` অনুযায়ী filter (staff হলে যে module permission নেই সেটার মেনু hide), topbar-এ "টিম মেম্বার — {owner_name}-এর শপ" badge
 4. Design system rules (CONTEXT.md §22) — bilingual, mobile-first, dark/light, token color — বাধ্যতামূলক
 
-### Phase 2 — বাকি মডিউল (Phase 1 শেষ হওয়ার পরে শুরু হবে)
+### Phase 2 — ✅ সম্পন্ন (2026-08-10, বিস্তারিত §9)
 
-Pattern A scoping + `staff_permission` middleware সম্প্রসারণ:
+Pattern A scoping + `staff_permission` middleware সম্প্রসারণ — সব সম্পন্ন:
 - Accounting/Transactions
-- Analytics (read-only module — `analytics` permission শুধু view gate করবে)
-- Landing Pages + Media Library
-- Fraud Check + Blacklist
-- Facebook leads (Meta App review নির্ভরতা §SAAS_MODULE_CONTEXT.md §15.11-এর সাথে সাংঘর্ষিক না, স্বাধীনভাবে করা যাবে)
-- Abandoned checkout
-- Support chat — সিদ্ধান্ত বাকি: staff কি owner-এর সাথে একই `support_conversations` থ্রেড শেয়ার করবে (Pattern B, `shopOwnerId()` দিয়ে thread resolve) নাকি staff-এর জন্য আলাদা থ্রেড — **এই প্রশ্নটা Phase 2 শুরুর আগে user-কে জিজ্ঞাসা করতে হবে**
+- Analytics (read-only module — `analytics` permission শুধু view gate করে)
+- Landing Pages + Media Library + Landing Page Analytics + Abandoned Checkout (একটাই `landing_pages` module-এ গ্রুপ করা হয়েছে)
+- Fraud Check + Blacklist + Courier-based fraud check
+- Facebook — connect/pixel settings owner-only (Pattern B, courier settings-এর মতো), leads/reply-templates নতুন `facebook` module permission-এ (Pattern A shared)
+- Support chat — user সিদ্ধান্ত: **প্রতিটা staff-এর জন্য আলাদা থ্রেড** (বিদ্যমান `unique(user_id)` constraint স্বাভাবিকভাবেই এটা দেয়) — কোনো কোড পরিবর্তন লাগেনি, দেখো §9.1
 
 ---
 
@@ -217,7 +216,8 @@ Pattern A scoping + `staff_permission` middleware সম্প্রসারণ
 2. ✅ Phase 1 backend implementation — সম্পন্ন (§7)
 3. ✅ Phase 1 frontend implementation — সম্পন্ন (§8)
 4. ✅ Phase 1 deploy + live verify — সম্পন্ন (§8.4, একই সেশনে backend fix + frontend deploy একসাথে)
-5. 🔲 Phase 2 (support chat threading সিদ্ধান্তসহ) — user confirm-এর পর শুরু হবে
+5. ✅ Phase 2 backend + frontend implementation + deploy + live verify — সম্পন্ন (§9)
+6. ✅ Phase 1 follow-up (dashboard home Quick Access permission-gate) — সম্পন্ন (§9.2)
 
 ---
 
@@ -325,6 +325,75 @@ Live HTTP round-trip test করার সময় ধরা পড়ে: `For
 
 ### 8.5 এই সেশনে যা করা হয়নি (out of scope / ভবিষ্যতের ফলো-আপ)
 
-- Dashboard home page "Quick Access" গ্রিড permission-gate করা (§8.2-এ নোট)
+- ~~Dashboard home page "Quick Access" গ্রিড permission-gate করা~~ ✅ §9.2-এ সম্পন্ন
 - Mobile viewport visual QA (আগের phase-গুলোর মতো একই tool সীমাবদ্ধতা — remote Chrome window resize কাজ করেনি)
-- Phase 2 module scoping (Accounting/Analytics/Landing Pages/Fraud/Facebook/Support chat threading সিদ্ধান্ত)
+- ~~Phase 2 module scoping~~ ✅ §9-এ সম্পন্ন
+
+---
+
+## 9. Phase 2 — Implementation log (2026-08-10, নতুন সেশন)
+
+User request: "Phase 1 backend এবং frontend এর কোন কিছু implementation বাকি থাকলে সেটি শুরু কর। এরপর Phase 2 backend এবং frontend implementation শেষ করার পর কমিট পুশ কর।"
+
+### 9.1 Support chat সিদ্ধান্ত (Phase 2 শুরুর আগে user-কে জিজ্ঞাসা করা হয়েছিল, §4-এ flag করা ছিল)
+
+**সিদ্ধান্ত: প্রতিটা staff-এর জন্য আলাদা থ্রেড।** `support_conversations.unique(user_id)` constraint এমনিতেই প্রতিটা user (owner বা staff, উভয়ের নিজস্ব `id`) এর জন্য আলাদা থ্রেড দেয় — **কোনো ব্যাকএন্ড/ফ্রন্টএন্ড কোড পরিবর্তন লাগেনি**, শুধু `SupportController`-এর বিদ্যমান `auth()->id()`-based scoping ইচ্ছাকৃতভাবে অপরিবর্তিত রাখা হয়েছে (এটাই সঠিক আচরণ এই সিদ্ধান্তে)। Admin inbox-এ প্রতি শপ একাধিক থ্রেড (owner + প্রতিটা staff) হিসেবে দেখা যাবে — এটাই expected।
+
+### 9.2 Phase 1 follow-up — Dashboard home "Quick Access" gating
+
+`frontend/src/app/dashboard/page.tsx` — প্রতিটা shortcut item-এ `module: StaffModuleKey` ট্যাগ যোগ করে `hasModuleAccess()` দিয়ে ফিল্টার (`visibleShortcuts` memo)। সব shortcut বাদ পড়লে পুরো "Quick Access" section hide হয়।
+
+### 9.3 স্থাপত্যগত আবিষ্কার — Order owner-keying-এর প্রভাব LandingPage/Fraud-এও ছড়িয়ে পড়ে
+
+Phase 1-এর §3.3/§7.1 আবিষ্কারের (Order.user_id সবসময় owner id) একটা downstream প্রভাব এই সেশনে ধরা পড়ে এবং ঠিক করা হয়েছে:
+
+- **`LandingPageOrderService::create()`** — আগে সরাসরি `$page->user_id` ব্যবহার করত Order-এর `user_id`/order-number generation-এর জন্য। যেহেতু landing page staff তৈরি করতে পারে (Pattern A, creator-keyed রাখা হয়েছে audit trail-এর জন্য), সরাসরি `$page->user_id` ব্যবহার করলে staff-তৈরি landing page থেকে আসা অর্ডারের `user_id` staff-এর id হয়ে যেত — courier booking ভেঙে যেত। **Fix:** `$page->user?->shopOwnerId()` রিজলভ করে ব্যবহার — landing page নিজে Pattern A থাকে, কিন্তু downstream Order সবসময় owner-keyed।
+- **`CheckoutOtpService::maybeSendForOrder()`** — একইভাবে `$page->user_id` দিয়ে SMS gateway/credit wallet resolve করত (Pattern B রিসোর্স, staff-এর জন্য ভাঙত)। **Fix:** যেহেতু এতক্ষণে `$order->user_id` ইতিমধ্যে owner-resolved, সরাসরি `User::find($order->user_id)` ব্যবহার — কোনো অতিরিক্ত resolve লাগেনি।
+- **`FraudController`/`CourierFraudCheckController`** — `customer_fraud_profiles`/`customer_blacklist` টেবিল shop-wide singleton রিসোর্স (Order/Customer-এর মতো) — `auth()->id()` না, `auth()->user()->shopOwnerId()` ব্যবহার করতে হয়েছে (single-value resolve, `whereIn` না — কারণ এটা owner-keyed singleton, multi-creator shared array না)।
+- **`AbandonedCheckoutController::attachCustomerValue()`** — `Customer` টেবিল owner-keyed (Phase 1-এ প্রতিষ্ঠিত) বলে, এই helper-এ owner id resolve করে পাঠাতে হয়েছে যদিও মূল `AbandonedCheckout` query নিজে shopUserIds()-দিয়ে shared (Pattern A)।
+
+এই প্যাটার্নটা এখন স্পষ্ট নিয়ম হিসেবে ডকুমেন্ট করা গেল: **"যেকোনো downstream resource যেটা Order/Customer/CourierSetting/SmsGateway-এর মতো owner-keyed singleton টেবিল রেফারেন্স করে, সবসময় `shopOwnerId()` (single value) ব্যবহার করতে হবে, `$creatorRow->user_id` সরাসরি trust করা যাবে না — এমনকি সেই creator row নিজে Pattern A (multi-creator shared) হলেও।"**
+
+### 9.4 Backend — নতুন/পরিবর্তিত ফাইল
+
+- **`StaffPermission::MODULE_KEYS`** — নতুন `'facebook'` key যোগ (কোনো migration লাগেনি, plain string column)
+- **`LandingPageOrderService.php`**, **`CheckoutOtpService.php`** — owner-keying fix (§9.3)
+- **`LandingPageController.php`** — `index/show/update/destroy/publish` → `whereIn(shopUserIds())`; `store()`-এ `$actingUserId` (creator, audit) বনাম `$shopUserIds` (product-ownership validation + read scope) আলাদা করা হয়েছে; `validatePayload()`/`syncProducts()` সিগনেচার `int $userId` → `array $shopUserIds`
+- **`LandingMediaLibraryController.php`** — `index()` scoping
+- **`LandingPageAnalyticsController.php`** (non-Api namespace) — ৫টা manual ownership check (`!==` → `!in_array(..., shopUserIds())`) + order-link Rule::exists → `shopOwnerId()`
+- **`AbandonedCheckoutController.php`** — সব merchant method `whereIn(shopUserIds())`, `attachCustomerValue()`/order-link validation → `shopOwnerId()` (§9.3)
+- **`TransactionController.php`** — সব read `whereIn(shopUserIds())`, `store()`-এ audit id অপরিবর্তিত
+- **`AnalyticsController.php`** — সব ৪টা endpoint (sales/products/customers/courier) `whereIn(shopUserIds())`, pure read-only বলে audit-id বিবেচনা নেই
+- **`FraudController.php`**, **`CourierFraudCheckController.php`** — `shopOwnerId()` single-value resolve (§9.3)
+- **`FacebookLeadController.php`** — সব read `whereIn(shopUserIds())` (create নেই, সব webhook-driven বা update-only)
+- **`FacebookReplyTemplateController.php`** — reads `whereIn(shopUserIds())`, `store()` audit id অপরিবর্তিত
+- **`FacebookConnectController.php`**, **`FacebookPixelSettingController.php`** — কোনো internal পরিবর্তন লাগেনি (শুধু route-level `owner_only`, subscription-controller-এর মতো precedent)
+- **`routes/api.php`** — Landing Page Builder+Analytics+Media+Abandoned Checkout ব্লক → `staff_permission:landing_pages`; Accounting → `staff_permission:accounting`; Analytics → `staff_permission:analytics`; Facebook connect+pixel → `owner_only`; Facebook leads+reply-templates → `staff_permission:facebook`; Fraud → `staff_permission:fraud`
+
+### 9.5 Frontend — নতুন/পরিবর্তিত ফাইল
+
+- **`frontend/src/lib/dashboard-client.ts`** — `STAFF_MODULE_KEYS`-এ `'facebook'` যোগ
+- **`frontend/src/app/dashboard/settings/staff/page.tsx`** — `MODULE_KEYS` ৫→১০ এন্ট্রি, `moduleLabels` bn/en সম্পূর্ণ, checkbox grid `grid-cols-2 sm:grid-cols-3`, modal `max-w-md` → `max-w-lg` (১০টা টগলের জন্য বেশি জায়গা)
+- **`frontend/src/components/user-shell.tsx`** — `filterMenuForStaff()` সম্পূর্ণ পুনর্লিখন: আগে শুধু top-level group filter করত, এখন **recursive item+child-level filter** — কারণ কিছু group-এর children আলাদা module দিয়ে gated (যেমন "Orders" group-এর ভেতরে "Fraud Check"/"Blacklist" আসলে `fraud` permission দিয়ে gated, `orders` না)। নতুন `MODULE_KEY_BY_MENU_ITEM` map (leaf-level) + `OWNER_ONLY_MENU_KEYS` set (`settings`, `sms-credit` — permission দিয়েও কখনো দেখানো হবে না)
+- **`frontend/src/app/dashboard/page.tsx`** — Quick Access shortcut প্রতিটাতে `module` ট্যাগ, `hasModuleAccess()` দিয়ে ফিল্টার করা `visibleShortcuts` (§9.2)
+
+### 9.6 Verification (এই সেশনেই সম্পন্ন)
+
+- `php -l` — ১৪টা নতুন/পরিবর্তিত backend ফাইলে clean
+- `php artisan route:list -v` — সব নতুন middleware assignment কনফার্ম (`landing_pages`/`accounting`/`analytics`/`facebook` → `EnsureStaffPermission:{module}`; facebook connect/pixel → `EnsureShopOwner`)
+- **Rollback-wrapped tinker**: নতুন module permission check, staff-তৈরি LandingPage থেকে `LandingPageOrderService::create()` কল করে Order.user_id owner id হয়েছে কনফার্ম (staff id না), `shopUserIds()` উভয় দিক থেকে সঠিক — সব pass, rollback করা হয়েছে
+- **Live HTTP round-trip** (`bsol.zyrotechbd.com`, seeded owner+staff+package, পরে DB থেকে মোছা): `landing_pages` granted → `200`; `accounting` not granted → `403 staff_permission_denied`; `facebook/connect/status` (owner_only) → `403 owner_only`; `fraud/blacklist` granted → `200`; `analytics` not granted → `403`
+- `npx tsc --noEmit` + `npm run build` clean (ESLint সহ), `/dashboard/settings/staff` route intact
+- `sudo -n .../deploy-safe.sh` — 8/8 pass, live smoke check (`/`, `/api/health`, `/dashboard/settings/staff`) সব `200`
+- **লাইভ ব্রাউজার QA** (claude-in-chrome, owner + মিশ্র-permission staff [orders✓, landing_pages✓, facebook✓, fraud✗, products✗] দিয়ে, session শেষে সব cleanup):
+  - Staff dashboard — sidebar-এ শুধু Dashboard/Landing Pages/Abandoned Checkouts/Orders/Facebook Leads দেখা গেছে (বাকি সব হাইড); "Orders" expand করে দেখা গেছে ভেতরে শুধু "All Orders"/"New Order" আছে, "Fraud Check"/"Blacklist" নেই — **recursive child-level filtering লাইভ কনফার্ম**
+  - Dashboard home Quick Access-এ শুধু "Create New Order" দেখা গেছে (বাকি ৫টা shortcut হাইড, permission অনুযায়ী)
+  - Team-member header badge সঠিক
+  - Owner-এর staff-list পেজে ঠিক granted module chip দেখা গেছে (Orders/Landing Pages/Facebook Leads, Fraud Check না)
+  - Add-staff মডালে ১০-checkbox গ্রিড ৩-কলামে পরিষ্কারভাবে রেন্ডার হয়েছে
+  - টেস্ট user/package/permission/token সব cleanup করা হয়েছে
+
+### 9.7 এই সেশনে যা করা হয়নি
+
+- Mobile viewport visual QA (আগের মতোই একই tool সীমাবদ্ধতা)
+- Facebook go-live external dependency (Meta App Review) — অপরিবর্তিত, `facebook_integration_context.md`-এ ট্র্যাক হচ্ছে, এই স্টাফ-ফিচার কাজের সাথে সম্পর্কহীন

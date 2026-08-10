@@ -15,7 +15,7 @@ class CourierFraudCheckController extends Controller
             'phone' => 'required|string|max:20',
         ]);
 
-        $result = $service->check(auth()->id(), $data['phone']);
+        $result = $service->check(auth()->user()->shopOwnerId(), $data['phone']);
 
         if (! $result['success']) {
             return response()->json($result, 422);

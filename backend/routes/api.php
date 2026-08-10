@@ -219,39 +219,40 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
     });
 
 Route::middleware('active_subscription')->group(function () {
-    // ── Landing Page Builder ────────────────────────────────────────────────
-    Route::get('/landing/templates', [LandingTemplateController::class, 'index']);
-    Route::get('/landing/templates/{id}', [LandingTemplateController::class, 'show'])->where('id', '[0-9]+');
-    Route::get('/landing/pages', [LandingPageController::class, 'index']);
-    Route::post('/landing/pages', [LandingPageController::class, 'store']);
-    Route::get('/landing/pages/{id}', [LandingPageController::class, 'show'])->where('id', '[0-9]+');
-    Route::put('/landing/pages/{id}', [LandingPageController::class, 'update'])->where('id', '[0-9]+');
-    Route::delete('/landing/pages/{id}', [LandingPageController::class, 'destroy'])->where('id', '[0-9]+');
-    Route::post('/landing/pages/{id}/publish', [LandingPageController::class, 'publish'])->where('id', '[0-9]+');
+    // ── Landing Page Builder + Analytics + Media Library + Abandoned Checkouts ──
+    // Phase 2 module — staff/team sub-account role, staff_team_role_context.md §9
+    Route::middleware('staff_permission:landing_pages')->group(function () {
+        Route::get('/landing/templates', [LandingTemplateController::class, 'index']);
+        Route::get('/landing/templates/{id}', [LandingTemplateController::class, 'show'])->where('id', '[0-9]+');
+        Route::get('/landing/pages', [LandingPageController::class, 'index']);
+        Route::post('/landing/pages', [LandingPageController::class, 'store']);
+        Route::get('/landing/pages/{id}', [LandingPageController::class, 'show'])->where('id', '[0-9]+');
+        Route::put('/landing/pages/{id}', [LandingPageController::class, 'update'])->where('id', '[0-9]+');
+        Route::delete('/landing/pages/{id}', [LandingPageController::class, 'destroy'])->where('id', '[0-9]+');
+        Route::post('/landing/pages/{id}/publish', [LandingPageController::class, 'publish'])->where('id', '[0-9]+');
 
-    // ── Landing Page Analytics ──────────────────────────────────────────────────
-    Route::prefix('landing/analytics')->group(function () {
-        Route::get('/{landingPageId}/statistics', [LandingPageAnalyticsController::class, 'getStatistics'])->where('landingPageId', '[0-9]+');
-        Route::get('/{landingPageId}/visitors', [LandingPageAnalyticsController::class, 'getVisitors'])->where('landingPageId', '[0-9]+');
-        Route::get('/{landingPageId}/by-country', [LandingPageAnalyticsController::class, 'getByCountry'])->where('landingPageId', '[0-9]+');
-        Route::get('/{landingPageId}/by-referrer', [LandingPageAnalyticsController::class, 'getByReferrer'])->where('landingPageId', '[0-9]+');
-        Route::post('/{landingPageId}/link-visit-to-order', [LandingPageAnalyticsController::class, 'linkVisitToOrder'])->where('landingPageId', '[0-9]+');
-    });
+        Route::prefix('landing/analytics')->group(function () {
+            Route::get('/{landingPageId}/statistics', [LandingPageAnalyticsController::class, 'getStatistics'])->where('landingPageId', '[0-9]+');
+            Route::get('/{landingPageId}/visitors', [LandingPageAnalyticsController::class, 'getVisitors'])->where('landingPageId', '[0-9]+');
+            Route::get('/{landingPageId}/by-country', [LandingPageAnalyticsController::class, 'getByCountry'])->where('landingPageId', '[0-9]+');
+            Route::get('/{landingPageId}/by-referrer', [LandingPageAnalyticsController::class, 'getByReferrer'])->where('landingPageId', '[0-9]+');
+            Route::post('/{landingPageId}/link-visit-to-order', [LandingPageAnalyticsController::class, 'linkVisitToOrder'])->where('landingPageId', '[0-9]+');
+        });
 
-    Route::prefix('landing/media-library')->group(function () {
-        Route::get('/', [LandingMediaLibraryController::class, 'index']);
-        Route::get('/policy', [LandingMediaLibraryController::class, 'policy']);
-        Route::post('/upload', [LandingMediaLibraryController::class, 'store']);
-    });
+        Route::prefix('landing/media-library')->group(function () {
+            Route::get('/', [LandingMediaLibraryController::class, 'index']);
+            Route::get('/policy', [LandingMediaLibraryController::class, 'policy']);
+            Route::post('/upload', [LandingMediaLibraryController::class, 'store']);
+        });
 
-    // ── Abandoned Checkouts ──────────────────────────────────────────────────
-    Route::prefix('landing/abandoned-checkouts')->group(function () {
-        Route::get('/', [AbandonedCheckoutController::class, 'index']);
-        Route::get('/stats', [AbandonedCheckoutController::class, 'stats']);
-        Route::get('/export', [AbandonedCheckoutController::class, 'export']);
-        Route::get('/{id}', [AbandonedCheckoutController::class, 'show'])->where('id', '[0-9]+');
-        Route::put('/{id}', [AbandonedCheckoutController::class, 'update'])->where('id', '[0-9]+');
-        Route::delete('/{id}', [AbandonedCheckoutController::class, 'destroy'])->where('id', '[0-9]+');
+        Route::prefix('landing/abandoned-checkouts')->group(function () {
+            Route::get('/', [AbandonedCheckoutController::class, 'index']);
+            Route::get('/stats', [AbandonedCheckoutController::class, 'stats']);
+            Route::get('/export', [AbandonedCheckoutController::class, 'export']);
+            Route::get('/{id}', [AbandonedCheckoutController::class, 'show'])->where('id', '[0-9]+');
+            Route::put('/{id}', [AbandonedCheckoutController::class, 'update'])->where('id', '[0-9]+');
+            Route::delete('/{id}', [AbandonedCheckoutController::class, 'destroy'])->where('id', '[0-9]+');
+        });
     });
 
     // ── Product Management ────────────────────────────────────────────────────
@@ -303,14 +304,18 @@ Route::middleware('active_subscription')->group(function () {
     });
 
     // ── Accounting ───────────────────────────────────────────────────────────
-    Route::get('/accounting/summary', [TransactionController::class, 'summary']);
-    Route::get('/accounting/transactions', [TransactionController::class, 'index']);
-    Route::post('/accounting/transactions', [TransactionController::class, 'store']);
-    Route::put('/accounting/transactions/{id}', [TransactionController::class, 'update']);
-    Route::delete('/accounting/transactions/{id}', [TransactionController::class, 'destroy']);
+    // Phase 2 module — staff_team_role_context.md §9
+    Route::middleware('staff_permission:accounting')->group(function () {
+        Route::get('/accounting/summary', [TransactionController::class, 'summary']);
+        Route::get('/accounting/transactions', [TransactionController::class, 'index']);
+        Route::post('/accounting/transactions', [TransactionController::class, 'store']);
+        Route::put('/accounting/transactions/{id}', [TransactionController::class, 'update']);
+        Route::delete('/accounting/transactions/{id}', [TransactionController::class, 'destroy']);
+    });
 
     // ── Analytics ────────────────────────────────────────────────────────────
-    Route::prefix('analytics')->group(function () {
+    // Phase 2 module (read-only) — staff_team_role_context.md §9
+    Route::middleware('staff_permission:analytics')->prefix('analytics')->group(function () {
         Route::get('/sales', [AnalyticsController::class, 'sales']);
         Route::get('/products', [AnalyticsController::class, 'products']);
         Route::get('/customers', [AnalyticsController::class, 'customers']);
@@ -378,37 +383,47 @@ Route::middleware('active_subscription')->group(function () {
     });
 
     // ── Facebook Page connection + lead inbox ───────────────────────────────
-    Route::prefix('facebook/connect')->group(function () {
-        Route::get('/status', [FacebookConnectController::class, 'status']);
-        Route::get('/redirect', [FacebookConnectController::class, 'redirect']);
-        Route::get('/pending-pages', [FacebookConnectController::class, 'pendingPages']);
-        Route::post('/select', [FacebookConnectController::class, 'select']);
-        Route::delete('/{id}', [FacebookConnectController::class, 'disconnect'])->where('id', '[0-9]+');
+    // Phase 2 module — staff_team_role_context.md §9. Connection/pixel are
+    // Pattern B credentials (owner_only, like courier settings/subscription —
+    // no internal controller change needed, same as those). Leads + reply
+    // templates are Pattern A shared (staff_permission:facebook).
+    Route::middleware('owner_only')->group(function () {
+        Route::prefix('facebook/connect')->group(function () {
+            Route::get('/status', [FacebookConnectController::class, 'status']);
+            Route::get('/redirect', [FacebookConnectController::class, 'redirect']);
+            Route::get('/pending-pages', [FacebookConnectController::class, 'pendingPages']);
+            Route::post('/select', [FacebookConnectController::class, 'select']);
+            Route::delete('/{id}', [FacebookConnectController::class, 'disconnect'])->where('id', '[0-9]+');
+        });
+        Route::prefix('facebook/pixel')->group(function () {
+            Route::get('/', [FacebookPixelSettingController::class, 'show']);
+            Route::put('/', [FacebookPixelSettingController::class, 'update']);
+            Route::post('/test-event', [FacebookPixelSettingController::class, 'testEvent']);
+        });
     });
-    Route::prefix('facebook/leads')->group(function () {
-        Route::get('/', [FacebookLeadController::class, 'index']);
-        Route::get('/unread-count', [FacebookLeadController::class, 'unreadCount']);
-        Route::get('/stats', [FacebookLeadController::class, 'stats']);
-        Route::get('/{id}', [FacebookLeadController::class, 'show'])->where('id', '[0-9]+');
-        Route::put('/{id}/read', [FacebookLeadController::class, 'markRead'])->where('id', '[0-9]+');
-        Route::put('/{id}/ignore', [FacebookLeadController::class, 'ignore'])->where('id', '[0-9]+');
-        Route::post('/{id}/convert', [FacebookLeadController::class, 'convertToCustomer'])->where('id', '[0-9]+');
-        Route::post('/{id}/reply', [FacebookLeadController::class, 'reply'])->where('id', '[0-9]+');
-    });
-    Route::prefix('facebook/pixel')->group(function () {
-        Route::get('/', [FacebookPixelSettingController::class, 'show']);
-        Route::put('/', [FacebookPixelSettingController::class, 'update']);
-        Route::post('/test-event', [FacebookPixelSettingController::class, 'testEvent']);
-    });
-    Route::prefix('facebook/reply-templates')->group(function () {
-        Route::get('/', [FacebookReplyTemplateController::class, 'index']);
-        Route::post('/', [FacebookReplyTemplateController::class, 'store']);
-        Route::put('/{id}', [FacebookReplyTemplateController::class, 'update'])->where('id', '[0-9]+');
-        Route::delete('/{id}', [FacebookReplyTemplateController::class, 'destroy'])->where('id', '[0-9]+');
+
+    Route::middleware('staff_permission:facebook')->group(function () {
+        Route::prefix('facebook/leads')->group(function () {
+            Route::get('/', [FacebookLeadController::class, 'index']);
+            Route::get('/unread-count', [FacebookLeadController::class, 'unreadCount']);
+            Route::get('/stats', [FacebookLeadController::class, 'stats']);
+            Route::get('/{id}', [FacebookLeadController::class, 'show'])->where('id', '[0-9]+');
+            Route::put('/{id}/read', [FacebookLeadController::class, 'markRead'])->where('id', '[0-9]+');
+            Route::put('/{id}/ignore', [FacebookLeadController::class, 'ignore'])->where('id', '[0-9]+');
+            Route::post('/{id}/convert', [FacebookLeadController::class, 'convertToCustomer'])->where('id', '[0-9]+');
+            Route::post('/{id}/reply', [FacebookLeadController::class, 'reply'])->where('id', '[0-9]+');
+        });
+        Route::prefix('facebook/reply-templates')->group(function () {
+            Route::get('/', [FacebookReplyTemplateController::class, 'index']);
+            Route::post('/', [FacebookReplyTemplateController::class, 'store']);
+            Route::put('/{id}', [FacebookReplyTemplateController::class, 'update'])->where('id', '[0-9]+');
+            Route::delete('/{id}', [FacebookReplyTemplateController::class, 'destroy'])->where('id', '[0-9]+');
+        });
     });
 
     // ── Fraud Check ───────────────────────────────────────────────────────────
-    Route::prefix('fraud')->group(function () {
+    // Phase 2 module — staff_team_role_context.md §9
+    Route::middleware('staff_permission:fraud')->prefix('fraud')->group(function () {
         Route::post('/check-phone', [FraudController::class, 'checkPhone']);
         Route::post('/bulk-check', [FraudController::class, 'bulkCheck']);
         Route::get('/blacklist', [FraudController::class, 'blacklist']);

@@ -56,7 +56,12 @@ class CheckoutOtpService
             return;
         }
 
-        $user = User::find($page->user_id);
+        // Gateway assignment + SMS credit wallet are shop-owner-level
+        // (Pattern B) — by this point $order->user_id is already resolved to
+        // the shop owner (LandingPageOrderService::create()), not
+        // $page->user_id, which may be a staff sub-account. See
+        // staff_team_role_context.md §3.3.
+        $user = User::find($order->user_id);
         if (!$user || !$user->sms_gateway_id) {
             return;
         }

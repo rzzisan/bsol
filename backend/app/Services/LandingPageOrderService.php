@@ -19,13 +19,20 @@ class LandingPageOrderService
     public function create(LandingPage $page, array $validated, Collection $lineItems, array $resolvedFields = []): Order
     {
         return DB::transaction(function () use ($page, $validated, $lineItems, $resolvedFields) {
-            $userId = $page->user_id;
+            // Order.user_id must be the shop OWNER id, not $page->user_id
+            // directly — the landing page may have been created by a staff
+            // sub-account (Pattern A), but courier providers resolve
+            // CourierSetting credentials via $order->user_id (Pattern B), so
+            // it has to land on the owner. See staff_team_role_context.md §3.3/§7.1.
+            $pageOwner = $page->user;
+            $shopOwnerId = $pageOwner?->shopOwnerId() ?? $page->user_id;
+            $shopUserIds = $pageOwner?->shopUserIds() ?? [$page->user_id];
             $subtotal = 0;
             $landingProducts = $page->products->keyBy('product_id');
 
             $order = Order::create([
-                'user_id' => $userId,
-                'order_number' => Order::generateOrderNumber($userId),
+                'user_id' => $shopOwnerId,
+                'order_number' => Order::generateOrderNumber($shopUserIds),
                 'public_token' => Str::random(40),
                 'customer_name' => $validated['customer_name'],
                 'customer_phone' => $validated['customer_phone'],

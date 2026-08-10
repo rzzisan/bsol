@@ -27,7 +27,7 @@ class TransactionController extends Controller
         }
 
         $base = Transaction::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->whereDate('transaction_date', '>=', $from)
             ->whereDate('transaction_date', '<=', $to)
             ->where('status', Transaction::STATUS_CONFIRMED);
@@ -36,7 +36,7 @@ class TransactionController extends Controller
         $expense = (float) (clone $base)->where('type', Transaction::TYPE_EXPENSE)->sum('amount');
 
         $topExpenseCategories = Transaction::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->whereDate('transaction_date', '>=', $from)
             ->whereDate('transaction_date', '<=', $to)
             ->where('status', Transaction::STATUS_CONFIRMED)
@@ -61,7 +61,7 @@ class TransactionController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Transaction::query()->where('user_id', auth()->id());
+        $query = Transaction::query()->whereIn('user_id', auth()->user()->shopUserIds());
 
         if ($request->filled('type')) {
             $query->where('type', $request->string('type'));
@@ -130,7 +130,7 @@ class TransactionController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $txn = Transaction::query()->where('user_id', auth()->id())->findOrFail($id);
+        $txn = Transaction::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         if ($txn->is_auto) {
             return response()->json([
@@ -155,7 +155,7 @@ class TransactionController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        $txn = Transaction::query()->where('user_id', auth()->id())->findOrFail($id);
+        $txn = Transaction::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         if ($txn->is_auto) {
             return response()->json([

@@ -291,30 +291,75 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
   ];
 }
 
-// Staff/Team sub-account role — see staff_team_role_context.md §4. Phase 1
-// only wired staff_permission gating into these five backend modules — every
-// other top-level menu group (landing pages, analytics, accounting, settings,
-// etc.) still works for owners but a staff account would just see empty
-// data there (untouched Phase-2 scoping), so it's cleaner to hide them from
-// the menu entirely rather than show a confusing empty screen. "dashboard"
-// is always shown. Owners/admins are never filtered.
-const STAFF_VISIBLE_MODULE_MENU: Record<string, StaffModuleKey> = {
-  orders: "orders",
-  products: "products",
-  customers: "customers",
-  courier: "courier",
-  sms: "sms",
+// Staff/Team sub-account role — see staff_team_role_context.md §4/§9.
+// "dashboard" is always shown. Owners/admins are never filtered.
+
+// Owner-only resources — never shown to staff regardless of any permission
+// grant (billing/settings, Pattern B — matches the backend's owner_only
+// route middleware, not staff_permission).
+const OWNER_ONLY_MENU_KEYS = new Set(["settings", "sms-credit"]);
+
+// Maps a leaf menu item's key (a top-level item with no children, OR a
+// child inside a parent group) to the backend module permission that gates
+// it. Parent groups themselves (orders/products/customers/courier/sms/
+// analytics/accounting) aren't listed — a group's visibility is derived
+// from whether any of its children remain visible, since some groups mix
+// children gated by different modules (e.g. "orders" group has fraud-check/
+// blacklist gated by the separate "fraud" permission, not "orders").
+const MODULE_KEY_BY_MENU_ITEM: Record<string, StaffModuleKey> = {
+  "landing-pages": "landing_pages",
+  "abandoned-checkouts": "landing_pages",
+  "facebook-leads": "facebook",
+
+  "all-orders": "orders",
+  "create-order": "orders",
+  "fraud-check": "fraud",
+  blacklist: "fraud",
+
+  "product-list": "products",
+  categories: "products",
+  stock: "products",
+
+  "customer-list": "customers",
+  "vip-customers": "customers",
+  "risky-customers": "customers",
+
+  "book-parcel": "courier",
+  "track-orders": "courier",
+  "courier-perf": "courier",
+
+  "sms-send": "sms",
+  "sms-history": "sms",
+  "sms-automation": "sms",
+
+  "sales-report": "analytics",
+  intelligence: "analytics",
+  "ads-roi": "analytics",
+  "courier-report": "analytics",
+
+  "daily-report": "accounting",
+  expenses: "accounting",
+  profit: "accounting",
 };
 
 function filterMenuForStaff(menu: ShellMenuItem[], user: AuthUser | null): ShellMenuItem[] {
   if (!user?.is_staff) return menu;
 
-  return menu.filter((item) => {
-    if (item.key === "dashboard") return true;
-    const moduleKey = STAFF_VISIBLE_MODULE_MENU[item.key];
-    if (!moduleKey) return false;
+  const isLeafVisible = (key: string): boolean => {
+    if (OWNER_ONLY_MENU_KEYS.has(key)) return false;
+    const moduleKey = MODULE_KEY_BY_MENU_ITEM[key];
+    if (!moduleKey) return false; // default-deny for anything unmapped
     return hasModuleAccess(user, moduleKey);
-  });
+  };
+
+  return menu
+    .filter((item) => !OWNER_ONLY_MENU_KEYS.has(item.key))
+    .map((item) => (item.children ? { ...item, children: item.children.filter((c) => isLeafVisible(c.key)) } : item))
+    .filter((item) => {
+      if (item.key === "dashboard") return true;
+      if (item.children) return item.children.length > 0;
+      return isLeafVisible(item.key);
+    });
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────

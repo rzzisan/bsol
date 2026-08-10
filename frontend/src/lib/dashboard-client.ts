@@ -36,6 +36,7 @@ export const STAFF_MODULE_KEYS = [
   "analytics",
   "landing_pages",
   "fraud",
+  "facebook",
 ] as const;
 
 export type StaffModuleKey = (typeof STAFF_MODULE_KEYS)[number];

@@ -22,10 +22,10 @@ class AnalyticsController extends Controller
 
     public function sales(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->shopUserIds();
         [$from, $to] = $this->resolveRange($request);
 
-        $base = Order::where('user_id', $userId)
+        $base = Order::whereIn('user_id', $userId)
             ->whereDate('created_at', '>=', $from)
             ->whereDate('created_at', '<=', $to);
 
@@ -74,7 +74,7 @@ class AnalyticsController extends Controller
 
     public function products(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->shopUserIds();
         [$from, $to] = $this->resolveRange($request);
 
         // COALESCE(order_items.product_id, product_variants.product_id) covers
@@ -84,7 +84,7 @@ class AnalyticsController extends Controller
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->leftJoin('product_variants', 'product_variants.id', '=', 'order_items.product_variant_id')
             ->join('products', 'products.id', '=', DB::raw('COALESCE(order_items.product_id, product_variants.product_id)'))
-            ->where('orders.user_id', $userId)
+            ->whereIn('orders.user_id', $userId)
             ->whereNull('orders.deleted_at')
             ->whereDate('orders.created_at', '>=', $from)
             ->whereDate('orders.created_at', '<=', $to)
@@ -132,10 +132,10 @@ class AnalyticsController extends Controller
 
     public function customers(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->shopUserIds();
         [$from, $to] = $this->resolveRange($request);
 
-        $totals = Customer::where('user_id', $userId)
+        $totals = Customer::whereIn('user_id', $userId)
             ->selectRaw("
                 COUNT(*) as total_customers,
                 COUNT(*) FILTER (WHERE total_orders >= 3) as loyal_customers,
@@ -147,7 +147,7 @@ class AnalyticsController extends Controller
             ")
             ->first();
 
-        $newCustomers = Customer::where('user_id', $userId)
+        $newCustomers = Customer::whereIn('user_id', $userId)
             ->whereDate('created_at', '>=', $from)
             ->whereDate('created_at', '<=', $to)
             ->count();
@@ -155,7 +155,7 @@ class AnalyticsController extends Controller
         $totalCustomers = (int) $totals->total_customers;
         $repeatCustomers = (int) $totals->repeat_customers;
 
-        $districtBreakdown = Order::where('user_id', $userId)
+        $districtBreakdown = Order::whereIn('user_id', $userId)
             ->whereNotNull('customer_district')
             ->whereDate('created_at', '>=', $from)
             ->whereDate('created_at', '<=', $to)
@@ -188,10 +188,10 @@ class AnalyticsController extends Controller
 
     public function courier(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->shopUserIds();
         [$from, $to] = $this->resolveRange($request);
 
-        $byCourier = Order::where('user_id', $userId)
+        $byCourier = Order::whereIn('user_id', $userId)
             ->whereNotNull('courier_name')
             ->whereDate('created_at', '>=', $from)
             ->whereDate('created_at', '<=', $to)
@@ -209,7 +209,7 @@ class AnalyticsController extends Controller
 
         $avgDeliveryHours = OrderStatusLog::query()
             ->join('orders', 'orders.id', '=', 'order_status_logs.order_id')
-            ->where('orders.user_id', $userId)
+            ->whereIn('orders.user_id', $userId)
             ->whereNull('orders.deleted_at')
             ->where('order_status_logs.new_status', 'delivered')
             ->whereNotNull('orders.courier_name')

@@ -17,7 +17,7 @@ class FacebookLeadController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = FacebookLead::where('user_id', auth()->id());
+        $query = FacebookLead::whereIn('user_id', auth()->user()->shopUserIds());
 
         if ($request->filled('channel')) {
             $query->where('channel', $request->string('channel'));
@@ -51,7 +51,7 @@ class FacebookLeadController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $lead = FacebookLead::where('user_id', auth()->id())->with(['customer:id,name,phone', 'pageConnection:id,page_name'])->findOrFail($id);
+        $lead = FacebookLead::whereIn('user_id', auth()->user()->shopUserIds())->with(['customer:id,name,phone', 'pageConnection:id,page_name'])->findOrFail($id);
         [$lead] = $this->withOrderAttribution([$lead]);
 
         return response()->json(['success' => true, 'data' => $lead]);
@@ -74,7 +74,7 @@ class FacebookLeadController extends Controller
 
         $leadIds = collect($leads)->pluck('id')->map(fn ($id) => (string) $id);
 
-        $stats = Order::where('user_id', auth()->id())
+        $stats = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->where('source', 'facebook_inbox')
             ->whereIn('source_ref', $leadIds)
             ->selectRaw('source_ref, COUNT(*) as order_count, MAX(id) as latest_order_id')
@@ -93,7 +93,7 @@ class FacebookLeadController extends Controller
 
     public function unreadCount(): JsonResponse
     {
-        $count = FacebookLead::where('user_id', auth()->id())->where('is_read', false)->count();
+        $count = FacebookLead::whereIn('user_id', auth()->user()->shopUserIds())->where('is_read', false)->count();
 
         return response()->json(['success' => true, 'count' => $count]);
     }
@@ -106,9 +106,9 @@ class FacebookLeadController extends Controller
      */
     public function stats(): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->shopUserIds();
 
-        $counts = FacebookLead::where('user_id', $userId)
+        $counts = FacebookLead::whereIn('user_id', $userId)
             ->selectRaw("
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'new') as new_count,
@@ -118,10 +118,10 @@ class FacebookLeadController extends Controller
             ")
             ->first();
 
-        $ordersCount = Order::where('user_id', $userId)
+        $ordersCount = Order::whereIn('user_id', $userId)
             ->where('source', 'facebook_inbox')
             ->whereIn('source_ref', function ($q) use ($userId) {
-                $q->select(DB::raw('id::text'))->from('facebook_leads')->where('user_id', $userId);
+                $q->select(DB::raw('id::text'))->from('facebook_leads')->whereIn('user_id', $userId);
             })
             ->distinct()
             ->count('source_ref');
@@ -141,7 +141,7 @@ class FacebookLeadController extends Controller
 
     public function markRead(int $id): JsonResponse
     {
-        $lead = FacebookLead::where('user_id', auth()->id())->findOrFail($id);
+        $lead = FacebookLead::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
         $lead->update(['is_read' => true]);
 
         return response()->json(['success' => true, 'data' => $lead]);
@@ -149,7 +149,7 @@ class FacebookLeadController extends Controller
 
     public function ignore(int $id): JsonResponse
     {
-        $lead = FacebookLead::where('user_id', auth()->id())->findOrFail($id);
+        $lead = FacebookLead::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
         $lead->update(['status' => 'ignored', 'is_read' => true]);
 
         return response()->json(['success' => true, 'data' => $lead]);
@@ -157,7 +157,7 @@ class FacebookLeadController extends Controller
 
     public function convertToCustomer(Request $request, int $id): JsonResponse
     {
-        $lead = FacebookLead::where('user_id', auth()->id())->findOrFail($id);
+        $lead = FacebookLead::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         $data = $request->validate([
             'phone' => ['required', 'string', 'regex:/^01[3-9][0-9]{8}$/'],
@@ -193,7 +193,7 @@ class FacebookLeadController extends Controller
      */
     public function reply(Request $request, int $id): JsonResponse
     {
-        $lead = FacebookLead::where('user_id', auth()->id())->with('pageConnection')->findOrFail($id);
+        $lead = FacebookLead::whereIn('user_id', auth()->user()->shopUserIds())->with('pageConnection')->findOrFail($id);
 
         $data = $request->validate([
             'message' => ['required', 'string', 'max:2000'],

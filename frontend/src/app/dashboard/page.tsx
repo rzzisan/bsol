@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
-import { getStoredLocale, getStoredToken, getStoredUser, type Locale } from "@/lib/dashboard-client";
+import {
+  getStoredLocale,
+  getStoredToken,
+  getStoredUser,
+  hasModuleAccess,
+  type Locale,
+  type StaffModuleKey,
+} from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -22,12 +29,12 @@ const text = {
     status: "স্ট্যাটাস",
     total: "মোট",
     shortcutItems: [
-      { label: "নতুন অর্ডার তৈরি", href: "/dashboard/orders/create", icon: "➕" },
-      { label: "ফ্রড চেক করুন", href: "/dashboard/orders/fraud-check", icon: "🔍" },
-      { label: "পার্সেল বুক করুন", href: "/dashboard/courier", icon: "🚚" },
-      { label: "SMS পাঠান", href: "/dashboard/sms/send", icon: "✉️" },
-      { label: "কাস্টমার দেখুন", href: "/dashboard/customers", icon: "👥" },
-      { label: "পণ্য ব্যবস্থাপনা", href: "/dashboard/products", icon: "📦" },
+      { label: "নতুন অর্ডার তৈরি", href: "/dashboard/orders/create", icon: "➕", module: "orders" as StaffModuleKey },
+      { label: "ফ্রড চেক করুন", href: "/dashboard/orders/fraud-check", icon: "🔍", module: "fraud" as StaffModuleKey },
+      { label: "পার্সেল বুক করুন", href: "/dashboard/courier", icon: "🚚", module: "courier" as StaffModuleKey },
+      { label: "SMS পাঠান", href: "/dashboard/sms/send", icon: "✉️", module: "sms" as StaffModuleKey },
+      { label: "কাস্টমার দেখুন", href: "/dashboard/customers", icon: "👥", module: "customers" as StaffModuleKey },
+      { label: "পণ্য ব্যবস্থাপনা", href: "/dashboard/products", icon: "📦", module: "products" as StaffModuleKey },
     ],
   },
   en: {
@@ -44,12 +51,12 @@ const text = {
     status: "Status",
     total: "Total",
     shortcutItems: [
-      { label: "Create New Order", href: "/dashboard/orders/create", icon: "➕" },
-      { label: "Fraud Check", href: "/dashboard/orders/fraud-check", icon: "🔍" },
-      { label: "Book Parcel", href: "/dashboard/courier", icon: "🚚" },
-      { label: "Send SMS", href: "/dashboard/sms/send", icon: "✉️" },
-      { label: "View Customers", href: "/dashboard/customers", icon: "👥" },
-      { label: "Products", href: "/dashboard/products", icon: "📦" },
+      { label: "Create New Order", href: "/dashboard/orders/create", icon: "➕", module: "orders" as StaffModuleKey },
+      { label: "Fraud Check", href: "/dashboard/orders/fraud-check", icon: "🔍", module: "fraud" as StaffModuleKey },
+      { label: "Book Parcel", href: "/dashboard/courier", icon: "🚚", module: "courier" as StaffModuleKey },
+      { label: "Send SMS", href: "/dashboard/sms/send", icon: "✉️", module: "sms" as StaffModuleKey },
+      { label: "View Customers", href: "/dashboard/customers", icon: "👥", module: "customers" as StaffModuleKey },
+      { label: "Products", href: "/dashboard/products", icon: "📦", module: "products" as StaffModuleKey },
     ],
   },
 };
@@ -115,6 +122,12 @@ export default function UserDashboardPage() {
   }, [token]);
 
   const t = useMemo(() => text[locale], [locale]);
+  // Staff/Team sub-account role — hide shortcuts a staff account isn't
+  // permitted to use, see staff_team_role_context.md §8.5.
+  const visibleShortcuts = useMemo(
+    () => t.shortcutItems.filter((item) => hasModuleAccess(getStoredUser(), item.module)),
+    [t],
+  );
 
   const fmt = (n: number | string | null | undefined) =>
     n == null ? "—" : Number(n).toLocaleString(locale === "bn" ? "bn-BD" : "en");
@@ -181,10 +194,11 @@ export default function UserDashboardPage() {
       )}
 
       {/* Quick shortcuts */}
+      {visibleShortcuts.length > 0 && (
       <section className="catv-panel mt-4 p-4 sm:p-5">
         <h3 className="mb-3 text-base font-semibold">{t.shortcuts}</h3>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {t.shortcutItems.map(item => (
+          {visibleShortcuts.map(item => (
             <Link key={item.href} href={item.href}
               className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-3 text-sm font-medium transition-colors hover:bg-[var(--surface)] hover:border-[var(--accent)]">
               <span className="text-lg">{item.icon}</span>
@@ -193,6 +207,7 @@ export default function UserDashboardPage() {
           ))}
         </div>
       </section>
+      )}
 
       {/* Recent orders */}
       <section className="catv-panel mt-4 overflow-x-auto">

@@ -244,11 +244,11 @@ class LandingPageController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
         $perPage = min((int) ($request->per_page ?? 20), 100);
 
         $pages = LandingPage::query()
-            ->where('user_id', $userId)
+            ->whereIn('user_id', $shopUserIds)
             ->with(['template:id,code,name_bn,name_en', 'products'])
             ->orderByDesc('id')
             ->paginate($perPage);
@@ -284,14 +284,15 @@ class LandingPageController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $userId = auth()->id();
-        $data = $this->validatePayload($request, $userId);
+        $actingUserId = auth()->id(); // audit — the LandingPage row itself stays Pattern A (creator)
+        $shopUserIds = auth()->user()->shopUserIds();
+        $data = $this->validatePayload($request, $shopUserIds);
 
-        $page = DB::transaction(function () use ($data, $userId) {
+        $page = DB::transaction(function () use ($data, $actingUserId, $shopUserIds) {
             $slug = $this->resolveSlug($data['slug'] ?? null, $data['title']);
 
             $page = LandingPage::create([
-                'user_id' => $userId,
+                'user_id' => $actingUserId,
                 'template_id' => $data['template_id'] ?? null,
                 'title' => $data['title'],
                 'slug' => $slug,
@@ -303,7 +304,7 @@ class LandingPageController extends Controller
                 'published_at' => ($data['status'] ?? 'draft') === 'published' ? now() : null,
             ]);
 
-            $this->syncProducts($page, $data['products'] ?? [], $userId);
+            $this->syncProducts($page, $data['products'] ?? [], $shopUserIds);
 
             return $page->load(['template', 'products.product.images', 'products.variant.optionValues.option']);
         });
@@ -314,7 +315,7 @@ class LandingPageController extends Controller
     public function show(int $id): JsonResponse
     {
         $page = LandingPage::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->with(['template', 'products.product.images', 'products.variant.optionValues.option'])
             ->findOrFail($id);
 
@@ -328,9 +329,9 @@ class LandingPageController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $userId = auth()->id();
-        $page = LandingPage::query()->where('user_id', $userId)->findOrFail($id);
-        $data = $this->validatePayload($request, $userId, $page);
+        $shopUserIds = auth()->user()->shopUserIds();
+        $page = LandingPage::query()->whereIn('user_id', $shopUserIds)->findOrFail($id);
+        $data = $this->validatePayload($request, $shopUserIds, $page);
 
         if (($data['status'] ?? null) === 'published' && $page->admin_locked) {
             return response()->json([
@@ -340,7 +341,7 @@ class LandingPageController extends Controller
             ], 403);
         }
 
-        $page = DB::transaction(function () use ($page, $data, $userId) {
+        $page = DB::transaction(function () use ($page, $data, $shopUserIds) {
             $status = $data['status'] ?? $page->status;
             $slug = $this->resolveSlug(
                 $data['slug'] ?? $page->slug,
@@ -361,7 +362,7 @@ class LandingPageController extends Controller
             ]);
 
             if (array_key_exists('products', $data)) {
-                $this->syncProducts($page, $data['products'] ?? [], $userId);
+                $this->syncProducts($page, $data['products'] ?? [], $shopUserIds);
             }
 
             return $page->load(['template', 'products.product.images', 'products.variant.optionValues.option']);
@@ -372,7 +373,7 @@ class LandingPageController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        $page = LandingPage::query()->where('user_id', auth()->id())->findOrFail($id);
+        $page = LandingPage::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
         $page->delete();
 
         return response()->json([
@@ -383,7 +384,7 @@ class LandingPageController extends Controller
 
     public function publish(int $id): JsonResponse
     {
-        $page = LandingPage::query()->where('user_id', auth()->id())->findOrFail($id);
+        $page = LandingPage::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         if ($page->admin_locked) {
             return response()->json([
@@ -404,7 +405,8 @@ class LandingPageController extends Controller
         ]);
     }
 
-    private function validatePayload(Request $request, int $userId, ?LandingPage $page = null): array
+    /** @param array<int, int> $shopUserIds */
+    private function validatePayload(Request $request, array $shopUserIds, ?LandingPage $page = null): array
     {
         $pageId = $page?->id;
 
@@ -427,7 +429,7 @@ class LandingPageController extends Controller
             'products.*.product_id' => [
                 'required',
                 'integer',
-                Rule::exists('products', 'id')->where('user_id', $userId),
+                Rule::exists('products', 'id')->where(fn ($q) => $q->whereIn('user_id', $shopUserIds)),
             ],
             // Pinned variant when the merchant attaches one specific
             // combination instead of the whole product — validated against
@@ -495,7 +497,8 @@ class LandingPageController extends Controller
         return $slug;
     }
 
-    private function syncProducts(LandingPage $page, array $products, int $userId): void
+    /** @param array<int, int> $shopUserIds */
+    private function syncProducts(LandingPage $page, array $products, array $shopUserIds): void
     {
         $productIds = collect($products)->pluck('product_id')->filter()->unique()->values();
         if ($productIds->isEmpty()) {
@@ -504,7 +507,7 @@ class LandingPageController extends Controller
         }
 
         $validIds = Product::query()
-            ->where('user_id', $userId)
+            ->whereIn('user_id', $shopUserIds)
             ->whereIn('id', $productIds)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)

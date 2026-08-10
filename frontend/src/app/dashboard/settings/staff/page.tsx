@@ -19,15 +19,47 @@ import {
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
-// Phase 1 module scope — staff_team_role_context.md §4. Keep this list in
-// sync with StaffPermission::MODULE_KEYS' first five entries; adding a
-// Phase-2 module here only requires appending one row + label pair.
-const MODULE_KEYS = ["orders", "products", "customers", "courier", "sms"] as const;
+// All modules — staff_team_role_context.md §4/§9. Keep this list in sync
+// with StaffPermission::MODULE_KEYS on the backend.
+const MODULE_KEYS = [
+  "orders",
+  "products",
+  "customers",
+  "courier",
+  "sms",
+  "accounting",
+  "analytics",
+  "landing_pages",
+  "fraud",
+  "facebook",
+] as const;
 type ModuleKey = (typeof MODULE_KEYS)[number];
 
 const moduleLabels: Record<Locale, Record<ModuleKey, string>> = {
-  bn: { orders: "অর্ডার", products: "পণ্য", customers: "কাস্টমার", courier: "কুরিয়ার", sms: "এসএমএস" },
-  en: { orders: "Orders", products: "Products", customers: "Customers", courier: "Courier", sms: "SMS" },
+  bn: {
+    orders: "অর্ডার",
+    products: "পণ্য",
+    customers: "কাস্টমার",
+    courier: "কুরিয়ার",
+    sms: "এসএমএস",
+    accounting: "হিসাব",
+    analytics: "অ্যানালিটিক্স",
+    landing_pages: "ল্যান্ডিং পেজ",
+    fraud: "ফ্রড চেক",
+    facebook: "ফেসবুক লিডস",
+  },
+  en: {
+    orders: "Orders",
+    products: "Products",
+    customers: "Customers",
+    courier: "Courier",
+    sms: "SMS",
+    accounting: "Accounting",
+    analytics: "Analytics",
+    landing_pages: "Landing Pages",
+    fraud: "Fraud Check",
+    facebook: "Facebook Leads",
+  },
 };
 
 const t = {
@@ -521,7 +553,7 @@ function StaffFormModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-[var(--surface)] p-5 sm:rounded-2xl sm:p-6"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-[var(--surface)] p-5 sm:rounded-2xl sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -592,7 +624,7 @@ function StaffFormModal({
 
           <div>
             <span className="mb-2 block text-xs font-medium text-[var(--muted)]">{tt.permissionsTitle}</span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {MODULE_KEYS.map((key) => (
                 <label
                   key={key}

@@ -22,6 +22,7 @@ class StaffPermission extends Model
         'analytics',
         'landing_pages',
         'fraud',
+        'facebook',
     ];
 
     protected function casts(): array

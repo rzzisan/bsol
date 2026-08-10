@@ -12,7 +12,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 
 | # | ফিচার | স্ট্যাটাস | ডিটেইল ফাইল |
 |---|---|---|---|
-| — | **Staff/Team sub-account role** | 🟢 **Phase 1 সম্পন্ন** (backend+frontend, deployed+verified) — Phase 2 বাকি | `staff_team_role_context.md` |
+| — | **Staff/Team sub-account role** | ✅ **সম্পন্ন** (Phase 1 + Phase 2, সব মডিউল কভার করা হয়েছে, deployed+verified) | `staff_team_role_context.md` |
 | 1 | চেকআউটে অনলাইন পেমেন্ট কালেকশন | ⬜ Not started | — |
 | 2 | WhatsApp Business integration | ⬜ Not started | — |
 | 3 | Auto-top-up / usage-based billing | ⬜ Not started | — |

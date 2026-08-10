@@ -25,7 +25,7 @@ class LandingPageAnalyticsController extends Controller
         $landingPage = LandingPage::findOrFail($landingPageId);
         
         // Check authorization: user must own this landing page
-        if ($landingPage->user_id !== auth()->id()) {
+        if (! in_array($landingPage->user_id, auth()->user()->shopUserIds(), true)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -51,7 +51,7 @@ class LandingPageAnalyticsController extends Controller
         $landingPage = LandingPage::findOrFail($landingPageId);
         
         // Check authorization: user must own this landing page
-        if ($landingPage->user_id !== auth()->id()) {
+        if (! in_array($landingPage->user_id, auth()->user()->shopUserIds(), true)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -81,7 +81,7 @@ class LandingPageAnalyticsController extends Controller
         $landingPage = LandingPage::findOrFail($landingPageId);
         
         // Check authorization: user must own this landing page
-        if ($landingPage->user_id !== auth()->id()) {
+        if (! in_array($landingPage->user_id, auth()->user()->shopUserIds(), true)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -107,7 +107,7 @@ class LandingPageAnalyticsController extends Controller
         $landingPage = LandingPage::findOrFail($landingPageId);
         
         // Check authorization: user must own this landing page
-        if ($landingPage->user_id !== auth()->id()) {
+        if (! in_array($landingPage->user_id, auth()->user()->shopUserIds(), true)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -133,7 +133,7 @@ class LandingPageAnalyticsController extends Controller
         $landingPage = LandingPage::findOrFail($landingPageId);
         
         // Check authorization: user must own this landing page
-        if ($landingPage->user_id !== auth()->id()) {
+        if (! in_array($landingPage->user_id, auth()->user()->shopUserIds(), true)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -148,7 +148,7 @@ class LandingPageAnalyticsController extends Controller
             ],
             'order_id' => [
                 'required',
-                Rule::exists('orders', 'id')->where('user_id', auth()->id()),
+                Rule::exists('orders', 'id')->where('user_id', auth()->user()->shopOwnerId()),
             ],
         ]);
 

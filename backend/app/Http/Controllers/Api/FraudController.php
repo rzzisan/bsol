@@ -20,7 +20,7 @@ class FraudController extends Controller
             'phone' => 'required|string|max:20',
         ]);
 
-        $result = $this->computeScore(auth()->id(), $data['phone']);
+        $result = $this->computeScore(auth()->user()->shopOwnerId(), $data['phone']);
 
         return response()->json(['success' => true, 'data' => $result]);
     }
@@ -36,7 +36,7 @@ class FraudController extends Controller
 
         $results = [];
         foreach ($data['phones'] as $phone) {
-            $results[] = $this->computeScore(auth()->id(), $phone);
+            $results[] = $this->computeScore(auth()->user()->shopOwnerId(), $phone);
         }
 
         return response()->json(['success' => true, 'data' => $results]);
@@ -46,7 +46,7 @@ class FraudController extends Controller
 
     public function blacklist(Request $request): JsonResponse
     {
-        $userId = auth()->id();
+        $userId = auth()->user()->shopOwnerId();
         $query  = DB::table('customer_blacklist')->where('user_id', $userId);
 
         if ($request->filled('search')) {
@@ -79,7 +79,7 @@ class FraudController extends Controller
             'reason' => 'nullable|string|max:300',
         ]);
 
-        $userId = auth()->id();
+        $userId = auth()->user()->shopOwnerId();
 
         $existing = DB::table('customer_blacklist')
             ->where('user_id', $userId)
@@ -110,7 +110,7 @@ class FraudController extends Controller
     public function removeBlacklist(int $id): JsonResponse
     {
         $row = DB::table('customer_blacklist')
-            ->where('user_id', auth()->id())
+            ->where('user_id', auth()->user()->shopOwnerId())
             ->where('id', $id)
             ->first();
 
@@ -119,7 +119,7 @@ class FraudController extends Controller
         }
 
         DB::table('customer_blacklist')
-            ->where('user_id', auth()->id())
+            ->where('user_id', auth()->user()->shopOwnerId())
             ->where('id', $id)
             ->delete();
 
