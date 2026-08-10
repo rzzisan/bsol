@@ -19,6 +19,15 @@
 /public/storage
 /storage/*.key
 /storage/pail
+
+# dompdf's runtime font cache (auto-generated on first use from the fonts
+# actually committed — NotoSansBengali-*.ttf, see InvoicePdfService). Keep
+# the source .ttf files, ignore dompdf's derived .ufm/.json/hashed-name copies.
+/storage/fonts/*.ufm
+/storage/fonts/*.ufm.json
+/storage/fonts/*.afm.json
+/storage/fonts/installed-fonts.json
+/storage/fonts/appfont_*
 /vendor
 _ide_helper.php
 Homestead.json

@@ -2,7 +2,7 @@
 
 এই ফাইলে এই কনভারসেশনে সাবস্ক্রিপশন/বিলিং ফিচার উন্নয়ন এবং SMS credit কেনার ফিচার প্ল্যানিং সংক্রান্ত সব কাজের context লিপিবদ্ধ থাকবে (user-এর বাধ্যতামূলক নির্দেশনা অনুযায়ী)। Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (product/feature — subscription §15.8/§18, SMS §15.5)।
 
-Last updated: 2026-08-09 — **Phase 1 ও Phase 2 দুটোই কোড সম্পন্ন, migrate + deploy + live-verify করা হয়েছে।** Phase 1 (subscription upgrade/proration/invoice) user নিজে bKash gateway দিয়ে লাইভ টেস্ট করে সফল কনফার্ম করেছেন। Phase 2 (SMS credit self-service purchase) implementation log নিচে §6-এ।
+Last updated: 2026-08-10 — **Phase 3: PDF ইনভয়েস + সাবস্ক্রিপশন/SMS-credit UI সম্পূর্ণ redesign সম্পন্ন, deploy + live-verify করা হয়েছে।** নিচে §7-এ implementation log। Phase 1/2 আগেই সম্পন্ন (§5, §6), Phase 1 user নিজে bKash gateway দিয়ে লাইভ টেস্ট করে সফল কনফার্ম করেছেন।
 
 ---
 
@@ -257,5 +257,56 @@ Upgrade করলে নতুন `ends_at = now() + target_package.duration_day
 
 ### 6.4 যা এই ফেজে করা হয়নি (out of scope)
 - Bulk-discount credit pack pricing (§3.1-এ উল্লেখ করা হয়েছিল না করার সিদ্ধান্ত হিসেবে) — শুধু flat rate × credits
-- PDF রিসিট/ইনভয়েস
+- ~~PDF রিসিট/ইনভয়েস~~ — ✅ Phase 3-এ যোগ করা হয়েছে, §7 দেখুন
 - `bkash_payment_id` না থাকা অবস্থায় admin manually purchase-এর status "stuck" রিকভারি UI (§18.1-এর bug-এর মতো কোনো সমস্যা রিপ্রোডিউস করা যায়নি — `bkash_payment_id` Fillable-এ প্রথম থেকেই যোগ করা হয়েছে এই ফাইলে, §18.1-এর শিক্ষা মাথায় রেখে)
+
+---
+
+## 7. Phase 3 — PDF ইনভয়েস + UI সম্পূর্ণ redesign (2026-08-10)
+
+User request: "এসএমএস ক্রেডিট, প্যাকেজ, ইনভয়েস PDF ও বিল পেমেন্ট এর সকল UI নতুন করে ডিজাইন কর। সহজ সাবলিল এবং মডার্ন ডিজাইন।"
+
+### 7.1 নতুন backend capability — PDF ইনভয়েস জেনারেশন
+
+আগে কোনো PDF library ছিল না (§15.10-এ gap হিসেবে নোট করা ছিল)। এখন যোগ করা হয়েছে:
+
+- **Package:** `barryvdh/laravel-dompdf` (`^3.1`, Laravel 13-compatible, `composer require` দিয়ে ইনস্টল করা হয়েছে, কোনো conflict হয়নি)
+- **Bengali font সমস্যা ও সমাধান:** dompdf-এর built-in font (DejaVu Sans)-এ বাংলা script এবং ৳ (Taka sign, U+09F3) glyph নেই — কাস্টমার নাম বাংলায় হলে বা টাকার চিহ্ন থাকলে blank/tofu box দেখাত। সমাধান: Google Noto Sans Bengali (Regular + Bold, `backend/storage/fonts/`-এ ডাউনলোড করে রাখা হয়েছে, `www-data` ownership) — `@font-face`-এর মাধ্যমে PDF-এ embed করা হয় (`file://` local path)।
+  - **⚠️ গুরুত্বপূর্ণ শেখা:** পুরো ডকুমেন্টে গ্লোবালি Noto Sans Bengali ব্যবহার করলে Latin টেক্সট (labels, headings)-এর letter-spacing বাজেভাবে চওড়া দেখাচ্ছিল (dompdf + এই ফন্টের Latin glyph metrics-এর কম্প্যাটিবিলিটি সমস্যা) — তাই body-র default font রাখা হয়েছে dompdf-এর built-in **DejaVu Sans** (ভালো Latin rendering), আর Noto Sans Bengali শুধু `.i18n` class-scoped elements-এ (customer name) এবং amount/currency cells-এ apply করা হয়েছে (`.amount`, `.credit-amount`, `.total-row .amount`) — যেখানে বাংলা script বা ৳ চিহ্ন থাকার সম্ভাবনা আছে। Item label-এ ৳ থাকলে (যেমন SMS credit-এর rate note "× ৳0.35/credit") সেই অংশটুকু আলাদা `<span class="i18n">`-এ split করা হয়েছে, বাকি লেবেল ("1,000 SMS credits") default font-এ থাকে — mixed-font-per-element সীমাবদ্ধতা এড়ানোর জন্য এই split pattern ব্যবহার করা হয়েছে।
+- **`app/Services/InvoicePdfService.php`** — shared service, দুটো method: `subscriptionInvoice(SubscriptionPayment)` ও `smsCreditInvoice(SmsCreditPurchase)`, দুটোই একই Blade template ব্যবহার করে
+- **`resources/views/invoices/document.blade.php`** — একটাই shared invoice layout: brand header, billed-to + invoice# meta, line-items টেবিল (proration credit থাকলে আলাদা লাইনে ঋণাত্মক দেখায়), status badge (PAID/AWAITING PAYMENT/REJECTED, রঙ-কোডেড), pending হলে "awaiting payment" নোটিশ বক্স, payment method/TrxID/paid-date ফুটার লাইন
+- **নতুন endpoint:** `GET /subscription/payments/{payment}/invoice` ও `GET /sms/credit/purchases/{purchase}/invoice` (`auth:sanctum`, `abort_unless($record->user_id === auth()->id(), 403)` ownership guard) — `stream()` দিয়ে `Content-Disposition: inline` PDF রেসপন্স করে (নতুন ব্রাউজার ট্যাবে খোলার জন্য, ডাউনলোডও করা যায় সেখান থেকে)
+
+### 7.2 Frontend — authenticated PDF download pattern
+
+Plain `<a href>` Bearer token header পাঠাতে পারে না (Sanctum bearer-token auth, cookie-based না) — তাই নতুন shared helper:
+
+- **`frontend/src/lib/dashboard-client.ts` → `openAuthenticatedPdf(url)`** — `fetch()` দিয়ে Authorization header-সহ PDF blob নামায়, `URL.createObjectURL()` দিয়ে নতুন ট্যাবে খোলে, ৬০ সেকেন্ড পর object URL revoke করে (নতুন ট্যাব ততক্ষণে load হয়ে যাবে)। Subscription ও SMS-credit উভয় পেজেই reuse হয়েছে।
+
+### 7.3 Frontend — সম্পূর্ণ UI redesign
+
+দুটো ফাইলই বড় visual redesign হয়েছে (business logic/state/effects অপরিবর্তিত — শুধু JSX + presentation):
+
+- **`frontend/src/app/dashboard/settings/subscription/page.tsx`**:
+  - Hero "Current Plan" card — gradient accent ব্যাকগ্রাউন্ড, স্ট্যাটাস পিল, **লাইভ countdown "digit box" UI** (দিন/ঘণ্টা/মিনিট আলাদা রাউন্ডেড বক্সে বড় সংখ্যা, প্রতি সেকেন্ডে টিক করে)
+  - প্যাকেজ কার্ড — বড় spacing, `lucide-react` আইকন (CheckCircle2 ফিচার বুলেট, Sparkles আপগ্রেড ব্যাজ, Lock ডাউনগ্রেড-লকড), hover elevation, কার্ডের নিচে স্পষ্ট CTA টেক্সট ("নির্বাচন করুন"/"নির্বাচিত"/লকড মেসেজ)
+  - ইনভয়েস প্রিভিউ — dashed-border "রসিদ-স্টাইল" কার্ড (প্রকৃত PDF-এর visual language-এর সাথে সামঞ্জস্যপূর্ণ)
+  - বিল পেমেন্ট সেকশন — bKash বাটন প্রাইমারি/prominent রাখা হয়েছে, ম্যানুয়াল ফর্ম এখন **collapsible** (ডিফল্ট লুকানো, "ম্যানুয়ালি পেমেন্ট করুন" টগল বাটনে দেখা যায়) — কম clutter, বেশি modern checkout feel
+  - History টেবিল থেকে বদলে **"invoice row" card list**-এ — প্রতি রো: প্যাকেজ নাম+তারিখ, টাকা+স্ট্যাটাস পিল (আইকনসহ), এবং **PDF ডাউনলোড আইকন বাটন** (`openAuthenticatedPdf` কল করে)
+- **`frontend/src/app/dashboard/sms/credit/page.tsx`**: একই ডিজাইন ভাষা — ব্যালেন্স hero (wallet আইকন), quick-pick credit chip বাটন + custom input, dashed-border প্রাইস ব্রেকডাউন কার্ড, একই collapsible ম্যানুয়াল পেমেন্ট প্যাটার্ন, invoice-row history + PDF ডাউনলোড বাটন
+
+সব existing design token (`--background/--foreground/--surface/--surface-soft/--border/--muted/--accent`) এবং `catv-panel` shared card class অপরিবর্তিত রাখা হয়েছে (CONTEXT.md §22 design consistency policy মেনে) — শুধু ভেতরের composition/spacing/icon যোগ করে modern feel আনা হয়েছে, নতুন কোনো hardcoded color/arbitrary card style তৈরি হয়নি।
+
+### 7.4 Verification
+
+- **PDF রেন্ডারিং**: rollback-wrapped tinker দিয়ে test invoice generate করে `pdftoppm` (নতুন ইনস্টল করা `poppler-utils`) দিয়ে PNG-তে কনভার্ট করে visually inspect করা হয়েছে — 3 iteration লেগেছে (①গ্লোবাল Noto ফন্টে Latin spacing bug ধরা পড়ে, ②scoped font-এ fix করার পর item-label-এ ৳ tofu ধরা পড়ে, ③label/note split দিয়ে fix) — চূড়ান্ত রেজাল্ট ক্লিন, professional, উভয় Latin ও Bengali/৳ গ্লিফ সঠিক
+- **Backend:** `php -l` clean সব ফাইলে, `php artisan route:list --path=invoice` দিয়ে ৪টা নতুন invoice route কনফার্ম
+- **Frontend:** `npx tsc --noEmit` clean, `npm run deploy:prod:safe` 8/8 pass
+- **Live HTTP round-trip** (`bsol.zyrotechbd.com`): `GET /subscription/payments/{id}/invoice` ও `GET /sms/credit/purchases/{id}/invoice` উভয়েই `200`, `Content-Type: application/pdf`, `Content-Disposition: inline` — `pdfinfo` দিয়ে valid single-page A4 PDF কনফার্ম
+- **লাইভ ব্রাউজার যাচাই** (claude-in-chrome দিয়ে, seeded test user + localStorage token সহ, session শেষে সব cleanup করা হয়েছে): উভয় পেজ light ও dark theme-এ স্ক্রিনশট নিয়ে visual QA করা হয়েছে — hero card, countdown, package grid, invoice preview, payment section, history rows সব সঠিকভাবে রেন্ডার হয়েছে; history রো-তে PDF ডাউনলোড আইকনে ক্লিক করে **প্রকৃত ব্রাউজার ফ্লো দিয়ে** নতুন ট্যাবে blob PDF খুলে confirm করা হয়েছে (`openAuthenticatedPdf` end-to-end কাজ করে)
+- Mobile viewport resize এই সেশনের browser tool-এ কাজ করেনি (remote Chrome window resize সীমাবদ্ধতা) — deep mobile-viewport visual QA করা যায়নি, কিন্তু ব্যবহৃত সব Tailwind class (`sm:`, `flex-wrap`, `grid gap-3 sm:grid-cols-2 lg:grid-cols-4`) বাকি কোডবেসের established mobile-first প্যাটার্ন অনুসরণ করে
+
+### 7.5 যা এই ফেজে করা হয়নি
+- Mobile viewport-এ সরাসরি visual QA (টুল সীমাবদ্ধতা, §7.4-এ নোট)
+- Admin billing/sms-credit পেজে invoice PDF ডাউনলোড বাটন (এই ফেজ শুধু seller-facing পেজ কভার করেছে; admin থেকেও চাইলে একই endpoint pattern দিয়ে সহজে যোগ করা যাবে)
+- PDF-এ platform logo/letterhead image (এখন শুধু টেক্সট ব্র্যান্ডিং)

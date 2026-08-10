@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\PlatformBillingSetting;
 use App\Models\SmsCreditPurchase;
 use App\Models\SmsCreditSetting;
+use App\Services\InvoicePdfService;
 use App\Services\Payment\BkashPgwPaymentGatewayClient;
 use App\Services\SmsCreditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Seller-facing self-service SMS credit purchase — see
@@ -22,6 +24,7 @@ class SmsCreditPurchaseController extends Controller
     public function __construct(
         private readonly SmsCreditService $creditService,
         private readonly BkashPgwPaymentGatewayClient $bkashPgw,
+        private readonly InvoicePdfService $invoicePdfService,
     ) {}
 
     public function rate(): JsonResponse
@@ -93,5 +96,13 @@ class SmsCreditPurchaseController extends Controller
             'message' => 'Purchase submitted. It will be reviewed shortly.',
             'data' => $purchase,
         ], 201);
+    }
+
+    public function invoicePdf(SmsCreditPurchase $purchase): Response
+    {
+        abort_unless($purchase->user_id === auth()->id(), 403);
+
+        return $this->invoicePdfService->smsCreditInvoice($purchase)
+            ->stream("invoice-SMSC-{$purchase->id}.pdf");
     }
 }

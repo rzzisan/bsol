@@ -6,16 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\PlatformBillingSetting;
 use App\Models\SubscriptionPackage;
 use App\Models\SubscriptionPayment;
+use App\Services\InvoicePdfService;
 use App\Services\Payment\BkashPgwPaymentGatewayClient;
 use App\Services\SubscriptionInvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class SubscriptionController extends Controller
 {
     public function __construct(
         private readonly BkashPgwPaymentGatewayClient $bkashPgw,
         private readonly SubscriptionInvoiceService $invoiceService,
+        private readonly InvoicePdfService $invoicePdfService,
     ) {}
 
     public function plans(): JsonResponse
@@ -151,5 +154,13 @@ class SubscriptionController extends Controller
             'message' => 'Payment submitted. It will be reviewed shortly.',
             'data' => $payment,
         ], 201);
+    }
+
+    public function invoicePdf(SubscriptionPayment $payment): Response
+    {
+        abort_unless($payment->user_id === auth()->id(), 403);
+
+        return $this->invoicePdfService->subscriptionInvoice($payment)
+            ->stream("invoice-SUB-{$payment->id}.pdf");
     }
 }

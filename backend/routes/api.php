@@ -167,6 +167,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sms/credit/rate', [SmsCreditPurchaseController::class, 'rate']);
     Route::get('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'myPurchases']);
     Route::post('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'submitPayment']);
+    Route::get('/sms/credit/purchases/{purchase}/invoice', [SmsCreditPurchaseController::class, 'invoicePdf']);
     Route::post('/sms/credit/pay/bkash/initiate', [SmsCreditBkashPaymentController::class, 'initiate']);
     Route::post('/sms/credit/pay/bkash-pgw/create', [SmsCreditBkashPgwPaymentController::class, 'create']);
     Route::post('/sms/credit/pay/bkash-pgw/execute/{paymentId}', [SmsCreditBkashPgwPaymentController::class, 'execute']);
@@ -176,6 +177,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
     Route::get('/subscription/invoice/preview', [SubscriptionController::class, 'invoicePreview']);
     Route::post('/subscription/payments', [SubscriptionController::class, 'submitPayment']);
+    Route::get('/subscription/payments/{payment}/invoice', [SubscriptionController::class, 'invoicePdf']);
     Route::post('/subscription/pay/bkash/initiate', [BkashPaymentController::class, 'initiate']);
 
     // bKash classic Checkout API ("PGW") — JS-widget flow, no redirect
