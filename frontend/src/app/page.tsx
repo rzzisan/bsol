@@ -21,6 +21,7 @@ import {
   getStoredToken,
   getStoredUser,
   LOCALE_STORAGE_KEY,
+  mergeAuthPayload,
   THEME_STORAGE_KEY,
   type AuthUser,
   type Locale,
@@ -362,10 +363,11 @@ function AuthSection({
     setError(null);
   }
 
-  function persistAuth(token: string, userData: AuthUser) {
+  function persistAuth(token: string, loginResponse: Record<string, unknown>) {
+    const merged = mergeAuthPayload(loginResponse as Parameters<typeof mergeAuthPayload>[0]);
     const normalizedUser: AuthUser = {
-      ...userData,
-      role: userData.role === "admin" ? "admin" : "user",
+      ...merged,
+      role: merged.role === "admin" ? "admin" : "user",
     };
     localStorage.setItem("auth_token", token);
     localStorage.setItem("auth_user", JSON.stringify(normalizedUser));
@@ -392,7 +394,7 @@ function AuthSection({
           : data?.message;
         setError(firstError ?? "Login failed.");
       } else {
-        persistAuth(data.token, data.user as AuthUser);
+        persistAuth(data.token, data);
         setLoginEmail("");
         setLoginPassword("");
       }

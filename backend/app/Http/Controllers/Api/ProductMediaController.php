@@ -26,7 +26,7 @@ class ProductMediaController extends Controller
     public function index(int $product): JsonResponse
     {
         $item = Product::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->with(['images'])
             ->findOrFail($product);
 
@@ -38,7 +38,7 @@ class ProductMediaController extends Controller
 
     public function store(ProductMediaUploadRequest $request, int $product): JsonResponse
     {
-        $item = Product::query()->where('user_id', auth()->id())->findOrFail($product);
+        $item = Product::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($product);
         $policy = $this->effectivePolicy();
 
         $existingCount = $item->images()->count();
@@ -121,7 +121,7 @@ class ProductMediaController extends Controller
 
     public function reorder(Request $request, int $product): JsonResponse
     {
-        $item = Product::query()->where('user_id', auth()->id())->findOrFail($product);
+        $item = Product::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($product);
 
         $data = $request->validate([
             'order' => ['required', 'array', 'min:1'],
@@ -130,7 +130,7 @@ class ProductMediaController extends Controller
 
         $ids = ProductImage::query()
             ->where('product_id', $item->id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->pluck('id')
             ->toArray();
 
@@ -148,16 +148,16 @@ class ProductMediaController extends Controller
 
     public function setThumbnail(int $product, int $mediaId): JsonResponse
     {
-        $item = Product::query()->where('user_id', auth()->id())->findOrFail($product);
+        $item = Product::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($product);
 
         $media = ProductImage::query()
             ->where('product_id', $item->id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->findOrFail($mediaId);
 
         ProductImage::query()
             ->where('product_id', $item->id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->update(['is_primary' => false]);
 
         $media->update(['is_primary' => true]);
@@ -171,12 +171,12 @@ class ProductMediaController extends Controller
 
     public function destroy(int $product, int $mediaId): JsonResponse
     {
-        $item = Product::query()->where('user_id', auth()->id())->findOrFail($product);
+        $item = Product::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($product);
         $policy = $this->effectivePolicy();
 
         $media = ProductImage::query()
             ->where('product_id', $item->id)
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->findOrFail($mediaId);
 
         $total = $item->images()->count();

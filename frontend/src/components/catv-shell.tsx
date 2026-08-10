@@ -191,7 +191,13 @@ export default function CatvShell({
 
   const resolvedUser = authUser;
   const displayName = resolvedUser?.name ?? userName ?? "User";
-  const displayMeta = resolvedUser?.email ?? userMeta ?? "";
+  // Staff/Team sub-account role — see staff_team_role_context.md §3.7. A
+  // staff account has no shop of its own, so its header identity line
+  // additionally names the owner's shop it's acting on behalf of.
+  const teamMemberSuffix = resolvedUser?.is_staff
+    ? ` · ${locale === "bn" ? "টিম মেম্বার" : "Team member"}${resolvedUser.owner_name ? ` (${resolvedUser.owner_name})` : ""}`
+    : "";
+  const displayMeta = (resolvedUser?.email ?? userMeta ?? "") + teamMemberSuffix;
 
   function openProfileModal() {
     setMenuOpen(false);
@@ -289,7 +295,14 @@ export default function CatvShell({
       }
 
       if (data.user) {
+        // PUT /me only returns the raw `user` row — it doesn't recompute the
+        // staff/team sibling fields (is_staff/owner_name/permissions) the
+        // way /login and /me (GET) do, so merge onto the existing state
+        // instead of replacing it wholesale, or a plain name/email edit
+        // would silently wipe a staff account's permission set. See
+        // staff_team_role_context.md §3.7.
         const nextUser: AuthUser = {
+          ...authUser,
           ...data.user,
           role: data.user.role === "admin" ? "admin" : "user",
         };

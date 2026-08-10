@@ -14,7 +14,7 @@ class ProductController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Product::where('user_id', auth()->id())
+        $query = Product::whereIn('user_id', auth()->user()->shopUserIds())
             ->with(['category:id,name', 'images'])
             ->withCount(['variants as active_variants_count' => fn ($q) => $q->where('is_active', true)])
             ->withTrashed(false);
@@ -58,7 +58,7 @@ class ProductController extends Controller
                 'required',
                 'string',
                 'max:100',
-                Rule::unique('products', 'sku')->where(fn ($q) => $q->where('user_id', auth()->id())->whereNull('deleted_at')),
+                Rule::unique('products', 'sku')->where(fn ($q) => $q->whereIn('user_id', auth()->user()->shopUserIds())->whereNull('deleted_at')),
             ],
             'description'      => 'required|string',
             'regular_price'    => 'nullable|numeric|min:0',
@@ -120,7 +120,7 @@ class ProductController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $product = Product::where('user_id', auth()->id())
+        $product = Product::whereIn('user_id', auth()->user()->shopUserIds())
             ->with(['category:id,name', 'images'])
             ->findOrFail($id);
 
@@ -129,7 +129,7 @@ class ProductController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $product = Product::where('user_id', auth()->id())->findOrFail($id);
+        $product = Product::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         $data = $request->validate([
             'name'            => 'sometimes|required|string|max:255',
@@ -139,7 +139,7 @@ class ProductController extends Controller
                 'required',
                 'string',
                 'max:100',
-                Rule::unique('products', 'sku')->where(fn ($q) => $q->where('user_id', auth()->id())->whereNull('deleted_at'))->ignore($product->id),
+                Rule::unique('products', 'sku')->where(fn ($q) => $q->whereIn('user_id', auth()->user()->shopUserIds())->whereNull('deleted_at'))->ignore($product->id),
             ],
             'description'     => 'sometimes|required|string',
             'regular_price'   => 'nullable|numeric|min:0',
@@ -182,7 +182,7 @@ class ProductController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        $product = Product::where('user_id', auth()->id())->findOrFail($id);
+        $product = Product::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
         $product->delete(); // soft delete
 
         return response()->json(['success' => true, 'message' => 'Product deleted.']);
@@ -190,16 +190,16 @@ class ProductController extends Controller
 
     public function stats(): JsonResponse
     {
-        $userId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
 
-        $total    = Product::where('user_id', $userId)->count();
-        $active   = Product::where('user_id', $userId)->where('status', 'active')->count();
-        $inactive = Product::where('user_id', $userId)->where('status', 'inactive')->count();
-        $lowStock = Product::where('user_id', $userId)
+        $total    = Product::whereIn('user_id', $shopUserIds)->count();
+        $active   = Product::whereIn('user_id', $shopUserIds)->where('status', 'active')->count();
+        $inactive = Product::whereIn('user_id', $shopUserIds)->where('status', 'inactive')->count();
+        $lowStock = Product::whereIn('user_id', $shopUserIds)
             ->where('track_stock', true)
             ->whereColumn('stock', '<=', 'low_stock_alert')
             ->count();
-        $outOfStock = Product::where('user_id', $userId)
+        $outOfStock = Product::whereIn('user_id', $shopUserIds)
             ->where('track_stock', true)
             ->where('stock', 0)
             ->count();
@@ -212,7 +212,7 @@ class ProductController extends Controller
 
     public function adjustStock(Request $request, int $id): JsonResponse
     {
-        $product = Product::where('user_id', auth()->id())->findOrFail($id);
+        $product = Product::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         $data = $request->validate([
             'adjustment' => 'required|integer', // positive = add, negative = subtract
@@ -231,7 +231,7 @@ class ProductController extends Controller
 
     private function validateCategoryOwnership(int $categoryId): void
     {
-        \App\Models\ProductCategory::where('user_id', auth()->id())
+        \App\Models\ProductCategory::whereIn('user_id', auth()->user()->shopUserIds())
             ->findOrFail($categoryId);
     }
 

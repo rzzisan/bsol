@@ -30,17 +30,33 @@ class Customer extends Model
 
     public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
+        // Customer.user_id is always the shop owner id (see syncFromOrder below),
+        // but individual Order rows carry the actual creator's id (which may be
+        // a staff sub-account) — whereIn the whole shop pool, not just this id.
+        // See staff_team_role_context.md §3.3.
+        $shopUserIds = $this->user?->shopUserIds() ?? [$this->user_id];
+
         return $this->hasMany(Order::class, 'customer_phone', 'phone')
-            ->where('orders.user_id', $this->user_id);
+            ->whereIn('orders.user_id', $shopUserIds);
     }
 
     /**
      * Upsert a customer record from an order, updating aggregates.
+     *
+     * Keyed by the shop owner's id (not the order's own user_id, which is the
+     * actual creator and may be a staff sub-account) so every team member
+     * shares one aggregate customer profile per phone number instead of each
+     * staff member fragmenting it into a separate row. See
+     * staff_team_role_context.md §3.3.
      */
     public static function syncFromOrder(Order $order): self
     {
+        $actingUser = $order->relationLoaded('user') ? $order->user : User::find($order->user_id);
+        $shopOwnerId = $actingUser?->shopOwnerId() ?? $order->user_id;
+        $shopUserIds = $actingUser?->shopUserIds() ?? [$order->user_id];
+
         $customer = self::firstOrNew([
-            'user_id' => $order->user_id,
+            'user_id' => $shopOwnerId,
             'phone'   => $order->customer_phone,
         ]);
 
@@ -61,7 +77,7 @@ class Customer extends Model
                 $customer->address = $order->customer_address;
         }
 
-        $agg = Order::where('user_id', $order->user_id)
+        $agg = Order::whereIn('user_id', $shopUserIds)
             ->where('customer_phone', $order->customer_phone)
             ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total),0) as spent, MAX(created_at) as last_at')
             ->first();

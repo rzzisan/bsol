@@ -36,20 +36,51 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($user->isStaff() && $user->staff_status !== 'active') {
+            throw ValidationException::withMessages([
+                'email' => ['This staff account has been suspended.'],
+            ]);
+        }
+
         $token = $user->createToken('frontend')->plainTextToken;
 
         return response()->json([
             'message' => 'Login successful.',
             'token' => $token,
             'user' => $user,
+            ...$this->staffAuthContext($user),
         ]);
     }
 
     public function me(Request $request): JsonResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+
         return response()->json([
-            'user' => $request->user(),
+            'user' => $user,
+            ...$this->staffAuthContext($user),
         ]);
+    }
+
+    /**
+     * Staff/Team sub-account role context — see staff_team_role_context.md §3.7.
+     * `permissions`/`owner_name` are only meaningful (and only included) for
+     * staff accounts; owner/admin accounts always have full access.
+     */
+    private function staffAuthContext(User $user): array
+    {
+        $context = [
+            'is_staff' => $user->isStaff(),
+            'must_change_password' => (bool) $user->must_change_password,
+        ];
+
+        if ($user->isStaff()) {
+            $context['owner_name'] = $user->owner?->name;
+            $context['permissions'] = $user->staffPermissions()->pluck('enabled', 'module_key')->all();
+        }
+
+        return $context;
     }
 
     public function updateProfile(Request $request): JsonResponse
@@ -72,6 +103,10 @@ class AuthController extends Controller
         }
 
         unset($validated['current_password']);
+
+        if (array_key_exists('password', $validated)) {
+            $validated['must_change_password'] = false; // clears the forced-change flag from staff temp-password creation, §3.7
+        }
 
         $originalEmail = $user->email;
         $emailChanged = array_key_exists('email', $validated) && $validated['email'] !== $originalEmail;

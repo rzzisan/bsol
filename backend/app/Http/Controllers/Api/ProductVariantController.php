@@ -415,7 +415,7 @@ class ProductVariantController extends Controller
 
     private function authorizeProduct(Product $product): void
     {
-        abort_if($product->user_id !== auth()->id(), 403);
+        abort_if(! in_array($product->user_id, auth()->user()->shopUserIds(), true), 403);
     }
 
     private function validateVariantPayload(Request $request, Product $product, ?int $ignoreId = null): array

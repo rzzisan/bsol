@@ -12,7 +12,7 @@ class ProductCategoryController extends Controller
 {
     public function index(): JsonResponse
     {
-        $categories = ProductCategory::where('user_id', auth()->id())
+        $categories = ProductCategory::whereIn('user_id', auth()->user()->shopUserIds())
             ->orderBy('sort_order')
             ->orderBy('name')
             ->withCount('products')
@@ -42,7 +42,7 @@ class ProductCategoryController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $category = ProductCategory::where('user_id', auth()->id())->findOrFail($id);
+        $category = ProductCategory::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         $data = $request->validate([
             'name'        => 'sometimes|required|string|max:150',
@@ -62,7 +62,7 @@ class ProductCategoryController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        $category = ProductCategory::where('user_id', auth()->id())->findOrFail($id);
+        $category = ProductCategory::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         // Move products to uncategorized instead of blocking delete
         $category->products()->update(['category_id' => null]);
@@ -78,7 +78,7 @@ class ProductCategoryController extends Controller
         $i    = 1;
 
         while (
-            ProductCategory::where('user_id', auth()->id())
+            ProductCategory::whereIn('user_id', auth()->user()->shopUserIds())
                 ->where('slug', $slug)
                 ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
                 ->exists()

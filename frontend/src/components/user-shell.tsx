@@ -11,12 +11,15 @@ import {
   getStoredTheme,
   getStoredToken,
   getStoredUser,
+  hasModuleAccess,
   LOCALE_STORAGE_KEY,
+  mergeAuthPayload,
   normalizeRole,
   setStoredUser,
   THEME_STORAGE_KEY,
   type AuthUser,
   type Locale,
+  type StaffModuleKey,
   type ThemeMode,
 } from "@/lib/dashboard-client";
 import { LocaleContext } from "@/lib/locale-context";
@@ -82,6 +85,20 @@ const menuText = {
     courierAccounts: "কুরিয়ার একাউন্ট",
     facebookConnect: "ফেসবুক পেজ",
     subscription: "সাবস্ক্রিপশন",
+    staffManagement: "টিম / স্টাফ",
+
+    // force-password-change gate
+    fpcTitle: "নতুন পাসওয়ার্ড সেট করুন",
+    fpcSubtitle: "আপনার একাউন্ট temporary পাসওয়ার্ড দিয়ে তৈরি হয়েছে — চালিয়ে যাওয়ার আগে একটি নতুন পাসওয়ার্ড সেট করতে হবে।",
+    fpcCurrentPassword: "বর্তমান (temporary) পাসওয়ার্ড",
+    fpcNewPassword: "নতুন পাসওয়ার্ড",
+    fpcConfirmPassword: "নতুন পাসওয়ার্ড আবার লিখুন",
+    fpcSubmit: "পাসওয়ার্ড সেট করুন",
+    fpcSubmitting: "সেভ হচ্ছে...",
+    fpcMismatch: "নতুন পাসওয়ার্ড দুটি মিলছে না।",
+    fpcTooShort: "নতুন পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে।",
+    fpcGenericError: "পাসওয়ার্ড সেট করা যায়নি। আবার চেষ্টা করুন।",
+    fpcLogout: "লগআউট",
   },
   en: {
     sidebarTitle: "Business Dashboard",
@@ -140,6 +157,20 @@ const menuText = {
     courierAccounts: "Courier Accounts",
     facebookConnect: "Facebook Page",
     subscription: "Subscription",
+    staffManagement: "Staff & Team",
+
+    // force-password-change gate
+    fpcTitle: "Set a new password",
+    fpcSubtitle: "This account was created with a temporary password — set a new one before continuing.",
+    fpcCurrentPassword: "Current (temporary) password",
+    fpcNewPassword: "New password",
+    fpcConfirmPassword: "Confirm new password",
+    fpcSubmit: "Set password",
+    fpcSubmitting: "Saving...",
+    fpcMismatch: "New passwords do not match.",
+    fpcTooShort: "New password must be at least 8 characters.",
+    fpcGenericError: "Could not set password. Please try again.",
+    fpcLogout: "Log out",
   },
 };
 
@@ -254,9 +285,36 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
         { key: "courier-accounts", label: t.courierAccounts, href: "/dashboard/settings/courier" },
         { key: "facebook-connect", label: (t as any).facebookConnect ?? "ফেসবুক পেজ", href: "/dashboard/settings/facebook" },
         { key: "subscription", label: t.subscription, href: "/dashboard/settings/subscription" },
+        { key: "staff-management", label: t.staffManagement, href: "/dashboard/settings/staff" },
       ],
     },
   ];
+}
+
+// Staff/Team sub-account role — see staff_team_role_context.md §4. Phase 1
+// only wired staff_permission gating into these five backend modules — every
+// other top-level menu group (landing pages, analytics, accounting, settings,
+// etc.) still works for owners but a staff account would just see empty
+// data there (untouched Phase-2 scoping), so it's cleaner to hide them from
+// the menu entirely rather than show a confusing empty screen. "dashboard"
+// is always shown. Owners/admins are never filtered.
+const STAFF_VISIBLE_MODULE_MENU: Record<string, StaffModuleKey> = {
+  orders: "orders",
+  products: "products",
+  customers: "customers",
+  courier: "courier",
+  sms: "sms",
+};
+
+function filterMenuForStaff(menu: ShellMenuItem[], user: AuthUser | null): ShellMenuItem[] {
+  if (!user?.is_staff) return menu;
+
+  return menu.filter((item) => {
+    if (item.key === "dashboard") return true;
+    const moduleKey = STAFF_VISIBLE_MODULE_MENU[item.key];
+    if (!moduleKey) return false;
+    return hasModuleAccess(user, moduleKey);
+  });
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -340,7 +398,7 @@ export default function UserShell({
         if (!res.ok) return;
         const data = await res.json();
         if (!data.user) return;
-        const normalized: AuthUser = { ...data.user, role: data.user.role ?? "user" };
+        const normalized: AuthUser = { ...mergeAuthPayload(data), role: data.user.role ?? "user" };
         setStoredUser(normalized);
         setUser(normalized);
       } catch {
@@ -403,7 +461,10 @@ export default function UserShell({
   }, []);
 
   const t = useMemo(() => menuText[locale], [locale]);
-  const menu = useMemo(() => buildMenu(t, facebookLeadsUnread), [t, facebookLeadsUnread]);
+  const menu = useMemo(
+    () => filterMenuForStaff(buildMenu(t, facebookLeadsUnread), user),
+    [t, facebookLeadsUnread, user],
+  );
 
   const title = pageTitle ? pageTitle[locale] : t.sidebarTitle;
   const subtitle = pageSubtitle ? pageSubtitle[locale] : "";
@@ -464,6 +525,27 @@ export default function UserShell({
     );
   }
 
+  // ─── Forced password change (staff temp-password flow) ───────────────────
+  // §3.7: a staff account created by its owner must set a real password
+  // before touching anything else — mirrors the backend's
+  // ForcePasswordChange middleware, which 403s every route but /me,
+  // /user, /logout until this flag clears.
+  if (user?.must_change_password) {
+    return (
+      <ForcePasswordChangeScreen
+        t={t}
+        locale={locale}
+        theme={theme}
+        onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
+        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+        onSuccess={(updatedUser) => {
+          setStoredUser(updatedUser);
+          setUser(updatedUser);
+        }}
+      />
+    );
+  }
+
   return (
     <CatvShell
       title={title}
@@ -506,5 +588,173 @@ export default function UserShell({
         <SupportChatWidget />
       </LocaleContext.Provider>
     </CatvShell>
+  );
+}
+
+// ─── Forced password change screen ─────────────────────────────────────────
+// Staff/Team sub-account role — see staff_team_role_context.md §3.7. Full
+// dashboard block, not a dismissible modal — matches the backend's hard
+// gate (ForcePasswordChange middleware 403s every other route).
+
+function ForcePasswordChangeScreen({
+  t,
+  locale,
+  theme,
+  onToggleLocale,
+  onToggleTheme,
+  onSuccess,
+}: {
+  t: typeof menuText.bn;
+  locale: Locale;
+  theme: ThemeMode;
+  onToggleLocale: () => void;
+  onToggleTheme: () => void;
+  onSuccess: (user: AuthUser) => void;
+}) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (newPassword.length < 8) {
+      setError(t.fpcTooShort);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError(t.fpcMismatch);
+      return;
+    }
+
+    const token = getStoredToken();
+    if (!token) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/me", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          password: newPassword,
+          password_confirmation: confirmPassword,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        const firstError = data?.errors ? Object.values(data.errors as Record<string, string[]>)[0]?.[0] : data?.message;
+        setError(firstError ?? t.fpcGenericError);
+        return;
+      }
+
+      // PUT /me doesn't recompute is_staff/owner_name/permissions (they're
+      // relation-derived, not real columns) — merge onto the stored user
+      // instead of replacing it, same reasoning as catv-shell.tsx's profile save.
+      const stored = getStoredUser() ?? ({} as AuthUser);
+      onSuccess({ ...stored, ...data.user, must_change_password: false });
+    } catch {
+      setError(t.fpcGenericError);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleLogout() {
+    const token = getStoredToken();
+    if (token) {
+      try {
+        await fetch("/api/logout", {
+          method: "POST",
+          headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+        });
+      } catch {
+        // ignore
+      }
+    }
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    window.location.href = "/";
+  }
+
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-8">
+      <div className="mb-4 flex justify-end gap-2">
+        <button type="button" className="catv-chip" onClick={onToggleLocale}>
+          {locale === "bn" ? "বাংলা" : "English"}
+        </button>
+        <button type="button" className="catv-chip" onClick={onToggleTheme}>
+          {theme === "dark" ? "Dark" : "Light"}
+        </button>
+      </div>
+      <section className="catv-panel p-5 sm:p-6">
+        <h1 className="text-lg font-semibold text-[var(--foreground)] sm:text-xl">{t.fpcTitle}</h1>
+        <p className="mt-2 text-sm text-[var(--muted)]">{t.fpcSubtitle}</p>
+
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t.fpcCurrentPassword}</span>
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3.5 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t.fpcNewPassword}</span>
+            <input
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3.5 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">{t.fpcConfirmPassword}</span>
+            <input
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3.5 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+
+          {error && <p className="text-sm text-rose-500">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition disabled:opacity-60"
+          >
+            {submitting ? t.fpcSubmitting : t.fpcSubmit}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-4 w-full text-center text-xs font-medium text-[var(--muted)] underline underline-offset-2 hover:text-[var(--foreground)]"
+        >
+          {t.fpcLogout}
+        </button>
+      </section>
+    </main>
   );
 }

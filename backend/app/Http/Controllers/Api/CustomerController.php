@@ -103,7 +103,7 @@ class CustomerController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Customer::where('user_id', auth()->id());
+        $query = Customer::whereIn('user_id', auth()->user()->shopUserIds());
 
         if ($request->filled('search')) {
             $s = '%' . $request->search . '%';
@@ -141,9 +141,9 @@ class CustomerController extends Controller
 
     public function stats(): JsonResponse
     {
-        $userId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
 
-        $counts = Customer::where('user_id', $userId)
+        $counts = Customer::whereIn('user_id', $shopUserIds)
             ->selectRaw("
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE is_blocked = true)           AS blocked,
@@ -160,9 +160,9 @@ class CustomerController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $customer = Customer::where('user_id', auth()->id())->findOrFail($id);
+        $customer = Customer::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
-        $orders = Order::where('user_id', auth()->id())
+        $orders = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->where('customer_phone', $customer->phone)
             ->with('items:id,order_id,product_name,quantity,unit_price,total')
             ->orderByDesc('created_at')
@@ -179,7 +179,7 @@ class CustomerController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $customer = Customer::where('user_id', auth()->id())->findOrFail($id);
+        $customer = Customer::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         $data = $request->validate([
             'name'       => 'nullable|string|max:150',
@@ -208,7 +208,7 @@ class CustomerController extends Controller
 
     public function toggleBlock(int $id): JsonResponse
     {
-        $customer = Customer::where('user_id', auth()->id())->findOrFail($id);
+        $customer = Customer::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
         $customer->update(['is_blocked' => ! $customer->is_blocked]);
 
         return response()->json(['success' => true, 'data' => $customer]);
@@ -218,10 +218,10 @@ class CustomerController extends Controller
 
     public function syncAll(): JsonResponse
     {
-        $userId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
 
         // Latest order per distinct phone — used to seed name/address
-        $orders = Order::where('user_id', $userId)
+        $orders = Order::whereIn('user_id', $shopUserIds)
             ->orderByDesc('id')
             ->get()
             ->unique('customer_phone');

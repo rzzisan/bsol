@@ -35,7 +35,7 @@ class OrderController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Order::where('user_id', auth()->id())
+        $query = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->with(['items:id,order_id,product_name,quantity,unit_price,total']);
 
         if ($request->filled('status')) {
@@ -84,9 +84,9 @@ class OrderController extends Controller
 
     public function stats(): JsonResponse
     {
-        $userId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
 
-        $counts = Order::where('user_id', $userId)
+        $counts = Order::whereIn('user_id', $shopUserIds)
             ->selectRaw("
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE status = 'pending')   AS pending,
@@ -101,7 +101,7 @@ class OrderController extends Controller
             ")
             ->first();
 
-        $today = Order::where('user_id', $userId)
+        $today = Order::whereIn('user_id', $shopUserIds)
             ->whereDate('created_at', today())
             ->count();
 
@@ -115,11 +115,11 @@ class OrderController extends Controller
 
     public function createBootstrap(): JsonResponse
     {
-        $userId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
         $productColumns = $this->productSelectColumns();
 
         $products = Product::query()
-            ->where('user_id', $userId)
+            ->whereIn('user_id', $shopUserIds)
             ->where('status', 'active')
             ->withCount([
                 'variants as active_variants_count' => fn ($q) => $q->where('is_active', true),
@@ -129,7 +129,7 @@ class OrderController extends Controller
             ->get($productColumns);
 
         $categories = ProductCategory::query()
-            ->where('user_id', $userId)
+            ->whereIn('user_id', $shopUserIds)
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get();
@@ -170,11 +170,21 @@ class OrderController extends Controller
     public function store(StoreOrderRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $userId = auth()->id();
+        // Order.user_id is deliberately always the shop OWNER id (like
+        // Customer.user_id, staff_team_role_context.md §3.3) — not the acting
+        // staff member — because courier booking/tracking providers resolve
+        // CourierSetting credentials via $order->user_id (see
+        // app/Services/Courier/*CourierProvider.php), and those credentials
+        // only ever exist under the owner's account (Pattern B). The actual
+        // creator is still recorded for audit via OrderStatusLog.changed_by
+        // below (kept as the real acting user).
+        $actingUserId = auth()->id();
+        $ownerId = auth()->user()->shopOwnerId();
+        $shopUserIds = auth()->user()->shopUserIds();
 
-        $maxOrders = auth()->user()->subscriptionPackage?->max_orders;
+        $maxOrders = auth()->user()->shopOwner()->subscriptionPackage?->max_orders;
         if ($maxOrders !== null) {
-            $ordersThisMonth = Order::where('user_id', $userId)
+            $ordersThisMonth = Order::whereIn('user_id', $shopUserIds)
                 ->whereYear('created_at', now()->year)
                 ->whereMonth('created_at', now()->month)
                 ->count();
@@ -188,7 +198,7 @@ class OrderController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($data, $userId) {
+        return DB::transaction(function () use ($data, $actingUserId, $ownerId, $shopUserIds) {
 
             // Compute totals
             $subtotal = collect($data['items'])->sum(
@@ -199,8 +209,8 @@ class OrderController extends Controller
             $total          = max(0, $subtotal + $shippingCharge - $discount);
 
             $order = Order::create([
-                'user_id'           => $userId,
-                'order_number'      => Order::generateOrderNumber($userId),
+                'user_id'           => $ownerId,
+                'order_number'      => Order::generateOrderNumber($shopUserIds),
                 'customer_name'     => $data['customer_name'] ?? null,
                 'customer_phone'    => $data['customer_phone'],
                 'customer_address'  => $data['customer_address'] ?? null,
@@ -231,7 +241,7 @@ class OrderController extends Controller
                 ->values();
 
             $productsById = Product::query()
-                ->where('user_id', $userId)
+                ->whereIn('user_id', $shopUserIds)
                 ->whereIn('id', $productIds)
                 ->get($this->productOrderLookupColumns())
                 ->keyBy('id');
@@ -321,7 +331,7 @@ class OrderController extends Controller
                 'old_status' => null,
                 'new_status' => 'pending',
                 'note'       => 'Order created.',
-                'changed_by' => $userId,
+                'changed_by' => $actingUserId,
             ]);
 
             $order->load(['items', 'statusLogs']);
@@ -341,7 +351,7 @@ class OrderController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $order = Order::where('user_id', auth()->id())
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->with(['items.product:id,thumbnail', 'items.variant:id,sku,image_url', 'statusLogs.changedByUser:id,name'])
             ->findOrFail($id);
 
@@ -352,7 +362,7 @@ class OrderController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $order = Order::where('user_id', auth()->id())->findOrFail($id);
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
         $oldPhone = $order->customer_phone;
 
         $data = $request->validate([
@@ -403,7 +413,7 @@ class OrderController extends Controller
 
     public function updateStatus(Request $request, int $id): JsonResponse
     {
-        $order = Order::where('user_id', auth()->id())->findOrFail($id);
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
         $data = $request->validate([
             'status' => 'required|in:' . implode(',', self::VALID_STATUSES),
@@ -431,7 +441,7 @@ class OrderController extends Controller
             'note'   => 'nullable|string|max:500',
         ]);
 
-        $orders = Order::where('user_id', auth()->id())
+        $orders = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->whereIn('id', $data['ids'])
             ->get();
 
@@ -474,7 +484,7 @@ class OrderController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        $order = Order::where('user_id', auth()->id())->findOrFail($id);
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
         $phone = $order->customer_phone;
         $order->delete();
         PhoneIntelCache::bump($phone);

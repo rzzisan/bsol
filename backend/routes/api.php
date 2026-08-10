@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\LandingPageController;
 use App\Http\Controllers\Api\LandingMediaLibraryController;
 use App\Http\Controllers\Api\LandingTemplateController;
 use App\Http\Controllers\Api\SmsAutomationController;
+use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\AdminSupportController;
@@ -143,7 +144,7 @@ Route::get('/subscription/pay/bkash/callback', [BkashPaymentController::class, '
 Route::get('/sms/credit/pay/bkash/callback', [SmsCreditBkashPaymentController::class, 'callback'])
     ->middleware('throttle:20,1');
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () {
     // Email OTP for verification (authenticated)
     Route::post('/email/send-verification', [EmailOtpController::class, 'sendVerificationEmail']);
     Route::post('/email/verify', [EmailOtpController::class, 'verifyEmailOtp']);
@@ -153,38 +154,58 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::get('/sms/gateways', [AdminSmsGatewayController::class, 'myGateways']);
-    Route::post('/sms/preview', [AdminSmsGatewayController::class, 'preview']);
-    Route::post('/sms/send', [AdminSmsGatewayController::class, 'send']);
-    Route::get('/sms/history', [AdminSmsGatewayController::class, 'myHistory']);
-    Route::get('/sms/automation/rules', [SmsAutomationController::class, 'index']);
-    Route::post('/sms/automation/rules', [SmsAutomationController::class, 'store']);
-    Route::put('/sms/automation/rules/{id}', [SmsAutomationController::class, 'update']);
-    Route::delete('/sms/automation/rules/{id}', [SmsAutomationController::class, 'destroy']);
-    Route::get('/sms/automation/logs', [SmsAutomationController::class, 'logs']);
+    // Phase 1 core module — staff/team sub-account role, staff_team_role_context.md §4
+    Route::middleware('staff_permission:sms')->group(function () {
+        Route::get('/sms/gateways', [AdminSmsGatewayController::class, 'myGateways']);
+        Route::post('/sms/preview', [AdminSmsGatewayController::class, 'preview']);
+        Route::post('/sms/send', [AdminSmsGatewayController::class, 'send']);
+        Route::get('/sms/history', [AdminSmsGatewayController::class, 'myHistory']);
+        Route::get('/sms/automation/rules', [SmsAutomationController::class, 'index']);
+        Route::post('/sms/automation/rules', [SmsAutomationController::class, 'store']);
+        Route::put('/sms/automation/rules/{id}', [SmsAutomationController::class, 'update']);
+        Route::delete('/sms/automation/rules/{id}', [SmsAutomationController::class, 'destroy']);
+        Route::get('/sms/automation/logs', [SmsAutomationController::class, 'logs']);
+    });
 
     // ── SMS credit self-service purchase — subscription_billing_context.md §3 ──
-    Route::get('/sms/credit/rate', [SmsCreditPurchaseController::class, 'rate']);
-    Route::get('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'myPurchases']);
-    Route::post('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'submitPayment']);
-    Route::get('/sms/credit/purchases/{purchase}/invoice', [SmsCreditPurchaseController::class, 'invoicePdf']);
-    Route::post('/sms/credit/pay/bkash/initiate', [SmsCreditBkashPaymentController::class, 'initiate']);
-    Route::post('/sms/credit/pay/bkash-pgw/create', [SmsCreditBkashPgwPaymentController::class, 'create']);
-    Route::post('/sms/credit/pay/bkash-pgw/execute/{paymentId}', [SmsCreditBkashPgwPaymentController::class, 'execute']);
+    // Owner-only (Pattern B, staff_team_role_context.md §3.3): this is billing/wallet
+    // management, not an operational "send SMS" action — staff never purchases credit.
+    Route::middleware('owner_only')->group(function () {
+        Route::get('/sms/credit/rate', [SmsCreditPurchaseController::class, 'rate']);
+        Route::get('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'myPurchases']);
+        Route::post('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'submitPayment']);
+        Route::get('/sms/credit/purchases/{purchase}/invoice', [SmsCreditPurchaseController::class, 'invoicePdf']);
+        Route::post('/sms/credit/pay/bkash/initiate', [SmsCreditBkashPaymentController::class, 'initiate']);
+        Route::post('/sms/credit/pay/bkash-pgw/create', [SmsCreditBkashPgwPaymentController::class, 'create']);
+        Route::post('/sms/credit/pay/bkash-pgw/execute/{paymentId}', [SmsCreditBkashPgwPaymentController::class, 'execute']);
+    });
 
     // ── Subscription (self-service — must stay reachable even when expired) ───
-    Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
-    Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
-    Route::get('/subscription/invoice/preview', [SubscriptionController::class, 'invoicePreview']);
-    Route::post('/subscription/payments', [SubscriptionController::class, 'submitPayment']);
-    Route::get('/subscription/payments/{payment}/invoice', [SubscriptionController::class, 'invoicePdf']);
-    Route::post('/subscription/pay/bkash/initiate', [BkashPaymentController::class, 'initiate']);
+    // Owner-only (Pattern B, staff_team_role_context.md §3.3) — billing is never
+    // a staff-delegable action.
+    Route::middleware('owner_only')->group(function () {
+        Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
+        Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
+        Route::get('/subscription/invoice/preview', [SubscriptionController::class, 'invoicePreview']);
+        Route::post('/subscription/payments', [SubscriptionController::class, 'submitPayment']);
+        Route::get('/subscription/payments/{payment}/invoice', [SubscriptionController::class, 'invoicePdf']);
+        Route::post('/subscription/pay/bkash/initiate', [BkashPaymentController::class, 'initiate']);
 
-    // bKash classic Checkout API ("PGW") — JS-widget flow, no redirect
-    // callback needed (widget calls these two directly while the seller
-    // stays authenticated on our page). See §18, BkashPgwPaymentController.
-    Route::post('/subscription/pay/bkash-pgw/create', [BkashPgwPaymentController::class, 'create']);
-    Route::post('/subscription/pay/bkash-pgw/execute/{paymentId}', [BkashPgwPaymentController::class, 'execute']);
+        // bKash classic Checkout API ("PGW") — JS-widget flow, no redirect
+        // callback needed (widget calls these two directly while the seller
+        // stays authenticated on our page). See §18, BkashPgwPaymentController.
+        Route::post('/subscription/pay/bkash-pgw/create', [BkashPgwPaymentController::class, 'create']);
+        Route::post('/subscription/pay/bkash-pgw/execute/{paymentId}', [BkashPgwPaymentController::class, 'execute']);
+    });
+
+    // ── Staff/Team sub-account role (owner-only) — staff_team_role_context.md §3.6 ──
+    Route::middleware('owner_only')->prefix('staff')->group(function () {
+        Route::get('/', [StaffController::class, 'index']);
+        Route::post('/', [StaffController::class, 'store']);
+        Route::put('/{staff}', [StaffController::class, 'update']);
+        Route::post('/{staff}/reset-password', [StaffController::class, 'resetPassword']);
+        Route::delete('/{staff}', [StaffController::class, 'destroy']);
+    });
 
     // ── SaaS Support chat (seller ↔ admin team) — deliberately outside the
     // active_subscription group: a seller with an expired subscription needs
@@ -234,47 +255,52 @@ Route::middleware('active_subscription')->group(function () {
     });
 
     // ── Product Management ────────────────────────────────────────────────────
-    Route::get('/products/stats', [ProductController::class, 'stats']);
-    Route::get('/products/media-policy', [ProductMediaController::class, 'policy']);
-    Route::get('/products/{product}/media', [ProductMediaController::class, 'index']);
-    Route::post('/products/{product}/media', [ProductMediaController::class, 'store']);
-    Route::put('/products/{product}/media/reorder', [ProductMediaController::class, 'reorder']);
-    Route::put('/products/{product}/media/{mediaId}/set-thumbnail', [ProductMediaController::class, 'setThumbnail']);
-    Route::delete('/products/{product}/media/{mediaId}', [ProductMediaController::class, 'destroy']);
-    Route::post('/products/{product}/adjust-stock', [ProductController::class, 'adjustStock']);
-    Route::apiResource('/products', ProductController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+    // Phase 1 core module — staff/team sub-account role, staff_team_role_context.md §4
+    Route::middleware('staff_permission:products')->group(function () {
+        Route::get('/products/stats', [ProductController::class, 'stats']);
+        Route::get('/products/media-policy', [ProductMediaController::class, 'policy']);
+        Route::get('/products/{product}/media', [ProductMediaController::class, 'index']);
+        Route::post('/products/{product}/media', [ProductMediaController::class, 'store']);
+        Route::put('/products/{product}/media/reorder', [ProductMediaController::class, 'reorder']);
+        Route::put('/products/{product}/media/{mediaId}/set-thumbnail', [ProductMediaController::class, 'setThumbnail']);
+        Route::delete('/products/{product}/media/{mediaId}', [ProductMediaController::class, 'destroy']);
+        Route::post('/products/{product}/adjust-stock', [ProductController::class, 'adjustStock']);
+        Route::apiResource('/products', ProductController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
 
-    // ── Product Variant & Option Management ───────────────────────────────────
-    Route::prefix('products/{product}')->group(function () {
-        // Options
-        Route::get('/options',                                    [ProductVariantController::class, 'optionIndex']);
-        Route::post('/options',                                   [ProductVariantController::class, 'optionStore']);
-        Route::put('/options/{option}',                           [ProductVariantController::class, 'optionUpdate']);
-        Route::delete('/options/{option}',                        [ProductVariantController::class, 'optionDestroy']);
-        Route::post('/options/{option}/values',                   [ProductVariantController::class, 'valueStore']);
-        Route::put('/options/{option}/values/{value}',            [ProductVariantController::class, 'valueUpdate']);
-        Route::delete('/options/{option}/values/{value}',         [ProductVariantController::class, 'valueDestroy']);
+        // ── Product Variant & Option Management ───────────────────────────────
+        Route::prefix('products/{product}')->group(function () {
+            // Options
+            Route::get('/options',                                    [ProductVariantController::class, 'optionIndex']);
+            Route::post('/options',                                   [ProductVariantController::class, 'optionStore']);
+            Route::put('/options/{option}',                           [ProductVariantController::class, 'optionUpdate']);
+            Route::delete('/options/{option}',                        [ProductVariantController::class, 'optionDestroy']);
+            Route::post('/options/{option}/values',                   [ProductVariantController::class, 'valueStore']);
+            Route::put('/options/{option}/values/{value}',            [ProductVariantController::class, 'valueUpdate']);
+            Route::delete('/options/{option}/values/{value}',         [ProductVariantController::class, 'valueDestroy']);
 
-        // Variants
-        Route::get('/variants/resolve',                           [ProductVariantController::class, 'resolve']);
-        Route::post('/variants/resolve',                          [ProductVariantController::class, 'resolve']);
-        Route::post('/variants/generate',                         [ProductVariantController::class, 'generate']);
-        Route::put('/variants/bulk',                              [ProductVariantController::class, 'bulkUpdate']);
-        Route::get('/variants',                                   [ProductVariantController::class, 'index']);
-        Route::post('/variants',                                  [ProductVariantController::class, 'store']);
-        Route::put('/variants/{variant}',                         [ProductVariantController::class, 'update']);
-        Route::delete('/variants/{variant}',                      [ProductVariantController::class, 'destroy']);
+            // Variants
+            Route::get('/variants/resolve',                           [ProductVariantController::class, 'resolve']);
+            Route::post('/variants/resolve',                          [ProductVariantController::class, 'resolve']);
+            Route::post('/variants/generate',                         [ProductVariantController::class, 'generate']);
+            Route::put('/variants/bulk',                              [ProductVariantController::class, 'bulkUpdate']);
+            Route::get('/variants',                                   [ProductVariantController::class, 'index']);
+            Route::post('/variants',                                  [ProductVariantController::class, 'store']);
+            Route::put('/variants/{variant}',                         [ProductVariantController::class, 'update']);
+            Route::delete('/variants/{variant}',                      [ProductVariantController::class, 'destroy']);
+        });
+
+        Route::apiResource('/categories', ProductCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
-    Route::apiResource('/categories', ProductCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
-
     // ── Order Management ──────────────────────────────────────────────────────
-    Route::get('/orders/stats', [OrderController::class, 'stats']);
-    Route::get('/orders/create-bootstrap', [OrderController::class, 'createBootstrap']);
-    Route::get('/orders/create/bootstrap', [OrderController::class, 'createBootstrap']);
-    Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
-    Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
-    Route::apiResource('/orders', OrderController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+    Route::middleware('staff_permission:orders')->group(function () {
+        Route::get('/orders/stats', [OrderController::class, 'stats']);
+        Route::get('/orders/create-bootstrap', [OrderController::class, 'createBootstrap']);
+        Route::get('/orders/create/bootstrap', [OrderController::class, 'createBootstrap']);
+        Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
+        Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
+        Route::apiResource('/orders', OrderController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+    });
 
     // ── Accounting ───────────────────────────────────────────────────────────
     Route::get('/accounting/summary', [TransactionController::class, 'summary']);
@@ -292,54 +318,63 @@ Route::middleware('active_subscription')->group(function () {
     });
 
     // ── Customer Management ───────────────────────────────────────────────────
-    Route::get('/customers/lookup-by-phone', [CustomerController::class, 'lookupByPhone']);
-    Route::get('/customers/stats', [CustomerController::class, 'stats']);
-    Route::post('/customers/sync-all', [CustomerController::class, 'syncAll']);
-    Route::post('/customers/{customer}/toggle-block', [CustomerController::class, 'toggleBlock']);
-    Route::apiResource('/customers', CustomerController::class)->only(['index', 'show', 'update']);
+    Route::middleware('staff_permission:customers')->group(function () {
+        Route::get('/customers/lookup-by-phone', [CustomerController::class, 'lookupByPhone']);
+        Route::get('/customers/stats', [CustomerController::class, 'stats']);
+        Route::post('/customers/sync-all', [CustomerController::class, 'syncAll']);
+        Route::post('/customers/{customer}/toggle-block', [CustomerController::class, 'toggleBlock']);
+        Route::apiResource('/customers', CustomerController::class)->only(['index', 'show', 'update']);
+    });
 
     // ── Courier Integration ───────────────────────────────────────────────────
     Route::prefix('courier')->group(function () {
-        Route::get('/settings', [CourierController::class, 'getSettings']);
-        Route::put('/settings', [CourierController::class, 'saveSettings']);
-        Route::post('/settings/test', [CourierController::class, 'testConnection']);
-        Route::post('/settings/test-pathao', [CourierController::class, 'testPathaoConnection']);
-        Route::post('/settings/test-steadfast-fraud-check', [CourierController::class, 'testSteadfastFraudCheck']);
-        Route::get('/steadfast/balance', [CourierController::class, 'steadfastBalance']);
-        Route::get('/steadfast/status/consignment/{id}', [CourierController::class, 'steadfastStatusByConsignment']);
-        Route::get('/steadfast/status/invoice/{invoice}', [CourierController::class, 'steadfastStatusByInvoice']);
-        Route::get('/steadfast/status/tracking/{trackingCode}', [CourierController::class, 'steadfastStatusByTracking']);
-        Route::get('/steadfast/return-requests', [CourierController::class, 'steadfastReturnRequests']);
-        Route::get('/steadfast/return-requests/{id}', [CourierController::class, 'steadfastReturnRequest']);
-        Route::post('/steadfast/return-requests', [CourierController::class, 'createSteadfastReturnRequest']);
-        Route::get('/steadfast/payments', [CourierController::class, 'steadfastPayments']);
-        Route::get('/steadfast/payments/{paymentId}', [CourierController::class, 'steadfastPayment']);
-        Route::get('/steadfast/police-stations', [CourierController::class, 'steadfastPoliceStations']);
-        Route::get('/ready', [CourierController::class, 'readyToBook']);
-        Route::get('/booked', [CourierController::class, 'booked']);
-        Route::post('/book/bulk', [CourierController::class, 'bookBulk']);
-        Route::post('/book/{order}', [CourierController::class, 'book']);
-        Route::get('/track/{order}', [CourierController::class, 'trackOrder']);
-        Route::post('/cancel/{order}', [CourierController::class, 'cancelBooking']);
-        // Pathao location dropdowns
-        Route::get('/locations/cities', [CourierController::class, 'cities']);
-        Route::get('/locations/zones/{cityId}', [CourierController::class, 'zones']);
-        Route::get('/locations/areas/{zoneId}', [CourierController::class, 'areas']);
-        // Pathao stores & price
-        Route::get('/pathao/stores', [CourierController::class, 'pathaoStores']);
-        Route::post('/pathao/stores', [CourierController::class, 'createPathaoStore']);
-        Route::post('/pathao/price', [CourierController::class, 'pathaoPrice']);
-        // RedX areas, pickup stores & charge
-        Route::get('/redx/areas', [CourierController::class, 'redxAreas']);
-        Route::get('/redx/pickup-stores', [CourierController::class, 'redxPickupStores']);
-        Route::post('/redx/pickup-stores', [CourierController::class, 'createRedxPickupStore']);
-        Route::post('/redx/charge', [CourierController::class, 'redxCharge']);
-        Route::get('/carrybee/cities', [CourierController::class, 'carrybeeCities']);
-        Route::get('/carrybee/cities/{cityId}/zones', [CourierController::class, 'carrybeeZones']);
-        Route::get('/carrybee/cities/{cityId}/zones/{zoneId}/areas', [CourierController::class, 'carrybeeAreas']);
-        Route::get('/carrybee/area-suggestion', [CourierController::class, 'carrybeeAreaSuggestion']);
-        Route::get('/carrybee/stores', [CourierController::class, 'carrybeeStores']);
-        Route::post('/carrybee/stores', [CourierController::class, 'createCarrybeeStore']);
+        // Credentials/settings — Pattern B (staff_team_role_context.md §3.3):
+        // staff can book/track parcels but never touch courier API credentials.
+        Route::middleware('owner_only')->group(function () {
+            Route::get('/settings', [CourierController::class, 'getSettings']);
+            Route::put('/settings', [CourierController::class, 'saveSettings']);
+            Route::post('/settings/test', [CourierController::class, 'testConnection']);
+            Route::post('/settings/test-pathao', [CourierController::class, 'testPathaoConnection']);
+            Route::post('/settings/test-steadfast-fraud-check', [CourierController::class, 'testSteadfastFraudCheck']);
+        });
+
+        Route::middleware('staff_permission:courier')->group(function () {
+            Route::get('/steadfast/balance', [CourierController::class, 'steadfastBalance']);
+            Route::get('/steadfast/status/consignment/{id}', [CourierController::class, 'steadfastStatusByConsignment']);
+            Route::get('/steadfast/status/invoice/{invoice}', [CourierController::class, 'steadfastStatusByInvoice']);
+            Route::get('/steadfast/status/tracking/{trackingCode}', [CourierController::class, 'steadfastStatusByTracking']);
+            Route::get('/steadfast/return-requests', [CourierController::class, 'steadfastReturnRequests']);
+            Route::get('/steadfast/return-requests/{id}', [CourierController::class, 'steadfastReturnRequest']);
+            Route::post('/steadfast/return-requests', [CourierController::class, 'createSteadfastReturnRequest']);
+            Route::get('/steadfast/payments', [CourierController::class, 'steadfastPayments']);
+            Route::get('/steadfast/payments/{paymentId}', [CourierController::class, 'steadfastPayment']);
+            Route::get('/steadfast/police-stations', [CourierController::class, 'steadfastPoliceStations']);
+            Route::get('/ready', [CourierController::class, 'readyToBook']);
+            Route::get('/booked', [CourierController::class, 'booked']);
+            Route::post('/book/bulk', [CourierController::class, 'bookBulk']);
+            Route::post('/book/{order}', [CourierController::class, 'book']);
+            Route::get('/track/{order}', [CourierController::class, 'trackOrder']);
+            Route::post('/cancel/{order}', [CourierController::class, 'cancelBooking']);
+            // Pathao location dropdowns
+            Route::get('/locations/cities', [CourierController::class, 'cities']);
+            Route::get('/locations/zones/{cityId}', [CourierController::class, 'zones']);
+            Route::get('/locations/areas/{zoneId}', [CourierController::class, 'areas']);
+            // Pathao stores & price
+            Route::get('/pathao/stores', [CourierController::class, 'pathaoStores']);
+            Route::post('/pathao/stores', [CourierController::class, 'createPathaoStore']);
+            Route::post('/pathao/price', [CourierController::class, 'pathaoPrice']);
+            // RedX areas, pickup stores & charge
+            Route::get('/redx/areas', [CourierController::class, 'redxAreas']);
+            Route::get('/redx/pickup-stores', [CourierController::class, 'redxPickupStores']);
+            Route::post('/redx/pickup-stores', [CourierController::class, 'createRedxPickupStore']);
+            Route::post('/redx/charge', [CourierController::class, 'redxCharge']);
+            Route::get('/carrybee/cities', [CourierController::class, 'carrybeeCities']);
+            Route::get('/carrybee/cities/{cityId}/zones', [CourierController::class, 'carrybeeZones']);
+            Route::get('/carrybee/cities/{cityId}/zones/{zoneId}/areas', [CourierController::class, 'carrybeeAreas']);
+            Route::get('/carrybee/area-suggestion', [CourierController::class, 'carrybeeAreaSuggestion']);
+            Route::get('/carrybee/stores', [CourierController::class, 'carrybeeStores']);
+            Route::post('/carrybee/stores', [CourierController::class, 'createCarrybeeStore']);
+        });
     });
 
     // ── Facebook Page connection + lead inbox ───────────────────────────────

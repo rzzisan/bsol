@@ -42,7 +42,12 @@ class AdminSmsGatewayController extends Controller
             ]);
         }
 
-        if (! $actor->sms_gateway_id) {
+        // Gateway assignment is a shop-owner-level (Pattern B) setting — a
+        // staff sub-account has no assignment of its own and uses the
+        // owner's. See staff_team_role_context.md §3.3.
+        $gatewayOwner = $actor->shopOwner();
+
+        if (! $gatewayOwner->sms_gateway_id) {
             return response()->json([
                 'message' => 'No SMS gateway assigned to this user.',
                 'gateways' => [],
@@ -50,7 +55,7 @@ class AdminSmsGatewayController extends Controller
         }
 
         $gateway = SmsGateway::query()
-            ->where('id', $actor->sms_gateway_id)
+            ->where('id', $gatewayOwner->sms_gateway_id)
             ->where('is_enabled', true)
             ->first();
 
@@ -74,12 +79,12 @@ class AdminSmsGatewayController extends Controller
         ]);
 
         $actor = $request->user();
-        $actorId = $actor?->id;
+        $walletOwnerId = $actor?->shopOwnerId(); // shared wallet, Pattern B — see §3.3
         $creditsPerSms = $this->creditService->calculateCreditsRequired($validated['message']);
         $recipientCount = max(1, count($this->extractRecipients($validated['phone_numbers'] ?? null)));
         $totalCreditsRequired = $creditsPerSms * $recipientCount;
 
-        $available = $actorId ? $this->creditService->getBalance($actorId) : 0;
+        $available = $walletOwnerId ? $this->creditService->getBalance($walletOwnerId) : 0;
 
         return response()->json([
             'credits_required' => $totalCreditsRequired,
@@ -100,9 +105,8 @@ class AdminSmsGatewayController extends Controller
         ]);
 
         $actor = $request->user();
-        $actorId = $actor?->id;
 
-        if (! $actorId) {
+        if (! $actor) {
             return response()->json([
                 'message' => 'Unauthenticated.',
                 'histories' => [],
@@ -111,8 +115,9 @@ class AdminSmsGatewayController extends Controller
 
         $perPage = (int) ($validated['per_page'] ?? 20);
 
+        // Shared team history — Pattern A, see §3.3 (matches Order/Product/Customer).
         $query = SmsHistory::query()
-            ->where('user_id', $actorId)
+            ->whereIn('user_id', $actor->shopUserIds())
             ->latest('id');
 
         if (! empty($validated['search'])) {
@@ -284,11 +289,14 @@ class AdminSmsGatewayController extends Controller
         }
 
         $actor = $request->user();
-        $actorId = $actor?->id;
+        $actorId = $actor?->id; // audit: who actually sent this (history rows keep this)
+        $walletOwnerId = $actor?->shopOwnerId(); // shared wallet + gateway assignment, Pattern B — see §3.3
         $isAdmin = (bool) $actor?->isAdmin();
 
         if (! $isAdmin) {
-            if (! $actor?->sms_gateway_id) {
+            $assignedGatewayId = $actor?->shopOwner()->sms_gateway_id;
+
+            if (! $assignedGatewayId) {
                 $this->createHistoryRecord(
                     gateway: null,
                     userId: $actorId,
@@ -306,7 +314,7 @@ class AdminSmsGatewayController extends Controller
                 ], 422);
             }
 
-            $gateway = SmsGateway::find($actor->sms_gateway_id);
+            $gateway = SmsGateway::find($assignedGatewayId);
         } else {
             $gateway = isset($validated['gateway_id'])
                 ? SmsGateway::find($validated['gateway_id'])
@@ -444,8 +452,8 @@ class AdminSmsGatewayController extends Controller
 
         $totalCreditsRequired = $creditsPerSms * count($normalizedRecipients);
 
-        if (! $isAdmin && $actorId) {
-            $balance = $this->creditService->getBalance($actorId);
+        if (! $isAdmin && $walletOwnerId) {
+            $balance = $this->creditService->getBalance($walletOwnerId);
 
             if ($balance < $totalCreditsRequired) {
                 foreach ($normalizedRecipients as $recipient) {
@@ -507,11 +515,11 @@ class AdminSmsGatewayController extends Controller
             if ($ok) {
                 $successCount++;
 
-                if (! $isAdmin && $actorId) {
+                if (! $isAdmin && $walletOwnerId) {
                     $deducted = $this->creditService->deduct(
-                        userId: $actorId,
+                        userId: $walletOwnerId,
                         credits: $creditsPerSms,
-                        note: "SMS sent to {$recipient} via {$gateway->name}",
+                        note: "SMS sent to {$recipient} via {$gateway->name}" . ($actorId !== $walletOwnerId ? " (by staff #{$actorId})" : ''),
                     );
 
                     if (! $deducted) {

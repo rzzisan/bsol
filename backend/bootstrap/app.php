@@ -7,7 +7,10 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Middleware\EnsureActiveSubscription;
+use App\Http\Middleware\EnsureShopOwner;
+use App\Http\Middleware\EnsureStaffPermission;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\ForcePasswordChange;
 use App\Http\Middleware\TrackLandingPageVisit;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -38,6 +41,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'is_admin' => EnsureUserIsAdmin::class,
             'track_landing_page_visit' => TrackLandingPageVisit::class,
             'active_subscription' => EnsureActiveSubscription::class,
+            // Staff/Team sub-account role — see staff_team_role_context.md §3.4/§3.7
+            'staff_permission' => EnsureStaffPermission::class,
+            'owner_only' => EnsureShopOwner::class,
+            'force_password_change' => ForcePasswordChange::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {

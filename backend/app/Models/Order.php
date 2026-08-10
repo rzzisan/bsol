@@ -54,11 +54,22 @@ class Order extends Model
         return $this->hasMany(OrderStatusLog::class)->orderBy('created_at', 'desc');
     }
 
-    /** Generate next order number like ORD-20260502-0001 */
-    public static function generateOrderNumber(int $userId): string
+    /**
+     * Generate next order number like ORD-20260502-0001.
+     *
+     * Accepts the whole shop pool (owner + staff, see
+     * staff_team_role_context.md §3.3) rather than a single user id, so the
+     * sequence stays team-wide unique/sequential regardless of which staff
+     * member actually created the order — a per-creator sequence would let
+     * two team members collide on the same order number the same day.
+     *
+     * @param int|array<int, int> $shopUserIds
+     */
+    public static function generateOrderNumber(int|array $shopUserIds): string
     {
+        $shopUserIds = (array) $shopUserIds;
         $prefix = 'ORD-' . now()->format('Ymd') . '-';
-        $last   = static::where('user_id', $userId)
+        $last   = static::whereIn('user_id', $shopUserIds)
             ->where('order_number', 'like', $prefix . '%')
             ->orderByDesc('id')
             ->value('order_number');

@@ -18,7 +18,7 @@ class CourierController extends Controller
 {
     private function getSteadfastSettings(): ?CourierSetting
     {
-        $settings = CourierSetting::where('user_id', auth()->id())->first();
+        $settings = CourierSetting::where('user_id', auth()->user()->shopOwnerId())->first();
 
         if (! $settings || ! $settings->steadfast_api_key) {
             return null;
@@ -32,21 +32,21 @@ class CourierController extends Controller
     public function cities(): JsonResponse
     {
         $svc   = new PathaoLocationService();
-        $cities = $svc->getCities(auth()->id());
-        return response()->json(['success' => true, 'data' => $cities, 'has_credentials' => $svc->hasCredentials(auth()->id())]);
+        $cities = $svc->getCities(auth()->user()->shopOwnerId());
+        return response()->json(['success' => true, 'data' => $cities, 'has_credentials' => $svc->hasCredentials(auth()->user()->shopOwnerId())]);
     }
 
     public function zones(int $cityId): JsonResponse
     {
         $svc   = new PathaoLocationService();
-        $zones = $svc->getZones($cityId, auth()->id());
+        $zones = $svc->getZones($cityId, auth()->user()->shopOwnerId());
         return response()->json(['success' => true, 'data' => $zones]);
     }
 
     public function areas(int $zoneId): JsonResponse
     {
         $svc   = new PathaoLocationService();
-        $areas = $svc->getAreas($zoneId, auth()->id());
+        $areas = $svc->getAreas($zoneId, auth()->user()->shopOwnerId());
         return response()->json(['success' => true, 'data' => $areas]);
     }
 
@@ -55,14 +55,14 @@ class CourierController extends Controller
     public function redxAreas(Request $request): JsonResponse
     {
         $svc    = new RedxService();
-        $result = $svc->getAreas(auth()->id(), $request->query('post_code'), $request->query('district_name'));
+        $result = $svc->getAreas(auth()->user()->shopOwnerId(), $request->query('post_code'), $request->query('district_name'));
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     public function redxPickupStores(): JsonResponse
     {
         $svc    = new RedxService();
-        $result = $svc->getPickupStores(auth()->id());
+        $result = $svc->getPickupStores(auth()->user()->shopOwnerId());
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -75,7 +75,7 @@ class CourierController extends Controller
             'area_id' => 'required|integer',
         ]);
         $svc    = new RedxService();
-        $result = $svc->createPickupStore(auth()->id(), $data);
+        $result = $svc->createPickupStore(auth()->user()->shopOwnerId(), $data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -89,7 +89,7 @@ class CourierController extends Controller
         ]);
         $svc    = new RedxService();
         $result = $svc->calculateCharge(
-            auth()->id(),
+            auth()->user()->shopOwnerId(),
             $data['delivery_area_id'],
             $data['pickup_area_id'],
             (float) $data['cod_amount'],
@@ -103,21 +103,21 @@ class CourierController extends Controller
     public function carrybeeCities(): JsonResponse
     {
         $svc    = new CarrybeeService();
-        $result = $svc->getCities(auth()->id());
+        $result = $svc->getCities(auth()->user()->shopOwnerId());
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     public function carrybeeZones(int $cityId): JsonResponse
     {
         $svc    = new CarrybeeService();
-        $result = $svc->getZones(auth()->id(), $cityId);
+        $result = $svc->getZones(auth()->user()->shopOwnerId(), $cityId);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     public function carrybeeAreas(int $cityId, int $zoneId): JsonResponse
     {
         $svc    = new CarrybeeService();
-        $result = $svc->getAreas(auth()->id(), $cityId, $zoneId);
+        $result = $svc->getAreas(auth()->user()->shopOwnerId(), $cityId, $zoneId);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -125,14 +125,14 @@ class CourierController extends Controller
     {
         $data = $request->validate(['search' => 'required|string|min:3']);
         $svc    = new CarrybeeService();
-        $result = $svc->searchAreas(auth()->id(), $data['search']);
+        $result = $svc->searchAreas(auth()->user()->shopOwnerId(), $data['search']);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     public function carrybeeStores(): JsonResponse
     {
         $svc    = new CarrybeeService();
-        $result = $svc->getStores(auth()->id());
+        $result = $svc->getStores(auth()->user()->shopOwnerId());
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -149,7 +149,7 @@ class CourierController extends Controller
             'area_id'                            => 'required|integer',
         ]);
         $svc    = new CarrybeeService();
-        $result = $svc->createStore(auth()->id(), $data);
+        $result = $svc->createStore(auth()->user()->shopOwnerId(), $data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -157,7 +157,7 @@ class CourierController extends Controller
 
     public function getSettings(): JsonResponse
     {
-        $settings = CourierSetting::firstOrNew(['user_id' => auth()->id()]);
+        $settings = CourierSetting::firstOrNew(['user_id' => auth()->user()->shopOwnerId()]);
 
         return response()->json([
             'success' => true,
@@ -195,7 +195,7 @@ class CourierController extends Controller
         ]);
 
         // Only update keys that are actually sent (not masked placeholders)
-        $existing = CourierSetting::firstOrNew(['user_id' => auth()->id()]);
+        $existing = CourierSetting::firstOrNew(['user_id' => auth()->user()->shopOwnerId()]);
 
         // These columns are NOT NULL in the DB; an empty selection must not blank them out
         $notNullable = ['default_courier', 'redx_environment', 'carrybee_environment'];
@@ -206,7 +206,7 @@ class CourierController extends Controller
             if ($value === null && in_array($field, $notNullable, true)) continue;
             $existing->$field = $value;
         }
-        $existing->user_id = auth()->id();
+        $existing->user_id = auth()->user()->shopOwnerId();
         $existing->save();
 
         return response()->json(['success' => true, 'data' => $existing->masked()]);
@@ -398,14 +398,14 @@ class CourierController extends Controller
     public function testPathaoConnection(): JsonResponse
     {
         $svc = new PathaoService();
-        if (! $svc->hasCredentials(auth()->id())) {
+        if (! $svc->hasCredentials(auth()->user()->shopOwnerId())) {
             return response()->json(['success' => false, 'message' => 'Pathao credentials not configured. Go to Settings → Courier.'], 422);
         }
-        $token = $svc->getToken(auth()->id());
+        $token = $svc->getToken(auth()->user()->shopOwnerId());
         if (! $token) {
             return response()->json(['success' => false, 'message' => 'Failed to get Pathao access token. Check your credentials.'], 422);
         }
-        $stores = $svc->getStores(auth()->id());
+        $stores = $svc->getStores(auth()->user()->shopOwnerId());
         return response()->json([
             'success' => true,
             'message' => 'Pathao connection successful.',
@@ -418,7 +418,7 @@ class CourierController extends Controller
     public function pathaoStores(): JsonResponse
     {
         $svc    = new PathaoService();
-        $result = $svc->getStores(auth()->id());
+        $result = $svc->getStores(auth()->user()->shopOwnerId());
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -435,7 +435,7 @@ class CourierController extends Controller
             'area_id'          => 'required|integer',
         ]);
         $svc    = new PathaoService();
-        $result = $svc->createStore(auth()->id(), $data);
+        $result = $svc->createStore(auth()->user()->shopOwnerId(), $data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -452,7 +452,7 @@ class CourierController extends Controller
             'recipient_zone' => 'required|integer',
         ]);
         $svc    = new PathaoService();
-        $result = $svc->calculatePrice(auth()->id(), $data);
+        $result = $svc->calculatePrice(auth()->user()->shopOwnerId(), $data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -460,7 +460,7 @@ class CourierController extends Controller
 
     public function book(Request $request, int $orderId): JsonResponse
     {
-        $order = Order::where('user_id', auth()->id())->findOrFail($orderId);
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($orderId);
 
         $data = $request->validate([
             'courier'       => 'nullable|in:steadfast,pathao,redx,carrybee,paperfly,manual',
@@ -566,7 +566,7 @@ class CourierController extends Controller
         // support yet. Paperfly needs no such per-order lookup (storeName comes
         // from the seller's default in Settings → Courier), so it's bulk-eligible.
 
-        $orders = Order::where('user_id', auth()->id())
+        $orders = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->whereIn('id', $data['order_ids'])
             ->whereIn('status', ['confirmed', 'processing'])
             ->whereNull('courier_tracking_id')
@@ -621,7 +621,7 @@ class CourierController extends Controller
 
     public function trackOrder(int $orderId): JsonResponse
     {
-        $order = Order::where('user_id', auth()->id())->findOrFail($orderId);
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($orderId);
 
         if (! $order->courier_tracking_id) {
             return response()->json(['success' => false, 'message' => 'No tracking ID.'], 422);
@@ -648,7 +648,7 @@ class CourierController extends Controller
 
     public function cancelBooking(Request $request, int $orderId): JsonResponse
     {
-        $order = Order::where('user_id', auth()->id())->findOrFail($orderId);
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($orderId);
 
         if (! $order->courier_tracking_id) {
             return response()->json(['success' => false, 'message' => 'No courier booking to cancel.'], 422);
@@ -686,7 +686,7 @@ class CourierController extends Controller
 
     public function booked(Request $request): JsonResponse
     {
-        $query = Order::where('user_id', auth()->id())
+        $query = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->whereNotNull('courier_tracking_id')
             ->orderByDesc('updated_at');
 
@@ -712,7 +712,7 @@ class CourierController extends Controller
 
     public function readyToBook(Request $request): JsonResponse
     {
-        $query = Order::where('user_id', auth()->id())
+        $query = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->whereIn('status', ['confirmed', 'processing'])
             ->whereNull('courier_tracking_id')
             ->orderByDesc('created_at');

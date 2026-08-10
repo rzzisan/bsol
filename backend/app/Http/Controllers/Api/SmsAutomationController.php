@@ -16,7 +16,7 @@ class SmsAutomationController extends Controller
         $perPage = min((int) ($request->integer('per_page') ?: 20), 100);
 
         $rules = SmsAutomationRule::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->orderByDesc('is_active')
             ->latest('id')
             ->paginate($perPage);
@@ -63,7 +63,7 @@ class SmsAutomationController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $rule = SmsAutomationRule::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->findOrFail($id);
 
         $data = $request->validate([
@@ -86,7 +86,7 @@ class SmsAutomationController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $rule = SmsAutomationRule::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->findOrFail($id);
 
         $rule->delete();
@@ -102,7 +102,7 @@ class SmsAutomationController extends Controller
         $perPage = min((int) ($request->integer('per_page') ?: 20), 100);
 
         $logs = SmsAutomationLog::query()
-            ->where('user_id', auth()->id())
+            ->whereIn('user_id', auth()->user()->shopUserIds())
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->latest('id')
             ->paginate($perPage);

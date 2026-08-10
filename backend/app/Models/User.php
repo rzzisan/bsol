@@ -17,7 +17,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'mobile', 'mobile_verified_at', 'email', 'email_verified_at', 'password', 'role', 'user_status', 'subscription_package_id', 'sms_gateway_id', 'subscription_status', 'subscription_started_at', 'subscription_ends_at'])]
+#[Fillable(['name', 'mobile', 'mobile_verified_at', 'email', 'email_verified_at', 'password', 'role', 'user_status', 'subscription_package_id', 'sms_gateway_id', 'subscription_status', 'subscription_started_at', 'subscription_ends_at', 'owner_id', 'staff_status', 'must_change_password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -38,6 +38,7 @@ class User extends Authenticatable
             'subscription_started_at' => 'datetime',
             'subscription_ends_at'    => 'datetime',
             'deleted_at'              => 'datetime',
+            'must_change_password'    => 'boolean',
         ];
     }
 
@@ -85,5 +86,60 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    // ── Staff/Team sub-account role — see staff_team_role_context.md §3.2 ──
+
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function staffMembers()
+    {
+        return $this->hasMany(User::class, 'owner_id');
+    }
+
+    public function staffPermissions()
+    {
+        return $this->hasMany(StaffPermission::class);
+    }
+
+    public function isStaff(): bool
+    {
+        return $this->owner_id !== null;
+    }
+
+    /** The shop-owning account's id — self, unless this is a staff sub-account. */
+    public function shopOwnerId(): int
+    {
+        return $this->owner_id ?? $this->id;
+    }
+
+    /** The shop-owning account itself — self, unless this is a staff sub-account.
+     *  Use this (not $this) when reading owner-level singleton resources
+     *  (Pattern B, e.g. subscriptionPackage) so staff correctly see the
+     *  shop's plan instead of their own (always-empty) fields. */
+    public function shopOwner(): User
+    {
+        return $this->isStaff() ? ($this->owner ?? $this) : $this;
+    }
+
+    /** Owner + all of that owner's staff — the "shop pool" for shared (Pattern A) data scoping. */
+    public function shopUserIds(): array
+    {
+        $ownerId = $this->shopOwnerId();
+
+        return static::where('id', $ownerId)->orWhere('owner_id', $ownerId)->pluck('id')->all();
+    }
+
+    /** Owner/admin accounts always pass; staff accounts need an explicit enabled grant. */
+    public function hasStaffPermission(string $moduleKey): bool
+    {
+        if (! $this->isStaff()) {
+            return true;
+        }
+
+        return $this->staffPermissions()->where('module_key', $moduleKey)->where('enabled', true)->exists();
     }
 }

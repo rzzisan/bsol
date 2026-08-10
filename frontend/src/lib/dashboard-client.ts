@@ -12,6 +12,57 @@ export interface AuthUser {
   mobile_verified_at?: string | null;
   email_verified_at?: string | null;
   role?: "admin" | "user";
+  // Staff/Team sub-account role — see staff_team_role_context.md §3.7.
+  // These come as sibling keys on the /login and /me API responses (not
+  // nested inside `user`), so callers must merge them via mergeAuthPayload()
+  // before persisting — see that function below.
+  is_staff?: boolean;
+  must_change_password?: boolean;
+  owner_name?: string | null;
+  permissions?: Record<string, boolean>;
+}
+
+/** Canonical module keys for staff permission gating — mirrors
+ *  StaffPermission::MODULE_KEYS on the backend. Phase 1 only wires up the
+ *  first five in the UI (menu filtering, staff-management checkbox grid);
+ *  the rest are listed here so Phase 2 doesn't have to touch this constant. */
+export const STAFF_MODULE_KEYS = [
+  "orders",
+  "products",
+  "customers",
+  "courier",
+  "sms",
+  "accounting",
+  "analytics",
+  "landing_pages",
+  "fraud",
+] as const;
+
+export type StaffModuleKey = (typeof STAFF_MODULE_KEYS)[number];
+
+/** Owner/admin accounts always have full access; a staff sub-account needs
+ *  an explicit enabled grant for the module. Mirrors User::hasStaffPermission(). */
+export function hasModuleAccess(user: AuthUser | null, moduleKey: StaffModuleKey): boolean {
+  if (!user?.is_staff) return true;
+  return user.permissions?.[moduleKey] === true;
+}
+
+/** Flattens a /login or /me API response (`{ user, is_staff, must_change_password,
+ *  owner_name, permissions }`) into a single AuthUser object for storage. */
+export function mergeAuthPayload(payload: {
+  user: AuthUser;
+  is_staff?: boolean;
+  must_change_password?: boolean;
+  owner_name?: string | null;
+  permissions?: Record<string, boolean>;
+}): AuthUser {
+  return {
+    ...payload.user,
+    is_staff: payload.is_staff ?? false,
+    must_change_password: payload.must_change_password ?? false,
+    owner_name: payload.owner_name ?? null,
+    permissions: payload.permissions ?? {},
+  };
 }
 
 export function getStoredLocale(): Locale {
