@@ -6,6 +6,8 @@
 
 **Unrelated regression found + fixed same session:** seller's landing-pages list (`/dashboard/landing-pages`) was returning empty — a pre-existing bug from an earlier landing-page cleanup commit (`36fab21`), not caused by any Facebook work here. Full writeup + fix in `landing_page_context.md` §22.
 
+> **🚨 Staff/Team role আপডেট (2026-08-10, এই ফাইল তখনও পুরোপুরি rewrite হয়নি):** Facebook feature-এর ভেতরেও দুই ধরনের scoping এখন আছে — `FacebookConnectController` (Page OAuth connect/disconnect) ও `FacebookPixelSettingController` (pixel ID/token) **owner-only** (Pattern B, courier settings-এর মতো, `owner_only` route middleware) — staff এগুলো কখনো টাচ করতে পারবে না। `FacebookLeadController` (leads inbox) ও `FacebookReplyTemplateController` (quick-reply templates) নতুন `facebook` module permission-এ শেয়ার্ড (Pattern A, `whereIn(shopUserIds())`) — owner staff-কে এই permission দিলে staff পুরো leads inbox দেখতে/রিপ্লাই দিতে পারবে। বিস্তারিত: CONTEXT.md §৩১, `staff_team_role_context.md §9.4`। এই ফিচারে নতুন কাজ (যেমন App Review পাস হওয়ার পর নতুন endpoint) করলে এই owner-only vs shared boundary বজায় রাখতে হবে।
+
 ---
 
 ## 1. Architecture Summary

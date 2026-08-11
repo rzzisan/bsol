@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-10 — **Staff/Team sub-account role** (owner-এর অধীনে সীমিত-অনুমতির staff account) Phase 1+2 সম্পূর্ণ শেষ, সব existing module (orders/products/customers/courier/sms/accounting/analytics/landing_pages/fraud/facebook) staff-scoping-aware করা হয়েছে — বিস্তারিত `staff_team_role_context.md`। **এর ফলে §5/§6/§7-এর পুরনো "per-user = `where('user_id', auth()->id())`" checklist এখন স্টেল** — নতুন যেকোনো মডিউল/ফিচার তৈরির আগে CONTEXT.md §31 (নতুন মাস্টার rule) পড়া এখন বাধ্যতামূলক, নিচে §5/§6/§7 আপডেট করা হয়েছে pointer-সহ। Older entries kept as-is:
+
 Last updated: 2026-08-09 — bKash subscription-billing gateway is now **live in production** with a real merchant account (§18.2): the credentials turned out to be for the classic PGW/Checkout API, not Tokenized Checkout, so that product was implemented too (config-toggleable, both kept in code) and verified with a real ৳5 transaction. See below. Older entries kept as-is:
 
 Last updated: 2026-08-08 — Added §17.10: five more open findings from §17 fixed (queue worker, admin self-lockout, fraud-score↔courier merge, customers FK, Steadfast bulk-correlation, courier cancel() route) — see below. Older entries kept as-is:
@@ -317,22 +319,24 @@ reference_type, reference_id, amount, note, transaction_date
 
 ---
 
-## 5. Data Scoping Rules (mandatory per CONTEXT.md §25)
+## 5. Data Scoping Rules (mandatory per CONTEXT.md §25 এবং §31)
+
+> **⚠️ 2026-08-10 আপডেট — এই সেকশনের নিচের টেবিলটা এখন স্টেল/অসম্পূর্ণ।** "Per-user" মানে আগে ছিল শুধু `where('user_id', auth()->id())` — কিন্তু Staff/Team sub-account role চালু হওয়ার পর (দেখো `staff_team_role_context.md`) এটা যথেষ্ট না, কারণ `auth()->id()` staff-এর নিজের id হতে পারে যেটা shop-এর ডেটা খুঁজে পাবে না। **নতুন কোনো controller লেখার আগে এই সেকশনের বদলে সরাসরি CONTEXT.md §31 এবং `staff_team_role_context.md §3.3`/`§9.3` পড়ো** — নিচের পুরনো টেবিল শুধু historical reference হিসেবে রাখা হলো (কোন resource per-user/admin-shared তা বোঝার জন্য এখনো useful, কিন্তু exact scoping কোড প্যাটার্নটা আর সঠিক না)।
 
 All new controllers must answer: **"Shared across admins or per-user isolated?"**
 
-| Resource | Scoping Rule |
+| Resource | Scoping Rule (pre-2026-08 legacy — এখন §31 অনুযায়ী পড়তে হবে) |
 |---|---|
-| Orders | Per-user (`where('user_id', auth()->id())`) — each seller owns their orders |
-| Products | Per-user |
-| Customers | Per-user |
-| Courier accounts | Per-user |
-| Fraud profiles | Per-user (each seller builds their own history) |
-| Blacklist | Per-user |
-| SMS automation rules | Per-user |
-| Transactions | Per-user |
+| Orders | Per-user (এখন: owner-keyed, `whereIn(shopUserIds())` reads-এ — দেখো CONTEXT.md §31) |
+| Products | Per-user (এখন: `whereIn(shopUserIds())`) |
+| Customers | Per-user (এখন: owner-keyed, `whereIn(shopUserIds())`) |
+| Courier accounts | Per-user (এখন: credentials Pattern B `shopOwnerId()`, booking/tracking Pattern A `shopUserIds()`) |
+| Fraud profiles | Per-user (এখন: owner-keyed singleton, `shopOwnerId()`) |
+| Blacklist | Per-user (এখন: owner-keyed singleton, `shopOwnerId()`) |
+| SMS automation rules | Per-user (এখন: `whereIn(shopUserIds())`) |
+| Transactions | Per-user (এখন: `whereIn(shopUserIds())`) |
 
-**Note:** Admin-shared resources (notification templates, email configs, SMS gateways) already use `adminScopeUserIds()` per CONTEXT.md §25. New seller-facing resources are per-user by design.
+**Note:** Admin-shared resources (notification templates, email configs, SMS gateways) `adminScopeUserIds()` ব্যবহার করে (CONTEXT.md §25) — এটা staff/team pattern থেকে আলাদা এবং অপরিবর্তিত আছে।
 
 ---
 
@@ -342,10 +346,11 @@ When creating a new controller:
 
 1. Place in `app/Http/Controllers/Api/`
 2. Register route under `auth:sanctum` middleware (NOT `is_admin` — these are user routes)
-3. All queries scoped with `->where('user_id', auth()->id())`
-4. Standard response format: `{ success: true, data: [...], meta: { total, page } }`
-5. Validation in `app/Http/Requests/` (Form Requests)
-6. Run `php artisan route:list` to verify middleware
+3. **Scoping — CONTEXT.md §31 বাধ্যতামূলক পড়ো আগে।** Plain `where('user_id', auth()->id())` ব্যবহার কোরো না — Pattern A (`whereIn('user_id', auth()->user()->shopUserIds())`, reads-এ; `auth()->id()` writes-এ audit-এর জন্য) বা Pattern B (`auth()->user()->shopOwnerId()`, single-value, credential/wallet/billing resource) — কোনটা প্রযোজ্য ঠিক করো `staff_team_role_context.md §3.3` অনুযায়ী
+4. যদি নতুন module logically আলাদা staff-gate-able হয় (owner চাইবে staff-কে এই মডিউল আলাদাভাবে on/off করতে), নতুন `StaffPermission::MODULE_KEYS` entry যোগ করো (`app/Models/StaffPermission.php` + ফ্রন্টএন্ড `STAFF_MODULE_KEYS`) এবং route-এ `staff_permission:{module}` বা `owner_only` middleware বসাও — প্যাটার্নের জন্য `routes/api.php`-এর বিদ্যমান Phase 1/2 ব্লক দেখো
+5. Standard response format: `{ success: true, data: [...], meta: { total, page } }`
+6. Validation in `app/Http/Requests/` (Form Requests)
+7. Run `php artisan route:list -v` to verify middleware (scoping middleware সহ)
 
 ---
 
@@ -355,12 +360,14 @@ When implementing a module page:
 
 1. Replace `ModulePlaceholder` with real UI
 2. Use `UserShell` wrapper (keep `activeKey` + `defaultExpandedKey`)
-3. Follow design system: `var(--background)`, `var(--surface)`, `var(--accent)`, `var(--border)`, `var(--muted)`
-4. Mobile-first — test at 375px, 768px, 1280px
-5. Bilingual — all text must have `bn` and `en` versions
-6. Dark/light theme compatible
-7. Run `npm run build` after changes
-8. Restart: `supervisorctl restart hybrid-stack-frontend`
+3. নতুন মেনু আইটেম যোগ করলে `user-shell.tsx`-এর `MODULE_KEY_BY_MENU_ITEM` ম্যাপে entry যোগ করো (staff filtering সঠিকভাবে কাজ করার জন্য — না করলে default-deny-এ staff-এর কাছে মেনুটা hide হয়ে যাবে, এমনকি permission থাকলেও)
+4. নতুন module permission হলে `dashboard/settings/staff/page.tsx`-এর `MODULE_KEYS`/`moduleLabels`-এ যোগ করো
+5. Follow design system: `var(--background)`, `var(--surface)`, `var(--accent)`, `var(--border)`, `var(--muted)`
+6. Mobile-first — test at 375px, 768px, 1280px
+7. Bilingual — all text must have `bn` and `en` versions
+8. Dark/light theme compatible
+9. Run `npm run build` after changes
+10. Restart/deploy: `npm run deploy:prod:safe` (CONTEXT.md §26/§28 — **না যে** `supervisorctl restart hybrid-stack-frontend`, ওটা deprecated)
 
 ---
 

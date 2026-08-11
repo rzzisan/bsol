@@ -8,6 +8,22 @@ Last updated: 2026-08-10 — **Phase 1 + Phase 2 উভয়ই সম্পূ
 
 ---
 
+## ⚡ নতুন ফিচার/মডিউল তৈরি করার জন্য দ্রুত চেকলিস্ট (2026-08-10 যোগ হয়েছে)
+
+**এই ফাইলটা এখন শুধু "Staff/Team role কীভাবে তৈরি হয়েছে" তার log না — ভবিষ্যতে নতুন যেকোনো ফিচার/মডিউল তৈরির সময় বাধ্যতামূলক reference।** CONTEXT.md §৩১-এ এই নিয়ম master rule হিসেবে আছে, বিস্তারিত এখানে। পুরো ফাইল না পড়ে দ্রুত শুরু করতে চাইলে এই চেকলিস্টটা যথেষ্ট (বিস্তারিত/উদাহরণের জন্য লিংক করা সেকশনে যাও):
+
+1. নতুন resource **Pattern A না Pattern B** ঠিক করো (§3.3):
+   - Pattern A (team-shared): reads `whereIn('user_id', auth()->user()->shopUserIds())`, writes `auth()->id()` অপরিবর্তিত (audit)।
+   - Pattern B (owner-only singleton/credential): সবসময় `auth()->user()->shopOwnerId()`, কোনো `whereIn` না।
+2. **⚠️ সবচেয়ে ভুল-প্রবণ জায়গা:** নতুন resource যদি Order/Customer/CourierSetting/SmsGateway-এর মতো কোনো Pattern-B resource-কে creator-এর `user_id` দিয়ে reference করে — সেই `user_id` সরাসরি trust কোরো না, `shopOwnerId()` resolve করো (§9.3-এর LandingPage/Fraud উদাহরণ দেখো — এই একই ভুল দুইবার প্রায় হয়ে যাচ্ছিল)।
+3. নতুন module-level permission দরকার হলে `StaffPermission::MODULE_KEYS` (backend) + `STAFF_MODULE_KEYS` (frontend) দুই জায়গায় যোগ করো (§3.1, §9.4)।
+4. Route-এ `staff_permission:{module}` বা `owner_only` middleware বসাও (§3.4, §9.4-এর routes/api.php উদাহরণ)।
+5. Frontend মেনুতে নতুন আইটেম হলে `user-shell.tsx`-এর `MODULE_KEY_BY_MENU_ITEM` ম্যাপে যোগ করো (§9.5) — নাহলে default-deny-এ staff-এর কাছে hide হয়ে যাবে।
+6. Owner-এর staff-management পেজে (`dashboard/settings/staff/page.tsx`) নতুন module থাকলে `MODULE_KEYS`/`moduleLabels`-এ যোগ করো (§9.5)।
+7. Verify করার সময় staff account দিয়ে তিনটা কেস টেস্ট করো: granted→200, non-granted→403 `staff_permission_denied`, owner-only→403 `owner_only`।
+
+---
+
 ## 0. Scope (user request, সংক্ষেপে)
 
 `SAAS_MODULE_CONTEXT.md §16.6`-এ চিহ্নিত gap: বর্তমানে `users.role` শুধু `user`/`admin` — একটা shop-এর মধ্যে multiple staff/team member (order processing-এ সাহায্য করা কর্মী) রাখার কোনো সুবিধা নেই। ছোট F-commerce ব্যবসাতেও সাধারণত ২-৩ জন অর্ডার প্রসেস করে — এই ফিচার না থাকা মানে বড় সেলার retain করা কঠিন (স্টাফ নিয়োগ দিলে তারা platform ছাড়তে বাধ্য হয়)।

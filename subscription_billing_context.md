@@ -2,7 +2,9 @@
 
 এই ফাইলে এই কনভারসেশনে সাবস্ক্রিপশন/বিলিং ফিচার উন্নয়ন এবং SMS credit কেনার ফিচার প্ল্যানিং সংক্রান্ত সব কাজের context লিপিবদ্ধ থাকবে (user-এর বাধ্যতামূলক নির্দেশনা অনুযায়ী)। Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (product/feature — subscription §15.8/§18, SMS §15.5)।
 
-Last updated: 2026-08-10 — **Phase 3: PDF ইনভয়েস + সাবস্ক্রিপশন/SMS-credit UI সম্পূর্ণ redesign সম্পন্ন, deploy + live-verify করা হয়েছে।** নিচে §7-এ implementation log। Phase 1/2 আগেই সম্পন্ন (§5, §6), Phase 1 user নিজে bKash gateway দিয়ে লাইভ টেস্ট করে সফল কনফার্ম করেছেন।
+> **🚨 Staff/Team role সচেতনতা (2026-08-10):** Subscription billing (`SubscriptionController`, bKash payment routes) এবং SMS credit purchase/wallet (`SmsCreditPurchaseController`, `SmsCreditBkash*Controller`) — এই পুরো ফিচার-সেট **সবসময় Pattern B (owner-only)**, `routes/api.php`-এ `owner_only` middleware দিয়ে wrapped — staff account কখনো নিজের subscription কিনতে/দেখতে বা SMS credit কিনতে পারবে না, এটা ইচ্ছাকৃত ডিজাইন। SMS **পাঠানো** (send/history/automation) আলাদা এবং Pattern A/staff-permission-gated (`sms` module) — SMS credit wallet balance staff ব্যবহার করতে পারে (owner-এর wallet থেকে কাটে, `AdminSmsGatewayController::send()`-এ `shopOwnerId()` দিয়ে resolve করা হয়) কিন্তু কেনা/রিচার্জ করতে পারে না। এই ফিচারে নতুন payment/billing-সম্পর্কিত কাজ করলে এই owner-only boundary বজায় রাখতে হবে — বিস্তারিত: CONTEXT.md §৩১, `staff_team_role_context.md §3.3`।
+
+Last updated: 2026-08-10 — **Phase 4: Phase 3-এর ডিজাইন user-এর কাছে যথেষ্ট মনে হয়নি ("ভাল লাগে নাই"), তাই আরেকবার সম্পূর্ণ visual concept upgrade করা হয়েছে, deploy + live-verify করা হয়েছে।** নিচে §8-এ implementation log। Phase 1/2/3 আগেই সম্পন্ন (§5, §6, §7)।
 
 ---
 
@@ -310,3 +312,34 @@ Plain `<a href>` Bearer token header পাঠাতে পারে না (San
 - Mobile viewport-এ সরাসরি visual QA (টুল সীমাবদ্ধতা, §7.4-এ নোট)
 - Admin billing/sms-credit পেজে invoice PDF ডাউনলোড বাটন (এই ফেজ শুধু seller-facing পেজ কভার করেছে; admin থেকেও চাইলে একই endpoint pattern দিয়ে সহজে যোগ করা যাবে)
 - PDF-এ platform logo/letterhead image (এখন শুধু টেক্সট ব্র্যান্ডিং)
+
+---
+
+## 8. Phase 4 — দ্বিতীয় দফা visual redesign (2026-08-10, একই দিন)
+
+User feedback: "সাবসক্রিপশন এবং SMS ক্রেডিট কেনার UI ডিজাইন আমার কাছে ভাল লাগে নাই। ডিজাইন আরো উন্নত করা দরকার।" প্রশ্ন করে জানা যায় user layout/structure, রঙ/visual style, typography/spacing — সবগুলোতেই আরও উন্নতি চান, এবং সম্পূর্ণ concept বদলাতে রাজি; নির্দিষ্ট কোনো reference/inspiration নেই, agent-কে প্রস্তাব দিতে বলা হয়েছে।
+
+### 8.1 Design approach
+CONTEXT.md §22 (design consistency policy) অনুযায়ী `catv-panel` shell/border-radius/shadow এবং token family (`--background/--foreground/--surface/--surface-soft/--border/--muted/--accent`) অপরিবর্তিত রাখা হয়েছে — শুধু ভেতরের visual composition-এ বড় ধরনের upgrade আনা হয়েছে:
+- **Hero card**: radial `ProgressRing` (SVG, বর্তমান মেয়াদের কত % বাকি তা দেখায়) + decorative blurred accent "glow" blob background (`GlowBackdrop`)
+- **Package pricing card**: pure CTA-button-style bottom action area (আগে ছিল শুধু center-aligned টেক্সট), variable-height card grid-এ flex-column + flex-1 spacer দিয়ে bottom-aligned CTA, "সবচেয়ে জনপ্রিয়/Most Popular" badge (heuristic: সবচেয়ে সস্তা upgrade-able প্যাকেজ, না থাকলে মিডল-প্রাইসড প্যাকেজ — pure presentational, কোনো নতুন backend data লাগেনি)
+- **Invoice/price-breakdown**: dashed-border "রসিদ" কার্ড (`ReceiptCard`/`ReceiptRow`), positive/muted/bold tone variants
+- **Payment section**: bKash বাটনে brand-pink gradient, ফাইল আপলোড ইনপুট Tailwind `file:` variant দিয়ে স্টাইল করা কাস্টম বাটন লুক
+- **History**: flat row থেকে বদলে status-color-coded left accent bar + icon badge circle সহ `HistoryRow`
+
+### 8.2 নতুন shared component ফাইল
+- **নতুন** `frontend/src/components/billing-ui.tsx` — `SectionHeader`, `StatusPill`, `GlowBackdrop`, `ProgressRing`, `ReceiptCard`, `ReceiptRow`, `HistoryRow`। সাবস্ক্রিপশন ও SMS-credit উভয় পেজ এখন এই একই shared component সেট রিইউজ করে (আগে দুই পেজেই duplicate `StatusPill` ছিল) — দুই পেজের মধ্যে visual consistency এবং future maintenance সহজ হয়েছে।
+
+### 8.3 পরিবর্তিত ফাইল
+- `frontend/src/app/dashboard/settings/subscription/page.tsx` — শুধু JSX/presentation redesign, সব state/effect/handler/API call অবিকল রাখা হয়েছে
+- `frontend/src/app/dashboard/sms/credit/page.tsx` — একই, শুধু presentation redesign
+
+### 8.4 Verification
+- `npx tsc --noEmit` clean
+- `npm run deploy:prod:safe` (এই সেশনে root/sudo সহ চালাতে হয়েছে — `chown`/`systemctl restart`-এর জন্য `claude-dev` ইউজারের `/etc/sudoers.d`-এ ইতিমধ্যে NOPASSWD whitelist আছে `deploy-safe.sh`-এর জন্য, `sudo -n /var/www/hybrid-stack/frontend/scripts/deploy-safe.sh` দিয়ে রান করা হয়েছে) — 8/8 pass
+- **লাইভ ব্রাউজার QA** (claude-in-chrome দিয়ে, নতুন seeded test user `design-qa-temp@example.com` + Sanctum token localStorage-এ বসিয়ে, active subscription + SMS balance + একটা approved subscription payment + একটা pending SMS credit purchase দিয়ে): সাবস্ক্রিপশন পেজ dark+bn এবং light+bn, SMS credit পেজ light+en — hero ring, package grid (recommended badge, current/upgrade badge, bottom CTA alignment), receipt-style invoice/price breakdown, bKash gradient বাটন, history row (color bar + icon + status pill) সব সঠিকভাবে রেন্ডার হয়েছে; history-এর PDF ডাউনলোড আইকনে ক্লিক করে নতুন ট্যাবে blob PDF খুলে `openAuthenticatedPdf` end-to-end কনফার্ম করা হয়েছে
+- টেস্ট user, payment, purchase, token — সব session শেষে DB থেকে মুছে ফেলা হয়েছে এবং delete confirm করা হয়েছে
+
+### 8.5 যা এই ফেজে করা হয়নি
+- Mobile viewport visual QA (Phase 3-এর মতোই একই tool সীমাবদ্ধতা)
+- Admin billing/sms-credit পেজের ডিজাইন touch করা হয়নি (শুধু seller-facing পেজ scope-এ ছিল)

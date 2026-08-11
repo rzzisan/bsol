@@ -2,6 +2,8 @@
 আংশিক পড়ে কাজ শুরু করা হলে সেটি invalid execution হিসেবে গণ্য হবে।
 # Hybrid Stack Server Context
 
+Last updated: 2026-08-10 — **§৩১ যোগ হয়েছে: Staff/Team sub-account role এখন মাস্টার mandatory rule হিসেবে যোগ করা হয়েছে — নতুন যেকোনো ফিচার/মডিউল তৈরির আগে অবশ্যই পড়তে হবে** (সম্পূর্ণ reference: `staff_team_role_context.md`)। Older entries kept as-is:
+
 Last updated: 2026-07-28 — Supervisor fully removed from frontend management (§28), landing pages bilingual bn/en support + dashboard-wide instant language-switch fix via LocaleContext (§29, §30).
 
 📄 **সহ-ডকুমেন্ট**: ল্যান্ডিং পেজ বিল্ডার ফিচার (backend + frontend, সব ফাইল/লাইন নম্বরসহ)-এর জন্য আলাদা deep-reference ফাইল আছে — `/var/www/hybrid-stack/landing_page_context.md`। এই `CONTEXT.md` server/ops/deployment-level master context; landing-page-builder-related কাজের আগে ওই ফাইলটাও পড়ে নাও, এখানে সেটার বিষয়বস্তু ডুপ্লিকেট করা হয়নি।
@@ -1265,3 +1267,23 @@ React Context শুধু **descendant** কম্পোনেন্টে ক�
 ### Commit reference
 
 - `9a85a82` — bilingual public landing pages + LocaleContext fix + deploy-safe.sh systemd migration (pushed to `origin/main`, 2026-07-28)
+
+---
+
+## ৩১. 🚨 বাধ্যতামূলক: Staff/Team sub-account role — নতুন যেকোনো ফিচার/মডিউলে মেনে চলতে হবে (2026-08-10)
+
+**Staff/Team sub-account role** ফিচার (shop owner তার নিজের একাউন্টের অধীনে সীমিত-অনুমতির staff একাউন্ট তৈরি করতে পারে) এখন পুরো SaaS-এ (Phase 1+2, সব মডিউল) কার্যকর। সম্পূর্ণ, গভীর reference: **`/var/www/hybrid-stack/staff_team_role_context.md`** — এখানে শুধু সংক্ষিপ্ত mandatory pointer রাখা হলো (§25-এর `adminScopeUserIds()` pattern-এর সাথে গুলিয়ে ফেলা যাবে না — সেটা admin-shared resource-এর জন্য, এটা per-shop owner+staff-এর জন্য, দুটো সম্পূর্ণ আলাদা concept, দুটোই এখনো active/correct)।
+
+**এখন থেকে নতুন যেকোনো backend controller/route বা frontend module/menu-item তৈরি করার সময় নিচের প্রশ্নগুলোর উত্তর দিয়ে শুরু করতে হবে** (`staff_team_role_context.md §3.3`/`§9.3`-এ বিস্তারিত উদাহরণসহ):
+
+1. **এই resource কি shop-এর সবাই (owner+staff) একসাথে দেখবে/এডিট করবে, নাকি শুধু owner-এর একার জিনিস?**
+   - **Pattern A (team-shared)** — reads: `whereIn('user_id', auth()->user()->shopUserIds())`; writes: `auth()->id()` অপরিবর্তিত থাকে (audit trail, কে আসলে তৈরি/এডিট করেছে)। উদাহরণ: order, product, customer, transaction, landing page।
+   - **Pattern B (owner-only credential/singleton)** — সবসময় `auth()->user()->shopOwnerId()` (single value, `whereIn` না)। staff কখনো এই resource নিজে তৈরি/এডিট করতে পারবে না, শুধু "ব্যবহার" করতে পারে (permission থাকলে)। উদাহরণ: courier API credential, SMS gateway assignment, SMS credit wallet, subscription/billing, blacklist/fraud profile (shop-wide singleton)।
+2. **⚠️ সবচেয়ে সাধারণ ভুল (এই সেশনে বাস্তবে ধরা পড়েছে, `§9.3` দেখো):** কোনো Pattern-A resource (যেমন landing page) যদি ভেতরে কোনো Pattern-B resource-কে (order, courier credential, SMS wallet) reference করে creator-এর `user_id` দিয়ে — তাহলে সেই `user_id` সরাসরি trust করা যাবে না, `shopOwnerId()`-এ resolve করে ব্যবহার করতে হবে। নাহলে staff-তৈরি resource থেকে যা downstream তৈরি হয় (যেমন landing-page checkout থেকে আসা অর্ডার) ভুল owner-এ গিয়ে পুরো ফিচার নিঃশব্দে ভেঙে যায়।
+3. **নতুন module-level permission দরকার হলে**: `backend/app/Models/StaffPermission.php::MODULE_KEYS` এবং `frontend/src/lib/dashboard-client.ts::STAFF_MODULE_KEYS` দুই জায়গাতেই entry যোগ করো (কোনো migration লাগে না, plain string column) + route-এ `staff_permission:{module}` বা `owner_only` middleware।
+4. **Frontend মেনু**: নতুন dashboard মেনু আইটেম `frontend/src/components/user-shell.tsx`-এর `MODULE_KEY_BY_MENU_ITEM` ম্যাপে যোগ না করলে সেটা default-deny-এ staff-এর কাছে hide হয়ে যাবে (এমনকি permission grant থাকলেও) — ইচ্ছাকৃতভাবে fail-safe, কিন্তু মনে রাখতে হবে।
+5. **Staff management UI**: নতুন module permission হলে `frontend/src/app/dashboard/settings/staff/page.tsx`-এর `MODULE_KEYS`/`moduleLabels`-এও যোগ করতে হবে যাতে owner সেটা toggle করতে পারে।
+
+**Verification-এ নতুন যোগ**: নতুন module/controller লেখার পর rollback-wrapped tinker/live-HTTP টেস্টে staff-account দিয়ে (ক) granted module → 200, (খ) non-granted module → 403 `staff_permission_denied`, (গ) owner-only route staff দিয়ে → 403 `owner_only` — এই তিনটা কেস অবশ্যই যাচাই করতে হবে, শুধু owner দিয়ে টেস্ট করলে যথেষ্ট না।
+
+`SAAS_MODULE_CONTEXT.md §5/§6/§7`-এর checklist এই rule অনুযায়ী আপডেট করা হয়েছে (২০২৬-০৮-১০)।

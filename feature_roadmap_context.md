@@ -4,7 +4,9 @@
 
 Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground-truth audit, §16 আগের প্রায়োরিটি লিস্ট — এই ফাইলের সাথে ওভারল্যাপ আছে, এই ফাইলটা business/commercial angle-এ বেশি ফোকাসড এবং নতুন কিছু আইটেমও যোগ করে)।
 
-Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈরি। এখনো কোনো আইটেমে কাজ শুরু হয়নি (Staff/Team বাদে, যেটা আলাদা ফাইলে ট্র্যাক হচ্ছে)।
+> **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
+
+Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈরি। **Staff/Team sub-account role (Phase 1+2, সব মডিউল) সম্পূর্ণ শেষ** — বিস্তারিত `staff_team_role_context.md`, নিচের status টেবিলে আপডেট করা হয়েছে। নিচের বাকি আইটেমগুলোর কোনোটাতে এখনো কাজ শুরু হয়নি।
 
 ---
 
