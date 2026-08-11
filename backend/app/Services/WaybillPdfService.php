@@ -40,15 +40,23 @@ class WaybillPdfService
      * display *before* it; left alone, "জিসান" renders as "জসিান" and
      * "হেডফোন" as "হডেফোন". This moves those three signs ahead of their
      * consonant cluster (including any preceding virama-joined conjuncts)
-     * so dompdf's naive left-to-right placement matches reality. The
-     * precomposed ো/ৌ vowels are single codepoints with their own complete
-     * glyph in the font, so they don't need this.
+     * so dompdf's naive left-to-right placement matches reality.
+     *
+     * The precomposed ো/ৌ (U+09CB/U+09CC) turned out to ALSO need help,
+     * despite being single codepoints — the font apparently has no direct
+     * glyph for them and expects the OpenType `ccmp` feature to compose one
+     * from ে+া / ে+ৗ, which dompdf doesn't apply either, so they render as
+     * a missing-glyph mark (e.g. "হেডফোন" → "হেডফো·ন"). Decomposing them
+     * into their components *before* the reordering pass fixes both at once
+     * (the newly-split ে gets correctly reordered along with everything else).
      */
     private function reorderBengaliMatras(?string $text): ?string
     {
         if ($text === null || $text === '') {
             return $text;
         }
+
+        $text = str_replace(["\u{09CB}", "\u{09CC}"], ["\u{09C7}\u{09BE}", "\u{09C7}\u{09D7}"], $text);
 
         $consonant = '\x{0995}-\x{09B9}\x{09CE}\x{09DC}-\x{09DF}';
         $pattern = '/((?:[' . $consonant . ']\x{09CD})*[' . $consonant . '])([\x{09BF}\x{09C7}\x{09C8}])/u';

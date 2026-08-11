@@ -57,6 +57,9 @@ class OrderInvoicePdfService
             return $text;
         }
 
+        // Decompose precomposed ো/ৌ into ে+া / ে+ৗ first — see WaybillPdfService.
+        $text = str_replace(["\u{09CB}", "\u{09CC}"], ["\u{09C7}\u{09BE}", "\u{09C7}\u{09D7}"], $text);
+
         $consonant = '\x{0995}-\x{09B9}\x{09CE}\x{09DC}-\x{09DF}';
         $pattern = '/((?:[' . $consonant . ']\x{09CD})*[' . $consonant . '])([\x{09BF}\x{09C7}\x{09C8}])/u';
 

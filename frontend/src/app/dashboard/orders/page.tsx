@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
-import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
+import { getStoredLocale, getStoredToken, openAuthenticatedPdf, type Locale } from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -44,6 +44,9 @@ const t = {
     date: "তারিখ",
     actions: "অ্যাকশন",
     view: "দেখুন",
+    invoice: "ইনভয়েস",
+    invoicePreparing: "তৈরি হচ্ছে...",
+    invoiceFailed: "ইনভয়েস তৈরি করা যায়নি।",
     statusNames: { pending:"অপেক্ষমান", confirmed:"নিশ্চিত", processing:"প্রক্রিয়াধীন",
                    shipped:"পাঠানো হয়েছে", delivered:"ডেলিভারি হয়েছে", cancelled:"বাতিল", returned:"ফেরত" },
     riskNames: { low:"কম", medium:"মাঝারি", high:"উচ্চ" },
@@ -75,6 +78,9 @@ const t = {
     date: "Date",
     actions: "Actions",
     view: "View",
+    invoice: "Invoice",
+    invoicePreparing: "Preparing...",
+    invoiceFailed: "Could not generate the invoice.",
     statusNames: { pending:"Pending", confirmed:"Confirmed", processing:"Processing",
                    shipped:"Shipped", delivered:"Delivered", cancelled:"Cancelled", returned:"Returned" },
     riskNames: { low:"Low", medium:"Medium", high:"High" },
@@ -122,6 +128,9 @@ export default function OrdersPage() {
   const [newStatus, setNewStatus] = useState<Status>("confirmed");
   const [statusNote, setStatusNote] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
+
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<number | null>(null);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
 
   const token = getStoredToken();
 
@@ -193,6 +202,14 @@ export default function OrdersPage() {
 
   const fmtDate = (d: string) => new Date(d).toLocaleDateString(locale === "bn" ? "bn-BD" : "en-US", { day: "2-digit", month: "short", year: "2-digit" });
 
+  const downloadInvoice = async (orderId: number) => {
+    setDownloadingInvoiceId(orderId);
+    setInvoiceError(null);
+    const result = await openAuthenticatedPdf(`${API}/orders/${orderId}/invoice`);
+    if (!result.success) setInvoiceError(result.message ?? txt.invoiceFailed);
+    setDownloadingInvoiceId(null);
+  };
+
   return (
     <UserShell activeKey="all-orders" defaultExpandedKey="orders"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
@@ -211,6 +228,10 @@ export default function OrdersPage() {
           </article>
         ))}
       </div>
+
+      {invoiceError && (
+        <div className="catv-panel mb-4 p-3 text-sm text-red-400">{invoiceError}</div>
+      )}
 
       {/* Toolbar */}
       <div className="catv-panel mb-4 flex flex-wrap items-center gap-3 p-3">
@@ -304,10 +325,16 @@ export default function OrdersPage() {
                 </td>
                 <td className="px-3 py-3 hidden md:table-cell text-xs text-[var(--muted)]">{fmtDate(o.created_at)}</td>
                 <td className="px-3 py-3 text-right">
-                  <Link href={`/dashboard/orders/${o.id}`}
-                    className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]">
-                    {txt.view}
-                  </Link>
+                  <div className="flex justify-end gap-1.5">
+                    <button onClick={() => void downloadInvoice(o.id)} disabled={downloadingInvoiceId === o.id}
+                      className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)] disabled:opacity-50">
+                      {downloadingInvoiceId === o.id ? txt.invoicePreparing : txt.invoice}
+                    </button>
+                    <Link href={`/dashboard/orders/${o.id}`}
+                      className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]">
+                      {txt.view}
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}
