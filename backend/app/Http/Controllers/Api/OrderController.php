@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductVariant;
 use App\Services\AccountingService;
+use App\Services\OrderInvoicePdfService;
 use App\Services\OrderStatusService;
 use App\Support\PhoneIntelCache;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 class OrderController extends Controller
 {
@@ -356,6 +358,13 @@ class OrderController extends Controller
             ->findOrFail($id);
 
         return response()->json(['success' => true, 'data' => $order]);
+    }
+
+    public function invoicePdf(int $id, OrderInvoicePdfService $service): Response
+    {
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
+
+        return $service->render($order)->stream("invoice-{$order->order_number}.pdf");
     }
 
     // ── Update ────────────────────────────────────────────────────────────────

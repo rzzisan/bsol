@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import UserShell from "@/components/user-shell";
-import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
+import { getStoredLocale, getStoredToken, openAuthenticatedPdf, type Locale } from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -85,6 +85,9 @@ const t = {
     editOrder: "সম্পাদনা",
     changeStatus: "স্ট্যাটাস পরিবর্তন",
     bookCourier: "কুরিয়ার বুক করুন",
+    downloadInvoice: "ইনভয়েস ডাউনলোড",
+    downloadingInvoice: "তৈরি হচ্ছে...",
+    invoiceFailed: "ইনভয়েস তৈরি করা যায়নি।",
     deleteOrder: "মুছুন",
     confirmDelete: "এই অর্ডার মুছে ফেলবেন?",
     orderInfo: "অর্ডার তথ্য",
@@ -146,6 +149,9 @@ const t = {
     editOrder: "Edit",
     changeStatus: "Change Status",
     bookCourier: "Book Courier",
+    downloadInvoice: "Download Invoice",
+    downloadingInvoice: "Preparing...",
+    invoiceFailed: "Could not generate the invoice.",
     deleteOrder: "Delete",
     confirmDelete: "Delete this order?",
     orderInfo: "Order Info",
@@ -214,6 +220,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
   // modals
   const [editOpen, setEditOpen] = useState(false);
@@ -341,6 +348,14 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleDownloadInvoice = async () => {
+    if (!order) return;
+    setDownloadingInvoice(true);
+    const result = await openAuthenticatedPdf(`${API}/orders/${order.id}/invoice`);
+    if (!result.success) showToast("error", result.message ?? txt.invoiceFailed);
+    setDownloadingInvoice(false);
+  };
+
   const fmtDate = (iso: string) =>
     new Date(iso).toLocaleString(locale === "bn" ? "bn-BD" : "en-GB", {
       dateStyle: "medium", timeStyle: "short",
@@ -390,6 +405,10 @@ export default function OrderDetailPage() {
           <button onClick={() => { setStatusForm({ status: order.status, note: "" }); setStatusOpen(true); }}
             className="rounded-xl border border-[var(--border)] px-3 py-1.5 text-xs hover:bg-[var(--surface-soft)]">
             {txt.changeStatus}
+          </button>
+          <button onClick={() => void handleDownloadInvoice()} disabled={downloadingInvoice}
+            className="rounded-xl border border-[var(--border)] px-3 py-1.5 text-xs hover:bg-[var(--surface-soft)] disabled:opacity-50">
+            {downloadingInvoice ? txt.downloadingInvoice : txt.downloadInvoice}
           </button>
           {!order.courier_tracking_id && (
             <button onClick={() => router.push("/dashboard/courier")}

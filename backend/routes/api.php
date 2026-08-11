@@ -301,6 +301,7 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/orders/create/bootstrap', [OrderController::class, 'createBootstrap']);
         Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
         Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
+        Route::get('/orders/{order}/invoice', [OrderController::class, 'invoicePdf']);
         Route::apiResource('/orders', OrderController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
     });
 
