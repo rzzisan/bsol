@@ -360,6 +360,8 @@ Route::middleware('active_subscription')->group(function () {
             Route::post('/book/{order}', [CourierController::class, 'book']);
             Route::get('/track/{order}', [CourierController::class, 'trackOrder']);
             Route::post('/cancel/{order}', [CourierController::class, 'cancelBooking']);
+            Route::post('/waybill/bulk', [CourierController::class, 'waybillBulk']);
+            Route::get('/waybill/{order}', [CourierController::class, 'waybill']);
             // Pathao location dropdowns
             Route::get('/locations/cities', [CourierController::class, 'cities']);
             Route::get('/locations/zones/{cityId}', [CourierController::class, 'zones']);

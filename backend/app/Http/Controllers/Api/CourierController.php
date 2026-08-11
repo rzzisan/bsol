@@ -11,8 +11,10 @@ use App\Services\SteadfastService;
 use App\Services\PathaoService;
 use App\Services\RedxService;
 use App\Services\CarrybeeService;
+use App\Services\WaybillPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class CourierController extends Controller
 {
@@ -730,5 +732,40 @@ class CourierController extends Controller
             'data'    => $orders->items(),
             'meta'    => ['total' => $orders->total(), 'current_page' => $orders->currentPage(), 'last_page' => $orders->lastPage()],
         ]);
+    }
+
+    // ── Waybill / Label PDF ──────────────────────────────────────────────────
+
+    public function waybill(Request $request, int $orderId): Response
+    {
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())
+            ->whereNotNull('courier_tracking_id')
+            ->findOrFail($orderId);
+
+        $widthMm = (int) $request->query('size', 80);
+        $pdf = (new WaybillPdfService())->render([$order], $widthMm);
+
+        return $pdf->stream("waybill-{$order->order_number}.pdf");
+    }
+
+    public function waybillBulk(Request $request): Response
+    {
+        $data = $request->validate([
+            'order_ids'   => 'required|array|min:1|max:200',
+            'order_ids.*' => 'integer',
+            'size'        => 'nullable|integer|in:58,80',
+        ]);
+
+        $orders = Order::whereIn('user_id', auth()->user()->shopUserIds())
+            ->whereIn('id', $data['order_ids'])
+            ->whereNotNull('courier_tracking_id')
+            ->orderByDesc('updated_at')
+            ->get();
+
+        abort_if($orders->isEmpty(), 422, 'No booked orders found for the selected IDs.');
+
+        $pdf = (new WaybillPdfService())->render($orders, (int) ($data['size'] ?? 80));
+
+        return $pdf->stream('waybills.pdf');
     }
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
-import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
+import { getStoredLocale, getStoredToken, openAuthenticatedPdf, type Locale } from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -30,6 +30,12 @@ const t = {
     refresh: "রিফ্রেশ",
     refreshing: "চেক হচ্ছে...",
     total: "মোট",
+    printWaybill: "লেবেল প্রিন্ট",
+    printing: "তৈরি হচ্ছে...",
+    printFailed: "লেবেল তৈরি করা যায়নি।",
+    selectAll: "সব নির্বাচন",
+    printSelected: "সিলেক্টেড প্রিন্ট",
+    labelSize: "লেবেল সাইজ",
   },
   en: {
     pageTitle: "Track Parcels",
@@ -45,6 +51,12 @@ const t = {
     refresh: "Refresh",
     refreshing: "Checking...",
     total: "Total",
+    printWaybill: "Print label",
+    printing: "Preparing...",
+    printFailed: "Could not generate the label.",
+    selectAll: "Select all",
+    printSelected: "Print selected",
+    labelSize: "Label size",
   },
 };
 
@@ -67,6 +79,10 @@ export default function TrackPage() {
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [refreshing, setRefreshing] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [labelSize, setLabelSize] = useState<"58" | "80">("80");
+  const [printing, setPrinting] = useState<number | "bulk" | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
 
   const fetchBooked = useCallback(async () => {
     setLoading(true);
@@ -87,6 +103,43 @@ export default function TrackPage() {
 
   useEffect(() => { void fetchBooked(); }, [fetchBooked]);
   useEffect(() => { setPage(1); }, [search]);
+
+  const toggleSelect = (orderId: number, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(orderId); else next.delete(orderId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = (checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      orders.forEach(o => checked ? next.add(o.id) : next.delete(o.id));
+      return next;
+    });
+  };
+
+  const printWaybill = async (orderId: number) => {
+    setPrinting(orderId);
+    setPrintError(null);
+    const result = await openAuthenticatedPdf(`${API}/courier/waybill/${orderId}?size=${labelSize}`);
+    if (!result.success) setPrintError(result.message ?? txt.printFailed);
+    setPrinting(null);
+  };
+
+  const printSelected = async () => {
+    if (selectedIds.size === 0) return;
+    setPrinting("bulk");
+    setPrintError(null);
+    const result = await openAuthenticatedPdf(`${API}/courier/waybill/bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_ids: Array.from(selectedIds), size: Number(labelSize) }),
+    });
+    if (!result.success) setPrintError(result.message ?? txt.printFailed);
+    setPrinting(null);
+  };
 
   const refreshOrder = async (orderId: number) => {
     setRefreshing(orderId);
@@ -113,13 +166,36 @@ export default function TrackPage() {
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
           placeholder={txt.search}
           className="flex-1 min-w-[180px] rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+        <label className="flex items-center gap-1 text-xs text-[var(--muted)]">
+          {txt.labelSize}
+          <select value={labelSize} onChange={e => setLabelSize(e.target.value as "58" | "80")}
+            className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-xs">
+            <option value="80">80mm</option>
+            <option value="58">58mm</option>
+          </select>
+        </label>
+        <button onClick={() => void printSelected()}
+          disabled={selectedIds.size === 0 || printing === "bulk"}
+          className="rounded-xl border border-[var(--accent)] px-3 py-2 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/10 disabled:opacity-40 disabled:cursor-not-allowed">
+          {printing === "bulk" ? txt.printing : `${txt.printSelected} (${selectedIds.size})`}
+        </button>
         <p className="text-xs text-[var(--muted)]">{total} {locale === "bn" ? "টি পার্সেল" : "parcels"}</p>
       </div>
+
+      {printError && (
+        <div className="catv-panel mb-4 p-3 text-sm text-red-400">{printError}</div>
+      )}
 
       <div className="catv-panel overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--muted)] uppercase">
+              <th className="px-4 py-3 w-10">
+                <input type="checkbox" aria-label={txt.selectAll}
+                  checked={orders.length > 0 && orders.every(o => selectedIds.has(o.id))}
+                  onChange={e => toggleSelectAllVisible(e.target.checked)}
+                  className="h-4 w-4" />
+              </th>
               <th className="px-4 py-3">{txt.orderNo}</th>
               <th className="px-4 py-3">{txt.customer}</th>
               <th className="px-4 py-3 hidden md:table-cell">{txt.courier}</th>
@@ -130,11 +206,16 @@ export default function TrackPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--muted)] text-xs">{txt.noOrders}</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-[var(--muted)] text-xs">{txt.noOrders}</td></tr>
             ) : orders.map(o => (
               <tr key={o.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-soft)]">
+                <td className="px-4 py-3">
+                  <input type="checkbox" checked={selectedIds.has(o.id)}
+                    onChange={e => toggleSelect(o.id, e.target.checked)}
+                    className="h-4 w-4" />
+                </td>
                 <td className="px-4 py-3 font-mono text-xs text-[var(--accent)]">{o.order_number}</td>
                 <td className="px-4 py-3">
                   <p className="font-medium">{o.customer_name ?? "—"}</p>
@@ -150,14 +231,18 @@ export default function TrackPage() {
                   ) : "—"}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {(o.courier_name === "steadfast" || o.courier_name === "pathao" || o.courier_name === "redx" || o.courier_name === "carrybee" || o.courier_name === "paperfly") ? (
-                    <button onClick={() => void refreshOrder(o.id)} disabled={refreshing === o.id}
+                  <div className="flex items-center justify-end gap-2">
+                    <button onClick={() => void printWaybill(o.id)} disabled={printing === o.id}
                       className="rounded-xl border border-[var(--border)] px-3 py-1 text-xs hover:bg-[var(--surface-soft)] disabled:opacity-50">
-                      {refreshing === o.id ? txt.refreshing : txt.refresh}
+                      {printing === o.id ? txt.printing : txt.printWaybill}
                     </button>
-                  ) : (
-                    <span className="text-xs text-[var(--muted)]">—</span>
-                  )}
+                    {(o.courier_name === "steadfast" || o.courier_name === "pathao" || o.courier_name === "redx" || o.courier_name === "carrybee" || o.courier_name === "paperfly") && (
+                      <button onClick={() => void refreshOrder(o.id)} disabled={refreshing === o.id}
+                        className="rounded-xl border border-[var(--border)] px-3 py-1 text-xs hover:bg-[var(--surface-soft)] disabled:opacity-50">
+                        {refreshing === o.id ? txt.refreshing : txt.refresh}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

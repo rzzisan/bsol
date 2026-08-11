@@ -128,14 +128,18 @@ export function normalizeRole(user: AuthUser | null): "admin" | "user" | null {
  * Fetches an authenticated PDF (or any file) via Bearer token and opens it
  * in a new tab. Plain <a href> can't carry the Authorization header, so the
  * file has to be fetched as a blob first — used for invoice PDFs
- * (subscription payments, SMS credit purchases).
+ * (subscription payments, SMS credit purchases) and courier waybill labels.
+ * Pass `init` (method/body) for POST-based bulk downloads.
  */
-export async function openAuthenticatedPdf(url: string): Promise<{ success: boolean; message?: string }> {
+export async function openAuthenticatedPdf(url: string, init?: RequestInit): Promise<{ success: boolean; message?: string }> {
   const token = getStoredToken();
   if (!token) return { success: false, message: "Not authenticated." };
 
   try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(url, {
+      ...init,
+      headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+    });
     if (!res.ok) {
       let message: string | undefined;
       try {
