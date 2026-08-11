@@ -1,10 +1,12 @@
 # কুরিয়ার ওয়েবিল/লেবেল PDF — মাস্টার কনটেক্সট ফাইল
 
-> এই ফাইলটা AI agent-দের জন্য: courier waybill/sticker PDF ফিচার নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-08-11 (প্রথম ডেলিভারি + একাধিক dompdf বাগ ফিক্স, একই সেশনে)। এই ফিচার `feature_roadmap_context.md`-এর #5 আইটেম — সম্পূর্ণ হয়ে গেছে, ওই ফাইলের status টেবিলে আপডেট করা আছে।
+> এই ফাইলটা AI agent-দের জন্য: courier waybill/sticker PDF (এবং একই কোড-প্যাটার্ন শেয়ার করা order sales invoice, `OrderInvoicePdfService`) নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-08-11 (প্রথম ডেলিভারি + একাধিক dompdf বাগ ফিক্স + শপ প্রোফাইল ইন্টিগ্রেশন + অর্ডার ইনভয়েস ফিচার, একই দিনে একাধিক সেশনে)। এই ফিচার `feature_roadmap_context.md`-এর #5 আইটেম — মূল ডেলিভারি সম্পূর্ণ ও deployed, কিন্তু **§৪.৫-এ একটা বাংলা টেক্সট রেন্ডারিং বাগ এখনো OPEN/আনসলভড, ইউজারের অনুরোধে ডিফার করা হয়েছে** — নিচে দেখো।
 >
 > স্ট্যাক: Laravel backend (`/var/www/hybrid-stack/backend`) + Next.js/TypeScript frontend (`/var/www/hybrid-stack/frontend`)। PDF রেন্ডারার `barryvdh/laravel-dompdf` (dompdf/dompdf ^3.0) — subscription/SMS-credit ইনভয়েসেও (`InvoicePdfService`) একই লাইব্রেরি ব্যবহার হয়, কিন্তু waybill-এ **নতুন ধরনের কনটেন্ট (barcode/QR ইমেজ, ছোট থার্মাল পেজ সাইজ, বড় বোল্ড ফন্ট)** এমন কিছু dompdf বাগ সামনে এনেছে যেগুলো ইনভয়েস টেমপ্লেটে কখনো ধরা পড়েনি।
 
 > **🚨 Staff/Team role সচেতনতা:** কুরিয়ার মডিউল Pattern A (team-shared) — `CourierController`-এর সব মেথডই `Order::whereIn('user_id', auth()->user()->shopUserIds())` দিয়ে স্কোপড, নতুন `waybill`/`waybillBulk` মেথডও একই প্যাটার্ন অনুসরণ করেছে। রুট `staff_permission:courier` গ্রুপের ভেতরে (owner_only credential রুটের বাইরে) — নতুন `StaffPermission::MODULE_KEYS` entry লাগেনি, বিদ্যমান `courier` key-ই যথেষ্ট।
+
+> **🚨 KNOWN OPEN ISSUE (2026-08-11) — বাংলা matra reordering এখনো পুরোপুরি ঠিক হয়নি, কাজ ডিফার করা হয়েছে।** ইউজার একাধিকবার রিপোর্ট করেছে যে waybill/order-invoice-এ কিছু বাংলা নাম/ঠিকানা এখনো ভুল দেখাচ্ছে (যেমন "মনিরুজ্জামান"), অথচ **এই ফাইলের এজেন্ট নিজে high-res raster টেস্ট করে সেই একই স্ট্রিং সঠিক রেন্ডার হতে দেখেছে** (regular ও bold দুই ওজনেই) এবং browser-caching সম্ভাবনাও রুল-আউট করার চেষ্টা করা হয়েছে (নিচে দেখো)। **রুট কজ এখনো অজানা/আনসলভড** — নতুন কেউ এই সমস্যা ধরতে আসলে §৪.৫ পুরোটা পড়ো, আগে যা যা ট্রাই করা হয়েছে সেটা রিপিট কোরো না, বরং সেখানে "পরবর্তী ধাপ" অংশে যা প্রস্তাব করা আছে সেখান থেকে শুরু করো।
 
 ---
 
@@ -47,15 +49,35 @@ Barcode-এ `width:100%` এবং QR-এ fixed mm width — দুটোই pri
 ### ৪.৪ `vertical-align:middle` (inline-block pair) ওপরের কনটেন্টের সাথে overlap করে
 QR + caption টেক্সট `inline-block; vertical-align:middle` দিয়ে পাশাপাশি রাখলে — লম্বা QR ইমেজ (২০mm) ছোট টেক্সট ব্লকের (~৭mm) সাথে line-box-এর মাঝ বরাবর align হতে গিয়ে QR-এর ওপরের অংশ line-box-এর বাইরে ঠেলে দেয়, উপরের barcode-এর ওপর ওভারল্যাপ করে ফেলে। **ফিক্স:** `vertical-align:top` — দুটো element একই স্টার্ট-লাইনে anchor হয়, QR শুধু নিচের দিকে বাড়ে, ওপরের কনটেন্টে কখনো ঢোকে না।
 
-### ৪.৫ Complex-script (বাংলা) শেপিং নেই — matra reordering নিজেই করতে হয়
-dompdf-এ কোনো OpenType/HarfBuzz-স্টাইল text shaping engine নেই — এটা glyph-গুলো raw Unicode storage order-এ আঁকে, ফন্টের GSUB reordering rule apply করে না। বাংলার pre-base vowel sign (**ি, ে, ৈ** — U+09BF/U+09C7/U+09C8) Unicode-এ কনসোনেন্টের **পরে** স্টোর হয় কিন্তু ভিজুয়ালি **আগে** দেখাতে হয় — reorder না করলে "জিসান" রেন্ডার হয় "জসিান", "হেডফোন" রেন্ডার হয় "হডেফোন" (ইউজার-রিপোর্টেড রিয়েল প্রোডাকশন অর্ডার থেকে ধরা পড়েছে)। **ফিক্স:** `WaybillPdfService::reorderBengaliMatras()` — regex দিয়ে এই তিনটা vowel sign-কে তাদের consonant cluster-এর (আগের virama-জোড়া conjunct সহ) আগে সরিয়ে দেয়, dompdf-কে ফিড করার আগে। এই ফাংশন সব বাংলা টেক্সট ফিল্ডে apply হয়: রিসিভার নাম, সেন্ডার নাম, ঠিকানা, আইটেম নাম, নোট। precomposed **ো/ৌ** (single codepoint, নিজের সম্পূর্ণ গ্লিফ) reorder লাগে না, তাই বাদ দেওয়া হয়েছে।
-  ```php
-  $consonant = '\x{0995}-\x{09B9}\x{09CE}\x{09DC}-\x{09DF}';
-  $pattern = '/((?:[' . $consonant . ']\x{09CD})*[' . $consonant . '])([\x{09BF}\x{09C7}\x{09C8}])/u';
-  preg_replace($pattern, '$2$1', $text);
-  ```
-  **সাইড এফেক্ট:** এই রিঅর্ডার শুধু ভিজুয়াল রেন্ডারিং ঠিক করে — PDF-এর টেক্সট লেয়ার (কপি/এক্সট্র্যাক্ট করলে) reordered (ভুল) ক্রমেই থাকবে। প্রিন্টেড লেবেলের জন্য এটাই কাম্য ট্রেড-অফ (searchable text না, ভিজুয়াল প্রিন্ট-ই আসল উদ্দেশ্য)।
-  **⚠️ এই বাগ সম্ভবত `InvoicePdfService`/`resources/views/invoices/document.blade.php`-তেও আছে** (একই dompdf + একই ফন্ট ব্যবহার করে) — এখনো ভেরিফাই/ফিক্স করা হয়নি, শুধু বড় ফন্ট-সাইজ + bold weight-এর waybill-এ চোখে পড়েছে। ভবিষ্যতে কেউ যদি ইনভয়েসে বাংলা কাস্টমার নাম গার্বল্ড দেখে রিপোর্ট করে, এই একই ফিক্স ওখানেও দরকার হবে।
+### ৪.৫ Complex-script (বাংলা) শেপিং নেই — matra reordering নিজেই করতে হয় — ⚠️ **STATUS: OPEN/UNRESOLVED, 2026-08-11-এ ডিফার করা হয়েছে**
+
+dompdf-এ কোনো OpenType/HarfBuzz-স্টাইল text shaping engine নেই — এটা glyph-গুলো raw Unicode storage order-এ আঁকে, ফন্টের GSUB reordering rule apply করে না। বাংলার pre-base vowel sign (**ি, ে, ৈ** — U+09BF/U+09C7/U+09C8) Unicode-এ কনসোনেন্টের **পরে** স্টোর হয় কিন্তু ভিজুয়ালি **আগে** দেখাতে হয় — reorder না করলে "জিসান" রেন্ডার হয় "জসিান", "হেডফোন" রেন্ডার হয় "হডেফোন"।
+
+**যা যা ট্রাই করা হয়েছে (কালানুক্রমিকভাবে, সবগুলোই দুই ফাইলে ডুপ্লিকেট করা আছে — `WaybillPdfService::reorderBengaliMatras()` এবং `OrderInvoicePdfService::reorderBengaliMatras()`, শেয়ার্ড helper/trait-এ এক্সট্র্যাক্ট করা হয়নি):**
+
+1. **প্রথম পাস** — regex দিয়ে ি/ে/ৈ-কে তাদের consonant cluster-এর (আগের virama-জোড়া conjunct সহ) আগে সরানো:
+   ```php
+   $consonant = '\x{0995}-\x{09B9}\x{09CE}\x{09DC}-\x{09DF}';
+   $pattern = '/((?:[' . $consonant . ']\x{09CD})*[' . $consonant . '])([\x{09BF}\x{09C7}\x{09C8}])/u';
+   preg_replace($pattern, '$2$1', $text);
+   ```
+   এটা "জিসান"/"শহিদ"/"তাসু"-এর মতো সহজ কেসে কাজ করেছিল বলে মনে হয়েছিল।
+2. **দ্বিতীয় পাস (একই দিনে)** — ধরা পড়ল precomposed **ো/ৌ** (U+09CB/U+09CC)-ও ভাঙে ("হেডফোন" → "হেডফো·ন", missing-glyph mark) — ফন্টের ওগুলোর নিজস্ব glyph নেই, `ccmp` OpenType feature দিয়ে ে+া থেকে কম্পোজ হওয়ার কথা যেটা dompdf করে না। **ফিক্স যোগ হলো:** reorder-এর আগে ো→ে+া এবং ৌ→ে+ৗ ডিকম্পোজ করা।
+3. **ইউজার আবার রিপোর্ট করল** ("মনিরুজ্জামান" ঠিকমতো দেখাচ্ছে না, একটা রিয়েল অর্ডার ইনভয়েসে) — এজেন্ট তখন `ReflectionMethod` দিয়ে codepoint-লেভেলে ডিবাগ করে দেখাল যে "মনিরুজ্জামান" রিঅর্ডার হয়ে "মিনরুজ্জামান" (স্ট্রিং অর্ডার) হয়, কারণ "মন" (ম+ন, কোনো virama ছাড়া দুইটা আলাদা akshara) থাকলে regex-টা "নি" ম্যাচ করে "িন" বানিয়ে দেয় — এবং এটা তাত্ত্বিকভাবে ambiguous মনে হয়েছিল (ি এখন ম-এর ঠিক পরে বসে, যেন ম-এর সাথে অ্যাটাচড)।
+4. **কিন্তু isolated high-res raster টেস্টে** (dompdf দিয়ে সরাসরি "মিনরুজ্জামান" স্ট্রিং রেন্ডার করে `pdftoppm -r 300`/`-r 200` দিয়ে PNG-তে কনভার্ট করে চোখে দেখা) — regular ও bold দুই ওজনেই এটা ভিজুয়ালি **সঠিক** "মনিরুজ্জামান" হিসেবে রেন্ডার হয়েছে (ফন্টের ি গ্লিফ আপাতদৃষ্টিতে পরের ক্যারেক্টারের দিকে "ঝুঁকে" থাকে, আগেরটার দিকে না — তাই তাত্ত্বিক ambiguity বাস্তবে ঘটেনি)। অর্ডারের বাকি সব বাংলা স্ট্রিং (ঠিকানা, শপ নেম ইত্যাদি) একইভাবে আলাদা-আলাদা টেস্ট করেও সঠিক পাওয়া গেছে।
+5. **তাহলে সমস্যাটা কী?** — সন্দেহ করা হলো browser caching (dompdf-এর `stream()` কোনো `Cache-Control` হেডার সেট করে না, তাই আগের buggy PDF ব্রাউজারে cached থেকে যেতে পারত)। **ফিক্স:** সব PDF-stream endpoint-এ (`order invoice`, `waybill` single+bulk, subscription/SMS-credit invoice) `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` হেডার যোগ করা হলো, প্লাস ফ্রন্টএন্ড `openAuthenticatedPdf()`-এ `cache: "no-store"`।
+6. **এরপরও ইউজার বলল "এখনও সমস্যা সমাধান হয়নি"** — cache হেডার ডিপ্লয়ের পরেও। এই পয়েন্টে ইউজার কাজটা ডিফার করতে বলেছে।
+
+**বর্তমান অবস্থা / প্যারাডক্স:** এজেন্টের নিজস্ব verification (poppler/pdftoppm দিয়ে rasterize করে PNG-তে চোখে দেখা) বারবার "ঠিক আছে" দেখাচ্ছে, কিন্তু ইউজারের নিজের ডিভাইসে/ভিউয়ারে এখনও ভুল দেখাচ্ছে বলে রিপোর্ট। এই gap-টা এখনো ব্যাখ্যা করা যায়নি।
+
+**পরবর্তী ধাপ (এখানে থেকে শুরু করো, আগের ধাপগুলো রিপিট কোরো না):**
+- **ইউজারের কাছ থেকে নির্দিষ্ট তথ্য নাও, অনুমান কোরো না:** কোন word/character ভুল দেখাচ্ছে (স্ক্রিনশট + জুম করে দেখানো), কোন ডিভাইস/অ্যাপ/ব্রাউজার দিয়ে খুলছে (Chrome/Firefox built-in PDF viewer? Adobe Reader? সরাসরি প্রিন্টার?), মোবাইল না ডেস্কটপ। আগের turn-এ এই নির্দিষ্ট তথ্য চাওয়া হয়নি — অনুমান করে multiple hypothesis টেস্ট করা হয়েছে যেগুলো ভুল প্রমাণিত হয়েছে।
+- **PDF ফাইলটা সরাসরি ইউজারের কাছ থেকে নিয়ে ইন্সপেক্ট করো** (উনি যেটা ডাউনলোড করেছেন সেই আসল ফাইল/স্ক্রিনশট, নতুন করে জেনারেট করা নিজের কপি না) — `pdftotext`/`pdffonts` দিয়ে চেক করো এমবেডেড ফন্ট সাবসেট ও glyph mapping ঠিক আছে কিনা।
+- **pdf.js (Chrome/Firefox built-in ভিউয়ার) vs poppler রেন্ডারিং তুলনা করো** — এজেন্টের হাইপোথিসিস ছিল pre-positioned glyph সব renderer-এ একই দেখানো উচিত (PDF content stream-এ glyph position আগে থেকেই বসানো থাকে), কিন্তু এটা ভেরিফাই করা হয়নি সরাসরি pdf.js দিয়ে রেন্ডার করে — dompdf-generated ফন্ট সাবসেটে কোনো malformed cmap/glyph-index থাকলে different renderer আলাদা আচরণ করতে পারে।
+- **আরও দীর্ঘমেয়াদী বিকল্প বিবেচনা করো** যদি regex-reordering hack অবিশ্বস্ত প্রমাণিত হয়: (ক) প্রকৃত text-shaping (HarfBuzz PHP binding, যদি সার্ভারে ইনস্টলযোগ্য হয়) দিয়ে pre-shape করে গ্লিফ ইনডেক্স সরাসরি বসানো, (খ) headless Chrome/Puppeteer দিয়ে PDF জেনারেট করা (পূর্ণ browser text-shaping পাওয়া যায়, কিন্তু বড় আর্কিটেকচার পরিবর্তন — নতুন Node.js dependency, dompdf-এর পুরো replacement)।
+- এই সমস্যাটা §৪.৪/border-issue-এর (সেই ইস্যুও poppler-এ reproduce হয়নি কিন্তু ইউজারের real printer-এ হয়েছিল) সাথে একই "poppler-এ ঠিক, ইউজারের ডিভাইসে ভুল" প্যাটার্নের — সম্ভবত সম্পর্কিত/একই রুট কজ, একসাথে investigate করা যেতে পারে।
+
+**সাইড এফেক্ট (এখনো প্রযোজ্য):** এই রিঅর্ডার শুধু ভিজুয়াল রেন্ডারিং ঠিক করার চেষ্টা করে — PDF-এর টেক্সট লেয়ার (কপি/এক্সট্র্যাক্ট করলে) reordered (ভুল) ক্রমেই থাকবে।
 
 ### ৪.৬ Amount-এ ৳ গ্লিফ মিসিং হলে বক্স-ক্যারেক্টার দেখায়
 বেস `DejaVu Sans` ফন্টে ৳ (টাকা সাইন) গ্লিফ নেই — `.i18n` (AppFont/NotoSansBengali) ক্লাস লাগবে। কিন্তু পুরো amount লাইন `.i18n` করলে §৪.২-এর মতোই আরেকটা রহস্যময় character-drop হতো (root cause পুরোপুরি আইসোলেট করা যায়নি — ফন্ট-মিক্সিং vs অন্য কিছু, নিশ্চিত না)। **ফিক্স:** ৳ চিহ্নটাই বাদ দিয়ে ASCII **"Tk"** ব্যবহার করা হয়েছে (`COD Tk 1,120`) — পুরো লাইন `DejaVu Sans`-এই থাকে, কোনো ফন্ট-মিক্সিং হয় না, সমস্যাও নেই।
@@ -70,7 +92,7 @@ dompdf-এ কোনো OpenType/HarfBuzz-স্টাইল text shaping engine
 2. **বক্সড COD amount** (`.cod-box` — বর্ডার + প্যাডিং, "CASH ON DELIVERY" লেবেল + বড় বোল্ড amount) — টাকা কালেক্ট করা সবচেয়ে জরুরি তথ্য, ওপরে
 3. **Tracking ID + barcode** — hub scanning-এর জন্য ওপরের দিকে
 4. **TO (RECEIVER)** — লেবেলের সবচেয়ে বড় টেক্সট (name 17-20px, phone 15-17px) — ডেলিভারি রাইডার প্রথমে এটাই পড়ে
-5. **FROM (SENDER)** — কমপ্যাক্ট একলাইন (নাম · ফোন) + ঠিকানা (থাকলে), সেকেন্ডারি — §৮ দেখো, এখন `ShopProfile`-এর ডেটা
+5. **FROM (SENDER)** — কমপ্যাক্ট একলাইন (নাম · ফোন) + ঠিকানা (থাকলে), সেকেন্ডারি — §৬ দেখো, এখন `ShopProfile`-এর ডেটা
 6. **ORDER** — order# + item count, কমপ্যাক্ট একলাইন + item summary (Str::limit করা)
 7. **QR footer** — "SCAN FOR DETAILS" caption + QR code পাশাপাশি (inline-block, §৪.৪)
 
@@ -91,24 +113,57 @@ Page height জেনারাসলি সেট করা আছে (58mm→14
 
 ---
 
-## ৭. ডিপ্লয়মেন্ট নোট
+## ৭. Order Sales Invoice (2026-08-11 যোগ হয়েছে) — waybill-এর সাথে কোড-প্যাটার্ন শেয়ার করে
 
-- **Backend PDF সার্ভিস/ব্লেড টেমপ্লেট পরিবর্তনের পর:** `php artisan view:clear` (compiled Blade cache) + `sudo -n /usr/bin/systemctl restart php8.3-fpm` (opcache) — দুটোই লাগে, নাহলে পুরনো কম্পাইলড ভিউ/অপকোড সার্ভ হতে থাকে।
-- **`sudo` নন-ইন্টারঅ্যাক্টিভ flag বাধ্যতামূলক:** এই সার্ভারে `claude-dev` ইউজারের জন্য নির্দিষ্ট কমান্ডে passwordless sudo আছে (`sudoers -l` দেখো — `systemctl restart hybrid-frontend.service/php8.3-fpm/nginx`, `chown -R www-data:www-data .../.next`, পুরো `deploy-safe.sh` স্ক্রিপ্ট), কিন্তু bash tool-এর ভেতর থেকে চালালে `-n` (non-interactive) flag ছাড়া "a terminal is required to read the password" এরর দেয় যদিও NOPASSWD ম্যাচ করে — সবসময় `sudo -n <cmd>` ব্যবহার করা।
-- **Frontend পরিবর্তনের পর (এই সেশনে হয়নি waybill ফিচারে, কিন্তু আগের turn-এ লাগসিল):** `sudo -n /var/www/hybrid-stack/frontend/scripts/deploy-safe.sh` — build + `systemctl restart hybrid-frontend.service` + live smoke-check, সব এক কমান্ডে (রুট হিসেবে চলে, পুরো স্ক্রিপ্টটাই sudoers-এ NOPASSWD)। প্রোডাকশন `next start` (pre-built `.next` সার্ভ করে) চালাচ্ছে systemd-এর মাধ্যমে — শুধু সোর্স ফাইল এডিট করলে লাইভ সাইটে reflect হয় না, rebuild+restart বাধ্যতামূলক।
-- **টেস্টিং পদ্ধতি:** ফিচার ডেভেলপমেন্টের সময় `php artisan tinker` দিয়ে সরাসরি `WaybillPdfService::render()` কল করে `/tmp/.../scratchpad/*.pdf`-এ আউটপুট সেভ করে যাচাই করা হয়েছে — `pdfinfo` (page count/size) + `pdftotext -layout` (character-drop bug ধরার জন্য, visual bug ধরার জন্য না) + Read tool দিয়ে ভিজুয়াল রেন্ডার (visual bug ধরার জন্য — pdftotext দিয়ে §৪.৫-এর মতো visual-only বাগ ধরা যায় না, উল্টো ভুল কনফিডেন্স দেয়)।
+`OrderInvoicePdfService` — প্রতিটা অর্ডারের জন্য seller→customer A4 sales invoice PDF (Bill To, itemized product টেবিল, subtotal/discount/shipping/total, shop logo/নাম/ঠিকানা)। **`InvoicePdfService`-এর থেকে আলাদা** (ওটা platform→seller billing invoice — subscription/SMS credit)।
+
+- **Backend:** `app/Services/OrderInvoicePdfService.php` (নতুন) — `render(Order $order): PdfDocument`। নিজের কপি আছে `reorderBengaliMatras()`-এর (§৪.৫ দেখো, OPEN ইস্যু) এবং একটা নতুন `logoDataUri()` হেল্পার — `ShopProfile.logo_url`-এর `https://` লিংক dompdf fetch করতে পারে না (`enable_remote` false, SSRF প্রিভেনশনের জন্য ইচ্ছাকৃত) — তাই লোগো ফাইল সরাসরি local disk (`Storage::disk('public')`) থেকে পড়ে base64 data URI বানানো হয়, নেটওয়ার্ক কল ছাড়াই (barcode/QR-এর মতোই)।
+- **টেমপ্লেট:** `resources/views/invoices/order-invoice.blade.php` — safe A4-width প্যাটার্ন (waybill-এর ৫৮/৮০mm সংকীর্ণ কনটেক্সটের বাগগুলো এখানে প্রযোজ্য না, কারণ generous width; existing `invoices/document.blade.php`-এর মতোই `text-align:right` নিরাপদে ব্যবহার হয়েছে টোটাল/অ্যামাউন্ট কলামে)।
+- **Controller/রুট:** `OrderController::invoicePdf(int $id, OrderInvoicePdfService $service)` — `GET /orders/{order}/invoice`, `staff_permission:orders` গ্রুপ (Pattern A, `shopUserIds()`)।
+- **ফ্রন্টএন্ড:** "Download Invoice"/"Invoice" বাটন দুই জায়গায় — অর্ডার ডিটেইল পেজ (`dashboard/orders/[id]/page.tsx`, টপ অ্যাকশন বার) এবং অর্ডার লিস্ট পেজ (`dashboard/orders/page.tsx`, প্রতি row-এ Actions কলামে)। দুটোই `openAuthenticatedPdf()` ব্যবহার করে।
+- **`variant_info` শেপ:** flat `{optionName: value}` map (যেমন `{"Color":"Red","Size":"XL"}`), array-of-objects না — এই শেপ ভুল ধরে প্রথমবার লেখা হয়েছিল, frontend-এর `order-item-grid.tsx`/`order-intake-form.tsx` দেখে ঠিক করা হয়েছে।
 
 ---
 
-## ৮. দ্রুত রেফারেন্স — কাজভেদে কোন ফাইল
+## ৮. PDF ডাউনলোড কখনো ব্রাউজার-cached হবে না (2026-08-11)
+
+`dompdf`-এর `stream()` মেথড কোনো `Cache-Control` হেডার সেট করে না (barryvdh/laravel-dompdf ভেন্ডর কোড-এ ভেরিফাই করা হয়েছে) — মানে GET রিকোয়েস্ট heuristic browser caching-এর শিকার হতে পারে, একই order/purchase-এর জন্য বারবার ডাউনলোড করলে **আগের (হয়তো বাগযুক্ত) কপি** ফেরত আসতে পারে সার্ভার-সাইড ফিক্স ডিপ্লয়ের পরেও। এটা ঠিক §৪.৫-এর ডিবাগিং-এর সময় সন্দেহ করা হয়েছিল (নিশ্চিতভাবে প্রমাণিত না হলেও)।
+
+**ফিক্স (৫টা PDF-stream endpoint-এই):** `->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')` চেইন করা হয়েছে —
+- `OrderController::invoicePdf`
+- `CourierController::waybill` + `waybillBulk`
+- `SmsCreditPurchaseController::invoicePdf`
+- `SubscriptionController::invoicePdf`
+
+প্লাস ফ্রন্টএন্ড `frontend/src/lib/dashboard-client.ts::openAuthenticatedPdf()`-এ `cache: "no-store"` (defense-in-depth)।
+
+**নোট:** `->header()` `Illuminate\Http\ResponseTrait`-এর মেথড (dompdf-এর `stream()` আসলে `Illuminate\Http\Response` রিটার্ন করে, যদিও controller signature-এ প্রায়ই `Symfony\Component\HttpFoundation\Response` টাইপ-হিন্ট করা থাকে) — রানটাইমে কাজ করে যাচাই করা হয়েছে (`tinker`-এ `get_class()` + হেডার ভ্যালু চেক করে)।
+
+---
+
+## ৯. ডিপ্লয়মেন্ট নোট
+
+- **Backend PDF সার্ভিস/ব্লেড টেমপ্লেট পরিবর্তনের পর:** `php artisan view:clear` (compiled Blade cache) + `sudo -n /usr/bin/systemctl restart php8.3-fpm` (opcache) — দুটোই লাগে, নাহলে পুরনো কম্পাইলড ভিউ/অপকোড সার্ভ হতে থাকে।
+- **`sudo` নন-ইন্টারঅ্যাক্টিভ flag বাধ্যতামূলক:** এই সার্ভারে `claude-dev` ইউজারের জন্য নির্দিষ্ট কমান্ডে passwordless sudo আছে (`sudoers -l` দেখো — `systemctl restart hybrid-frontend.service/php8.3-fpm/nginx`, `chown -R www-data:www-data .../.next`, পুরো `deploy-safe.sh` স্ক্রিপ্ট), কিন্তু bash tool-এর ভেতর থেকে চালালে `-n` (non-interactive) flag ছাড়া "a terminal is required to read the password" এরর দেয় যদিও NOPASSWD ম্যাচ করে — সবসময় `sudo -n <cmd>` ব্যবহার করা।
+- **Frontend পরিবর্তনের পর:** `sudo -n /var/www/hybrid-stack/frontend/scripts/deploy-safe.sh` — build + `systemctl restart hybrid-frontend.service` + live smoke-check, সব এক কমান্ডে (রুট হিসেবে চলে, পুরো স্ক্রিপ্টটাই sudoers-এ NOPASSWD)। প্রোডাকশন `next start` (pre-built `.next` সার্ভ করে) চালাচ্ছে systemd-এর মাধ্যমে — শুধু সোর্স ফাইল এডিট করলে লাইভ সাইটে reflect হয় না, rebuild+restart বাধ্যতামূলক।
+- **টেস্টিং পদ্ধতি:** ফিচার ডেভেলপমেন্টের সময় `php artisan tinker` দিয়ে সরাসরি `WaybillPdfService::render()`/`OrderInvoicePdfService::render()` কল করে `/tmp/.../scratchpad/*.pdf`-এ আউটপুট সেভ করে যাচাই করা হয়েছে — `pdfinfo` (page count/size) + `pdftotext -layout` (character-drop bug ধরার জন্য, visual bug ধরার জন্য না) + `pdftoppm -r 300` দিয়ে high-res PNG-তে rasterize করে Read tool দিয়ে ভিজুয়াল ইন্সপেকশন (visual bug ধরার জন্য — pdftotext দিয়ে §৪.৫-এর মতো visual-only বাগ ধরা যায় না, উল্টো ভুল কনফিডেন্স দেয়)। **⚠️ এই পদ্ধতির সীমাবদ্ধতা:** poppler (pdftoppm/pdftotext)-এ সঠিক দেখানো মানেই ইউজারের আসল ভিউয়ার/প্রিন্টারে সঠিক দেখাবে তার গ্যারান্টি না — §৪.৪ (border) ও §৪.৫ (matra) দুটো ক্ষেত্রেই এই gap দেখা গেছে।
+
+---
+
+## ১০. দ্রুত রেফারেন্স — কাজভেদে কোন ফাইল
 
 | কাজ | ফাইল |
 |---|---|
 | Waybill PDF জেনারেশন লজিক | `app/Services/WaybillPdfService.php` |
 | Waybill লে-আউট/স্টাইল | `resources/views/couriers/waybill.blade.php` |
-| API এন্ডপয়েন্ট (single/bulk) | `app/Http/Controllers/Api/CourierController.php::waybill/waybillBulk` |
-| রুট | `routes/api.php` (`staff_permission:courier` গ্রুপ) |
-| প্রিন্ট বাটন/UI | `frontend/src/app/dashboard/courier/track/page.tsx` |
+| Waybill API এন্ডপয়েন্ট (single/bulk) | `app/Http/Controllers/Api/CourierController.php::waybill/waybillBulk` |
+| Waybill প্রিন্ট বাটন/UI | `frontend/src/app/dashboard/courier/track/page.tsx` |
+| Order sales invoice জেনারেশন লজিক | `app/Services/OrderInvoicePdfService.php` |
+| Order invoice লে-আউট/স্টাইল | `resources/views/invoices/order-invoice.blade.php` |
+| Order invoice API এন্ডপয়েন্ট | `app/Http/Controllers/Api/OrderController.php::invoicePdf` |
+| Order invoice ডাউনলোড বাটন/UI | `dashboard/orders/page.tsx` (list) + `dashboard/orders/[id]/page.tsx` (detail) |
+| Shop Profile (নাম/ফোন/ঠিকানা/লোগো) | §৬, `app/Models/ShopProfile.php` + `ShopProfileController.php` |
+| রুট (waybill + shop-profile) | `routes/api.php` (`staff_permission:courier` / `owner_only` গ্রুপ) |
 | Authenticated PDF ডাউনলোড হেল্পার | `frontend/src/lib/dashboard-client.ts::openAuthenticatedPdf` |
 | dompdf বাগ রেফারেন্স (নতুন কোনো PDF ফিচার বানানোর আগে পড়ো) | §৪ (এই ফাইল) |
-| বাংলা matra reordering হেল্পার | `WaybillPdfService::reorderBengaliMatras()` — অন্য কোনো dompdf+বাংলা ফিচারে দরকার হলে এখান থেকে কপি করা যায় (এখনো shared utility class-এ এক্সট্র্যাক্ট করা হয়নি) |
+| বাংলা matra reordering হেল্পার (⚠️ এখনো OPEN ইস্যু, §৪.৫ দেখো) | `WaybillPdfService::reorderBengaliMatras()` + `OrderInvoicePdfService::reorderBengaliMatras()` (ডুপ্লিকেট, শেয়ার্ড ক্লাসে এক্সট্র্যাক্ট করা হয়নি) |
