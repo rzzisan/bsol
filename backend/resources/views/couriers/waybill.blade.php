@@ -35,8 +35,12 @@
        drop bug, so nothing here relies on it except this centered box,
        which is short/fixed content (never a variable-length trailing run
        the way the amount text itself is), kept deliberately safe by giving
-       the amount line its own left-aligned block below the centered label. */
-    border: 1.5px solid #101418; padding: {{ $widthMm === 58 ? '2mm 2mm' : '2.5mm 3mm' }}; margin-top: 3px;
+       the amount line its own left-aligned block below the centered label.
+       Border is 2px/solid (not 1.5px) — a thin border on this box printed
+       with a broken/discontinuous left edge on a real thermal printer even
+       though it rasterizes fully intact in every PDF-viewer/DPI test here;
+       a bolder line survives print-head thresholding much more reliably. */
+    border: 2px solid #101418; padding: {{ $widthMm === 58 ? '2mm 2mm' : '2.5mm 3mm' }}; margin-top: 3px;
     text-align: center;
   }
   .cod-label { font-size: {{ $widthMm === 58 ? '7px' : '8px' }}; letter-spacing: 1px; color: #4a5563; }
@@ -98,6 +102,9 @@
 
       <div class="section-label">FROM (SENDER)</div>
       <div class="from-line i18n">{{ $label['shopName'] }} &middot; {{ $label['shopPhone'] }}</div>
+      @if($label['shopAddress'])
+        <div class="muted i18n">{{ \Illuminate\Support\Str::limit($label['shopAddress'], $widthMm === 58 ? 60 : 90) }}</div>
+      @endif
 
       <div class="rule"></div>
 

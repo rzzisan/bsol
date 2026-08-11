@@ -16,7 +16,7 @@
 
 ## ২. Backend ফাইল
 
-- **`app/Services/WaybillPdfService.php`** (নতুন) — মূল সার্ভিস, `InvoicePdfService.php`-এর প্যাটার্ন অনুসরণ করে (bundled `NotoSansBengali-Regular/Bold.ttf`, `Pdf::loadView()->setPaper()`)। মেথড: `render(Collection|array $orders, int $widthMm = 80): PdfDocument` — এক বা একাধিক অর্ডার নিয়ে multi-page PDF বানায় (এক অর্ডার = এক page)। প্রাইভেট হেল্পার: `barcodeDataUri()` (Code128 PNG, base64 data URI), `qrDataUri()` (QR PNG, base64 data URI, order summary টেক্সট এনকোড করে), `reorderBengaliMatras()` (§৫ দেখো — জরুরি বাগ ফিক্স)।
+- **`app/Services/WaybillPdfService.php`** (নতুন) — মূল সার্ভিস, `InvoicePdfService.php`-এর প্যাটার্ন অনুসরণ করে (bundled `NotoSansBengali-Regular/Bold.ttf`, `Pdf::loadView()->setPaper()`)। মেথড: `render(Collection|array $orders, int $widthMm = 80): PdfDocument` — এক বা একাধিক অর্ডার নিয়ে multi-page PDF বানায় (এক অর্ডার = এক page)। প্রাইভেট হেল্পার: `barcodeDataUri()` (Code128 PNG, base64 data URI), `qrDataUri()` (QR PNG, base64 data URI, order summary টেক্সট এনকোড করে), `reorderBengaliMatras()` (§৪.৫ দেখো — জরুরি বাগ ফিক্স)।
 - **`resources/views/couriers/waybill.blade.php`** (নতুন) — শেয়ার্ড Blade টেমপ্লেট, `@foreach($labels as $label)` লুপে প্রতিটা অর্ডারের জন্য একটা `.label` div, শেষটা ছাড়া সবগুলোতে `page-break-after: always`।
 - **`app/Http/Controllers/Api/CourierController.php`** — দুইটা নতুন মেথড যোগ হয়েছে (existing methods অপরিবর্তিত): `waybill(Request, int $orderId): Response` (GET, single, `?size=58|80`), `waybillBulk(Request): Response` (POST, `order_ids[]` + `size`, max ২০০টা)। দুটোই `Order::whereIn('user_id', auth()->user()->shopUserIds())->whereNotNull('courier_tracking_id')` দিয়ে স্কোপড — শুধু বুকড অর্ডারের জন্যই কাজ করে।
 - **`routes/api.php`** — `staff_permission:courier` গ্রুপের ভেতরে: `GET /courier/waybill/{order}`, `POST /courier/waybill/bulk`।
@@ -39,7 +39,7 @@
 `.label` div-এ `height: {{ $heightMm }}mm` (page-এর height-এর সমান) সেট করলে dompdf প্রতিটা label-এর পর একটা **সম্পূর্ণ ফাঁকা extra page** যোগ করে দিত (sub-pixel rounding — box height পেজ height-এর ঠিক সমান হলে overflow trigger হয়)। **ফিক্স:** `.label`-এ কোনো explicit `height` সেট না করা — শুধু `@page { size: ... }` CSS দিয়ে physical page size বাউন্ড করা, content-কে নিজের height নিতে দেওয়া। `page-break-after: always` আলাদাভাবে conditionally (`$loop->last`) apply করা হয়, CSS `:last-child` selector-এর ওপর ভরসা না করে (dompdf pseudo-selector সাপোর্ট অবিশ্বাস্য)।
 
 ### ৪.২ `text-align:right`/`float:right` টেক্সটের শেষ ক্যারেক্টার ড্রপ করে দেয়
-Width-constrained + `box-sizing:border-box` label-এর ভেতরে ডান-align করা যেকোনো টেক্সট ব্লক তার **শেষ ক্যারেক্টার সাইলেন্টলি হারিয়ে ফেলে** — `1,120` রেন্ডার হতো `1,12`, একক-ডিজিট ITEMS count (`"1"`) পুরোপুরি উধাও হয়ে যেত। মিনিমাল repro-তে নামিয়ে কনফার্ম করা হয়েছে: এটা `text-align:right` এবং `float:right` দুটোতেই হয়, `<div>` এবং `<td>` (table cell) দুটোতেই হয়, ফন্ট/সাইজ/কনটেন্ট-length নির্বিশেষে সবসময় হয়। **ফিক্স:** এই লেবেলের ভেতরে কোথাও `text-align:right`/`float:right` টেক্সটের জন্য ব্যবহার করা হয়নি — কুরিয়ার নাম + COD amount একলাইনে left-aligned (`{{ courier }} · COD Tk {{ amount }}`), ORDER/ITEMS দুটো stacked left-aligned লাইন (২-কলাম right-aligned টেবিলের বদলে)। **নোট:** `text-align:center` টেস্ট করে সেফ পাওয়া গেছে (§৭-এ ব্যবহৃত হচ্ছে), শুধু `right`/`float:right` সমস্যাজনক।
+Width-constrained + `box-sizing:border-box` label-এর ভেতরে ডান-align করা যেকোনো টেক্সট ব্লক তার **শেষ ক্যারেক্টার সাইলেন্টলি হারিয়ে ফেলে** — `1,120` রেন্ডার হতো `1,12`, একক-ডিজিট ITEMS count (`"1"`) পুরোপুরি উধাও হয়ে যেত। মিনিমাল repro-তে নামিয়ে কনফার্ম করা হয়েছে: এটা `text-align:right` এবং `float:right` দুটোতেই হয়, `<div>` এবং `<td>` (table cell) দুটোতেই হয়, ফন্ট/সাইজ/কনটেন্ট-length নির্বিশেষে সবসময় হয়। **ফিক্স:** এই লেবেলের ভেতরে কোথাও `text-align:right`/`float:right` টেক্সটের জন্য ব্যবহার করা হয়নি — কুরিয়ার নাম + COD amount একলাইনে left-aligned (`{{ courier }} · COD Tk {{ amount }}`), ORDER/ITEMS দুটো stacked left-aligned লাইন (২-কলাম right-aligned টেবিলের বদলে)। **নোট:** `text-align:center` টেস্ট করে সেফ পাওয়া গেছে (§৫-এ ব্যবহৃত হচ্ছে), শুধু `right`/`float:right` সমস্যাজনক।
 
 ### ৪.৩ Percentage-width/fixed-width `<img>` ডান মার্জিন ছাড়াই overflow করে
 Barcode-এ `width:100%` এবং QR-এ fixed mm width — দুটোই printable area-র ডান প্রান্ত পেরিয়ে গিয়ে কেটে যেত (কোনো ডান মার্জিন ছাড়াই, বাস্তব থার্মাল প্রিন্টে ইউজার-রিপোর্টেড)। **ফিক্স:** ইমেজের width PHP সাইডে (service-এ) explicit mm হিসেবে হিসাব করা হয় — content width (label width − padding) থেকে ২mm সেফটি বাফার বিয়োগ করে (`$barcodeWidthMm`), percentage বা edge-flush সাইজিং কোনোটাই ব্যবহার হয় না।
@@ -70,7 +70,7 @@ dompdf-এ কোনো OpenType/HarfBuzz-স্টাইল text shaping engine
 2. **বক্সড COD amount** (`.cod-box` — বর্ডার + প্যাডিং, "CASH ON DELIVERY" লেবেল + বড় বোল্ড amount) — টাকা কালেক্ট করা সবচেয়ে জরুরি তথ্য, ওপরে
 3. **Tracking ID + barcode** — hub scanning-এর জন্য ওপরের দিকে
 4. **TO (RECEIVER)** — লেবেলের সবচেয়ে বড় টেক্সট (name 17-20px, phone 15-17px) — ডেলিভারি রাইডার প্রথমে এটাই পড়ে
-5. **FROM (SENDER)** — কমপ্যাক্ট একলাইন, সেকেন্ডারি
+5. **FROM (SENDER)** — কমপ্যাক্ট একলাইন (নাম · ফোন) + ঠিকানা (থাকলে), সেকেন্ডারি — §৮ দেখো, এখন `ShopProfile`-এর ডেটা
 6. **ORDER** — order# + item count, কমপ্যাক্ট একলাইন + item summary (Str::limit করা)
 7. **QR footer** — "SCAN FOR DETAILS" caption + QR code পাশাপাশি (inline-block, §৪.৪)
 
@@ -78,7 +78,20 @@ Page height জেনারাসলি সেট করা আছে (58mm→14
 
 ---
 
-## ৬. ডিপ্লয়মেন্ট নোট
+## ৬. Shop Profile (2026-08-11 যোগ হয়েছে) — waybill-এর FROM (SENDER) ডেটার সোর্স
+
+`/dashboard/settings/shop` (আগে placeholder ছিল) এখন real ফিচার — শপের নাম, ফোন, ইমেইল (ঐচ্ছিক), ঠিকানা, লোগো সেভ করা যায়। **Pattern B** (owner-only — courier settings/subscription-এর মতো, staff কখনো এডিট করতে পারবে না)।
+
+- **DB:** `shop_profiles` টেবিল, `user_id` unique FK (এক শপে একটা রো)। `logo_path` (storage disk-এ relative path, ডিলিট/রিপ্লেসের জন্য) + `logo_url` (আপলোডের সময় হিসাব করা পূর্ণ URL, `LandingMediaAsset`-এর কনভেনশন অনুসরণ করে — প্রতিবার অ্যাক্সেসরে ডিরাইভ করা হয় না)।
+- **Model:** `app/Models/ShopProfile.php`।
+- **Controller:** `app/Http/Controllers/Api/ShopProfileController.php` — `show()` (GET, না থাকলে `User.name`/`mobile` দিয়ে non-persisted প্রি-ফিল করে), `update()` (POST, multipart — text ফিল্ড + ঐচ্ছিক `logo` ফাইল + `remove_logo` বুলিয়ান একই রিকোয়েস্টে)। লোগো `storage/app/public/shop-logos/{ownerId}`-এ (public disk, `storage:link` আগে থেকেই সেটআপ করা আছে)।
+- **রুট:** `owner_only` গ্রুপে (`routes/api.php`, courier গ্রুপের ঠিক আগে) — `GET/POST /shop-profile`।
+- **ফ্রন্টএন্ড:** `frontend/src/app/dashboard/settings/shop/page.tsx` — ফর্ম + লোগো আপলোড/প্রিভিউ/রিমুভ, সবসময় `FormData` দিয়ে POST করে (JSON না, কারণ ফাইলসহ/ছাড়া দুই ক্ষেত্রেই একই এন্ডপয়েন্ট)।
+- **Waybill ইন্টিগ্রেশন:** `WaybillPdfService::render()`-এ প্রতিটা লেবেলের জন্য owner id দিয়ে (per-request memoized — bulk-এ সব অর্ডার একই শপের হয়) `ShopProfile` লুকআপ করা হয়; `shopName`/`shopPhone` এখন `$profile->shop_name/phone ?? $shop->name/mobile` (প্রোফাইল সেটআপ না করা থাকলে অ্যাকাউন্টের নিজের নাম/মোবাইলে ফলব্যাক করে, লেবেল কখনো ফাঁকা দেখায় না) — এবং নতুন `shopAddress` ফিল্ড FROM (SENDER)-এ ঠিকানা লাইন হিসেবে যোগ হয়েছে (সেট করা থাকলে)। **লোগো waybill-এ বসানো হয়নি** — ইচ্ছাকৃতভাবে বাদ দেওয়া হয়েছে (§৪-এ ডকুমেন্টেড অনেকগুলো dompdf ইমেজ-সম্পর্কিত বাগের পর নতুন কোনো ইমেজ রিস্ক না নেওয়ার সিদ্ধান্ত, এবং বাস্তব কুরিয়ার স্টিকারে সাধারণত মার্চেন্ট লোগো থাকেই না — কুরিয়ারের নিজের ব্র্যান্ডিং-ই প্রাধান্য পায়)। ভবিষ্যতে লোগো অন্য কোথাও (ড্যাশবোর্ড টপবার, পাবলিক ল্যান্ডিং পেজ, ইনভয়েস) দেখাতে হলে সেটা আলাদা কাজ — এখনো কোথাও wire করা হয়নি।
+
+---
+
+## ৭. ডিপ্লয়মেন্ট নোট
 
 - **Backend PDF সার্ভিস/ব্লেড টেমপ্লেট পরিবর্তনের পর:** `php artisan view:clear` (compiled Blade cache) + `sudo -n /usr/bin/systemctl restart php8.3-fpm` (opcache) — দুটোই লাগে, নাহলে পুরনো কম্পাইলড ভিউ/অপকোড সার্ভ হতে থাকে।
 - **`sudo` নন-ইন্টারঅ্যাক্টিভ flag বাধ্যতামূলক:** এই সার্ভারে `claude-dev` ইউজারের জন্য নির্দিষ্ট কমান্ডে passwordless sudo আছে (`sudoers -l` দেখো — `systemctl restart hybrid-frontend.service/php8.3-fpm/nginx`, `chown -R www-data:www-data .../.next`, পুরো `deploy-safe.sh` স্ক্রিপ্ট), কিন্তু bash tool-এর ভেতর থেকে চালালে `-n` (non-interactive) flag ছাড়া "a terminal is required to read the password" এরর দেয় যদিও NOPASSWD ম্যাচ করে — সবসময় `sudo -n <cmd>` ব্যবহার করা।
@@ -87,7 +100,7 @@ Page height জেনারাসলি সেট করা আছে (58mm→14
 
 ---
 
-## ৭. দ্রুত রেফারেন্স — কাজভেদে কোন ফাইল
+## ৮. দ্রুত রেফারেন্স — কাজভেদে কোন ফাইল
 
 | কাজ | ফাইল |
 |---|---|

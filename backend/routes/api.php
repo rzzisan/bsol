@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
+use App\Http\Controllers\Api\ShopProfileController;
 use App\Http\Controllers\LandingPageAnalyticsController;
 
 Route::get('/health', function () {
@@ -329,6 +330,15 @@ Route::middleware('active_subscription')->group(function () {
         Route::post('/customers/sync-all', [CustomerController::class, 'syncAll']);
         Route::post('/customers/{customer}/toggle-block', [CustomerController::class, 'toggleBlock']);
         Route::apiResource('/customers', CustomerController::class)->only(['index', 'show', 'update']);
+    });
+
+    // ── Shop Profile (name/phone/address/logo — used on courier waybills) ────
+    // Pattern B (staff_team_role_context.md §3.3): shop identity/branding,
+    // staff never create/edit it, only see it used elsewhere (waybill FROM
+    // block reads the model directly, not through this endpoint).
+    Route::middleware('owner_only')->group(function () {
+        Route::get('/shop-profile', [ShopProfileController::class, 'show']);
+        Route::post('/shop-profile', [ShopProfileController::class, 'update']);
     });
 
     // ── Courier Integration ───────────────────────────────────────────────────

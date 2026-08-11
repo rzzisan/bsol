@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\ShopProfile;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as PdfDocument;
 use chillerlan\QRCode\Output\QROutputInterface;
@@ -121,8 +122,19 @@ class WaybillPdfService
         // it can never collide with the QR block.
         $qrTextWidthMm  = $widthMm - (2 * $paddingMm) - $qrSizeMm - 2;
 
-        $labels = $orders->map(function (Order $order) {
+        $shopProfiles = [];
+
+        $labels = $orders->map(function (Order $order) use (&$shopProfiles) {
             $shop = $order->user?->shopOwner();
+            $ownerId = $shop?->id;
+
+            // All orders in one request share the same shop (bulk is always
+            // scoped to the caller's shopUserIds()), so this is normally a
+            // single lookup — memoized per owner just in case.
+            if ($ownerId !== null && ! array_key_exists($ownerId, $shopProfiles)) {
+                $shopProfiles[$ownerId] = ShopProfile::where('user_id', $ownerId)->first();
+            }
+            $profile = $ownerId !== null ? $shopProfiles[$ownerId] : null;
 
             $address = collect([$order->customer_address, $order->customer_area, $order->customer_thana, $order->customer_district])
                 ->filter()->implode(', ');
@@ -130,8 +142,12 @@ class WaybillPdfService
 
             return [
                 'order'        => $order,
-                'shopName'     => $this->reorderBengaliMatras($shop?->name) ?? '—',
-                'shopPhone'    => $shop?->mobile ?? '—',
+                // Shop Profile (Settings → Shop Profile) is the source of
+                // truth once set up; falls back to the account's own
+                // name/mobile so labels aren't blank before a seller fills it in.
+                'shopName'     => $this->reorderBengaliMatras($profile?->shop_name ?? $shop?->name) ?? '—',
+                'shopPhone'    => $profile?->phone ?? $shop?->mobile ?? '—',
+                'shopAddress'  => $this->reorderBengaliMatras($profile?->address),
                 'customerName' => $this->reorderBengaliMatras($order->customer_name) ?? '—',
                 'itemCount'    => $order->items->sum('quantity'),
                 'itemsSummary' => $this->reorderBengaliMatras($itemsSummary),
