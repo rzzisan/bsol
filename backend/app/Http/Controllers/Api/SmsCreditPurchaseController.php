@@ -103,6 +103,7 @@ class SmsCreditPurchaseController extends Controller
         abort_unless($purchase->user_id === auth()->id(), 403);
 
         return $this->invoicePdfService->smsCreditInvoice($purchase)
-            ->stream("invoice-SMSC-{$purchase->id}.pdf");
+            ->stream("invoice-SMSC-{$purchase->id}.pdf")
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 }

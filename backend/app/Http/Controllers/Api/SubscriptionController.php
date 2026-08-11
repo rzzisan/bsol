@@ -161,6 +161,7 @@ class SubscriptionController extends Controller
         abort_unless($payment->user_id === auth()->id(), 403);
 
         return $this->invoicePdfService->subscriptionInvoice($payment)
-            ->stream("invoice-SUB-{$payment->id}.pdf");
+            ->stream("invoice-SUB-{$payment->id}.pdf")
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 }

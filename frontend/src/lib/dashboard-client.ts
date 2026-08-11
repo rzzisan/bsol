@@ -138,6 +138,10 @@ export async function openAuthenticatedPdf(url: string, init?: RequestInit): Pro
   try {
     const res = await fetch(url, {
       ...init,
+      // The server sends Cache-Control: no-store on these too, but a
+      // regenerated PDF (e.g. a font/layout fix) must never be masked by
+      // a stale cached response for the same URL — belt and suspenders.
+      cache: "no-store",
       headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {

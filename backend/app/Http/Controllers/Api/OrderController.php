@@ -364,7 +364,9 @@ class OrderController extends Controller
     {
         $order = Order::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
-        return $service->render($order)->stream("invoice-{$order->order_number}.pdf");
+        return $service->render($order)
+            ->stream("invoice-{$order->order_number}.pdf")
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     // ── Update ────────────────────────────────────────────────────────────────

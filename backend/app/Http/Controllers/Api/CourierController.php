@@ -745,7 +745,8 @@ class CourierController extends Controller
         $widthMm = (int) $request->query('size', 80);
         $pdf = (new WaybillPdfService())->render([$order], $widthMm);
 
-        return $pdf->stream("waybill-{$order->order_number}.pdf");
+        return $pdf->stream("waybill-{$order->order_number}.pdf")
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     public function waybillBulk(Request $request): Response
@@ -766,6 +767,7 @@ class CourierController extends Controller
 
         $pdf = (new WaybillPdfService())->render($orders, (int) ($data['size'] ?? 80));
 
-        return $pdf->stream('waybills.pdf');
+        return $pdf->stream('waybills.pdf')
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 }
