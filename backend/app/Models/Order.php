@@ -19,6 +19,7 @@ class Order extends Model
         'subtotal', 'shipping_charge', 'discount', 'total', 'notes', 'custom_fields',
         'fraud_score', 'risk_level',
         'courier_name', 'courier_tracking_id', 'courier_status', 'courier_charge',
+        'courier_cod_amount', 'courier_weight_kg', 'courier_booked_at',
         'assigned_to', 'otp_required', 'otp_verified_at',
     ];
 
@@ -28,6 +29,9 @@ class Order extends Model
         'discount'       => 'decimal:2',
         'total'          => 'decimal:2',
         'courier_charge' => 'decimal:2',
+        'courier_cod_amount' => 'decimal:2',
+        'courier_weight_kg' => 'decimal:2',
+        'courier_booked_at' => 'datetime',
         'fraud_score'    => 'integer',
         'custom_fields'  => 'array',
         'otp_required'   => 'boolean',

@@ -505,6 +505,11 @@ class CourierController extends Controller
                 'courier_tracking_id' => $data['tracking_id'] ?? null,
                 'courier_status'      => 'booked',
                 'status'              => 'processing',
+                // Waybill/label PDFs must print the amount actually asked of
+                // the courier, not order->total (may be a partial COD) — see
+                // courier_waybill_context.md.
+                'courier_cod_amount'  => $data['cod_amount'] ?? $order->total,
+                'courier_booked_at'   => now(),
             ]);
             return response()->json(['success' => true, 'data' => $order, 'message' => 'Manual tracking saved.']);
         }
@@ -522,6 +527,11 @@ class CourierController extends Controller
                 'courier_tracking_id' => $result['consignment_id'],
                 'courier_status'      => $result['courier_status'] ?? 'booked',
                 'status'              => 'processing',
+                // Same reasoning as the manual branch above — persist the
+                // actual amount asked of the courier, not order->total.
+                'courier_cod_amount'  => $data['cod_amount'] ?? $order->total,
+                'courier_weight_kg'   => $data['item_weight'] ?? $data['parcel_weight_kg'] ?? null,
+                'courier_booked_at'   => now(),
             ];
             if (($result['delivery_fee'] ?? null) !== null) {
                 $update['courier_charge'] = $result['delivery_fee'];

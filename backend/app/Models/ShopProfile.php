@@ -14,6 +14,12 @@ class ShopProfile extends Model
 {
     protected $fillable = [
         'user_id', 'shop_name', 'phone', 'email', 'address', 'logo_path', 'logo_url',
+        'show_phone_on_sticker', 'show_address_on_sticker',
+    ];
+
+    protected $casts = [
+        'show_phone_on_sticker'   => 'boolean',
+        'show_address_on_sticker' => 'boolean',
     ];
 
     public function user(): BelongsTo

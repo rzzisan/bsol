@@ -27,6 +27,10 @@ const t = {
     saveSuccess: "শপ প্রোফাইল সেভ হয়েছে।",
     saveFailed: "সেভ করা যায়নি, আবার চেষ্টা করুন।",
     required: "এই ফিল্ডটি আবশ্যক।",
+    stickerSettings: "স্টিকার প্রিন্ট সেটিং",
+    stickerSettingsHint: "কুরিয়ার স্টিকারের \"FROM (SENDER)\" অংশে আপনার এই তথ্যগুলো দেখানো হবে কি না, তা নিয়ন্ত্রণ করুন।",
+    showPhoneOnSticker: "স্টিকারে ফোন নাম্বার দেখাও",
+    showAddressOnSticker: "স্টিকারে ঠিকানা দেখাও",
   },
   en: {
     pageTitle: "Shop Profile",
@@ -48,6 +52,10 @@ const t = {
     saveSuccess: "Shop profile saved.",
     saveFailed: "Could not save, please try again.",
     required: "This field is required.",
+    stickerSettings: "Sticker Print Settings",
+    stickerSettingsHint: "Control whether your phone/address show up on the courier sticker's \"FROM (SENDER)\" block.",
+    showPhoneOnSticker: "Show phone number on sticker",
+    showAddressOnSticker: "Show address on sticker",
   },
 };
 
@@ -57,6 +65,8 @@ type ShopProfile = {
   email: string | null;
   address: string;
   logo_url: string | null;
+  show_phone_on_sticker: boolean;
+  show_address_on_sticker: boolean;
 };
 
 export default function ShopProfilePage() {
@@ -65,7 +75,10 @@ export default function ShopProfilePage() {
   const token = getStoredToken();
 
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState<ShopProfile>({ shop_name: "", phone: "", email: "", address: "", logo_url: null });
+  const [form, setForm] = useState<ShopProfile>({
+    shop_name: "", phone: "", email: "", address: "", logo_url: null,
+    show_phone_on_sticker: true, show_address_on_sticker: true,
+  });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [removeLogo, setRemoveLogo] = useState(false);
@@ -87,6 +100,8 @@ export default function ShopProfilePage() {
               email: d.data.email ?? "",
               address: d.data.address ?? "",
               logo_url: d.data.logo_url ?? null,
+              show_phone_on_sticker: d.data.show_phone_on_sticker ?? true,
+              show_address_on_sticker: d.data.show_address_on_sticker ?? true,
             });
           }
         }
@@ -119,6 +134,8 @@ export default function ShopProfilePage() {
       body.append("phone", form.phone);
       if (form.email) body.append("email", form.email);
       body.append("address", form.address);
+      body.append("show_phone_on_sticker", form.show_phone_on_sticker ? "1" : "0");
+      body.append("show_address_on_sticker", form.show_address_on_sticker ? "1" : "0");
       if (logoFile) body.append("logo", logoFile);
       if (removeLogo) body.append("remove_logo", "1");
 
@@ -135,6 +152,8 @@ export default function ShopProfilePage() {
           email: d.data.email ?? "",
           address: d.data.address ?? "",
           logo_url: d.data.logo_url ?? null,
+          show_phone_on_sticker: d.data.show_phone_on_sticker ?? true,
+          show_address_on_sticker: d.data.show_address_on_sticker ?? true,
         });
         setLogoFile(null);
         setRemoveLogo(false);
@@ -227,6 +246,23 @@ export default function ShopProfilePage() {
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
                   onChange={e => onLogoChange(e.target.files?.[0] ?? null)} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[var(--border)] p-4">
+              <p className="text-sm font-semibold">{txt.stickerSettings}</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">{txt.stickerSettingsHint}</p>
+              <div className="mt-3 flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={form.show_phone_on_sticker}
+                    onChange={e => setForm(f => ({ ...f, show_phone_on_sticker: e.target.checked }))} />
+                  {txt.showPhoneOnSticker}
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={form.show_address_on_sticker}
+                    onChange={e => setForm(f => ({ ...f, show_address_on_sticker: e.target.checked }))} />
+                  {txt.showAddressOnSticker}
+                </label>
               </div>
             </div>
 
