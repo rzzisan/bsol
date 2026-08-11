@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\ShopProfile;
+use App\Models\StickerCourierTemplate;
+use App\Models\StickerSetting;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as PdfDocument;
 use chillerlan\QRCode\Output\QROutputInterface;
@@ -11,6 +13,7 @@ use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Picqer\Barcode\BarcodeGeneratorPNG;
 
 /**
@@ -21,12 +24,25 @@ use Picqer\Barcode\BarcodeGeneratorPNG;
  * Each label carries a Code128 barcode (scanner-friendly tracking ID) and a
  * QR code (phone-camera-friendly order summary) — see feature_roadmap_context.md #5.
  *
- * Pathao orders get a dedicated layout that mirrors Pathao's own dashboard
- * sticker (fixed size, ignores the 58mm/80mm selector — real Pathao labels
- * aren't sized by that choice). Every other courier (or manual/no courier)
- * falls back to the original generic thermal design. A bulk print can mix
- * both in one PDF via dompdf's named-page CSS (`page: pathao;` on the
- * Pathao label wrapper) — see courier_waybill_context.md §5.2.
+ * ── Sticker Template feature (courier_waybill_context.md §6) ──────────────
+ * A seller picks a default label design (Settings → Sticker Templates) and
+ * optionally a different one per courier (StickerCourierTemplate). The
+ * available designs are the catalog in config/sticker_templates.php, each
+ * backed by a Blade partial under resources/views/couriers/templates/.
+ *
+ * dompdf has no support for CSS named @page selectors (only :first/:left/
+ * :right/:odd/:even — see Stylesheet::_parse_css's "page" case, which
+ * silently drops anything else), so ONE PDF document can only have ONE
+ * physical page size. This means a single render() call can only use ONE
+ * template for the whole document: if every order in the batch resolves to
+ * the same template, that template's native size is used; if the batch is
+ * mixed (different couriers with different overrides), the whole document
+ * falls back to 'classic' (the only template built to fit any content
+ * without a fixed native size) rather than trying to honor each order's
+ * individual choice. Print-one-order-at-a-time and same-courier bulk prints
+ * (the common cases) are unaffected by this. See §6.3 for the rationale and
+ * why merging separately-rendered per-template PDFs (e.g. via FPDI) was
+ * deliberately scoped out for now.
  */
 class WaybillPdfService
 {
@@ -144,10 +160,41 @@ class WaybillPdfService
         return $this->pathaoLocationNames[$externalId];
     }
 
+    /** "(SKU-QTY)+(SKU-QTY)" style product summary — cod_band_compact's reference design. */
+    private function skuSummary(Order $order): string
+    {
+        return $order->items->map(function ($item) {
+            $code = $item->sku ?: Str::upper(Str::substr(preg_replace('/[^A-Za-z0-9]/', '', $item->product_name ?? ''), 0, 4)) ?: '-';
+            return "({$code}-{$item->quantity})";
+        })->implode('+');
+    }
+
+    /** Compact item rows shared by invoice_table/pos_bill: name (truncated), qty, unit price, line total. */
+    private function itemRows(Order $order, int $nameLimit = 22): array
+    {
+        return $order->items->map(fn ($item) => [
+            'name'  => Str::limit($item->product_name ?? '-', $nameLimit),
+            'qty'   => $item->quantity,
+            'price' => (float) $item->unit_price,
+            'total' => (float) $item->total,
+        ])->all();
+    }
+
+    /**
+     * Resolves which template key applies to a single order: per-courier
+     * override first, then the shop's default, then 'classic'.
+     */
+    private function resolveTemplateKey(Order $order, ?string $defaultKey, array $courierOverrides): string
+    {
+        $courier = strtolower((string) $order->courier_name);
+        return $courierOverrides[$courier] ?? $defaultKey ?? 'classic';
+    }
+
     /**
      * @param  Collection<int, Order>|Order[]  $orders
-     * @param  int  $widthMm  58 or 80 — thermal label width (ignored for
-     *                        Pathao orders, which always use their own fixed size).
+     * @param  int  $widthMm  58 or 80 — thermal label width, used only by
+     *                        the 'classic' template (every other template
+     *                        has its own fixed native size).
      */
     public function render(Collection|array $orders, int $widthMm = 80): PdfDocument
     {
@@ -155,68 +202,36 @@ class WaybillPdfService
         $orders->each(fn (Order $order) => $order->loadMissing(['user', 'items']));
 
         $widthMm  = in_array($widthMm, [58, 80], true) ? $widthMm : 80;
-        // Generous height so content never overflows to a phantom second
-        // page — stacking (not tables) for ORDER/ITEMS and the QR block
-        // needs more vertical room than a side-by-side layout would.
-        $heightMm = $widthMm === 58 ? 145 : 150;
-        $paddingMm = $widthMm === 58 ? 2.5 : 3.5;
-        // Explicit mm widths for the barcode/QR images rather than
-        // percentage/edge-flush sizing — those overflowed past the printable
-        // area with no right margin on real thermal printers (percentage
-        // widths on <img> aren't reliably contained by dompdf here, same
-        // family of box-model quirks as the text-align:right bug above).
-        // A couple mm of slack is kept deliberately, not sized to the exact edge.
-        $barcodeWidthMm = $widthMm - (2 * $paddingMm) - 2;
-        $qrSizeMm       = $widthMm === 58 ? 16 : 20;
-        // Text sits beside the QR via inline-block (default left-to-right
-        // flow), not float/text-align:right — see the .qr comment in the
-        // template for why those are avoided here. Its width is capped so
-        // it can never collide with the QR block.
-        $qrTextWidthMm  = $widthMm - (2 * $paddingMm) - $qrSizeMm - 2;
 
-        // dompdf has no support for CSS named @page selectors (only
-        // :first/:left/:right/:odd/:even — see Stylesheet::_parse_css's
-        // "page" case, which silently drops anything else), so ONE PDF
-        // document can only have ONE physical page size. When every order
-        // in the batch is Pathao, the whole document uses Pathao's fixed
-        // landscape size; otherwise it uses the classic thermal size
-        // (existing behavior). A Pathao order's own cell/image widths are
-        // computed as a fraction of whichever page width wins below, so a
-        // Pathao label mixed into a thermal-sized batch still fits inside
-        // its (narrower, portrait) page instead of bleeding past the edge —
-        // it just prints smaller/cramped in that mixed-batch edge case.
-        $allPathao = $orders->isNotEmpty()
-            && $orders->every(fn (Order $o) => strtolower((string) $o->courier_name) === 'pathao');
+        $ownerId = $orders->first()?->user?->shopOwner()?->id;
+        $stickerSetting = $ownerId !== null ? StickerSetting::where('user_id', $ownerId)->first() : null;
+        $courierOverrides = $ownerId !== null
+            ? StickerCourierTemplate::where('user_id', $ownerId)->pluck('template_key', 'courier_name')
+                ->mapWithKeys(fn ($key, $courier) => [strtolower($courier) => $key])->all()
+            : [];
+        $defaultTemplateKey = $stickerSetting?->default_template_key ?? 'classic';
+        $catalog = config('sticker_templates', []);
 
-        $pageWidthMm  = $allPathao ? self::PATHAO_WIDTH_MM  : $widthMm;
-        $pageHeightMm = $allPathao ? self::PATHAO_HEIGHT_MM : $heightMm;
+        $resolvedKeys = $orders->map(fn (Order $o) => $this->resolveTemplateKey($o, $defaultTemplateKey, $courierOverrides))->unique();
+        // See the class doc comment: one document = one page size, so a
+        // mixed batch falls back to 'classic' rather than honoring each
+        // order's individual template.
+        $effectiveKey = ($resolvedKeys->count() === 1 && array_key_exists($resolvedKeys->first(), $catalog))
+            ? $resolvedKeys->first()
+            : 'classic';
 
-        $pathaoPaddingMm = round($pageWidthMm * 0.03, 2);
-        $pathaoLogoColMm = round($pageWidthMm * 0.20, 2);
-        $pathaoTypeColMm = round($pageWidthMm * 0.14, 2);
-        $pathaoQrMm      = round($pageWidthMm * 0.18, 2);
-        // -1mm below: the image is drawn slightly narrower than its table
-        // column, same safety-buffer reasoning as $barcodeWidthMm above —
-        // guards against any residual sub-mm rounding still bleeding to
-        // the page edge even after the table-width fix a few lines down.
-        $pathaoQrImgMm         = $pathaoQrMm - 1;
-        $pathaoBarcodeWidthMm  = round($pageWidthMm * 0.42, 2) - 1;
-        $pathaoBarcodeHeightMm = round($pageHeightMm * 0.16, 2);
-        // Wide enough that "Collectable Amount: BDT X,XXX.XX" fits on one
-        // line at .p-collect's font-size for realistic order totals.
-        $pathaoBottomLeftColMm = round($pageWidthMm * 0.52, 2);
-        // Every table column below gets an explicit mm width (none left
-        // "auto") — dompdf's table auto-layout doesn't reliably respect a
-        // 100%-width table when one column is unconstrained and another
-        // has long wrapping text (e.g. the customer address); it let the
-        // table grow past its container and pushed the QR column off the
-        // right edge of the page in testing. Explicit widths on every
-        // column, summing to exactly the content width, is the same fix
-        // already applied to the barcode/QR <img> sizing above.
-        $pathaoContentWidthMm    = round($pageWidthMm - (2 * $pathaoPaddingMm), 2);
-        $pathaoHeaderTextColMm   = round($pathaoContentWidthMm - $pathaoLogoColMm, 2);
-        $pathaoMidTextColMm      = round($pathaoContentWidthMm - $pathaoTypeColMm - $pathaoQrMm, 2);
-        $pathaoBottomRightColMm  = round($pathaoContentWidthMm - $pathaoBottomLeftColMm, 2);
+        $template = $catalog[$effectiveKey] ?? $catalog['classic'];
+        $pageWidthMm  = $template['widthMm']  ?? $widthMm;
+        $pageHeightMm = $template['heightMm'] ?? ($widthMm === 58 ? 145 : 150);
+
+        $geometry = match ($effectiveKey) {
+            'pathao'            => $this->pathaoGeometry($pageWidthMm, $pageHeightMm),
+            'cod_band_compact'  => $this->codBandCompactGeometry($pageWidthMm, $pageHeightMm),
+            'invoice_table'     => $this->invoiceTableGeometry($pageWidthMm, $pageHeightMm),
+            'pos_bill'          => $this->posBillGeometry($pageWidthMm, $pageHeightMm),
+            'mini_cod'          => $this->miniCodGeometry($pageWidthMm, $pageHeightMm),
+            default             => $this->classicGeometry($pageWidthMm, $pageHeightMm),
+        };
 
         $shopProfiles = [];
 
@@ -241,7 +256,6 @@ class WaybillPdfService
             // order->total for partial COD/advance-paid orders. Orders
             // booked before this field existed fall back to total.
             $codAmount = (float) ($order->courier_cod_amount ?? $order->total);
-            $isPathao = strtolower((string) $order->courier_name) === 'pathao';
 
             // Seller-controlled (Settings → Shop Profile): whether their own
             // phone/address print on the sender block. Default true so a
@@ -251,7 +265,6 @@ class WaybillPdfService
 
             return [
                 'order'        => $order,
-                'isPathao'     => $isPathao,
                 'codAmount'    => $codAmount,
                 // Shop Profile (Settings → Shop Profile) is the source of
                 // truth once set up; falls back to the account's own
@@ -262,14 +275,20 @@ class WaybillPdfService
                 'customerName' => $this->reorderBengaliMatras($order->customer_name) ?? '—',
                 'itemCount'    => $order->items->sum('quantity'),
                 'itemsSummary' => $this->reorderBengaliMatras($itemsSummary),
+                'skuSummary'   => $this->skuSummary($order),
+                'itemRows'     => $this->itemRows($order),
+                'subtotal'     => (float) $order->subtotal,
+                'shippingCharge' => (float) $order->shipping_charge,
+                'discount'     => (float) $order->discount,
                 'address'      => $this->reorderBengaliMatras($address) ?: '—',
                 'notes'        => $this->reorderBengaliMatras($order->notes),
                 'barcode'      => $this->barcodeDataUri($order->courier_tracking_id),
                 'qr'           => $this->qrDataUri($order, $codAmount),
                 // Pathao-layout-only fields — cheap to compute even when
-                // $isPathao is false, so no branching needed here.
+                // the active template isn't 'pathao', so no branching needed here.
                 'weightKg'     => $order->courier_weight_kg !== null ? (float) $order->courier_weight_kg : 0.5,
                 'bookedAt'     => ($order->courier_booked_at ?? $order->updated_at)?->format('Y-m-d h:i:s A'),
+                'dateShort'    => ($order->courier_booked_at ?? $order->created_at)?->format('n/j/Y'),
                 'cityName'     => $this->pathaoLocationName($order->pathao_city_id),
                 'zoneName'     => $this->pathaoLocationName($order->pathao_zone_id),
                 'areaName'     => $this->pathaoLocationName($order->pathao_area_id),
@@ -277,28 +296,102 @@ class WaybillPdfService
         });
 
         return Pdf::loadView('couriers.waybill', [
-            'labels'                => $labels,
-            'widthMm'               => $widthMm,
-            'heightMm'              => $heightMm,
-            'barcodeWidthMm'        => $barcodeWidthMm,
-            'qrSizeMm'              => $qrSizeMm,
-            'qrTextWidthMm'         => $qrTextWidthMm,
-            'pageWidthMm'           => $pageWidthMm,
-            'pageHeightMm'          => $pageHeightMm,
-            'pathaoPaddingMm'       => $pathaoPaddingMm,
-            'pathaoLogoColMm'       => $pathaoLogoColMm,
-            'pathaoTypeColMm'       => $pathaoTypeColMm,
-            'pathaoQrMm'            => $pathaoQrMm,
-            'pathaoQrImgMm'         => $pathaoQrImgMm,
-            'pathaoBarcodeWidthMm'  => $pathaoBarcodeWidthMm,
-            'pathaoBarcodeHeightMm' => $pathaoBarcodeHeightMm,
-            'pathaoBottomLeftColMm' => $pathaoBottomLeftColMm,
-            'pathaoContentWidthMm'   => $pathaoContentWidthMm,
-            'pathaoHeaderTextColMm'  => $pathaoHeaderTextColMm,
-            'pathaoMidTextColMm'     => $pathaoMidTextColMm,
-            'pathaoBottomRightColMm' => $pathaoBottomRightColMm,
-            'fontRegular'           => $this->fontRegular(),
-            'fontBold'              => $this->fontBold(),
+            'labels'       => $labels,
+            'templateKey'  => $effectiveKey,
+            'templateView' => $template['view'] ?? 'couriers.templates.classic',
+            'pageWidthMm'  => $pageWidthMm,
+            'pageHeightMm' => $pageHeightMm,
+            'g'            => $geometry,
+            'fontRegular'  => $this->fontRegular(),
+            'fontBold'     => $this->fontBold(),
         ])->setPaper([0, 0, $pageWidthMm * 2.8346, $pageHeightMm * 2.8346]);
+    }
+
+    /** Geometry for the 'classic' generic thermal template — unchanged from before the Sticker Template feature. */
+    private function classicGeometry(float $widthMm, float $heightMm): array
+    {
+        $paddingMm = $widthMm == 58 ? 2.5 : 3.5;
+        $barcodeWidthMm = $widthMm - (2 * $paddingMm) - 2;
+        $qrSizeMm = $widthMm == 58 ? 16 : 20;
+        $qrTextWidthMm = $widthMm - (2 * $paddingMm) - $qrSizeMm - 2;
+
+        return compact('paddingMm', 'barcodeWidthMm', 'qrSizeMm', 'qrTextWidthMm') + ['widthMm' => $widthMm];
+    }
+
+    /** Geometry for the 'pathao' template — see courier_waybill_context.md §5 for the derivation of these fractions. */
+    private function pathaoGeometry(float $pageWidthMm, float $pageHeightMm): array
+    {
+        $paddingMm = round($pageWidthMm * 0.03, 2);
+        $logoColMm = round($pageWidthMm * 0.20, 2);
+        $typeColMm = round($pageWidthMm * 0.14, 2);
+        $qrMm      = round($pageWidthMm * 0.18, 2);
+        $qrImgMm   = $qrMm - 1;
+        $barcodeWidthMm  = round($pageWidthMm * 0.42, 2) - 1;
+        $barcodeHeightMm = round($pageHeightMm * 0.16, 2);
+        $bottomLeftColMm = round($pageWidthMm * 0.52, 2);
+        $contentWidthMm    = round($pageWidthMm - (2 * $paddingMm), 2);
+        $headerTextColMm   = round($contentWidthMm - $logoColMm, 2);
+        $midTextColMm      = round($contentWidthMm - $typeColMm - $qrMm, 2);
+        $bottomRightColMm  = round($contentWidthMm - $bottomLeftColMm, 2);
+
+        return compact(
+            'paddingMm', 'logoColMm', 'typeColMm', 'qrMm', 'qrImgMm', 'barcodeWidthMm', 'barcodeHeightMm',
+            'bottomLeftColMm', 'contentWidthMm', 'headerTextColMm', 'midTextColMm', 'bottomRightColMm'
+        );
+    }
+
+    /** Geometry for 'cod_band_compact' (2x3in, reference "Sticker 1"). */
+    private function codBandCompactGeometry(float $pageWidthMm, float $pageHeightMm): array
+    {
+        $paddingMm = round($pageWidthMm * 0.04, 2);
+        $contentWidthMm = round($pageWidthMm - (2 * $paddingMm), 2);
+        $barcodeWidthMm = round($contentWidthMm - 2, 2);
+
+        return compact('paddingMm', 'contentWidthMm', 'barcodeWidthMm');
+    }
+
+    /** Geometry for 'invoice_table' (75x50mm landscape, reference "RetailBD"/"EcomDrive" family). */
+    private function invoiceTableGeometry(float $pageWidthMm, float $pageHeightMm): array
+    {
+        $paddingMm = round($pageWidthMm * 0.035, 2);
+        $contentWidthMm = round($pageWidthMm - (2 * $paddingMm), 2);
+        $barcodeColMm = round($contentWidthMm * 0.30, 2) - 1;
+        $barcodeHeightMm = 8;
+        $qtyColMm = round($contentWidthMm * 0.12, 2);
+        $priceColMm = round($contentWidthMm * 0.20, 2);
+        $totalColMm = round($contentWidthMm * 0.20, 2);
+        $nameColMm = round($contentWidthMm - $qtyColMm - $priceColMm - $totalColMm, 2);
+
+        return compact(
+            'paddingMm', 'contentWidthMm', 'barcodeColMm', 'barcodeHeightMm',
+            'nameColMm', 'qtyColMm', 'priceColMm', 'totalColMm'
+        );
+    }
+
+    /** Geometry for 'pos_bill' (80mm POS-style, reference "Pos Sticker"). */
+    private function posBillGeometry(float $pageWidthMm, float $pageHeightMm): array
+    {
+        $paddingMm = 3.5;
+        $contentWidthMm = round($pageWidthMm - (2 * $paddingMm), 2);
+        $barcodeWidthMm = round($contentWidthMm - 2, 2);
+        // Table columns stay left-aligned (never text-align:right — see the
+        // class doc comment on the classic template's known dompdf bug),
+        // so this is just a visual split, not alignment-critical.
+        $nameColMm  = round($contentWidthMm * 0.40, 2);
+        $priceColMm = round($contentWidthMm * 0.20, 2);
+        $qtyColMm   = round($contentWidthMm * 0.15, 2);
+        $totalColMm = round($contentWidthMm - $nameColMm - $priceColMm - $qtyColMm, 2);
+
+        return compact('paddingMm', 'contentWidthMm', 'barcodeWidthMm', 'nameColMm', 'priceColMm', 'qtyColMm', 'totalColMm');
+    }
+
+    /** Geometry for 'mini_cod' (38x25mm, reference "Shokher Gadget"). */
+    private function miniCodGeometry(float $pageWidthMm, float $pageHeightMm): array
+    {
+        $paddingMm = 1.5;
+        $contentWidthMm = round($pageWidthMm - (2 * $paddingMm), 2);
+        $barcodeWidthMm = round($contentWidthMm - 1, 2);
+
+        return compact('paddingMm', 'contentWidthMm', 'barcodeWidthMm');
     }
 }

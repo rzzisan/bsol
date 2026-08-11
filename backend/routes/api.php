@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\ShopProfileController;
+use App\Http\Controllers\Api\StickerTemplateController;
 use App\Http\Controllers\LandingPageAnalyticsController;
 
 Route::get('/health', function () {
@@ -340,6 +341,15 @@ Route::middleware('active_subscription')->group(function () {
     Route::middleware('owner_only')->group(function () {
         Route::get('/shop-profile', [ShopProfileController::class, 'show']);
         Route::post('/shop-profile', [ShopProfileController::class, 'update']);
+    });
+
+    // ── Sticker Template (default label design + per-courier overrides) ───────
+    // Pattern B (staff_team_role_context.md §3.3) — same reasoning as Shop
+    // Profile above: print/branding preference, not an operational action.
+    Route::middleware('owner_only')->prefix('sticker-templates')->group(function () {
+        Route::get('/catalog', [StickerTemplateController::class, 'catalog']);
+        Route::get('/settings', [StickerTemplateController::class, 'show']);
+        Route::post('/settings', [StickerTemplateController::class, 'update']);
     });
 
     // ── Courier Integration ───────────────────────────────────────────────────

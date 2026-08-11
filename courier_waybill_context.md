@@ -1,6 +1,6 @@
 # কুরিয়ার ওয়েবিল/লেবেল PDF — মাস্টার কনটেক্সট ফাইল
 
-> এই ফাইলটা AI agent-দের জন্য: courier waybill/sticker PDF (এবং একই কোড-প্যাটার্ন শেয়ার করা order sales invoice, `OrderInvoicePdfService`) নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-08-11 (প্রথম ডেলিভারি + একাধিক dompdf বাগ ফিক্স + শপ প্রোফাইল ইন্টিগ্রেশন + অর্ডার ইনভয়েস ফিচার, একই দিনে একাধিক সেশনে)। এই ফিচার `feature_roadmap_context.md`-এর #5 আইটেম — মূল ডেলিভারি সম্পূর্ণ ও deployed, কিন্তু **§৪.৫-এ একটা বাংলা টেক্সট রেন্ডারিং বাগ এখনো OPEN/আনসলভড, ইউজারের অনুরোধে ডিফার করা হয়েছে** — নিচে দেখো।
+> এই ফাইলটা AI agent-দের জন্য: courier waybill/sticker PDF (এবং একই কোড-প্যাটার্ন শেয়ার করা order sales invoice, `OrderInvoicePdfService`) নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-08-11 (প্রথম ডেলিভারি + একাধিক dompdf বাগ ফিক্স + শপ প্রোফাইল ইন্টিগ্রেশন + অর্ডার ইনভয়েস ফিচার + COD amount ফিক্স + Pathao-স্টাইল লেবেল + **Sticker Template ফিচার (§৬, একাধিক টেমপ্লেট + সেলার-সিলেক্টেবল)**, একই দিনে একাধিক সেশনে)। এই ফিচার `feature_roadmap_context.md`-এর #5 আইটেম — মূল ডেলিভারি সম্পূর্ণ ও deployed, কিন্তু **§৪.৫-এ একটা বাংলা টেক্সট রেন্ডারিং বাগ এখনো OPEN/আনসলভড, ইউজারের অনুরোধে ডিফার করা হয়েছে** — নিচে দেখো। **নতুন কোনো টেমপ্লেট/PDF লে-আউট বানানোর আগে §৬.৪ পড়ো** — dompdf-এর box-sizing না-থাকা নিয়ে একটা fundamental বাগ-ক্লাস ডকুমেন্টেড আছে সেখানে।
 >
 > স্ট্যাক: Laravel backend (`/var/www/hybrid-stack/backend`) + Next.js/TypeScript frontend (`/var/www/hybrid-stack/frontend`)। PDF রেন্ডারার `barryvdh/laravel-dompdf` (dompdf/dompdf ^3.0) — subscription/SMS-credit ইনভয়েসেও (`InvoicePdfService`) একই লাইব্রেরি ব্যবহার হয়, কিন্তু waybill-এ **নতুন ধরনের কনটেন্ট (barcode/QR ইমেজ, ছোট থার্মাল পেজ সাইজ, বড় বোল্ড ফন্ট)** এমন কিছু dompdf বাগ সামনে এনেছে যেগুলো ইনভয়েস টেমপ্লেটে কখনো ধরা পড়েনি।
 
@@ -92,7 +92,7 @@ dompdf-এ কোনো OpenType/HarfBuzz-স্টাইল text shaping engine
 2. **বক্সড COD amount** (`.cod-box` — বর্ডার + প্যাডিং, "CASH ON DELIVERY" লেবেল + বড় বোল্ড amount) — টাকা কালেক্ট করা সবচেয়ে জরুরি তথ্য, ওপরে
 3. **Tracking ID + barcode** — hub scanning-এর জন্য ওপরের দিকে
 4. **TO (RECEIVER)** — লেবেলের সবচেয়ে বড় টেক্সট (name 17-20px, phone 15-17px) — ডেলিভারি রাইডার প্রথমে এটাই পড়ে
-5. **FROM (SENDER)** — কমপ্যাক্ট একলাইন (নাম · ফোন) + ঠিকানা (থাকলে), সেকেন্ডারি — §৬ দেখো, এখন `ShopProfile`-এর ডেটা
+5. **FROM (SENDER)** — কমপ্যাক্ট একলাইন (নাম · ফোন) + ঠিকানা (থাকলে), সেকেন্ডারি — §৭ দেখো, এখন `ShopProfile`-এর ডেটা
 6. **ORDER** — order# + item count, কমপ্যাক্ট একলাইন + item summary (Str::limit করা)
 7. **QR footer** — "SCAN FOR DETAILS" caption + QR code পাশাপাশি (inline-block, §৪.৪)
 
@@ -100,7 +100,65 @@ Page height জেনারাসলি সেট করা আছে (58mm→14
 
 ---
 
-## ৬. Shop Profile (2026-08-11 যোগ হয়েছে) — waybill-এর FROM (SENDER) ডেটার সোর্স
+## ৬. Sticker Template ফিচার (2026-08-11 যোগ হয়েছে) — একাধিক লেবেল ডিজাইন, সেলার বেছে নেয়
+
+আগে waybill-এর ডিজাইন ছিল দুটো ফিক্সড অপশন (§৫-এর generic thermal + Pathao-স্টাইল, courier_name দিয়ে auto-select)। ইউজার ২২টা রিয়েল কুরিয়ার/সেলার স্টিকার-স্যাম্পল (স্ক্রিনশট) দিয়ে বলেছে একটা "Sticker Template" ফিচার চাই — সেলার একটা ডিফল্ট টেমপ্লেট বেছে নেবে, চাইলে প্রতি-কুরিয়ারের জন্য আলাদা টেমপ্লেটও সেট করতে পারবে। **স্কোপ সিদ্ধান্ত (ইউজারের সাথে কনফার্ম করে):** ২২টা pixel-perfect ক্লোন না বানিয়ে আর্কিটেকচার + ৬টা variety-covering টেমপ্লেট আগে ডেলিভার করা হয়েছে (৪টা নতুন + আগে থেকে থাকা classic/pathao দুটো), বাকিগুলো ভবিষ্যতে একই প্যাটার্নে যোগ করা যাবে।
+
+### ৬.১ Catalog ও ডাটা মডেল
+
+- **`config/sticker_templates.php`** — ফিক্সড ক্যাটালগ (কোড, DB না) — প্রতিটা এন্ট্রি: `label_bn`/`label_en`, `view` (Blade partial path), `widthMm`/`heightMm` (native fixed size; `classic`-এর জন্য `null` — এটা এখনো caller-এর 58/80mm সিলেক্টর মেনে চলে)।
+- **`sticker_settings` টেবিল** (Pattern B, owner-only, `user_id` unique) — `default_template_key` (default `'classic'`)। Model: `app/Models/StickerSetting.php`।
+- **`sticker_courier_templates` টেবিল** (Pattern B, owner-only, sparse — শুধু কাস্টমাইজ করা কুরিয়ারগুলোর রো) — `user_id + courier_name` unique, `template_key`। Model: `app/Models/StickerCourierTemplate.php`।
+- **রেজোলিউশন লজিক** (`WaybillPdfService::resolveTemplateKey()`): per-order courier_name → override টেবিলে খোঁজে → না পেলে shop-এর `default_template_key` → না পেলে `'classic'`।
+
+### ৬.২ ছয়টা টেমপ্লেট (রেফারেন্স স্ক্রিনশট থেকে)
+
+| Key | সাইজ | রেফারেন্স | মূল ফিল্ড |
+|---|---|---|---|
+| `classic` | 58/80mm (সিলেক্টর-নির্ভর) | আগে থেকে ছিল | কুরিয়ার ব্যানার, COD বক্স, barcode, TO/FROM/ORDER, QR |
+| `pathao` | 100 x 78mm | Pathao ড্যাশবোর্ড sticker | logo, Shipped From/To, QR, weight, collectable amount, barcode, target hub/zone/area — §৫ |
+| `cod_band_compact` | 2 x 3 inch (~51x76mm) | "Sticker 1" | ব্ল্যাক কুরিয়ার ব্যানার, বড় tracking ID, নাম/ফোন, ব্ল্যাক COD ব্যান্ড, SKU-qty প্রোডাক্ট সামারি `(SKU-QTY)+...`, নোট, barcode |
+| `invoice_table` | 75 x 50mm | RetailBD/EcomDrive পরিবার | শপ/ডেট/IV-no, কুরিয়ার+নাম+ফোন+ঠিকানা, barcode, parcel ID, প্রোডাক্ট টেবিল, sub total/delivery/due amount |
+| `pos_bill` | 80mm (auto height, cap 100mm) | "Pos Sticker" | সেন্টার্ড শপ নাম, "POS Machine Bill", issued-to/order-no/date, ব্ল্যাক-হেডার প্রোডাক্ট টেবিল, ব্ল্যাক TOTAL ব্যান্ড, seller/thank-you, barcode |
+| `mini_cod` | 38 x 25mm | "Shokher Gadget" | শুধু শপ নাম + barcode + parcel ID + বড় COD amount — ইচ্ছাকৃতভাবে বাকি সব বাদ (আসল রেফারেন্সেও নাই, এত ছোট ক্যানভাসে জায়গা হয় না) |
+
+সব ব্লেড partial `resources/views/couriers/templates/{key}.blade.php`-এ, মাস্টার `resources/views/couriers/waybill.blade.php` একটাই `<style>` ব্লকে সব টেমপ্লেটের CSS (prefix করা — `.p-*` pathao, `.cbc-*` cod_band_compact, `.it-*` invoice_table, `.pb-*` pos_bill, `.mc-*` mini_cod) রাখে, শুধু active টেমপ্লেটের partial `@include` করে।
+
+`WaybillPdfService`-এ প্রতিটা টেমপ্লেটের জন্য একটা `*Geometry()` প্রাইভেট মেথড আছে যেটা widthMm/heightMm থেকে সব padding/column/barcode/QR mm-সাইজ প্রি-কম্পিউট করে `$g` অ্যারেতে — নতুন টেমপ্লেট যোগ করতে হলে এই প্যাটার্ন অনুসরণ করা (নিচে §৬.৪-এর নিয়ম মেনে)।
+
+### ৬.৩ একটা PDF = একটা পেজ সাইজ (bulk-এ মিক্সড টেমপ্লেট)
+
+dompdf named `@page` selector সাপোর্ট করে না (`Stylesheet::_parse_css`-এর `"page"` কেস-এ `:first`/`:left`/`:right`/`:odd`/`:even` ছাড়া বাকি সব `default: break 2;`-এ silently ড্রপ হয়ে যায় — সোর্স গ্রেপ করে ভেরিফাই করা হয়েছে)। মানে একটা PDF ডকুমেন্টে একটাই ফিজিক্যাল পেজ সাইজ থাকতে পারে।
+
+- **Bulk-এর সব অর্ডার একই টেমপ্লেটে resolve করলে** → সেই টেমপ্লেটের native সাইজ পুরো ডকুমেন্টে।
+- **মিক্সড হলে** (আলাদা কুরিয়ার, আলাদা override) → পুরো ডকুমেন্ট `'classic'`-এ ফলব্যাক করে (একমাত্র টেমপ্লেট যেটা যেকোনো কন্টেন্ট/সাইজে ফিট করার জন্য ডিজাইন করা, ফিক্সড নেটিভ সাইজ নেই)। **ইউজারের individual template choice honor করা হয় না মিক্সড ব্যাচে** — একক অর্ডার প্রিন্ট বা same-courier bulk (কমন কেস) এতে প্রভাবিত হয় না।
+- Per-template-per-page সঠিকভাবে মার্জ করতে হলে আলাদাভাবে রেন্ডার করে `setasign/fpdi` দিয়ে merge করা যেত (প্রতিটা page-এর নিজস্ব সাইজ প্রিজার্ভ করে) — এই স্কোপে ইচ্ছাকৃতভাবে বাদ দেওয়া হয়েছে (নতুন ডিপেন্ডেন্সি + জটিলতা, rare edge case-এর জন্য যথেষ্ট justify হয়নি)। ভবিষ্যতে দরকার হলে এটা একটা ভালো ফলো-আপ।
+
+### ৬.৪ 🚨 নতুন dompdf বাগ ক্লাস — box-sizing পুরোপুরি আনসাপোর্টেড
+
+এই ফিচার বানানোর সময় §৪-এর তালিকায় থাকা বাগগুলোর চেয়ে **আরও fundamental** একটা dompdf সীমাবদ্ধতা পাওয়া গেছে, যেটা future PDF কাজের জন্য critical:
+
+**dompdf `box-sizing` CSS প্রপার্টি একদমই সাপোর্ট করে না** (পুরো ভেন্ডর সোর্সে গ্রেপ করে zero matches — প্রপার্টিটা silently ignore হয়)। মানে:
+
+1. **এক্সপ্লিসিট width সবসময় content-box** — কোনো এলিমেন্টে `width: Xmm; padding: Ymm;` দিলে তার **আসল দৃশ্যমান প্রস্থ হয় X + 2Y**, X না (border-box আচরণ আশা করাটাই ভুল, `box-sizing: border-box` লিখলেও তা কোনো effect করে না — সেটাও শুধু silently ignore হয়)।
+2. **`width: auto`** (কোনো width declare না করলে) একটা ভিন্ন, নিজস্ব বাগ আছে: child তার প্যারেন্টের "content minus padding" স্পেস ফিল করে না (যেমন CSS spec অনুযায়ী হওয়ার কথা) — বরং প্যারেন্টের **literal declared `width` value** ফিল করে, প্যারেন্টের নিজের padding হিসাবের বাইরে গিয়ে। একটা আইসোলেটেড টেস্ট দিয়ে কনফার্ম করা হয়েছে (`.outer{width:80mm;padding:10mm}` এর ভেতর `.autoband`-এ কোনো width না দিলে সেটা 80mm ফিল করে, 60mm না, ফলে পেজ-এজ পর্যন্ত bleed করে)।
+
+**ব্যবহারিক প্রভাব ও কী করতে হবে:**
+- কোনো এলিমেন্টের ***নিজস্ব দৃশ্যমান edge*** সুনির্দিষ্ট জায়গায় থামা দরকার হলে (কালারড ব্যান্ড, বর্ডার বক্স, টেবিল) — **সবসময় এক্সপ্লিসিট mm width দাও, কখনো `auto`/`100%` না** (`pb-total-band`-এ এটা মিস করে প্রথমে পেজ-এজে bleed করেছিল, ফিক্স হয়েছে explicit width দিয়ে)।
+- সেই width-এর ভ্যালু বসানোর সময় এলিমেন্টের **নিজের horizontal padding বাদ দিয়ে** বসাও (`intended_visible_width - left_padding - right_padding`) — নাহলে padding যোগ হয়ে overflow করবে (`pb-items-head td`-এ এই বাগ ধরা পড়েছিল, ফিক্স: horizontal padding পুরো ০ করে দেওয়া, column width দিয়েই স্পেসিং ম্যানেজ করা — এটাই সবচেয়ে সহজ/নিরাপদ প্যাটার্ন)।
+- চাইলে horizontal padding সম্পূর্ণ এড়িয়ে যাওয়াই সবচেয়ে নিরাপদ (এই ফাইলের বেশিরভাগ টেবিল/সেল CSS এখন তাই করে — `padding: Ymm 0` বা `padding: 0`)।
+- Top-level `.{key}-label` wrapper div-গুলো (`width:$pageWidthMm; padding:$g.paddingMm`) টেকনিক্যালি এই বাগের শিকার (content-box অনুযায়ী প্রকৃত edge পেজের বাইরে চলে যায়) — কিন্তু এটা harmless, কারণ ওদের নিজস্ব কোনো visible background/border নাই; ভেতরের প্রতিটা child নিজের এক্সপ্লিসিট width (content-width হিসেবে প্রি-ক্যালকুলেটেড) নিয়ে আসে, তাই আসল visible content সবসময় সঠিক জায়গায় বসে, wrapper-এর নিজের oversized বক্স পেজ-বাউন্ডারিতে invisible-ভাবে clip হয়ে যায়।
+- **নতুন কোনো টেমপ্লেট/PDF ফিচারে কাজ করার আগে এই সেকশন পড়ো** — এটা §৪-এর বাগগুলোর (text-align:right char-drop, image %-width overflow, table auto-layout overflow) root cause-ও একই পরিবারের, আরও ব্যাপকভাবে এখানে বোঝা গেছে।
+
+### ৬.৫ Backend/Frontend ফাইল
+
+- **Controller:** `app/Http/Controllers/Api/StickerTemplateController.php` — `catalog()` (GET, static list), `show()` (GET, বর্তমান default + overrides), `update()` (POST, দুটোই সেভ করে — override সেট পুরোটা replace করে, diff করে না)।
+- **রুট:** `owner_only` গ্রুপ, `sticker-templates` prefix — `GET /catalog`, `GET /settings`, `POST /settings` (`routes/api.php`, shop-profile গ্রুপের ঠিক পরে)।
+- **ফ্রন্টএন্ড:** `frontend/src/app/dashboard/settings/sticker-templates/page.tsx` (নতুন সেটিংস পেজ) — টেমপ্লেট গ্যালারি (কার্ড ক্লিক করে ডিফল্ট সেট), প্রতি-কুরিয়ার override ড্রপডাউন (steadfast/pathao/redx/carrybee/paperfly/manual)। মেনুতে যোগ হয়েছে `user-shell.tsx`-এ (Settings গ্রুপ, Shop Profile-এর ঠিক পরে)।
+
+---
+
+## ৭. Shop Profile (2026-08-11 যোগ হয়েছে) — waybill-এর FROM (SENDER) ডেটার সোর্স
 
 `/dashboard/settings/shop` (আগে placeholder ছিল) এখন real ফিচার — শপের নাম, ফোন, ইমেইল (ঐচ্ছিক), ঠিকানা, লোগো সেভ করা যায়। **Pattern B** (owner-only — courier settings/subscription-এর মতো, staff কখনো এডিট করতে পারবে না)।
 
@@ -113,7 +171,7 @@ Page height জেনারাসলি সেট করা আছে (58mm→14
 
 ---
 
-## ৭. Order Sales Invoice (2026-08-11 যোগ হয়েছে) — waybill-এর সাথে কোড-প্যাটার্ন শেয়ার করে
+## ৮. Order Sales Invoice (2026-08-11 যোগ হয়েছে) — waybill-এর সাথে কোড-প্যাটার্ন শেয়ার করে
 
 `OrderInvoicePdfService` — প্রতিটা অর্ডারের জন্য seller→customer A4 sales invoice PDF (Bill To, itemized product টেবিল, subtotal/discount/shipping/total, shop logo/নাম/ঠিকানা)। **`InvoicePdfService`-এর থেকে আলাদা** (ওটা platform→seller billing invoice — subscription/SMS credit)।
 
@@ -125,7 +183,7 @@ Page height জেনারাসলি সেট করা আছে (58mm→14
 
 ---
 
-## ৮. PDF ডাউনলোড কখনো ব্রাউজার-cached হবে না (2026-08-11)
+## ৯. PDF ডাউনলোড কখনো ব্রাউজার-cached হবে না (2026-08-11)
 
 `dompdf`-এর `stream()` মেথড কোনো `Cache-Control` হেডার সেট করে না (barryvdh/laravel-dompdf ভেন্ডর কোড-এ ভেরিফাই করা হয়েছে) — মানে GET রিকোয়েস্ট heuristic browser caching-এর শিকার হতে পারে, একই order/purchase-এর জন্য বারবার ডাউনলোড করলে **আগের (হয়তো বাগযুক্ত) কপি** ফেরত আসতে পারে সার্ভার-সাইড ফিক্স ডিপ্লয়ের পরেও। এটা ঠিক §৪.৫-এর ডিবাগিং-এর সময় সন্দেহ করা হয়েছিল (নিশ্চিতভাবে প্রমাণিত না হলেও)।
 
@@ -141,7 +199,7 @@ Page height জেনারাসলি সেট করা আছে (58mm→14
 
 ---
 
-## ৯. ডিপ্লয়মেন্ট নোট
+## ১০. ডিপ্লয়মেন্ট নোট
 
 - **Backend PDF সার্ভিস/ব্লেড টেমপ্লেট পরিবর্তনের পর:** `php artisan view:clear` (compiled Blade cache) + `sudo -n /usr/bin/systemctl restart php8.3-fpm` (opcache) — দুটোই লাগে, নাহলে পুরনো কম্পাইলড ভিউ/অপকোড সার্ভ হতে থাকে।
 - **`sudo` নন-ইন্টারঅ্যাক্টিভ flag বাধ্যতামূলক:** এই সার্ভারে `claude-dev` ইউজারের জন্য নির্দিষ্ট কমান্ডে passwordless sudo আছে (`sudoers -l` দেখো — `systemctl restart hybrid-frontend.service/php8.3-fpm/nginx`, `chown -R www-data:www-data .../.next`, পুরো `deploy-safe.sh` স্ক্রিপ্ট), কিন্তু bash tool-এর ভেতর থেকে চালালে `-n` (non-interactive) flag ছাড়া "a terminal is required to read the password" এরর দেয় যদিও NOPASSWD ম্যাচ করে — সবসময় `sudo -n <cmd>` ব্যবহার করা।
@@ -150,20 +208,25 @@ Page height জেনারাসলি সেট করা আছে (58mm→14
 
 ---
 
-## ১০. দ্রুত রেফারেন্স — কাজভেদে কোন ফাইল
+## ১১. দ্রুত রেফারেন্স — কাজভেদে কোন ফাইল
 
 | কাজ | ফাইল |
 |---|---|
-| Waybill PDF জেনারেশন লজিক | `app/Services/WaybillPdfService.php` |
-| Waybill লে-আউট/স্টাইল | `resources/views/couriers/waybill.blade.php` |
+| Waybill PDF জেনারেশন লজিক (template resolve + সব geometry) | `app/Services/WaybillPdfService.php` |
+| Waybill মাস্টার লে-আউট শেল + সব টেমপ্লেটের CSS | `resources/views/couriers/waybill.blade.php` |
+| প্রতিটা টেমপ্লেটের HTML markup | `resources/views/couriers/templates/{key}.blade.php` |
+| Sticker Template ক্যাটালগ | `config/sticker_templates.php`, §৬ |
+| Sticker Template সেটিংস API | `app/Http/Controllers/Api/StickerTemplateController.php` |
+| Sticker Template সেটিংস পেজ | `frontend/src/app/dashboard/settings/sticker-templates/page.tsx` |
+| dompdf-এ box-sizing/width বাগ (⚠️ নতুন কোনো টেমপ্লেট বানানোর আগে পড়ো) | §৬.৪ |
 | Waybill API এন্ডপয়েন্ট (single/bulk) | `app/Http/Controllers/Api/CourierController.php::waybill/waybillBulk` |
 | Waybill প্রিন্ট বাটন/UI | `frontend/src/app/dashboard/courier/track/page.tsx` |
 | Order sales invoice জেনারেশন লজিক | `app/Services/OrderInvoicePdfService.php` |
 | Order invoice লে-আউট/স্টাইল | `resources/views/invoices/order-invoice.blade.php` |
 | Order invoice API এন্ডপয়েন্ট | `app/Http/Controllers/Api/OrderController.php::invoicePdf` |
 | Order invoice ডাউনলোড বাটন/UI | `dashboard/orders/page.tsx` (list) + `dashboard/orders/[id]/page.tsx` (detail) |
-| Shop Profile (নাম/ফোন/ঠিকানা/লোগো) | §৬, `app/Models/ShopProfile.php` + `ShopProfileController.php` |
-| রুট (waybill + shop-profile) | `routes/api.php` (`staff_permission:courier` / `owner_only` গ্রুপ) |
+| Shop Profile (নাম/ফোন/ঠিকানা/লোগো + sticker phone/address টগল) | §৭, `app/Models/ShopProfile.php` + `ShopProfileController.php` |
+| রুট (waybill + shop-profile + sticker-templates) | `routes/api.php` (`staff_permission:courier` / `owner_only` গ্রুপ) |
 | Authenticated PDF ডাউনলোড হেল্পার | `frontend/src/lib/dashboard-client.ts::openAuthenticatedPdf` |
-| dompdf বাগ রেফারেন্স (নতুন কোনো PDF ফিচার বানানোর আগে পড়ো) | §৪ (এই ফাইল) |
+| dompdf বাগ রেফারেন্স (নতুন কোনো PDF ফিচার বানানোর আগে পড়ো) | §৪, §৬.৪ (এই ফাইল) |
 | বাংলা matra reordering হেল্পার (⚠️ এখনো OPEN ইস্যু, §৪.৫ দেখো) | `WaybillPdfService::reorderBengaliMatras()` + `OrderInvoicePdfService::reorderBengaliMatras()` (ডুপ্লিকেট, শেয়ার্ড ক্লাসে এক্সট্র্যাক্ট করা হয়নি) |

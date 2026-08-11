@@ -82,6 +82,7 @@ const menuText = {
 
     settings: "সেটিংস",
     shopProfile: "শপ প্রোফাইল",
+    stickerTemplates: "স্টিকার টেমপ্লেট",
     courierAccounts: "কুরিয়ার একাউন্ট",
     facebookConnect: "ফেসবুক পেজ",
     subscription: "সাবস্ক্রিপশন",
@@ -154,6 +155,7 @@ const menuText = {
 
     settings: "Settings",
     shopProfile: "Shop Profile",
+    stickerTemplates: "Sticker Templates",
     courierAccounts: "Courier Accounts",
     facebookConnect: "Facebook Page",
     subscription: "Subscription",
@@ -282,6 +284,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
       icon: "⚙️",
       children: [
         { key: "shop-profile", label: t.shopProfile, href: "/dashboard/settings/shop" },
+        { key: "sticker-templates", label: t.stickerTemplates, href: "/dashboard/settings/sticker-templates" },
         { key: "courier-accounts", label: t.courierAccounts, href: "/dashboard/settings/courier" },
         { key: "facebook-connect", label: (t as any).facebookConnect ?? "ফেসবুক পেজ", href: "/dashboard/settings/facebook" },
         { key: "subscription", label: t.subscription, href: "/dashboard/settings/subscription" },

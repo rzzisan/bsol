@@ -18,7 +18,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 1 | চেকআউটে অনলাইন পেমেন্ট কালেকশন | ⬜ Not started | — |
 | 2 | WhatsApp Business integration | ⬜ Not started | — |
 | 3 | Auto-top-up / usage-based billing | ⬜ Not started | — |
-| 5 | Courier waybill/label PDF | ✅ সম্পন্ন ও deployed, তবে ⚠️ একটা বাংলা matra-rendering বাগ এখনো OPEN (ডিফার করা হয়েছে) | `courier_waybill_context.md` §৪.৫ |
+| 5 | Courier waybill/label PDF | ✅ সম্পন্ন ও deployed — COD amount বাগ ফিক্স, Pathao-স্টাইল লেবেল, Sticker Template ফিচার (৬টা ডিজাইন, সেলার-সিলেক্টেবল) যোগ হয়েছে। তবে ⚠️ একটা বাংলা matra-rendering বাগ এখনো OPEN (ডিফার করা হয়েছে) | `courier_waybill_context.md` §৪.৫, §৬ |
 | 6 | Custom domain সাপোর্ট (landing pages) | ⬜ Not started | — |
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
 | — | Bulk/CSV order import | ⬜ Not started | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
