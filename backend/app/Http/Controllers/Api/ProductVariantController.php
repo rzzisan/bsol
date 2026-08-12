@@ -12,6 +12,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ProductVariantController extends Controller
 {
@@ -420,10 +421,21 @@ class ProductVariantController extends Controller
 
     private function validateVariantPayload(Request $request, Product $product, ?int $ignoreId = null): array
     {
-        $skuRule = 'required|string|max:100|unique:product_variants,sku' . ($ignoreId ? ",$ignoreId" : '') . ',id,deleted_at,NULL';
+        // Pre-existing bug fix: the old hand-built rule string
+        // ('unique:product_variants,sku,id,deleted_at,NULL' when $ignoreId
+        // was null) shifted the unique-rule parameter positions and crashed
+        // every create-variant call with "Undefined array key 1" inside
+        // Laravel's getUniqueExtra() — it only happened to work for updates,
+        // where $ignoreId filled the slot the string assumed was always
+        // present. Rule::unique() avoids the fragile positional string
+        // entirely, matching the pattern already used in ProductController.
+        $skuRule = Rule::unique('product_variants', 'sku')->whereNull('deleted_at');
+        if ($ignoreId) {
+            $skuRule = $skuRule->ignore($ignoreId);
+        }
 
         return $request->validate([
-            'sku'                => $skuRule,
+            'sku'                => ['required', 'string', 'max:100', $skuRule],
             'regular_price'      => 'required|numeric|min:0',
             'discount'           => 'nullable|numeric|min:0',
             'discount_type'      => 'nullable|in:amount,percent',
@@ -436,6 +448,8 @@ class ProductVariantController extends Controller
             'position'           => 'nullable|integer|min:0',
             'option_value_ids'   => 'nullable|array',
             'option_value_ids.*' => 'integer|exists:product_option_values,id',
+            'source'             => 'nullable|in:manual,woocommerce',
+            'source_ref'         => 'nullable|string|max:255',
         ]);
     }
 
@@ -454,6 +468,8 @@ class ProductVariantController extends Controller
         $variant = ProductVariant::create([
             'product_id'         => $product->id,
             'sku'                => $data['sku'],
+            'source'             => $data['source'] ?? null,
+            'source_ref'         => $data['source_ref'] ?? null,
             'regular_price'      => $data['regular_price'],
             'discount'           => $data['discount'] ?? 0,
             'discount_type'      => $data['discount_type'] ?? 'amount',

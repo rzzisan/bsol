@@ -76,6 +76,8 @@ class ProductController extends Controller
             'thumbnail'        => 'nullable|string|max:500',
             'images'           => 'nullable|array',
             'images.*'         => 'string|max:500',
+            'source'           => 'nullable|in:manual,woocommerce',
+            'source_ref'       => 'nullable|string|max:255',
         ]);
 
         $data['user_id']     = auth()->id();
@@ -155,6 +157,8 @@ class ProductController extends Controller
             'status'          => 'nullable|in:active,inactive,archived',
             'variants'        => 'nullable|array',
             'thumbnail'       => 'nullable|string|max:500',
+            'source'          => 'nullable|in:manual,woocommerce',
+            'source_ref'      => 'nullable|string|max:255',
         ]);
 
         if (!empty($data['category_id'])) {

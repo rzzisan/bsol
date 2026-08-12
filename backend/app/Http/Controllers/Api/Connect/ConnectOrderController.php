@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Services\OrderStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -60,17 +62,44 @@ class ConnectOrderController extends Controller
         $paymentMethod = ($data['payment_method'] ?? null) === 'cod' ? 'cod' : 'online';
 
         if (! $order) {
-            $items = collect($data['line_items'])->map(function (array $lineItem) {
+            $shopUserIds = $merchant->shopUserIds();
+
+            $items = collect($data['line_items'])->map(function (array $lineItem) use ($shopUserIds) {
                 $quantity = (int) $lineItem['quantity'];
                 $unitPrice = $quantity > 0
                     ? round(((float) $lineItem['total']) / $quantity, 2)
                     : (float) $lineItem['total'];
 
+                // Best-effort linkage to a real Product/ProductVariant by SKU
+                // (populated once /products/sync has run for this seller) —
+                // falls back to an unlinked ad-hoc line item on a miss, same
+                // as before products/sync existed.
+                $productId = null;
+                $variantId = null;
+                if (! empty($lineItem['sku'])) {
+                    $variant = ProductVariant::whereHas('product', fn ($q) => $q->whereIn('user_id', $shopUserIds))
+                        ->where('sku', $lineItem['sku'])
+                        ->whereNull('deleted_at')
+                        ->first();
+
+                    if ($variant) {
+                        $productId = $variant->product_id;
+                        $variantId = $variant->id;
+                    } else {
+                        $productId = Product::whereIn('user_id', $shopUserIds)
+                            ->where('sku', $lineItem['sku'])
+                            ->whereNull('deleted_at')
+                            ->value('id');
+                    }
+                }
+
                 return [
-                    'product_name' => $lineItem['name'],
-                    'sku'          => $lineItem['sku'] ?? null,
-                    'quantity'     => $quantity,
-                    'unit_price'   => $unitPrice,
+                    'product_name'       => $lineItem['name'],
+                    'sku'                => $lineItem['sku'] ?? null,
+                    'quantity'           => $quantity,
+                    'unit_price'         => $unitPrice,
+                    'product_id'         => $productId,
+                    'product_variant_id' => $variantId,
                 ];
             })->values()->all();
 

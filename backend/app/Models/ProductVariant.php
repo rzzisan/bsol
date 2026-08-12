@@ -12,7 +12,7 @@ class ProductVariant extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'product_id', 'sku', 'regular_price', 'discount', 'discount_type',
+        'product_id', 'sku', 'source', 'source_ref', 'regular_price', 'discount', 'discount_type',
         'selling_price', 'cost_price', 'stock_qty', 'low_stock_threshold',
         'weight', 'image_url', 'is_active', 'position',
     ];
