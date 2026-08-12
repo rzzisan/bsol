@@ -15,9 +15,17 @@
     <tr>
       <td style="width: {{ $g['infoColMm'] }}mm;">
         <div class="ptr-section">Invoice To:</div>
-        <div class="ptr-bold i18n">{{ $label['customerName'] }}</div>
+        @if($label['customerNameImg'])
+          <img src="{{ $label['customerNameImg'] }}" style="display:block; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;">
+        @else
+          <div class="ptr-bold i18n">{{ $label['customerName'] }}</div>
+        @endif
         <div>{{ $order->customer_phone }}</div>
-        <div class="ptr-muted i18n">{{ $label['address'] }}</div>
+        @if($label['addressImg'])
+          <img src="{{ $label['addressImg'] }}" style="display:block; width:{{ $label['addressImgW'] }}mm; height:{{ $label['addressImgH'] }}mm;">
+        @else
+          <div class="ptr-muted i18n">{{ $label['address'] }}</div>
+        @endif
       </td>
       <td style="width: {{ $g['barcodeColMm'] }}mm;">
         @if($label['barcode'])<img class="ptr-barcode" src="{{ $label['barcode'] }}">@endif
@@ -37,7 +45,13 @@
     </tr>
     @foreach($label['itemRows'] as $row)
       <tr>
-        <td style="width: {{ $g['ptNameColMm'] }}mm;" class="i18n">{{ $row['name'] }}</td>
+        <td style="width: {{ $g['ptNameColMm'] }}mm;">
+          @if($row['nameImg'])
+            <img src="{{ $row['nameImg'] }}" style="display:block; width:{{ $row['nameImgW'] }}mm; height:{{ $row['nameImgH'] }}mm;">
+          @else
+            <span class="i18n">{{ $row['name'] }}</span>
+          @endif
+        </td>
         <td style="width: {{ $g['ptQtyColMm'] }}mm;">{{ $row['qty'] }}</td>
         <td style="width: {{ $g['ptPriceColMm'] }}mm;">{{ number_format($row['price'], 0) }}</td>
         <td style="width: {{ $g['ptTotalColMm'] }}mm;">{{ number_format($row['total'], 0) }}</td>

@@ -4,8 +4,16 @@
   <table class="sgs-table">
     <tr>
       <td style="width: {{ $g['infoColMm'] }}mm;">
-        <div class="sgs-shop i18n">{{ $label['shopName'] }}</div>
-        <span class="sgs-bold i18n">{{ $label['customerName'] }}</span><br>
+        @if($label['shopNameImg'])
+          <img src="{{ $label['shopNameImg'] }}" style="display:block; width:{{ $label['shopNameImgW'] }}mm; height:{{ $label['shopNameImgH'] }}mm;">
+        @else
+          <div class="sgs-shop i18n">{{ $label['shopName'] }}</div>
+        @endif
+        @if($label['customerNameImg'])
+          <img src="{{ $label['customerNameImg'] }}" style="display:block; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;"><br>
+        @else
+          <span class="sgs-bold i18n">{{ $label['customerName'] }}</span><br>
+        @endif
         {{ $order->customer_phone }}
       </td>
       <td style="width: {{ $g['barcodeColMm'] }}mm;">
@@ -25,7 +33,13 @@
     </tr>
     @foreach($label['itemRows'] as $row)
       <tr>
-        <td style="width: {{ $g['skuColMm'] }}mm;" class="i18n">{{ $row['sku'] }}</td>
+        <td style="width: {{ $g['skuColMm'] }}mm;">
+          @if($row['skuImg'])
+            <img src="{{ $row['skuImg'] }}" style="display:block; width:{{ $row['skuImgW'] }}mm; height:{{ $row['skuImgH'] }}mm;">
+          @else
+            <span class="i18n">{{ $row['sku'] }}</span>
+          @endif
+        </td>
         <td style="width: {{ $g['qtyColMm'] }}mm;">{{ $row['qty'] }}</td>
       </tr>
     @endforeach
@@ -34,6 +48,10 @@
   <div class="sgs-due">Due Amount: {{ number_format($label['codAmount'], 0) }}</div>
 
   @if($label['notes'])
-    <div class="sgs-note-box i18n">{{ $label['notes'] }}</div>
+    @if($label['notesImg'])
+      <div class="sgs-note-box"><img src="{{ $label['notesImg'] }}" style="display:block; width:{{ $label['notesImgW'] }}mm; height:{{ $label['notesImgH'] }}mm;"></div>
+    @else
+      <div class="sgs-note-box i18n">{{ $label['notes'] }}</div>
+    @endif
   @endif
 </div>

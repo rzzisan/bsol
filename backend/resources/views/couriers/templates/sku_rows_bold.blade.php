@@ -5,7 +5,11 @@
     <tr>
       <td style="width: {{ $g['infoColMm'] }}mm;">
         Courier: {{ $order->courier_name ?? 'MANUAL' }}<br>
-        <span class="srb-name i18n">{{ $label['customerName'] }}</span><br>
+        @if($label['customerNameImg'])
+          <img src="{{ $label['customerNameImg'] }}" style="display:block; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;"><br>
+        @else
+          <span class="srb-name i18n">{{ $label['customerName'] }}</span><br>
+        @endif
         <span class="srb-phone">{{ $order->customer_phone }}</span>
       </td>
       <td style="width: {{ $g['barcodeColMm'] }}mm;">
@@ -14,7 +18,11 @@
     </tr>
   </table>
 
-  <div class="srb-muted i18n">{{ $label['address'] }}</div>
+  @if($label['addressImg'])
+    <img src="{{ $label['addressImg'] }}" style="display:block; width:{{ $label['addressImgW'] }}mm; height:{{ $label['addressImgH'] }}mm;">
+  @else
+    <div class="srb-muted i18n">{{ $label['address'] }}</div>
+  @endif
   <div class="srb-parcel">Parcel ID: {{ $order->courier_tracking_id ?? '—' }}</div>
 
   <div class="srb-rule"></div>
@@ -26,7 +34,13 @@
     </tr>
     @foreach($label['itemRows'] as $row)
       <tr>
-        <td style="width: {{ $g['skuColMm'] }}mm;" class="i18n">{{ $row['sku'] }}</td>
+        <td style="width: {{ $g['skuColMm'] }}mm;">
+          @if($row['skuImg'])
+            <img src="{{ $row['skuImg'] }}" style="display:block; width:{{ $row['skuImgW'] }}mm; height:{{ $row['skuImgH'] }}mm;">
+          @else
+            <span class="i18n">{{ $row['sku'] }}</span>
+          @endif
+        </td>
         <td style="width: {{ $g['qtyColMm'] }}mm;">{{ $row['qty'] }}</td>
       </tr>
     @endforeach

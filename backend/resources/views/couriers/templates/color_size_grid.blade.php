@@ -4,8 +4,16 @@
   <table class="csg-table">
     <tr>
       <td style="width: {{ $g['headerLeftColMm'] }}mm;">
-        <div class="csg-shop i18n">{{ $label['shopName'] }}</div>
-        <span class="csg-bold i18n">{{ $label['customerName'] }}</span><br>
+        @if($label['shopNameImg'])
+          <img src="{{ $label['shopNameImg'] }}" style="display:block; width:{{ $label['shopNameImgW'] }}mm; height:{{ $label['shopNameImgH'] }}mm;">
+        @else
+          <div class="csg-shop i18n">{{ $label['shopName'] }}</div>
+        @endif
+        @if($label['customerNameImg'])
+          <img src="{{ $label['customerNameImg'] }}" style="display:block; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;"><br>
+        @else
+          <span class="csg-bold i18n">{{ $label['customerName'] }}</span><br>
+        @endif
         {{ $order->customer_phone }}
       </td>
       <td style="width: {{ $g['parcelBoxColMm'] }}mm;">
@@ -31,7 +39,12 @@
     @foreach($label['itemRows'] as $row)
       <tr>
         <td style="width: {{ $g['csgNameColMm'] }}mm;" class="i18n">
-          {{ $row['name'] }}@if($row['variant']) <span class="csg-variant">({{ $row['variant'] }})</span>@endif
+          @if($row['nameImg'])
+            <img src="{{ $row['nameImg'] }}" style="vertical-align:text-bottom; width:{{ $row['nameImgW'] }}mm; height:{{ $row['nameImgH'] }}mm;">
+          @else
+            {{ $row['name'] }}
+          @endif
+          @if($row['variant']) <span class="csg-variant">({{ $row['variant'] }})</span>@endif
         </td>
         <td style="width: {{ $g['csgQtyColMm'] }}mm;">{{ $row['qty'] }}</td>
       </tr>

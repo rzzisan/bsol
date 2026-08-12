@@ -1,14 +1,25 @@
 {{-- POS-bill style label — reference "Pos Sticker" (80mm width). --}}
 @php($order = $label['order'])
 <div class="pb-label {{ $loop->last ? '' : 'label-break' }}">
-  <div class="pb-shop i18n">{{ $label['shopName'] }}</div>
+  @if($label['shopNameImg'])
+    <img src="{{ $label['shopNameImg'] }}" style="display:block; margin:0 auto; width:{{ $label['shopNameImgW'] }}mm; height:{{ $label['shopNameImgH'] }}mm;"><br>
+  @else
+    <div class="pb-shop i18n">{{ $label['shopName'] }}</div>
+  @endif
   <div class="pb-subtitle">POS Machine Bill</div>
 
   <div class="pb-rule"></div>
 
   <table class="pb-table">
     <tr>
-      <td class="i18n">ISSUED TO: {{ $label['customerName'] }}</td>
+      <td>
+        ISSUED TO:
+        @if($label['customerNameImg'])
+          <img src="{{ $label['customerNameImg'] }}" style="vertical-align:text-bottom; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;">
+        @else
+          <span class="i18n">{{ $label['customerName'] }}</span>
+        @endif
+      </td>
       <td class="pb-right-col">ORDER NO: {{ $order->order_number }}<br>DATE: {{ $label['dateShort'] }}</td>
     </tr>
   </table>
@@ -24,7 +35,13 @@
     </tr>
     @foreach($label['itemRows'] as $row)
       <tr>
-        <td style="width: {{ $g['nameColMm'] }}mm;" class="i18n">{{ $row['name'] }}</td>
+        <td style="width: {{ $g['nameColMm'] }}mm;">
+          @if($row['nameImg'])
+            <img src="{{ $row['nameImg'] }}" style="display:block; width:{{ $row['nameImgW'] }}mm; height:{{ $row['nameImgH'] }}mm;">
+          @else
+            <span class="i18n">{{ $row['name'] }}</span>
+          @endif
+        </td>
         <td style="width: {{ $g['priceColMm'] }}mm;">{{ number_format($row['price'], 0) }}</td>
         <td style="width: {{ $g['qtyColMm'] }}mm;">{{ $row['qty'] }}</td>
         <td style="width: {{ $g['totalColMm'] }}mm;">{{ number_format($row['total'], 0) }}</td>

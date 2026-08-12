@@ -5,7 +5,18 @@
     <tr>
       <td style="width: {{ $g['logoColMm'] }}mm;"><div class="p-logo">PATHAO</div></td>
       <td style="width: {{ $g['headerTextColMm'] }}mm;">
-        Shipped From: <span class="p-bold i18n">{{ $label['shopName'] }}</span><br>
+        {{-- Real-shaped image when available (proper conjunct ligatures —
+             courier_waybill_context.md §4.7), plain reordered text
+             otherwise. The muted "shop - city" line below always stays
+             plain text (shaping the same field twice at two sizes isn't
+             supported by this scheme — see resolveShapingSpec() doc). --}}
+        Shipped From:
+        @if($label['shopLineImg'])
+          <img src="{{ $label['shopLineImg'] }}" style="vertical-align:text-bottom; width:{{ $label['shopLineImgW'] }}mm; height:{{ $label['shopLineImgH'] }}mm;">
+        @else
+          <span class="p-bold i18n">{{ $label['shopName'] }}</span>
+        @endif
+        <br>
         <span class="p-muted i18n">{{ $label['shopName'] }}@if($label['cityName']) - {{ $label['cityName'] }}@endif</span><br>
         @if($label['shopPhone'])<span class="p-muted">Contact: {{ $label['shopPhone'] }}</span>@endif
       </td>
@@ -18,11 +29,22 @@
     <tr>
       <td style="width: {{ $g['typeColMm'] }}mm;"><div class="p-type">Regular</div></td>
       <td style="width: {{ $g['midTextColMm'] }}mm;">
-        Shipped To: <span class="p-to-name i18n">{{ $label['customerName'] }}</span><br>
+        Shipped To:
+        @if($label['customerNameImg'])
+          <img src="{{ $label['customerNameImg'] }}" style="vertical-align:text-bottom; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;">
+        @else
+          <span class="p-to-name i18n">{{ $label['customerName'] }}</span>
+        @endif
+        <br>
         Phone: {{ $order->customer_phone }}<br>
         Secondary Phone: N/A<br>
         @if($label['address'] !== '—')
-          Address: <span class="i18n">{{ $label['address'] }}</span>
+          Address:
+          @if($label['addressImg'])
+            <img src="{{ $label['addressImg'] }}" style="vertical-align:text-bottom; width:{{ $label['addressImgW'] }}mm; height:{{ $label['addressImgH'] }}mm;">
+          @else
+            <span class="i18n">{{ $label['address'] }}</span>
+          @endif
         @endif
       </td>
       <td style="width: {{ $g['qrMm'] }}mm;"><img class="p-qr" src="{{ $label['qr'] }}"></td>

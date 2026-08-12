@@ -4,9 +4,18 @@
   <table class="npm-table">
     <tr>
       <td style="width: {{ $g['infoColMm'] }}mm;">
-        <div class="npm-shop i18n">{{ $label['shopName'] }}</div>
+        @if($label['shopNameImg'])
+          <img src="{{ $label['shopNameImg'] }}" style="display:block; width:{{ $label['shopNameImgW'] }}mm; height:{{ $label['shopNameImgH'] }}mm;">
+        @else
+          <div class="npm-shop i18n">{{ $label['shopName'] }}</div>
+        @endif
         Courier: {{ $order->courier_name ?? 'MANUAL' }}<br>
-        <span class="npm-bold i18n">{{ $label['customerName'] }}</span> &middot; {{ $order->customer_phone }}
+        @if($label['customerNameImg'])
+          <img src="{{ $label['customerNameImg'] }}" style="vertical-align:text-bottom; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;">
+        @else
+          <span class="npm-bold i18n">{{ $label['customerName'] }}</span>
+        @endif
+        &middot; {{ $order->customer_phone }}
       </td>
       <td style="width: {{ $g['barcodeColMm'] }}mm;">
         @if($label['barcode'])<img class="npm-barcode" src="{{ $label['barcode'] }}">@endif
@@ -14,7 +23,11 @@
     </tr>
   </table>
 
-  <div class="npm-muted i18n">{{ $label['address'] }}</div>
+  @if($label['addressImg'])
+    <img src="{{ $label['addressImg'] }}" style="display:block; width:{{ $label['addressImgW'] }}mm; height:{{ $label['addressImgH'] }}mm;">
+  @else
+    <div class="npm-muted i18n">{{ $label['address'] }}</div>
+  @endif
   <div class="npm-parcel">Parcel ID: {{ $order->courier_tracking_id ?? '—' }}</div>
 
   <div class="npm-rule"></div>
@@ -26,7 +39,13 @@
     </tr>
     @foreach($label['itemRows'] as $row)
       <tr>
-        <td style="width: {{ $g['npmNameColMm'] }}mm;" class="i18n">{{ $row['name'] }}</td>
+        <td style="width: {{ $g['npmNameColMm'] }}mm;">
+          @if($row['nameImg'])
+            <img src="{{ $row['nameImg'] }}" style="display:block; width:{{ $row['nameImgW'] }}mm; height:{{ $row['nameImgH'] }}mm;">
+          @else
+            <span class="i18n">{{ $row['name'] }}</span>
+          @endif
+        </td>
         <td style="width: {{ $g['npmQtyColMm'] }}mm;">{{ $row['qty'] }}</td>
       </tr>
     @endforeach
@@ -35,7 +54,11 @@
   @if($label['notes'])
     <div class="npm-note-box i18n">
       <div class="npm-note-label">Shipping Note</div>
-      <div>{{ $label['notes'] }}</div>
+      @if($label['notesImg'])
+        <img src="{{ $label['notesImg'] }}" style="display:block; width:{{ $label['notesImgW'] }}mm; height:{{ $label['notesImgH'] }}mm;">
+      @else
+        <div>{{ $label['notes'] }}</div>
+      @endif
     </div>
   @endif
 </div>

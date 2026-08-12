@@ -1,12 +1,20 @@
 {{-- Black shop-name banner, "qty x price/=" line format, black COD band + Order Note — reference "Sticker 20" (3x4in). --}}
 @php($order = $label['order'])
 <div class="epb-label {{ $loop->last ? '' : 'label-break' }}">
-  <div class="epb-banner i18n">{{ $label['shopName'] }}</div>
+  @if($label['shopNameImg'])
+    <img src="{{ $label['shopNameImg'] }}" style="display:block; width:{{ $label['shopNameImgW'] }}mm; height:{{ $label['shopNameImgH'] }}mm;">
+  @else
+    <div class="epb-banner i18n">{{ $label['shopName'] }}</div>
+  @endif
 
   <table class="epb-table">
     <tr>
       <td style="width: {{ $g['infoColMm'] }}mm;">
-        <span class="epb-bold i18n">{{ $label['customerName'] }}</span><br>
+        @if($label['customerNameImg'])
+          <img src="{{ $label['customerNameImg'] }}" style="display:block; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;"><br>
+        @else
+          <span class="epb-bold i18n">{{ $label['customerName'] }}</span><br>
+        @endif
         {{ $order->customer_phone }}<br>
         Parcel ID: {{ $order->courier_tracking_id ?? '—' }}
       </td>
@@ -26,7 +34,13 @@
     </tr>
     @foreach($label['itemRows'] as $row)
       <tr>
-        <td style="width: {{ $g['epbNameColMm'] }}mm;" class="i18n">{{ $row['name'] }}</td>
+        <td style="width: {{ $g['epbNameColMm'] }}mm;">
+          @if($row['nameImg'])
+            <img src="{{ $row['nameImg'] }}" style="display:block; width:{{ $row['nameImgW'] }}mm; height:{{ $row['nameImgH'] }}mm;">
+          @else
+            <span class="i18n">{{ $row['name'] }}</span>
+          @endif
+        </td>
         <td style="width: {{ $g['epbQtyColMm'] }}mm;">{{ $row['qty'] }}</td>
         <td style="width: {{ $g['epbTotalColMm'] }}mm;">{{ number_format($row['total'], 0) }}/=</td>
       </tr>
@@ -38,7 +52,11 @@
   @if($label['notes'])
     <div class="epb-note-box">
       <div class="epb-note-label">ORDER NOTE</div>
-      <div class="i18n">{{ $label['notes'] }}</div>
+      @if($label['notesImg'])
+        <img src="{{ $label['notesImg'] }}" style="display:block; width:{{ $label['notesImgW'] }}mm; height:{{ $label['notesImgH'] }}mm;">
+      @else
+        <div class="i18n">{{ $label['notes'] }}</div>
+      @endif
     </div>
   @endif
 </div>

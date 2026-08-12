@@ -321,20 +321,18 @@ class WaybillPdfService
         $geometry = $this->geometryFor($effectiveKey, $pageWidthMm, $pageHeightMm);
 
         $shopProfiles = [];
-        // Real-shaping (courier_waybill_context.md §4.7) is currently wired
-        // up for the 'classic' template only — see that section for why,
-        // and the pattern to extend it to the other 21. Every other
-        // template still uses the regex-reorder text approach below as its
-        // ONLY rendering (never a "fallback" for them — no jobs are ever
-        // queued for them, so $shaped stays empty and every *Img field is null).
-        $shapeThisDoc = $effectiveKey === 'classic';
+        // Real-shaping (courier_waybill_context.md §4.7) — wired up for
+        // every template via resolveShapingSpec()'s per-template field
+        // specs (font size/weight/color/wrap-width, matching each
+        // template's own CSS). A field with no spec entry for this
+        // template just keeps using the plain regex-reordered text as
+        // before (not a "fallback" in that case — it was never queued).
         $shapingJobs = [];
         $addrLimit = $pageWidthMm == 58 ? 60 : 90;
-        $labelFontPx = $pageWidthMm == 58 ? 17 : 20;
-        $bodyFontPx  = $pageWidthMm == 58 ? 9 : 10;
+        $spec = $this->resolveShapingSpec($effectiveKey, $geometry, $pageWidthMm);
 
         $labels = $orders->values()->map(function (Order $order, int $index) use (
-            &$shopProfiles, &$shapingJobs, $shapeThisDoc, $addrLimit, $labelFontPx, $bodyFontPx, $pageWidthMm, $geometry
+            &$shopProfiles, &$shapingJobs, $spec, $effectiveKey, $addrLimit, $pageWidthMm, $geometry
         ) {
             $shop = $order->user?->shopOwner();
             $ownerId = $shop?->id;
@@ -389,17 +387,47 @@ class WaybillPdfService
             $itemsSummaryText = $this->reorderBengaliMatras($rawItemsSummary);
             $notesText    = $rawNotes !== null ? $this->reorderBengaliMatras($rawNotes) : null;
             $fromLine     = $this->reorderBengaliMatras($rawFromLine);
-
-            $contentWidthMm = $geometry['contentWidthMm'] ?? null;
+            // Pathao's "Shipped From: {shop}" line — same reasoning as
+            // classic's $rawFromLine, this template's own composite.
+            $rawShopLine  = $rawShopName;
 
             $jobIds = [];
-            if ($shapeThisDoc) {
-                $jobIds['customerName'] = $this->queueShapingJob($shapingJobs, "o{$index}_customerName", $rawCustomerName, $labelFontPx, true);
-                $jobIds['address']      = $this->queueShapingJob($shapingJobs, "o{$index}_address", $rawAddress, $bodyFontPx, false, $contentWidthMm, '#4a5563');
-                $jobIds['fromLine']     = $this->queueShapingJob($shapingJobs, "o{$index}_fromLine", $rawFromLine, $bodyFontPx, false, $contentWidthMm);
-                $jobIds['shopAddress']  = $this->queueShapingJob($shapingJobs, "o{$index}_shopAddress", $rawShopAddress, $bodyFontPx, false, $contentWidthMm, '#4a5563');
-                $jobIds['itemsSummary'] = $this->queueShapingJob($shapingJobs, "o{$index}_itemsSummary", $rawItemsSummary, $bodyFontPx, false, $contentWidthMm, '#4a5563');
-                $jobIds['notes']        = $this->queueShapingJob($shapingJobs, "o{$index}_notes", $rawNotes, $bodyFontPx, false, $contentWidthMm, '#4a5563');
+            $rawByField = [
+                'shopName'     => $rawShopName,
+                'customerName' => $rawCustomerName,
+                'address'      => $rawAddress,
+                'notes'        => $rawNotes,
+                'itemsSummary' => $rawItemsSummary,
+                'fromLine'     => $rawFromLine,
+                'shopLine'     => $rawShopLine,
+                'shopAddress'  => $rawShopAddress,
+            ];
+            foreach ($spec as $field => $f) {
+                if (! array_key_exists($field, $rawByField)) {
+                    continue;
+                }
+                $jobIds[$field] = $this->queueShapingJob(
+                    $shapingJobs, "o{$index}_{$field}", $rawByField[$field],
+                    $f['px'], $f['bold'], $f['wrap'] ?? null, $f['color'] ?? '#101418'
+                );
+            }
+
+            // Item rows: name/sku shaped per-row too when this template's
+            // spec calls for it (product tables, SKU lists, etc.) — same
+            // job-queue-now/attach-after-batch-shape pattern as everything else.
+            $itemRows = $this->itemRows($order);
+            if (isset($spec['itemName']) || isset($spec['itemSku'])) {
+                foreach ($itemRows as $j => &$row) {
+                    if (isset($spec['itemName'])) {
+                        $f = $spec['itemName'];
+                        $row['nameJobId'] = $this->queueShapingJob($shapingJobs, "o{$index}_item{$j}_name", $row['name'], $f['px'], $f['bold'], $f['wrap'] ?? null, $f['color'] ?? '#101418');
+                    }
+                    if (isset($spec['itemSku'])) {
+                        $f = $spec['itemSku'];
+                        $row['skuJobId'] = $this->queueShapingJob($shapingJobs, "o{$index}_item{$j}_sku", $row['sku'], $f['px'], $f['bold'], $f['wrap'] ?? null, $f['color'] ?? '#101418');
+                    }
+                }
+                unset($row);
             }
 
             return [
@@ -416,19 +444,22 @@ class WaybillPdfService
                 'itemCount'    => $order->items->sum('quantity'),
                 'itemsSummary' => $itemsSummaryText,
                 'skuSummary'   => $this->skuSummary($order),
-                'itemRows'     => $this->itemRows($order),
+                'itemRows'     => $itemRows,
                 'subtotal'     => (float) $order->subtotal,
                 'shippingCharge' => (float) $order->shipping_charge,
                 'discount'     => (float) $order->discount,
                 'address'      => $addressText,
                 'notes'        => $notesText,
                 'fromLine'     => $fromLine,
+                'shopLine'     => $shopName,
                 'barcode'      => $this->barcodeDataUri($order->courier_tracking_id),
                 'qr'           => $this->qrDataUri($order, $codAmount),
                 // Real-shaped Bengali images (courier_waybill_context.md §4.7)
-                // — null for every field on every template except 'classic'
-                // for now; Blade falls back to the plain .i18n text above
-                // whenever the corresponding *Img key is null.
+                // — a field only ends up here if this template's
+                // resolveShapingSpec() entry exists for it; Blade falls
+                // back to the plain .i18n text above whenever the
+                // corresponding *Img key is null (shaping not attempted,
+                // or attempted and failed — same fallback either way).
                 '_shapeJobIds' => $jobIds,
                 // Pathao-layout-only fields — cheap to compute even when
                 // the active template isn't 'pathao', so no branching needed here.
@@ -448,15 +479,35 @@ class WaybillPdfService
         // unavailable, timeout, etc.) simply has no *Img entry, and Blade's
         // fallback (the plain reordered text already in the label) renders
         // exactly as it did before this feature existed.
-        $shaped = $shapeThisDoc ? $this->bengaliShaper->shapeBatch($shapingJobs) : [];
-        $labels = $labels->map(function (array $label) use ($shaped) {
+        $shaped = $this->bengaliShaper->shapeBatch($shapingJobs);
+        $attachImg = function (?array $result = null): array {
+            return [
+                'Img'  => $result['dataUri'] ?? null,
+                'ImgW' => $result['widthMm'] ?? null,
+                'ImgH' => $result['heightMm'] ?? null,
+            ];
+        };
+        $labels = $labels->map(function (array $label) use ($shaped, $attachImg) {
             foreach ($label['_shapeJobIds'] ?? [] as $field => $jobId) {
                 $result = $jobId !== null ? ($shaped[$jobId] ?? null) : null;
-                $label["{$field}Img"]  = $result['dataUri'] ?? null;
-                $label["{$field}ImgW"] = $result['widthMm'] ?? null;
-                $label["{$field}ImgH"] = $result['heightMm'] ?? null;
+                foreach ($attachImg($result) as $suffix => $value) {
+                    $label["{$field}{$suffix}"] = $value;
+                }
             }
             unset($label['_shapeJobIds']);
+
+            $label['itemRows'] = collect($label['itemRows'])->map(function (array $row) use ($shaped, $attachImg) {
+                foreach (['nameJobId' => 'name', 'skuJobId' => 'sku'] as $jobKey => $field) {
+                    $jobId = $row[$jobKey] ?? null;
+                    $result = $jobId !== null ? ($shaped[$jobId] ?? null) : null;
+                    foreach ($attachImg($result) as $suffix => $value) {
+                        $row["{$field}{$suffix}"] = $value;
+                    }
+                    unset($row[$jobKey]);
+                }
+                return $row;
+            })->all();
+
             return $label;
         });
 
@@ -470,6 +521,162 @@ class WaybillPdfService
             'fontRegular'  => $this->fontRegular(),
             'fontBold'     => $this->fontBold(),
         ])->setPaper([0, 0, $pageWidthMm * 2.8346, $pageHeightMm * 2.8346]);
+    }
+
+    /**
+     * Per-template real-shaping field specs (courier_waybill_context.md
+     * §4.7) — one entry per label-array field this template's Blade
+     * partial actually renders with Bengali content, sized/colored to
+     * match that template's own CSS class for the field (so the shaped
+     * <img> looks identical to the plain-text version it replaces). A
+     * template with no entry for a given field just never queues a job
+     * for it — its Blade keeps using the plain regex-reordered text,
+     * unchanged from before this feature existed (not a "failure" case).
+     *
+     * `wrap` is a max-width in mm (from this template's own geometry) for
+     * fields that need word-wrap, or null for single-line fields. `px`
+     * matches the field's CSS font-size; `bold` its font-weight.
+     *
+     * Compound fields built in render() itself (not simple label scalars):
+     * 'fromLine' (classic: "shop · phone") and 'shopLine' (pathao's
+     * "Shipped From: shop" — shopName's OWN other appearance, on the
+     * muted "shop - city" line, is left as plain-text only; shaping a
+     * field twice at two different sizes isn't supported by this scheme).
+     */
+    private function resolveShapingSpec(string $key, array $g, float $pageWidthMm): array
+    {
+        $cw = fn (float $sub = 0) => ($g['contentWidthMm'] ?? ($pageWidthMm - 6)) - $sub;
+        $muted = '#4a5563';
+
+        return match ($key) {
+            'classic' => [
+                'customerName' => ['px' => $pageWidthMm == 58 ? 17 : 20, 'bold' => true],
+                'address'      => ['px' => $pageWidthMm == 58 ? 9 : 10, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'fromLine'     => ['px' => $pageWidthMm == 58 ? 9 : 10, 'bold' => false, 'wrap' => $cw()],
+                'shopAddress'  => ['px' => $pageWidthMm == 58 ? 9 : 10, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemsSummary' => ['px' => $pageWidthMm == 58 ? 9 : 10, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'notes'        => ['px' => $pageWidthMm == 58 ? 9 : 10, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+            ],
+            'pathao' => [
+                'shopLine'     => ['px' => 8, 'bold' => true, 'wrap' => $g['headerTextColMm'] ?? $cw()],
+                'customerName' => ['px' => 11, 'bold' => true, 'wrap' => $g['midTextColMm'] ?? $cw()],
+                'address'      => ['px' => 8, 'bold' => false, 'wrap' => $g['midTextColMm'] ?? $cw()],
+            ],
+            'cod_band_compact' => [
+                'customerName' => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'notes'        => ['px' => 8, 'bold' => false, 'wrap' => $cw()],
+            ],
+            'invoice_table' => [
+                'shopName'     => ['px' => 10, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 8, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 6.5, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemName'     => ['px' => 6, 'bold' => false, 'wrap' => $g['nameColMm'] ?? $cw()],
+                'notes'        => ['px' => 6, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+            ],
+            'pos_bill' => [
+                'shopName'     => ['px' => 18, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 9, 'bold' => false, 'wrap' => $g['nameColMm'] ?? $cw()],
+                'itemName'     => ['px' => 8, 'bold' => false, 'wrap' => $g['nameColMm'] ?? $cw()],
+            ],
+            'mini_cod' => [
+                'shopName' => ['px' => 9, 'bold' => true, 'wrap' => $cw()],
+            ],
+            'product_table_receipt' => [
+                'customerName' => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemName'     => ['px' => 7.5, 'bold' => false, 'wrap' => $g['ptNameColMm'] ?? $cw()],
+            ],
+            'order_note_receipt' => [
+                'customerName' => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemName'     => ['px' => 7.5, 'bold' => false, 'wrap' => $g['ptNameColMm'] ?? $cw()],
+                'notes'        => ['px' => 8, 'bold' => false, 'wrap' => $cw(4)],
+            ],
+            'retail_compact' => [
+                'customerName' => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemName'     => ['px' => 7.5, 'bold' => false, 'wrap' => $g['ptNameColMm'] ?? $cw()],
+                'notes'        => ['px' => 8.5, 'bold' => false, 'wrap' => $cw()],
+            ],
+            'qr_cod_enlarged' => [
+                'shopName'     => ['px' => 12, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 12, 'bold' => true, 'wrap' => $cw()],
+            ],
+            'sku_rows_bold' => [
+                'customerName' => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemSku'      => ['px' => 9, 'bold' => false, 'wrap' => $g['skuColMm'] ?? $cw()],
+            ],
+            'shipping_note_no_barcode' => [
+                'shopName'     => ['px' => 13, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemName'     => ['px' => 7.5, 'bold' => false, 'wrap' => $g['ptNameColMm'] ?? $cw()],
+                'notes'        => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(4), 'color' => $muted],
+            ],
+            'logo_invoice_compact' => [
+                'shopName'     => ['px' => 10, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 8, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 6.5, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemName'     => ['px' => 6, 'bold' => false, 'wrap' => $g['ptNameColMm'] ?? $cw()],
+                'notes'        => ['px' => 6, 'bold' => false, 'wrap' => $cw()],
+            ],
+            'bengali_shipping_note' => [
+                'shopName'     => ['px' => 10, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 8.5, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 7, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemName'     => ['px' => 8, 'bold' => false, 'wrap' => $g['bsnNameColMm'] ?? $cw()],
+                'notes'        => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(4)],
+            ],
+            'sku_truncate_note' => [
+                'shopName'     => ['px' => 9, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 6.5, 'bold' => true, 'wrap' => $cw()],
+                'itemName'     => ['px' => 6, 'bold' => false, 'wrap' => $g['ptNameColMm'] ?? $cw()],
+                'notes'        => ['px' => 6, 'bold' => false, 'wrap' => $cw(4)],
+            ],
+            'dual_note_receipt' => [
+                'shopName'     => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemName'     => ['px' => 7.5, 'bold' => false, 'wrap' => $g['ptNameColMm'] ?? $cw()],
+                'notes'        => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(4)],
+            ],
+            'sku_grid_square' => [
+                'shopName'     => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 10, 'bold' => true, 'wrap' => $cw()],
+                'itemSku'      => ['px' => 9, 'bold' => false, 'wrap' => $g['skuColMm'] ?? $cw()],
+                'notes'        => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(4)],
+            ],
+            'color_size_grid' => [
+                'shopName'     => ['px' => 10, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 10, 'bold' => true, 'wrap' => $cw()],
+                'itemName'     => ['px' => 8.5, 'bold' => false, 'wrap' => $g['csgNameColMm'] ?? $cw()],
+            ],
+            'minimal_list' => [
+                'shopName' => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'itemName' => ['px' => 6.5, 'bold' => false, 'wrap' => $cw()],
+            ],
+            'equals_price_band' => [
+                'shopName'     => ['px' => 15, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 11, 'bold' => true, 'wrap' => $cw()],
+                'itemName'     => ['px' => 8, 'bold' => false, 'wrap' => $g['epbNameColMm'] ?? $cw()],
+                'notes'        => ['px' => 8, 'bold' => false, 'wrap' => $cw(4)],
+            ],
+            'qr_recipient_focus' => [
+                'shopName'     => ['px' => 12, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 13, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 8, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemsSummary' => ['px' => 8, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+            ],
+            'no_price_multipage' => [
+                'shopName'     => ['px' => 10, 'bold' => true, 'wrap' => $cw()],
+                'customerName' => ['px' => 9, 'bold' => true, 'wrap' => $cw()],
+                'address'      => ['px' => 7.5, 'bold' => false, 'wrap' => $cw(), 'color' => $muted],
+                'itemName'     => ['px' => 8.5, 'bold' => false, 'wrap' => $g['npmNameColMm'] ?? $cw()],
+                'notes'        => ['px' => 8, 'bold' => false, 'wrap' => $cw(4)],
+            ],
+            default => [],
+        };
     }
 
     /** Dispatches to the right *Geometry() builder for a template key — shared by render() and renderPreview(). */

@@ -1,10 +1,18 @@
 {{-- Enlarged name/phone + boxed barcode + black COD band — reference "Sticker 12" (50x75mm). --}}
 @php($order = $label['order'])
 <div class="qce-label {{ $loop->last ? '' : 'label-break' }}">
-  <div class="qce-shop i18n">{{ $label['shopName'] }}</div>
+  @if($label['shopNameImg'])
+    <img src="{{ $label['shopNameImg'] }}" style="display:block; margin:0 auto; width:{{ $label['shopNameImgW'] }}mm; height:{{ $label['shopNameImgH'] }}mm;">
+  @else
+    <div class="qce-shop i18n">{{ $label['shopName'] }}</div>
+  @endif
 
   <div class="qce-field-label">NAME</div>
-  <div class="qce-field-value i18n">{{ $label['customerName'] }}</div>
+  @if($label['customerNameImg'])
+    <img src="{{ $label['customerNameImg'] }}" style="display:block; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;">
+  @else
+    <div class="qce-field-value i18n">{{ $label['customerName'] }}</div>
+  @endif
 
   <div class="qce-field-label">PHONE</div>
   <div class="qce-field-value">{{ $order->customer_phone }}</div>

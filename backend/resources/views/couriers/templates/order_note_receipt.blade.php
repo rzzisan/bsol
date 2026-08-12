@@ -17,9 +17,17 @@
 
   <div>Courier: {{ $order->courier_name ?? 'MANUAL' }}</div>
   <div class="onr-section">Invoice To:</div>
-  <div class="onr-bold i18n">{{ $label['customerName'] }}</div>
+  @if($label['customerNameImg'])
+    <img src="{{ $label['customerNameImg'] }}" style="display:block; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;">
+  @else
+    <div class="onr-bold i18n">{{ $label['customerName'] }}</div>
+  @endif
   <div>{{ $order->customer_phone }}</div>
-  <div class="onr-muted i18n">{{ $label['address'] }}</div>
+  @if($label['addressImg'])
+    <img src="{{ $label['addressImg'] }}" style="display:block; width:{{ $label['addressImgW'] }}mm; height:{{ $label['addressImgH'] }}mm;">
+  @else
+    <div class="onr-muted i18n">{{ $label['address'] }}</div>
+  @endif
 
   @if($label['barcode'])
     <img class="onr-barcode" src="{{ $label['barcode'] }}">
@@ -36,7 +44,13 @@
     </tr>
     @foreach($label['itemRows'] as $row)
       <tr>
-        <td style="width: {{ $g['ptNameColMm'] }}mm;" class="i18n">{{ $row['name'] }}</td>
+        <td style="width: {{ $g['ptNameColMm'] }}mm;">
+          @if($row['nameImg'])
+            <img src="{{ $row['nameImg'] }}" style="display:block; width:{{ $row['nameImgW'] }}mm; height:{{ $row['nameImgH'] }}mm;">
+          @else
+            <span class="i18n">{{ $row['name'] }}</span>
+          @endif
+        </td>
         <td style="width: {{ $g['ptQtyColMm'] }}mm;">{{ $row['qty'] }}</td>
         <td style="width: {{ $g['ptPriceColMm'] }}mm;">{{ number_format($row['price'], 0) }}</td>
         <td style="width: {{ $g['ptTotalColMm'] }}mm;">{{ number_format($row['total'], 0) }}</td>
@@ -52,7 +66,11 @@
   @if($label['notes'])
     <div class="onr-note-box">
       <div class="onr-note-label">ORDER NOTE</div>
-      <div class="i18n">{{ $label['notes'] }}</div>
+      @if($label['notesImg'])
+        <img src="{{ $label['notesImg'] }}" style="display:block; width:{{ $label['notesImgW'] }}mm; height:{{ $label['notesImgH'] }}mm;">
+      @else
+        <div class="i18n">{{ $label['notes'] }}</div>
+      @endif
     </div>
   @endif
 </div>

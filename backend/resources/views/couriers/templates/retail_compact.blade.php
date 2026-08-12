@@ -5,7 +5,11 @@
     <tr>
       <td style="width: {{ $g['infoColMm'] }}mm;">
         Courier: {{ $order->courier_name ?? 'MANUAL' }}<br>
-        <span class="rtc-bold i18n">{{ $label['customerName'] }}</span><br>
+        @if($label['customerNameImg'])
+          <img src="{{ $label['customerNameImg'] }}" style="display:block; width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;"><br>
+        @else
+          <span class="rtc-bold i18n">{{ $label['customerName'] }}</span><br>
+        @endif
         {{ $order->customer_phone }}
       </td>
       <td style="width: {{ $g['barcodeColMm'] }}mm;">
@@ -14,7 +18,11 @@
     </tr>
   </table>
 
-  <div class="rtc-muted i18n">{{ $label['address'] }}</div>
+  @if($label['addressImg'])
+    <img src="{{ $label['addressImg'] }}" style="display:block; width:{{ $label['addressImgW'] }}mm; height:{{ $label['addressImgH'] }}mm;">
+  @else
+    <div class="rtc-muted i18n">{{ $label['address'] }}</div>
+  @endif
   <div class="rtc-parcel">Parcel ID: {{ $order->courier_tracking_id ?? '—' }}</div>
 
   <div class="rtc-rule"></div>
@@ -28,7 +36,13 @@
     </tr>
     @foreach($label['itemRows'] as $row)
       <tr>
-        <td style="width: {{ $g['ptNameColMm'] }}mm;" class="i18n">{{ $row['name'] }}</td>
+        <td style="width: {{ $g['ptNameColMm'] }}mm;">
+          @if($row['nameImg'])
+            <img src="{{ $row['nameImg'] }}" style="display:block; width:{{ $row['nameImgW'] }}mm; height:{{ $row['nameImgH'] }}mm;">
+          @else
+            <span class="i18n">{{ $row['name'] }}</span>
+          @endif
+        </td>
         <td style="width: {{ $g['ptQtyColMm'] }}mm;">{{ $row['qty'] }}</td>
         <td style="width: {{ $g['ptPriceColMm'] }}mm;">{{ number_format($row['price'], 0) }}</td>
         <td style="width: {{ $g['ptTotalColMm'] }}mm;">{{ number_format($row['total'], 0) }}</td>
@@ -44,6 +58,10 @@
   @if($label['notes'])
     <div class="rtc-rule"></div>
     <div class="rtc-note-label">Shipping Note:</div>
-    <div class="i18n">{{ $label['notes'] }}</div>
+    @if($label['notesImg'])
+      <img src="{{ $label['notesImg'] }}" style="display:block; width:{{ $label['notesImgW'] }}mm; height:{{ $label['notesImgH'] }}mm;">
+    @else
+      <div class="i18n">{{ $label['notes'] }}</div>
+    @endif
   @endif
 </div>
