@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Http\Middleware\AuthenticatePlatformApiKey;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureShopOwner;
 use App\Http\Middleware\EnsureStaffPermission;
@@ -45,6 +46,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'staff_permission' => EnsureStaffPermission::class,
             'owner_only' => EnsureShopOwner::class,
             'force_password_change' => ForcePasswordChange::class,
+            // WordPress/WooCommerce connector — bsol_history_and_new_context.md §5
+            'connect_api_key' => AuthenticatePlatformApiKey::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {

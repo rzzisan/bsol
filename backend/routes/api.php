@@ -16,6 +16,9 @@ use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\Api\AbandonedCheckoutController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\CheckoutOtpController;
+use App\Http\Controllers\Api\Connect\ConnectAuthController;
+use App\Http\Controllers\Api\Connect\ConnectFraudController;
+use App\Http\Controllers\Api\Connect\ConnectOrderController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
@@ -52,6 +55,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\ShopProfileController;
 use App\Http\Controllers\Api\StickerTemplateController;
+use App\Http\Controllers\Api\WordpressApiKeyController;
 use App\Http\Controllers\LandingPageAnalyticsController;
 
 Route::get('/health', function () {
@@ -145,6 +149,24 @@ Route::get('/subscription/pay/bkash/callback', [BkashPaymentController::class, '
 // SmsCreditBkashPaymentController, subscription_billing_context.md §3.
 Route::get('/sms/credit/pay/bkash/callback', [SmsCreditBkashPaymentController::class, 'callback'])
     ->middleware('throttle:20,1');
+
+// ── WordPress/WooCommerce Connector (plugin-facing) ─────────────────────────
+// A different trust boundary from the auth:sanctum group below — authenticated
+// by a domain-bound PlatformApiKey (X-API-KEY + X-Client-Domain), not a
+// Sanctum session. See bsol_history_and_new_context.md §5.
+Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
+    Route::post('/connect', [ConnectAuthController::class, 'connect'])
+        ->middleware('throttle:30,1');
+    Route::post('/disconnect', [ConnectAuthController::class, 'disconnect'])
+        ->middleware('throttle:30,1');
+
+    Route::middleware(['active_subscription', 'throttle:120,1'])->group(function () {
+        Route::post('/orders/sync', [ConnectOrderController::class, 'sync']);
+        Route::post('/orders/sync-status', [ConnectOrderController::class, 'syncStatus']);
+        Route::post('/fraud/check-phone', [ConnectFraudController::class, 'checkPhone'])
+            ->middleware('throttle:60,1');
+    });
+});
 
 Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () {
     // Email OTP for verification (authenticated)
@@ -350,6 +372,16 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/catalog', [StickerTemplateController::class, 'catalog']);
         Route::get('/settings', [StickerTemplateController::class, 'show']);
         Route::post('/settings', [StickerTemplateController::class, 'update']);
+    });
+
+    // ── WordPress/WooCommerce Connector API key (dashboard-facing) ───────────
+    // Pattern B (staff_team_role_context.md §3.3) — a credential, staff never
+    // generate/revoke it. Distinct from the plugin-facing /connect/v1/* above.
+    // See bsol_history_and_new_context.md §5.
+    Route::middleware('owner_only')->prefix('wordpress')->group(function () {
+        Route::get('/api-key', [WordpressApiKeyController::class, 'show']);
+        Route::post('/api-key', [WordpressApiKeyController::class, 'store']);
+        Route::delete('/api-key', [WordpressApiKeyController::class, 'destroy']);
     });
 
     // ── Courier Integration ───────────────────────────────────────────────────

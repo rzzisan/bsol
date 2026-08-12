@@ -28,7 +28,10 @@ class OrderController extends Controller
         private readonly OrderStatusService $orderStatusService,
     ) {}
 
-    private const VALID_STATUSES = [
+    // Public: single source of truth for BSOL's canonical status vocabulary —
+    // also referenced directly by Api\Connect\ConnectOrderController::syncStatus()
+    // rather than duplicated (bsol_history_and_new_context.md §5).
+    public const VALID_STATUSES = [
         'pending', 'confirmed', 'processing', 'shipped',
         'delivered', 'cancelled', 'returned',
     ];
@@ -232,6 +235,7 @@ class OrderController extends Controller
                 'discount'          => $discount,
                 'total'             => $total,
                 'notes'             => $data['notes'] ?? null,
+                'custom_fields'     => $data['custom_fields'] ?? null,
                 'fraud_score'       => 0,
                 'risk_level'        => 'low',
             ]);
