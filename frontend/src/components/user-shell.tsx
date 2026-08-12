@@ -85,6 +85,7 @@ const menuText = {
     stickerTemplates: "স্টিকার টেমপ্লেট",
     courierAccounts: "কুরিয়ার একাউন্ট",
     facebookConnect: "ফেসবুক পেজ",
+    wordpressConnect: "ওয়ার্ডপ্রেস কানেক্ট",
     subscription: "সাবস্ক্রিপশন",
     staffManagement: "টিম / স্টাফ",
 
@@ -158,6 +159,7 @@ const menuText = {
     stickerTemplates: "Sticker Templates",
     courierAccounts: "Courier Accounts",
     facebookConnect: "Facebook Page",
+    wordpressConnect: "WordPress Connect",
     subscription: "Subscription",
     staffManagement: "Staff & Team",
 
@@ -287,6 +289,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
         { key: "sticker-templates", label: t.stickerTemplates, href: "/dashboard/settings/sticker-templates" },
         { key: "courier-accounts", label: t.courierAccounts, href: "/dashboard/settings/courier" },
         { key: "facebook-connect", label: (t as any).facebookConnect ?? "ফেসবুক পেজ", href: "/dashboard/settings/facebook" },
+        { key: "wordpress-connect", label: (t as any).wordpressConnect ?? "ওয়ার্ডপ্রেস কানেক্ট", href: "/dashboard/settings/wordpress" },
         { key: "subscription", label: t.subscription, href: "/dashboard/settings/subscription" },
         { key: "staff-management", label: t.staffManagement, href: "/dashboard/settings/staff" },
       ],
