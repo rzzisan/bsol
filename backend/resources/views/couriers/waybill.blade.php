@@ -162,6 +162,292 @@
   .mc-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 30 }}mm; height: 7mm; margin: 1mm auto; }
   .mc-parcel { font-size: 6px; }
   .mc-cod { font-weight: bold; font-size: 11px; margin-top: 1mm; }
+
+  {{-- ══════════════════════════ product_table_receipt ══════════════════════════ --}}
+  .ptr-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 4 }}mm; font-size: 8px; line-height: 1.3; }
+  .ptr-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm; border-collapse: collapse; }
+  .ptr-table td { vertical-align: top; padding: 0; }
+  .ptr-bold { font-weight: bold; font-size: 11px; }
+  .ptr-meta { font-size: 7px; color: #4a5563; }
+  .ptr-help { font-size: 8px; margin-top: 1mm; }
+  .ptr-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .ptr-section { font-size: 7px; color: #4a5563; text-transform: uppercase; letter-spacing: 0.5px; }
+  .ptr-muted { color: #4a5563; font-size: 7.5px; }
+  .ptr-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 20 }}mm; height: {{ $g['barcodeHeightMm'] ?? 12 }}mm; }
+  .ptr-tracking { font-size: 6.5px; word-break: break-all; margin-top: 1px; }
+  .ptr-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  {{-- Vertical-only padding on table cells throughout this file — see the
+       pb-items-head comment above for why horizontal padding on a cell
+       breaks its explicit mm width. --}}
+  .ptr-items td { font-size: 7.5px; padding: 1px 0; }
+  .ptr-totals { font-size: 8.5px; }
+  .ptr-due { font-size: 11px; font-weight: bold; margin-top: 1px; }
+
+  {{-- ══════════════════════════ order_note_receipt ══════════════════════════ --}}
+  .onr-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 4 }}mm; font-size: 8px; line-height: 1.3; }
+  .onr-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm; border-collapse: collapse; }
+  .onr-table td { vertical-align: top; padding: 0; }
+  {{-- Explicit width + vertical-only padding — a colored box needs its own
+       visible right edge to land exactly at its column's width. --}}
+  .onr-parcel-box {
+    background: #101418; color: #fff; text-align: center; padding: 1.5mm 0;
+    width: {{ $g['parcelBoxColMm'] ?? 28 }}mm;
+  }
+  .onr-parcel-label { font-size: 6px; letter-spacing: 1px; }
+  .onr-parcel-value { font-size: 9px; font-weight: bold; word-break: break-all; }
+  .onr-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .onr-section { font-size: 7px; color: #4a5563; text-transform: uppercase; margin-top: 1mm; }
+  .onr-bold { font-weight: bold; font-size: 11px; }
+  .onr-muted { color: #4a5563; font-size: 7.5px; }
+  .onr-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 60 }}mm; height: {{ $g['barcodeHeightMm'] ?? 12 }}mm; margin-top: 1mm; }
+  .onr-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .onr-items td { font-size: 7.5px; padding: 1px 0; }
+  .onr-totals { font-size: 8px; }
+  .onr-due { font-size: 11px; font-weight: bold; }
+  .onr-note-box {
+    border: 1px solid #cbd2d9; padding: 1.5mm 2mm; margin-top: 2mm;
+    width: {{ ($g['contentWidthMm'] ?? ($pageWidthMm - 8)) - 4 }}mm;
+  }
+  .onr-note-label { font-size: 7px; color: #4a5563; text-transform: uppercase; margin-bottom: 0.5mm; }
+
+  {{-- ══════════════════════════ retail_compact ══════════════════════════ --}}
+  .rtc-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 4 }}mm; font-size: 8.5px; line-height: 1.3; }
+  .rtc-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm; border-collapse: collapse; }
+  .rtc-table td { vertical-align: top; padding: 0; }
+  .rtc-bold { font-weight: bold; font-size: 11px; }
+  .rtc-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 20 }}mm; height: {{ $g['barcodeHeightMm'] ?? 11 }}mm; }
+  .rtc-muted { color: #4a5563; font-size: 7.5px; margin-top: 1mm; }
+  .rtc-parcel { font-size: 8px; margin-top: 1mm; }
+  .rtc-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .rtc-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .rtc-items td { font-size: 7.5px; padding: 1px 0; }
+  .rtc-totals { font-size: 8.5px; }
+  .rtc-due { font-size: 11px; font-weight: bold; }
+  .rtc-note-label { font-size: 7px; color: #4a5563; text-transform: uppercase; margin-top: 1mm; }
+
+  {{-- ══════════════════════════ qr_cod_enlarged ══════════════════════════ --}}
+  .qce-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 2.5 }}mm; text-align: center; font-size: 8px; line-height: 1.3; }
+  .qce-shop { font-weight: bold; font-size: 12px; }
+  .qce-field-label { font-size: 6px; color: #4a5563; text-transform: uppercase; letter-spacing: 1px; margin-top: 1.2mm; }
+  .qce-field-value { font-size: 12px; font-weight: bold; }
+  .qce-field-value-small { font-size: 8px; font-weight: bold; }
+  .qce-barcode-box {
+    border: 1.5px solid #101418; padding: {{ $g['barcodeBoxPaddingMm'] ?? 2 }}mm; margin-top: 1.2mm;
+    width: {{ $g['barcodeWidthMm'] ?? 40 }}mm;
+  }
+  .qce-barcode { display: block; width: {{ ($g['barcodeWidthMm'] ?? 40) - 1 }}mm; height: {{ $g['barcodeHeightMm'] ?? 14 }}mm; margin: 0 auto; }
+  .qce-barcode-caption { font-size: 6.5px; color: #4a5563; margin-top: 1mm; letter-spacing: 1px; }
+  .qce-cod-band {
+    background: #101418; color: #fff; font-weight: bold; font-size: 14px; padding: 1.5mm 0; margin-top: 1.5mm;
+    width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 5) }}mm;
+  }
+
+  {{-- ══════════════════════════ sku_rows_bold ══════════════════════════ --}}
+  .srb-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 4 }}mm; font-size: 8.5px; line-height: 1.3; }
+  .srb-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm; border-collapse: collapse; }
+  .srb-table td { vertical-align: top; padding: 0; }
+  .srb-name { font-size: 11px; font-weight: bold; }
+  .srb-phone { font-size: 13px; font-weight: bold; }
+  .srb-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 20 }}mm; height: {{ $g['barcodeHeightMm'] ?? 11 }}mm; }
+  .srb-muted { color: #4a5563; font-size: 7.5px; margin-top: 1mm; }
+  .srb-parcel { font-size: 8px; margin-top: 1mm; }
+  .srb-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .srb-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .srb-items td { font-size: 9px; padding: 2px 0; }
+  .srb-due { font-size: 12px; font-weight: bold; }
+
+  {{-- ══════════════════════════ shipping_note_no_barcode ══════════════════════════ --}}
+  .snb-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 4 }}mm; font-size: 8px; line-height: 1.3; }
+  .snb-shop { font-weight: bold; font-size: 13px; }
+  .snb-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .snb-section { font-size: 7px; color: #4a5563; text-transform: uppercase; }
+  .snb-bold { font-weight: bold; font-size: 11px; }
+  .snb-muted { color: #4a5563; font-size: 7.5px; }
+  .snb-parcel { font-size: 8px; margin-top: 1mm; }
+  .snb-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm; border-collapse: collapse; }
+  .snb-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .snb-items td { font-size: 7.5px; padding: 1px 0; }
+  .snb-totals { font-size: 8px; }
+  .snb-due { font-size: 11px; font-weight: bold; }
+  .snb-note-box {
+    border: 1px solid #cbd2d9; padding: 1.5mm 2mm; margin-top: 1.5mm; font-size: 7.5px; color: #4a5563;
+    width: {{ ($g['contentWidthMm'] ?? ($pageWidthMm - 8)) - 4 }}mm;
+  }
+
+  {{-- ══════════════════════════ logo_invoice_compact ══════════════════════════ --}}
+  .lic-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 2.5 }}mm; font-size: 6.5px; line-height: 1.3; }
+  .lic-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 5) }}mm; border-collapse: collapse; }
+  .lic-table td { vertical-align: top; padding: 0; }
+  .lic-logo { display: block; width: {{ $g['logoColMm'] ?? 12 }}mm; height: {{ $g['logoColMm'] ?? 12 }}mm; object-fit: contain; }
+  .lic-logo-placeholder { width: {{ $g['logoColMm'] ?? 12 }}mm; height: {{ $g['logoColMm'] ?? 12 }}mm; background: #eef0f2; border-radius: 2px; }
+  .lic-shop { font-size: 10px; font-weight: bold; }
+  .lic-meta { font-size: 6px; color: #4a5563; }
+  .lic-rule { border-top: 1px solid #cbd2d9; margin: 1px 0; }
+  .lic-bold { font-weight: bold; font-size: 8px; }
+  .lic-muted { color: #4a5563; }
+  .lic-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 18 }}mm; height: {{ $g['barcodeHeightMm'] ?? 8 }}mm; margin-left: auto; }
+  .lic-parcel { font-size: 6.5px; margin-top: 1px; }
+  .lic-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .lic-items td { font-size: 6px; padding: 0.5px 0; }
+  .lic-totals { font-size: 6.5px; margin-top: 1px; }
+  .lic-due { font-size: 8px; font-weight: bold; margin-top: 1px; }
+  .lic-note-label { font-size: 6px; color: #4a5563; text-transform: uppercase; margin-top: 1px; }
+  .lic-note { font-size: 6px; }
+
+  {{-- ══════════════════════════ bengali_shipping_note ══════════════════════════ --}}
+  .bsn-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 3 }}mm; font-size: 7.5px; line-height: 1.3; }
+  .bsn-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 6) }}mm; border-collapse: collapse; }
+  .bsn-table td { vertical-align: top; padding: 0; }
+  .bsn-shop { font-weight: bold; font-size: 10px; }
+  .bsn-bold { font-weight: bold; font-size: 8.5px; }
+  .bsn-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 18 }}mm; height: {{ $g['barcodeHeightMm'] ?? 8 }}mm; margin-left: auto; }
+  .bsn-muted { color: #4a5563; font-size: 7px; margin-top: 1mm; }
+  .bsn-parcel { font-size: 7.5px; margin-top: 1mm; }
+  .bsn-rule { border-top: 1px solid #cbd2d9; margin: 1px 0; }
+  .bsn-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .bsn-items td { font-size: 8px; padding: 1px 0; }
+  .bsn-due { font-size: 10px; font-weight: bold; margin-top: 1px; }
+  .bsn-note-box {
+    background: #eef4ff; border: 1px solid #b6cdfa; padding: 1.5mm 2mm; margin-top: 1.5mm; font-size: 7.5px;
+    width: {{ ($g['contentWidthMm'] ?? ($pageWidthMm - 6)) - 4 }}mm;
+  }
+
+  {{-- ══════════════════════════ sku_truncate_note ══════════════════════════ --}}
+  .stn-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 2.5 }}mm; font-size: 6.5px; line-height: 1.3; }
+  .stn-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 5) }}mm; border-collapse: collapse; }
+  .stn-table td { vertical-align: top; padding: 0; }
+  .stn-shop { font-weight: bold; font-size: 9px; }
+  .stn-bold { font-weight: bold; }
+  .stn-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 18 }}mm; height: {{ $g['barcodeHeightMm'] ?? 8 }}mm; margin-left: auto; }
+  .stn-parcel { font-size: 6.5px; margin-top: 1px; }
+  .stn-rule { border-top: 1px solid #cbd2d9; margin: 1px 0; }
+  .stn-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .stn-items td { font-size: 6px; padding: 0.5px 0; }
+  .stn-due { font-size: 8.5px; font-weight: bold; margin-top: 1px; }
+  .stn-note-box {
+    background: #fff8e6; border: 1px solid #f0d789; padding: 1.5mm 2mm; margin-top: 1.5mm; font-size: 6px;
+    width: {{ ($g['contentWidthMm'] ?? ($pageWidthMm - 5)) - 4 }}mm;
+  }
+
+  {{-- ══════════════════════════ dual_note_receipt ══════════════════════════ --}}
+  .dnr-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 4 }}mm; font-size: 8px; line-height: 1.3; }
+  .dnr-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm; border-collapse: collapse; }
+  .dnr-table td { vertical-align: top; padding: 0; }
+  .dnr-logo { display: block; width: {{ $g['logoColMm'] ?? 14 }}mm; height: {{ $g['logoColMm'] ?? 14 }}mm; object-fit: contain; }
+  .dnr-logo-placeholder { width: {{ $g['logoColMm'] ?? 14 }}mm; height: {{ $g['logoColMm'] ?? 14 }}mm; background: #eef0f2; border-radius: 2px; }
+  .dnr-shop { font-size: 11px; font-weight: bold; }
+  .dnr-meta { font-size: 7px; color: #4a5563; }
+  .dnr-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .dnr-bold { font-weight: bold; font-size: 11px; }
+  .dnr-muted { color: #4a5563; font-size: 7.5px; }
+  .dnr-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 20 }}mm; height: {{ $g['barcodeHeightMm'] ?? 11 }}mm; }
+  .dnr-parcel { font-size: 8px; margin-top: 1mm; }
+  .dnr-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .dnr-items td { font-size: 7.5px; padding: 1px 0; }
+  .dnr-due { font-size: 11px; font-weight: bold; margin-top: 1px; }
+  .dnr-note-box {
+    border: 1px solid #cbd2d9; padding: 1.5mm 2mm; margin-top: 1.5mm; font-size: 7.5px;
+    width: {{ ($g['contentWidthMm'] ?? ($pageWidthMm - 8)) - 4 }}mm;
+  }
+  .dnr-note-label { font-size: 7px; color: #4a5563; text-transform: uppercase; margin-bottom: 0.5mm; }
+
+  {{-- ══════════════════════════ sku_grid_square ══════════════════════════ --}}
+  .sgs-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 4 }}mm; font-size: 8.5px; line-height: 1.3; }
+  .sgs-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm; border-collapse: collapse; }
+  .sgs-table td { vertical-align: top; padding: 0; }
+  .sgs-shop { font-weight: bold; font-size: 11px; }
+  .sgs-bold { font-weight: bold; font-size: 10px; }
+  .sgs-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 20 }}mm; height: {{ $g['barcodeHeightMm'] ?? 10 }}mm; }
+  .sgs-parcel { font-size: 8px; margin-top: 1mm; }
+  .sgs-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .sgs-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .sgs-items td { font-size: 9px; padding: 1.5px 0; }
+  .sgs-due { font-size: 11px; font-weight: bold; margin-top: 1px; }
+  .sgs-note-box {
+    border: 1px solid #cbd2d9; padding: 1.5mm 2mm; margin-top: 1.5mm; font-size: 7.5px;
+    width: {{ ($g['contentWidthMm'] ?? ($pageWidthMm - 8)) - 4 }}mm;
+  }
+
+  {{-- ══════════════════════════ color_size_grid ══════════════════════════ --}}
+  .csg-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 4 }}mm; font-size: 8.5px; line-height: 1.3; }
+  .csg-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm; border-collapse: collapse; }
+  .csg-table td { vertical-align: top; padding: 0; }
+  .csg-shop { font-weight: bold; font-size: 10px; }
+  .csg-bold { font-weight: bold; font-size: 10px; }
+  .csg-parcel-box {
+    border: 1.5px solid #101418; text-align: center; padding: 1.5mm 0;
+    width: {{ $g['parcelBoxColMm'] ?? 30 }}mm;
+  }
+  .csg-parcel-label { font-size: 6px; letter-spacing: 1px; color: #4a5563; }
+  .csg-parcel-value { font-size: 8.5px; font-weight: bold; word-break: break-all; }
+  .csg-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 60 }}mm; height: {{ $g['barcodeHeightMm'] ?? 11 }}mm; margin-top: 2mm; }
+  .csg-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .csg-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .csg-items td { font-size: 8.5px; padding: 1.5px 0; }
+  .csg-variant { color: #4a5563; font-size: 7.5px; }
+  .csg-summary { font-size: 9px; }
+  .csg-summary-bold { font-size: 12px; font-weight: bold; }
+
+  {{-- ══════════════════════════ minimal_list ══════════════════════════ --}}
+  .ml-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 2 }}mm; text-align: center; font-size: 6.5px; line-height: 1.2; }
+  .ml-shop { font-weight: bold; font-size: 11px; }
+  .ml-phone { font-weight: bold; font-size: 12px; margin-top: 1mm; }
+  .ml-item { margin-top: 1mm; }
+  .ml-parcel { font-size: 6px; color: #4a5563; margin-top: 1.5mm; }
+
+  {{-- ══════════════════════════ equals_price_band ══════════════════════════ --}}
+  .epb-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 4 }}mm; font-size: 8px; line-height: 1.3; }
+  .epb-banner {
+    background: #101418; color: #fff; font-weight: bold; text-align: center; font-size: 15px; padding: 2mm 0; margin-bottom: 2mm;
+    width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm;
+  }
+  .epb-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm; border-collapse: collapse; }
+  .epb-table td { vertical-align: top; padding: 0; }
+  .epb-bold { font-weight: bold; font-size: 11px; }
+  .epb-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 20 }}mm; height: {{ $g['barcodeHeightMm'] ?? 11 }}mm; }
+  .epb-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .epb-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .epb-items td { font-size: 8px; padding: 1.5px 0; }
+  .epb-cod-band {
+    background: #101418; color: #fff; font-weight: bold; font-size: 15px; padding: 2mm 0; margin-top: 2mm; text-align: center;
+    width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 8) }}mm;
+  }
+  .epb-note-box {
+    border: 1px solid #cbd2d9; padding: 1.5mm 2mm; margin-top: 2mm;
+    width: {{ ($g['contentWidthMm'] ?? ($pageWidthMm - 8)) - 4 }}mm;
+  }
+  .epb-note-label { font-size: 7px; color: #4a5563; text-transform: uppercase; margin-bottom: 0.5mm; }
+
+  {{-- ══════════════════════════ qr_recipient_focus ══════════════════════════ --}}
+  .qrf-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 2.5 }}mm; font-size: 8px; line-height: 1.35; }
+  .qrf-shop { text-align: center; font-weight: bold; font-size: 12px; }
+  .qrf-cod-band {
+    background: #101418; color: #fff; font-weight: bold; font-size: 18px; text-align: center; padding: 2mm 0; margin-top: 1.5mm;
+    width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 5) }}mm;
+  }
+  .qrf-section { font-size: 7px; color: #4a5563; text-transform: uppercase; letter-spacing: 1px; margin-top: 2mm; }
+  .qrf-name { font-size: 13px; font-weight: bold; }
+  .qrf-muted { color: #4a5563; font-size: 8px; }
+  .qrf-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 40 }}mm; height: {{ $g['barcodeHeightMm'] ?? 11 }}mm; margin-top: 1mm; }
+  .qrf-tracking { font-size: 7px; word-break: break-all; }
+
+  {{-- ══════════════════════════ no_price_multipage ══════════════════════════ --}}
+  .npm-label { width: {{ $pageWidthMm }}mm; box-sizing: border-box; padding: {{ $g['paddingMm'] ?? 3 }}mm; font-size: 8px; line-height: 1.3; }
+  .npm-table { width: {{ $g['contentWidthMm'] ?? ($pageWidthMm - 6) }}mm; border-collapse: collapse; }
+  .npm-table td { vertical-align: top; padding: 0; }
+  .npm-shop { font-weight: bold; font-size: 10px; }
+  .npm-bold { font-weight: bold; font-size: 9px; }
+  .npm-barcode { display: block; width: {{ $g['barcodeWidthMm'] ?? 18 }}mm; height: {{ $g['barcodeHeightMm'] ?? 8 }}mm; margin-left: auto; }
+  .npm-muted { color: #4a5563; font-size: 7.5px; margin-top: 1mm; }
+  .npm-parcel { font-size: 8px; margin-top: 1mm; }
+  .npm-rule { border-top: 1px solid #cbd2d9; margin: 2px 0; }
+  .npm-items-head { font-weight: bold; border-bottom: 1px solid #101418; }
+  .npm-items td { font-size: 8.5px; padding: 1.5px 0; }
+  .npm-note-box {
+    background: #eef4ff; border: 1px solid #b6cdfa; padding: 2mm; margin-top: 2mm; font-size: 8px;
+    width: {{ ($g['contentWidthMm'] ?? ($pageWidthMm - 6)) - 4 }}mm;
+  }
+  .npm-note-label { font-size: 7px; color: #4a5563; text-transform: uppercase; margin-bottom: 1mm; font-weight: bold; }
 </style>
 </head>
 <body>

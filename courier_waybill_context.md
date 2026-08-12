@@ -1,6 +1,6 @@
 # কুরিয়ার ওয়েবিল/লেবেল PDF — মাস্টার কনটেক্সট ফাইল
 
-> এই ফাইলটা AI agent-দের জন্য: courier waybill/sticker PDF (এবং একই কোড-প্যাটার্ন শেয়ার করা order sales invoice, `OrderInvoicePdfService`) নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-08-11 (প্রথম ডেলিভারি + একাধিক dompdf বাগ ফিক্স + শপ প্রোফাইল ইন্টিগ্রেশন + অর্ডার ইনভয়েস ফিচার + COD amount ফিক্স + Pathao-স্টাইল লেবেল + **Sticker Template ফিচার (§৬, একাধিক টেমপ্লেট + সেলার-সিলেক্টেবল)**, একই দিনে একাধিক সেশনে)। এই ফিচার `feature_roadmap_context.md`-এর #5 আইটেম — মূল ডেলিভারি সম্পূর্ণ ও deployed, কিন্তু **§৪.৫-এ একটা বাংলা টেক্সট রেন্ডারিং বাগ এখনো OPEN/আনসলভড, ইউজারের অনুরোধে ডিফার করা হয়েছে** — নিচে দেখো। **নতুন কোনো টেমপ্লেট/PDF লে-আউট বানানোর আগে §৬.৪ পড়ো** — dompdf-এর box-sizing না-থাকা নিয়ে একটা fundamental বাগ-ক্লাস ডকুমেন্টেড আছে সেখানে।
+> এই ফাইলটা AI agent-দের জন্য: courier waybill/sticker PDF (এবং একই কোড-প্যাটার্ন শেয়ার করা order sales invoice, `OrderInvoicePdfService`) নিয়ে কোনো কাজ করার আগে পুরো কোডবেস স্ক্যান না করে এই ফাইল পড়লেই যথেষ্ট। শেষ আপডেট: 2026-08-12 (প্রথম ডেলিভারি + একাধিক dompdf বাগ ফিক্স + শপ প্রোফাইল ইন্টিগ্রেশন + অর্ডার ইনভয়েস ফিচার + COD amount ফিক্স + Pathao-স্টাইল লেবেল + **Sticker Template ফিচার — এখন ২২টা টেমপ্লেট সম্পূর্ণ, প্রিভিউ থাম্বনেইল সহ (§৬)**, একাধিক দিনে একাধিক সেশনে)। এই ফিচার `feature_roadmap_context.md`-এর #5 আইটেম — মূল ডেলিভারি সম্পূর্ণ ও deployed, কিন্তু **§৪.৫-এ একটা বাংলা টেক্সট রেন্ডারিং বাগ এখনো OPEN/আনসলভড, ইউজারের অনুরোধে ডিফার করা হয়েছে** — নিচে দেখো। **নতুন কোনো টেমপ্লেট/PDF লে-আউট বানানোর আগে §৬.৪ পড়ো** — dompdf-এর box-sizing না-থাকা নিয়ে একটা fundamental বাগ-ক্লাস ডকুমেন্টেড আছে সেখানে।
 >
 > স্ট্যাক: Laravel backend (`/var/www/hybrid-stack/backend`) + Next.js/TypeScript frontend (`/var/www/hybrid-stack/frontend`)। PDF রেন্ডারার `barryvdh/laravel-dompdf` (dompdf/dompdf ^3.0) — subscription/SMS-credit ইনভয়েসেও (`InvoicePdfService`) একই লাইব্রেরি ব্যবহার হয়, কিন্তু waybill-এ **নতুন ধরনের কনটেন্ট (barcode/QR ইমেজ, ছোট থার্মাল পেজ সাইজ, বড় বোল্ড ফন্ট)** এমন কিছু dompdf বাগ সামনে এনেছে যেগুলো ইনভয়েস টেমপ্লেটে কখনো ধরা পড়েনি।
 
@@ -111,20 +111,38 @@ Page height জেনারাসলি সেট করা আছে (58mm→14
 - **`sticker_courier_templates` টেবিল** (Pattern B, owner-only, sparse — শুধু কাস্টমাইজ করা কুরিয়ারগুলোর রো) — `user_id + courier_name` unique, `template_key`। Model: `app/Models/StickerCourierTemplate.php`।
 - **রেজোলিউশন লজিক** (`WaybillPdfService::resolveTemplateKey()`): per-order courier_name → override টেবিলে খোঁজে → না পেলে shop-এর `default_template_key` → না পেলে `'classic'`।
 
-### ৬.২ ছয়টা টেমপ্লেট (রেফারেন্স স্ক্রিনশট থেকে)
+### ৬.২ বাইশটা টেমপ্লেট (রেফারেন্স স্ক্রিনশট থেকে, সম্পূর্ণ ক্যাটালগ)
+
+প্রথম সেশনে ৬টা (architecture + variety-covering সেট) ডেলিভার হয়েছিল, ব্যবহারকারীর অনুরোধে পরে বাকি ১৬টা ধাপে ধাপে (৪-৪টার ব্যাচে) যোগ হয়েছে — মোট ২২টা, প্রতিটা user-provided রেফারেন্স স্ক্রিনশটের একটা distinct ডিজাইনের সাথে ম্যাপ করা।
 
 | Key | সাইজ | রেফারেন্স | মূল ফিল্ড |
 |---|---|---|---|
 | `classic` | 58/80mm (সিলেক্টর-নির্ভর) | আগে থেকে ছিল | কুরিয়ার ব্যানার, COD বক্স, barcode, TO/FROM/ORDER, QR |
 | `pathao` | 100 x 78mm | Pathao ড্যাশবোর্ড sticker | logo, Shipped From/To, QR, weight, collectable amount, barcode, target hub/zone/area — §৫ |
-| `cod_band_compact` | 2 x 3 inch (~51x76mm) | "Sticker 1" | ব্ল্যাক কুরিয়ার ব্যানার, বড় tracking ID, নাম/ফোন, ব্ল্যাক COD ব্যান্ড, SKU-qty প্রোডাক্ট সামারি `(SKU-QTY)+...`, নোট, barcode |
+| `cod_band_compact` | 2 x 3 inch | "Sticker 1" | ব্ল্যাক কুরিয়ার ব্যানার, বড় tracking ID, নাম/ফোন, ব্ল্যাক COD ব্যান্ড, SKU-qty প্রোডাক্ট সামারি, নোট, barcode |
 | `invoice_table` | 75 x 50mm | RetailBD/EcomDrive পরিবার | শপ/ডেট/IV-no, কুরিয়ার+নাম+ফোন+ঠিকানা, barcode, parcel ID, প্রোডাক্ট টেবিল, sub total/delivery/due amount |
-| `pos_bill` | 80mm (auto height, cap 100mm) | "Pos Sticker" | সেন্টার্ড শপ নাম, "POS Machine Bill", issued-to/order-no/date, ব্ল্যাক-হেডার প্রোডাক্ট টেবিল, ব্ল্যাক TOTAL ব্যান্ড, seller/thank-you, barcode |
-| `mini_cod` | 38 x 25mm | "Shokher Gadget" | শুধু শপ নাম + barcode + parcel ID + বড় COD amount — ইচ্ছাকৃতভাবে বাকি সব বাদ (আসল রেফারেন্সেও নাই, এত ছোট ক্যানভাসে জায়গা হয় না) |
+| `pos_bill` | 80mm (auto, cap 100mm) | "Pos Sticker" | সেন্টার্ড শপ নাম, "POS Machine Bill", issued-to/order-no/date, ব্ল্যাক-হেডার প্রোডাক্ট টেবিল, ব্ল্যাক TOTAL ব্যান্ড, seller/thank-you, barcode |
+| `mini_cod` | 38 x 25mm | "Shokher Gadget" | শুধু শপ নাম + barcode + parcel ID + বড় COD amount — বাকি সব ইচ্ছাকৃতভাবে বাদ |
+| `product_table_receipt` | 3 x 4 inch | "Sticker 2" | Help Line, Invoice No/Date, Invoice To ব্লক, barcode, প্রোডাক্ট টেবিল, sub total/delivery fee/due amount |
+| `order_note_receipt` | 3 x 4 inch | "Sticker 4" | Hotline/Date, ব্ল্যাক Parcel ID বক্স (top-right), Invoice To, barcode, প্রোডাক্ট টেবিল, Order Note বক্স |
+| `retail_compact` | 3 inch (auto height) | "Sticker 10/11" | Courier/নাম/ফোন + barcode, ঠিকানা, Parcel ID, প্রোডাক্ট টেবিল, Shipping Note বক্স |
+| `qr_cod_enlarged` | 50 x 75mm | "Sticker 12" | বড় NAME/PHONE লেবেল, বর্ডারড barcode বক্স ("COURIER BARCODE" ক্যাপশন), ব্ল্যাক COD ব্যান্ড |
+| `sku_rows_bold` | 3 x 4 inch | "Sticker 14" | বোল্ড ফোন, SKU-only রো (প্রোডাক্ট নাম/প্রাইস ছাড়া, শুধু SKU+Qty) |
+| `shipping_note_no_barcode` | 3 x 4 inch | "Sticker 5" | **কোনো barcode নাই** (ইচ্ছাকৃত), Invoice To, প্রোডাক্ট টেবিল, ফিক্সড disclaimer + অর্ডার নোট |
+| `logo_invoice_compact` | 75 x 50mm | "Sticker 7" | **শপ লোগো** (top-left, `ShopProfile.logo_path` থেকে base64 — নতুন `logoDataUri()` হেল্পার), courier/নাম/ফোন/ঠিকানা, barcode, প্রোডাক্ট টেবিল |
+| `bengali_shipping_note` | 75 x 50mm | "Sticker 8" | নাম+qty-only প্রোডাক্ট লিস্ট (প্রাইস কলাম নাই), হাইলাইটেড শিপিং নোট বক্স |
+| `sku_truncate_note` | 75 x 50mm | "Sticker 9" | টাইট-truncated SKU নাম, হলুদ-হাইলাইটেড শিপিং নোট বক্স |
+| `dual_note_receipt` | 3 inch (auto height) | "Sticker 15" | শপ লোগো, প্রোডাক্ট টেবিল, **দুইটা আলাদা নোট বক্স** (Shipping Note + Order Note) |
+| `sku_grid_square` | 3 x 3 inch | "Sticker 16" | স্কয়ার ক্যানভাস, SKU-only রো, একটা নোট বক্স |
+| `color_size_grid` | 3 x 4 inch | "Sticker 18" | বড় ব্ল্যাক-বর্ডার Parcel ID বক্স (top-right) + নিচে barcode, প্রোডাক্ট টেবিলে **color/size variant** (`variant_info` থেকে, নতুন `formatVariant()`), Total Product/Total Bill |
+| `minimal_list` | 45 x 35mm | "Sticker 19" | শুধু বড় merchant/phone + প্লেইন প্রোডাক্ট লিস্ট (নাম x qty) + Parcel ID — barcode নাই |
+| `equals_price_band` | 3 x 4 inch | "Sticker 20" | ব্ল্যাক শপ-নেম ব্যানার (top), প্রোডাক্ট টেবিল "মূল্য/=" ফরম্যাটে (`750/=`), ব্ল্যাক COD ব্যান্ড, Order Note বক্স |
+| `qr_recipient_focus` | 50 x 75mm | "Sticker 21" | ব্ল্যাক COD ব্যান্ড (Tk, ৳ না — §৪.৬), RECIPIENT সেকশন (বড় বোল্ড নাম), PRODUCT সেকশন + barcode |
+| `no_price_multipage` | 75 x 50mm | "Sticker 22" | **কোথাও কোনো প্রাইস/টোটাল/due amount দেখানো হয় না** (কুরিয়ার রাইডারকে দাম দেখাতে না চাইলে) — শুধু নাম+qty, বড় শিপিং নোট |
 
-সব ব্লেড partial `resources/views/couriers/templates/{key}.blade.php`-এ, মাস্টার `resources/views/couriers/waybill.blade.php` একটাই `<style>` ব্লকে সব টেমপ্লেটের CSS (prefix করা — `.p-*` pathao, `.cbc-*` cod_band_compact, `.it-*` invoice_table, `.pb-*` pos_bill, `.mc-*` mini_cod) রাখে, শুধু active টেমপ্লেটের partial `@include` করে।
+সব ব্লেড partial `resources/views/couriers/templates/{key}.blade.php`-এ, মাস্টার `resources/views/couriers/waybill.blade.php` একটাই `<style>` ব্লকে সব টেমপ্লেটের CSS (প্রতিটা টেমপ্লেটের নিজস্ব ২-৩ অক্ষরের prefix — `.p-*`, `.cbc-*`, `.it-*`, `.pb-*`, `.mc-*`, `.ptr-*`, `.onr-*`, `.rtc-*`, `.qce-*`, `.srb-*`, `.snb-*`, `.lic-*`, `.bsn-*`, `.stn-*`, `.dnr-*`, `.sgs-*`, `.csg-*`, `.ml-*`, `.epb-*`, `.qrf-*`, `.npm-*`) রাখে, শুধু active টেমপ্লেটের partial `@include` করে।
 
-`WaybillPdfService`-এ প্রতিটা টেমপ্লেটের জন্য একটা `*Geometry()` প্রাইভেট মেথড আছে যেটা widthMm/heightMm থেকে সব padding/column/barcode/QR mm-সাইজ প্রি-কম্পিউট করে `$g` অ্যারেতে — নতুন টেমপ্লেট যোগ করতে হলে এই প্যাটার্ন অনুসরণ করা (নিচে §৬.৪-এর নিয়ম মেনে)।
+`WaybillPdfService`-এ প্রতিটা টেমপ্লেটের জন্য একটা `*Geometry()` প্রাইভেট মেথড আছে যেটা widthMm/heightMm থেকে সব padding/column/barcode/QR mm-সাইজ প্রি-কম্পিউট করে `$g` অ্যারেতে — `geometryFor()` ডিসপ্যাচার দুটো এন্ট্রি পয়েন্ট (`render()` আসল অর্ডারের জন্য, `renderPreview()` প্রিভিউ থাম্বনেইলের জন্য) দুটোতেই শেয়ার হয়। বেশ কয়েকটা টেমপ্লেট **কমন হেল্পার** `productTableColumns()` রিইউজ করে (name/qty/price/total ৪-কলাম split) — একই লজিক বারবার লেখা এড়াতে। নতুন টেমপ্লেট যোগ করতে হলে এই প্যাটার্ন অনুসরণ করা (নিচে §৬.৪-এর নিয়ম মেনে): (1) `config/sticker_templates.php`-এ এন্ট্রি, (2) `*Geometry()` মেথড + `geometryFor()`-এ ম্যাচ কেস, (3) Blade partial, (4) মাস্টার ফাইলে prefix করা CSS, (5) `php artisan tinker` দিয়ে `renderPreview()` কল করে `pdfinfo`/`pdftoppm`-দিয়ে টেস্ট (single page, margin/overflow চেক)।
 
 ### ৬.৩ একটা PDF = একটা পেজ সাইজ (bulk-এ মিক্সড টেমপ্লেট)
 
@@ -154,7 +172,17 @@ dompdf named `@page` selector সাপোর্ট করে না (`Styleshee
 
 - **Controller:** `app/Http/Controllers/Api/StickerTemplateController.php` — `catalog()` (GET, static list), `show()` (GET, বর্তমান default + overrides), `update()` (POST, দুটোই সেভ করে — override সেট পুরোটা replace করে, diff করে না)।
 - **রুট:** `owner_only` গ্রুপ, `sticker-templates` prefix — `GET /catalog`, `GET /settings`, `POST /settings` (`routes/api.php`, shop-profile গ্রুপের ঠিক পরে)।
-- **ফ্রন্টএন্ড:** `frontend/src/app/dashboard/settings/sticker-templates/page.tsx` (নতুন সেটিংস পেজ) — টেমপ্লেট গ্যালারি (কার্ড ক্লিক করে ডিফল্ট সেট), প্রতি-কুরিয়ার override ড্রপডাউন (steadfast/pathao/redx/carrybee/paperfly/manual)। মেনুতে যোগ হয়েছে `user-shell.tsx`-এ (Settings গ্রুপ, Shop Profile-এর ঠিক পরে)।
+- **ফ্রন্টএন্ড:** `frontend/src/app/dashboard/settings/sticker-templates/page.tsx` (নতুন সেটিংস পেজ) — টেমপ্লেট গ্যালারি (কার্ড ক্লিক করে ডিফল্ট সেট), প্রতি-কুরিয়ার override ড্রপডাউন (steadfast/pathao/redx/carrybee/paperfly/manual), প্রিভিউ থাম্বনেইল + ক্লিক করলে enlarge modal (§৬.৬ দেখো)। মেনুতে যোগ হয়েছে `user-shell.tsx`-এ (Settings গ্রুপ, Shop Profile-এর ঠিক পরে)।
+
+### ৬.৬ প্রিভিউ থাম্বনেইল (2026-08-12 যোগ হয়েছে)
+
+প্রতিটা টেমপ্লেট কার্ডে একটা রিয়েল রেন্ডারড প্রিভিউ ছবি দেখা যায় (নিছক টেক্সট লেবেল না) — সেলার ডিজাইন না বেছেই দেখতে পারে কেমন দেখাবে।
+
+- **`WaybillPdfService::renderPreview(string $templateKey)`** — কোনো real `Order`/DB ছাড়াই একটা single-label PDF রেন্ডার করে, fixed demo ডেটা দিয়ে (`new Order([...])` — unsaved Eloquent instance, শুধু attribute access-এর জন্য, `->save()` কখনো কল হয় না)। `render()`-এর মতোই `geometryFor()` শেয়ার করে, তাই preview আর real render একদম একই layout logic ব্যবহার করে — কোনো ডুপ্লিকেট টেমপ্লেট-স্পেসিফিক কোড নাই।
+- **`app/Services/StickerPreviewService.php`** — PDF-কে PNG-তে কনভার্ট করে `pdftoppm -r 150 -png -singlefile` (Symfony Process দিয়ে শেল-আউট, `poppler-utils` — এই প্রজেক্টের নিজস্ব ডিবাগিং ওয়ার্কফ্লো-তেও ব্যবহৃত, সার্ভারে কনফার্মড ইনস্টলড)। ফলাফল `storage/app/public/sticker-previews/{key}.png`-এ ক্যাশড থাকে।
+- **অটো-ইনভ্যালিডেশন:** ক্যাশড PNG-র mtime বনাম টেমপ্লেটের Blade partial ফাইলের mtime তুলনা করে — partial-এ কোনো ডিজাইন পরিবর্তন হলে পরের রিকোয়েস্টেই নতুন প্রিভিউ অটো-রিজেনারেট হয়, ম্যানুয়াল cache-bust লাগে না।
+- **`php artisan sticker-templates:warm-previews`** (নতুন artisan command) — সব টেমপ্লেটের প্রিভিউ deploy-টাইমে prে-জেনারেট করে রাখে, যাতে ডিপ্লয়ের পর প্রথম যে সেলার সেটিংস পেজ খুলবে তাকে live render+rasterize-এর খরচ বহন করতে না হয় (ঐচ্ছিক — না চালালেও `previewUrl()` on-demand জেনারেট করবে, শুধু প্রথম রিকোয়েস্টটা একটু স্লো হবে)।
+- **এন্ডপয়েন্ট:** `catalog()`-এর রেসপন্সে প্রতিটা এন্ট্রিতে `preview_url` যোগ হয়েছে (null হতে পারে যদি rasterize ফেইল করে — frontend তখন "প্রিভিউ নাই" দেখায়, catalog fetch ব্লক হয় না)।
 
 ---
 
@@ -215,9 +243,11 @@ dompdf named `@page` selector সাপোর্ট করে না (`Styleshee
 | Waybill PDF জেনারেশন লজিক (template resolve + সব geometry) | `app/Services/WaybillPdfService.php` |
 | Waybill মাস্টার লে-আউট শেল + সব টেমপ্লেটের CSS | `resources/views/couriers/waybill.blade.php` |
 | প্রতিটা টেমপ্লেটের HTML markup | `resources/views/couriers/templates/{key}.blade.php` |
-| Sticker Template ক্যাটালগ | `config/sticker_templates.php`, §৬ |
+| Sticker Template ক্যাটালগ (২২টা) | `config/sticker_templates.php`, §৬.২ |
 | Sticker Template সেটিংস API | `app/Http/Controllers/Api/StickerTemplateController.php` |
-| Sticker Template সেটিংস পেজ | `frontend/src/app/dashboard/settings/sticker-templates/page.tsx` |
+| Sticker Template সেটিংস পেজ (প্রিভিউ গ্যালারি সহ) | `frontend/src/app/dashboard/settings/sticker-templates/page.tsx` |
+| প্রিভিউ থাম্বনেইল জেনারেশন | `app/Services/StickerPreviewService.php`, §৬.৬ |
+| প্রিভিউ warm-cache artisan command | `app/Console/Commands/WarmStickerPreviews.php` |
 | dompdf-এ box-sizing/width বাগ (⚠️ নতুন কোনো টেমপ্লেট বানানোর আগে পড়ো) | §৬.৪ |
 | Waybill API এন্ডপয়েন্ট (single/bulk) | `app/Http/Controllers/Api/CourierController.php::waybill/waybillBulk` |
 | Waybill প্রিন্ট বাটন/UI | `frontend/src/app/dashboard/courier/track/page.tsx` |

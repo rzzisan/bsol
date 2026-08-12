@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\StickerCourierTemplate;
 use App\Models\StickerSetting;
+use App\Services\StickerPreviewService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,14 +19,15 @@ use Illuminate\Http\Request;
 class StickerTemplateController extends Controller
 {
     /** The fixed catalog of selectable designs — static, not seller-editable. */
-    public function catalog(): JsonResponse
+    public function catalog(StickerPreviewService $previews): JsonResponse
     {
-        $catalog = collect(config('sticker_templates', []))->map(function ($tpl, $key) {
+        $catalog = collect(config('sticker_templates', []))->map(function ($tpl, $key) use ($previews) {
             return [
                 'key' => $key,
                 'label_bn' => $tpl['label_bn'],
                 'label_en' => $tpl['label_en'],
                 'size_label' => $tpl['sizeLabel'],
+                'preview_url' => $previews->previewUrl($key),
             ];
         })->values();
 

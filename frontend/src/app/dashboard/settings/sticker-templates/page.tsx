@@ -18,6 +18,8 @@ const t = {
     defaultTemplate: "ডিফল্ট টেমপ্লেট",
     setDefault: "ডিফল্ট হিসেবে বেছে নিন",
     isDefault: "✓ ডিফল্ট",
+    noPreview: "প্রিভিউ নাই",
+    close: "বন্ধ করুন",
     courierOverrides: "কুরিয়ার-ভিত্তিক টেমপ্লেট (ঐচ্ছিক)",
     courierOverridesHint: "নির্দিষ্ট না করলে ডিফল্ট টেমপ্লেট ব্যবহার হবে।",
     useDefault: "— ডিফল্ট ব্যবহার করুন —",
@@ -37,6 +39,8 @@ const t = {
     defaultTemplate: "Default Template",
     setDefault: "Set as default",
     isDefault: "✓ Default",
+    noPreview: "No preview",
+    close: "Close",
     courierOverrides: "Per-Courier Templates (optional)",
     courierOverridesHint: "Leave as default unless you want a different design for that courier.",
     useDefault: "— Use default —",
@@ -51,7 +55,7 @@ const t = {
   },
 };
 
-type CatalogItem = { key: string; label_bn: string; label_en: string; size_label: string };
+type CatalogItem = { key: string; label_bn: string; label_en: string; size_label: string; preview_url: string | null };
 type Override = { courier: string; template_key: string };
 
 export default function StickerTemplatesPage() {
@@ -65,6 +69,7 @@ export default function StickerTemplatesPage() {
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ success: boolean; msg: string } | null>(null);
+  const [enlarged, setEnlarged] = useState<CatalogItem | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -145,15 +150,29 @@ export default function StickerTemplatesPage() {
                   const isDefault = tpl.key === defaultKey;
                   return (
                     <button key={tpl.key} type="button" onClick={() => setDefaultKey(tpl.key)}
-                      className={`rounded-xl border p-4 text-left transition ${
+                      className={`rounded-xl border p-3 text-left transition ${
                         isDefault
                           ? "border-[var(--accent)] bg-[var(--accent)]/10"
                           : "border-[var(--border)] hover:bg-[var(--surface-soft)]"
                       }`}>
-                      <div className="font-semibold">{locale === "bn" ? tpl.label_bn : tpl.label_en}</div>
-                      <div className="mt-1 text-xs text-[var(--muted)]">{tpl.size_label}</div>
-                      <div className={`mt-2 text-xs font-semibold ${isDefault ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}>
-                        {isDefault ? txt.isDefault : txt.setDefault}
+                      <div
+                        onClick={(e) => { if (tpl.preview_url) { e.stopPropagation(); setEnlarged(tpl); } }}
+                        className="mb-2 flex h-40 items-center justify-center overflow-hidden rounded-lg bg-white"
+                      >
+                        {tpl.preview_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={tpl.preview_url} alt={locale === "bn" ? tpl.label_bn : tpl.label_en}
+                            className="max-h-full max-w-full object-contain" />
+                        ) : (
+                          <span className="text-xs text-[var(--muted)]">{txt.noPreview}</span>
+                        )}
+                      </div>
+                      <div className="px-1">
+                        <div className="font-semibold">{locale === "bn" ? tpl.label_bn : tpl.label_en}</div>
+                        <div className="mt-1 text-xs text-[var(--muted)]">{tpl.size_label}</div>
+                        <div className={`mt-2 text-xs font-semibold ${isDefault ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}>
+                          {isDefault ? txt.isDefault : txt.setDefault}
+                        </div>
                       </div>
                     </button>
                   );
@@ -189,6 +208,23 @@ export default function StickerTemplatesPage() {
           </div>
         )}
       </div>
+
+      {enlarged && enlarged.preview_url && (
+        <div onClick={() => setEnlarged(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+          <div onClick={(e) => e.stopPropagation()} className="max-h-[85vh] max-w-full rounded-xl bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={enlarged.preview_url} alt={locale === "bn" ? enlarged.label_bn : enlarged.label_en}
+              className="max-h-[75vh] max-w-full object-contain" />
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-sm font-semibold text-black">{locale === "bn" ? enlarged.label_bn : enlarged.label_en}</span>
+              <button onClick={() => setEnlarged(null)} className="rounded-lg border border-black/20 px-3 py-1 text-xs text-black">
+                {txt.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </UserShell>
   );
 }
