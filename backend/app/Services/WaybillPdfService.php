@@ -56,6 +56,8 @@ class WaybillPdfService
     /** @var array<int, ?string> memoized pathao_locations name lookups, keyed by external_id */
     private array $pathaoLocationNames = [];
 
+    public function __construct(private readonly BengaliShapingService $bengaliShaper) {}
+
     private function fontRegular(): string
     {
         return 'file://' . storage_path('fonts/NotoSansBengali-Regular.ttf');
@@ -64,6 +66,56 @@ class WaybillPdfService
     private function fontBold(): string
     {
         return 'file://' . storage_path('fonts/NotoSansBengali-Bold.ttf');
+    }
+
+    /** Plain filesystem paths (not the file:// URI dompdf's @font-face wants) — for BengaliShapingService. */
+    private function fontRegularPath(): string
+    {
+        return storage_path('fonts/NotoSansBengali-Regular.ttf');
+    }
+
+    private function fontBoldPath(): string
+    {
+        return storage_path('fonts/NotoSansBengali-Bold.ttf');
+    }
+
+    private function containsBengali(?string $text): bool
+    {
+        return $text !== null && $text !== '' && preg_match('/\p{Bengali}/u', $text) === 1;
+    }
+
+    /**
+     * Queues a real-shaping job for $text (see BengaliShapingService /
+     * courier_waybill_context.md §4.7) if it contains Bengali, and returns
+     * the job id to look up later — or null if there's nothing to shape
+     * (caller keeps using the plain reorderBengaliMatras() text as-is, no
+     * image involved). $maxWidthMm null means single-line/no-wrap.
+     */
+    private function queueShapingJob(
+        array &$jobs,
+        string $id,
+        ?string $text,
+        float $fontSizePx,
+        bool $bold,
+        ?float $maxWidthMm = null,
+        string $color = '#101418'
+    ): ?string {
+        if (! $this->containsBengali($text)) {
+            return null;
+        }
+
+        $jobs[$id] = [
+            'text' => $text,
+            'fontPath' => $bold ? $this->fontBoldPath() : $this->fontRegularPath(),
+            'latinFontPath' => base_path($bold
+                ? 'vendor/dompdf/dompdf/lib/fonts/DejaVuSans-Bold.ttf'
+                : 'vendor/dompdf/dompdf/lib/fonts/DejaVuSans.ttf'),
+            'fontSizePx' => $fontSizePx,
+            'maxWidthPx' => $maxWidthMm !== null ? BengaliShapingService::mmToPx($maxWidthMm) : 0,
+            'color' => $color,
+        ];
+
+        return $id;
     }
 
     /**
@@ -269,8 +321,21 @@ class WaybillPdfService
         $geometry = $this->geometryFor($effectiveKey, $pageWidthMm, $pageHeightMm);
 
         $shopProfiles = [];
+        // Real-shaping (courier_waybill_context.md §4.7) is currently wired
+        // up for the 'classic' template only — see that section for why,
+        // and the pattern to extend it to the other 21. Every other
+        // template still uses the regex-reorder text approach below as its
+        // ONLY rendering (never a "fallback" for them — no jobs are ever
+        // queued for them, so $shaped stays empty and every *Img field is null).
+        $shapeThisDoc = $effectiveKey === 'classic';
+        $shapingJobs = [];
+        $addrLimit = $pageWidthMm == 58 ? 60 : 90;
+        $labelFontPx = $pageWidthMm == 58 ? 17 : 20;
+        $bodyFontPx  = $pageWidthMm == 58 ? 9 : 10;
 
-        $labels = $orders->map(function (Order $order) use (&$shopProfiles) {
+        $labels = $orders->values()->map(function (Order $order, int $index) use (
+            &$shopProfiles, &$shapingJobs, $shapeThisDoc, $addrLimit, $labelFontPx, $bodyFontPx, $pageWidthMm, $geometry
+        ) {
             $shop = $order->user?->shopOwner();
             $ownerId = $shop?->id;
 
@@ -298,28 +363,73 @@ class WaybillPdfService
             $showPhone   = $profile?->show_phone_on_sticker   ?? true;
             $showAddress = $profile?->show_address_on_sticker ?? true;
 
+            // Raw (un-reordered) text — this is what gets shaped. HarfBuzz
+            // does its own correct complex-script reordering internally;
+            // feeding it text already mangled by reorderBengaliMatras()'s
+            // regex would double-reorder it into a THIRD, wrong order (this
+            // was caught in testing — see courier_waybill_context.md §4.7).
+            // The regex-reordered variants below exist only as the
+            // plain-text fallback for when shaping isn't available.
+            $rawShopName  = $profile?->shop_name ?? $shop?->name ?? '—';
+            $shopPhone    = $showPhone ? ($profile?->phone ?? $shop?->mobile ?? '—') : null;
+            $rawShopAddress = $showAddress && $profile?->address ? Str::limit($profile->address, $addrLimit) : null;
+            $rawCustomerName = $order->customer_name ?: '—';
+            $rawAddress   = $address !== '' ? $address : '—';
+            $rawItemsSummary = Str::limit($itemsSummary, $addrLimit);
+            $rawNotes     = $order->notes ? Str::limit($order->notes, $addrLimit) : null;
+            // "শপনাম · ফোন" — built here (not in Blade) so it can be shaped
+            // as one image when it contains Bengali, keeping the middot and
+            // phone number on the same visual baseline as the shop name.
+            $rawFromLine  = $rawShopName . ($shopPhone ? ' · ' . $shopPhone : '');
+
+            $shopName     = $this->reorderBengaliMatras($rawShopName);
+            $shopAddress  = $rawShopAddress !== null ? $this->reorderBengaliMatras($rawShopAddress) : null;
+            $customerName = $this->reorderBengaliMatras($rawCustomerName);
+            $addressText  = $this->reorderBengaliMatras($rawAddress);
+            $itemsSummaryText = $this->reorderBengaliMatras($rawItemsSummary);
+            $notesText    = $rawNotes !== null ? $this->reorderBengaliMatras($rawNotes) : null;
+            $fromLine     = $this->reorderBengaliMatras($rawFromLine);
+
+            $contentWidthMm = $geometry['contentWidthMm'] ?? null;
+
+            $jobIds = [];
+            if ($shapeThisDoc) {
+                $jobIds['customerName'] = $this->queueShapingJob($shapingJobs, "o{$index}_customerName", $rawCustomerName, $labelFontPx, true);
+                $jobIds['address']      = $this->queueShapingJob($shapingJobs, "o{$index}_address", $rawAddress, $bodyFontPx, false, $contentWidthMm, '#4a5563');
+                $jobIds['fromLine']     = $this->queueShapingJob($shapingJobs, "o{$index}_fromLine", $rawFromLine, $bodyFontPx, false, $contentWidthMm);
+                $jobIds['shopAddress']  = $this->queueShapingJob($shapingJobs, "o{$index}_shopAddress", $rawShopAddress, $bodyFontPx, false, $contentWidthMm, '#4a5563');
+                $jobIds['itemsSummary'] = $this->queueShapingJob($shapingJobs, "o{$index}_itemsSummary", $rawItemsSummary, $bodyFontPx, false, $contentWidthMm, '#4a5563');
+                $jobIds['notes']        = $this->queueShapingJob($shapingJobs, "o{$index}_notes", $rawNotes, $bodyFontPx, false, $contentWidthMm, '#4a5563');
+            }
+
             return [
                 'order'        => $order,
                 'codAmount'    => $codAmount,
                 // Shop Profile (Settings → Shop Profile) is the source of
                 // truth once set up; falls back to the account's own
                 // name/mobile so labels aren't blank before a seller fills it in.
-                'shopName'     => $this->reorderBengaliMatras($profile?->shop_name ?? $shop?->name) ?? '—',
-                'shopPhone'    => $showPhone ? ($profile?->phone ?? $shop?->mobile ?? '—') : null,
-                'shopAddress'  => $showAddress ? $this->reorderBengaliMatras($profile?->address) : null,
+                'shopName'     => $shopName,
+                'shopPhone'    => $shopPhone,
+                'shopAddress'  => $shopAddress,
                 'shopLogo'     => $this->logoDataUri($profile?->logo_path),
-                'customerName' => $this->reorderBengaliMatras($order->customer_name) ?? '—',
+                'customerName' => $customerName,
                 'itemCount'    => $order->items->sum('quantity'),
-                'itemsSummary' => $this->reorderBengaliMatras($itemsSummary),
+                'itemsSummary' => $itemsSummaryText,
                 'skuSummary'   => $this->skuSummary($order),
                 'itemRows'     => $this->itemRows($order),
                 'subtotal'     => (float) $order->subtotal,
                 'shippingCharge' => (float) $order->shipping_charge,
                 'discount'     => (float) $order->discount,
-                'address'      => $this->reorderBengaliMatras($address) ?: '—',
-                'notes'        => $this->reorderBengaliMatras($order->notes),
+                'address'      => $addressText,
+                'notes'        => $notesText,
+                'fromLine'     => $fromLine,
                 'barcode'      => $this->barcodeDataUri($order->courier_tracking_id),
                 'qr'           => $this->qrDataUri($order, $codAmount),
+                // Real-shaped Bengali images (courier_waybill_context.md §4.7)
+                // — null for every field on every template except 'classic'
+                // for now; Blade falls back to the plain .i18n text above
+                // whenever the corresponding *Img key is null.
+                '_shapeJobIds' => $jobIds,
                 // Pathao-layout-only fields — cheap to compute even when
                 // the active template isn't 'pathao', so no branching needed here.
                 'weightKg'     => $order->courier_weight_kg !== null ? (float) $order->courier_weight_kg : 0.5,
@@ -329,6 +439,25 @@ class WaybillPdfService
                 'zoneName'     => $this->pathaoLocationName($order->pathao_zone_id),
                 'areaName'     => $this->pathaoLocationName($order->pathao_area_id),
             ];
+        });
+
+        // One batched Node/HarfBuzz invocation for the WHOLE document,
+        // regardless of how many orders/fields need shaping — see
+        // BengaliShapingService's doc comment for why per-field spawning
+        // would be too slow. Any field the shaper couldn't handle (Node
+        // unavailable, timeout, etc.) simply has no *Img entry, and Blade's
+        // fallback (the plain reordered text already in the label) renders
+        // exactly as it did before this feature existed.
+        $shaped = $shapeThisDoc ? $this->bengaliShaper->shapeBatch($shapingJobs) : [];
+        $labels = $labels->map(function (array $label) use ($shaped) {
+            foreach ($label['_shapeJobIds'] ?? [] as $field => $jobId) {
+                $result = $jobId !== null ? ($shaped[$jobId] ?? null) : null;
+                $label["{$field}Img"]  = $result['dataUri'] ?? null;
+                $label["{$field}ImgW"] = $result['widthMm'] ?? null;
+                $label["{$field}ImgH"] = $result['heightMm'] ?? null;
+            }
+            unset($label['_shapeJobIds']);
+            return $label;
         });
 
         return Pdf::loadView('couriers.waybill', [
@@ -444,8 +573,9 @@ class WaybillPdfService
         $barcodeWidthMm = $widthMm - (2 * $paddingMm) - 2;
         $qrSizeMm = $widthMm == 58 ? 16 : 20;
         $qrTextWidthMm = $widthMm - (2 * $paddingMm) - $qrSizeMm - 2;
+        $contentWidthMm = $widthMm - (2 * $paddingMm);
 
-        return compact('paddingMm', 'barcodeWidthMm', 'qrSizeMm', 'qrTextWidthMm') + ['widthMm' => $widthMm];
+        return compact('paddingMm', 'barcodeWidthMm', 'qrSizeMm', 'qrTextWidthMm', 'contentWidthMm') + ['widthMm' => $widthMm];
     }
 
     /** Geometry for the 'pathao' template — see courier_waybill_context.md §5 for the derivation of these fractions. */

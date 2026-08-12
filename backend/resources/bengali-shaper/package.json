@@ -1,0 +1,10 @@
+{
+  "name": "bengali-shaper",
+  "private": true,
+  "version": "1.0.0",
+  "description": "HarfBuzz-based complex-script text shaping for Bengali PDF content — see courier_waybill_context.md §4.5/§4.7. Renders text to SVG glyph outlines (real OpenType GSUB ligatures + GPOS mark positioning) so dompdf (which has no shaping engine of its own) can embed it as an <img> instead of drawing raw, un-shaped codepoints.",
+  "type": "module",
+  "dependencies": {
+    "harfbuzzjs": "^1.6.0"
+  }
+}

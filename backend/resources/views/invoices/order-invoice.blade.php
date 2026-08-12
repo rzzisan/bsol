@@ -52,8 +52,21 @@
       @if($logoUrl)
         <img class="logo" src="{{ $logoUrl }}">
       @endif
-      <div class="shop-name i18n">{{ $shopName }}</div>
-      @if($shopAddress)<div class="shop-meta i18n">{{ $shopAddress }}</div>@endif
+      {{-- Real-shaped image when available (proper conjunct ligatures —
+           see courier_waybill_context.md §4.7), plain reordered text
+           otherwise. --}}
+      @if($shopNameImg)
+        <img src="{{ $shopNameImg['dataUri'] }}" style="display:block; width:{{ $shopNameImg['widthMm'] }}mm; height:{{ $shopNameImg['heightMm'] }}mm;">
+      @else
+        <div class="shop-name i18n">{{ $shopName }}</div>
+      @endif
+      @if($shopAddress)
+        @if($shopAddressImg)
+          <img src="{{ $shopAddressImg['dataUri'] }}" style="display:block; margin-top:2px; width:{{ $shopAddressImg['widthMm'] }}mm; height:{{ $shopAddressImg['heightMm'] }}mm;">
+        @else
+          <div class="shop-meta i18n">{{ $shopAddress }}</div>
+        @endif
+      @endif
       <div class="shop-meta">
         @if($shopPhone){{ $shopPhone }}@endif
         @if($shopPhone && $shopEmail) &middot; @endif
@@ -78,9 +91,17 @@
 
   <div class="bill-to">
     <div class="section-label">BILL TO</div>
-    <div class="name i18n">{{ $customerName }}</div>
+    @if($customerNameImg)
+      <img src="{{ $customerNameImg['dataUri'] }}" style="display:block; width:{{ $customerNameImg['widthMm'] }}mm; height:{{ $customerNameImg['heightMm'] }}mm;">
+    @else
+      <div class="name i18n">{{ $customerName }}</div>
+    @endif
     <div class="muted">{{ $order->customer_phone }}</div>
-    <div class="muted i18n" style="margin-top:2px">{{ $address }}</div>
+    @if($addressImg)
+      <img src="{{ $addressImg['dataUri'] }}" style="display:block; margin-top:2px; width:{{ $addressImg['widthMm'] }}mm; height:{{ $addressImg['heightMm'] }}mm;">
+    @else
+      <div class="muted i18n" style="margin-top:2px">{{ $address }}</div>
+    @endif
   </div>
 
   <table class="items-table">
@@ -94,13 +115,17 @@
       @foreach($items as $item)
       <tr>
         <td>
-          <span class="i18n">{{ $item['name'] }}</span>
-          @if($item['sku'] || $item['variant'])
-            <div class="item-sub i18n">
-              @if($item['sku']){{ $item['sku'] }}@endif
-              @if($item['sku'] && $item['variant']) &middot; @endif
-              @if($item['variant']){{ $item['variant'] }}@endif
-            </div>
+          @if($item['nameImg'])
+            <img src="{{ $item['nameImg']['dataUri'] }}" style="display:block; width:{{ $item['nameImg']['widthMm'] }}mm; height:{{ $item['nameImg']['heightMm'] }}mm;">
+          @else
+            <span class="i18n">{{ $item['name'] }}</span>
+          @endif
+          @if($item['sub'])
+            @if($item['subImg'])
+              <img src="{{ $item['subImg']['dataUri'] }}" style="display:block; margin-top:2px; width:{{ $item['subImg']['widthMm'] }}mm; height:{{ $item['subImg']['heightMm'] }}mm;">
+            @else
+              <div class="item-sub i18n">{{ $item['sub'] }}</div>
+            @endif
           @endif
         </td>
         <td class="num">{{ $item['quantity'] }}</td>
@@ -139,7 +164,16 @@
   @endif
 
   @if($order->notes)
-    <div class="notes-box i18n">{{ $order->notes }}</div>
+    <div class="notes-box">
+      @if($notesImg)
+        <img src="{{ $notesImg['dataUri'] }}" style="display:block; width:{{ $notesImg['widthMm'] }}mm; height:{{ $notesImg['heightMm'] }}mm;">
+      @else
+        {{-- $notesText, not raw $order->notes — this was previously
+             rendered un-reordered (a separate latent bug fixed in passing;
+             the shaped image path above is unaffected either way). --}}
+        <span class="i18n">{{ $notesText }}</span>
+      @endif
+    </div>
   @endif
 
   <div class="footer i18n">This is a computer-generated invoice from {{ $shopName }}. No signature required.</div>

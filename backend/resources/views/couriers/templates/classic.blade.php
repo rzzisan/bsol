@@ -22,16 +22,35 @@
   <div class="rule-heavy"></div>
 
   <div class="section-label">TO (RECEIVER)</div>
-  <div class="to-name i18n">{{ $label['customerName'] }}</div>
+  {{-- Real-shaped image when available (proper conjunct ligatures — see
+       courier_waybill_context.md §4.7), plain reordered text otherwise.
+       Every *Img field is null on every template except 'classic' today. --}}
+  @if($label['customerNameImg'])
+    <img class="to-name-img" src="{{ $label['customerNameImg'] }}" style="width:{{ $label['customerNameImgW'] }}mm; height:{{ $label['customerNameImgH'] }}mm;">
+  @else
+    <div class="to-name i18n">{{ $label['customerName'] }}</div>
+  @endif
   <div class="to-phone">{{ $order->customer_phone }}</div>
-  <div class="to-address muted i18n">{{ $label['address'] }}</div>
+  @if($label['addressImg'])
+    <img class="to-address-img" src="{{ $label['addressImg'] }}" style="width:{{ $label['addressImgW'] }}mm; height:{{ $label['addressImgH'] }}mm;">
+  @else
+    <div class="to-address muted i18n">{{ $label['address'] }}</div>
+  @endif
 
   <div class="rule"></div>
 
   <div class="section-label">FROM (SENDER)</div>
-  <div class="from-line i18n">{{ $label['shopName'] }}@if($label['shopPhone']) &middot; {{ $label['shopPhone'] }}@endif</div>
+  @if($label['fromLineImg'])
+    <img class="from-line-img" src="{{ $label['fromLineImg'] }}" style="width:{{ $label['fromLineImgW'] }}mm; height:{{ $label['fromLineImgH'] }}mm;">
+  @else
+    <div class="from-line i18n">{{ $label['shopName'] }}@if($label['shopPhone']) &middot; {{ $label['shopPhone'] }}@endif</div>
+  @endif
   @if($label['shopAddress'])
-    <div class="muted i18n">{{ \Illuminate\Support\Str::limit($label['shopAddress'], $pageWidthMm == 58 ? 60 : 90) }}</div>
+    @if($label['shopAddressImg'])
+      <img class="muted-img" src="{{ $label['shopAddressImg'] }}" style="width:{{ $label['shopAddressImgW'] }}mm; height:{{ $label['shopAddressImgH'] }}mm;">
+    @else
+      <div class="muted i18n">{{ $label['shopAddress'] }}</div>
+    @endif
   @endif
 
   <div class="rule"></div>
@@ -39,13 +58,21 @@
   <div class="section-label">ORDER</div>
   <div class="order-line">{{ $order->order_number }} &middot; {{ $label['itemCount'] }} item(s)</div>
   @if($label['itemsSummary'])
-    <div class="muted i18n footer-note">{{ \Illuminate\Support\Str::limit($label['itemsSummary'], $pageWidthMm == 58 ? 60 : 90) }}</div>
+    @if($label['itemsSummaryImg'])
+      <img class="muted-img footer-note" src="{{ $label['itemsSummaryImg'] }}" style="width:{{ $label['itemsSummaryImgW'] }}mm; height:{{ $label['itemsSummaryImgH'] }}mm;">
+    @else
+      <div class="muted i18n footer-note">{{ $label['itemsSummary'] }}</div>
+    @endif
   @endif
 
   @if($label['notes'])
     <div class="rule"></div>
     <div class="section-label">NOTE</div>
-    <div class="muted i18n">{{ \Illuminate\Support\Str::limit($label['notes'], $pageWidthMm == 58 ? 60 : 90) }}</div>
+    @if($label['notesImg'])
+      <img class="muted-img" src="{{ $label['notesImg'] }}" style="width:{{ $label['notesImgW'] }}mm; height:{{ $label['notesImgH'] }}mm;">
+    @else
+      <div class="muted i18n">{{ $label['notes'] }}</div>
+    @endif
   @endif
 
   <div class="rule"></div>

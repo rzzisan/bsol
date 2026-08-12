@@ -753,7 +753,7 @@ class CourierController extends Controller
             ->findOrFail($orderId);
 
         $widthMm = (int) $request->query('size', 80);
-        $pdf = (new WaybillPdfService())->render([$order], $widthMm);
+        $pdf = app(WaybillPdfService::class)->render([$order], $widthMm);
 
         return $pdf->stream("waybill-{$order->order_number}.pdf")
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
@@ -775,7 +775,7 @@ class CourierController extends Controller
 
         abort_if($orders->isEmpty(), 422, 'No booked orders found for the selected IDs.');
 
-        $pdf = (new WaybillPdfService())->render($orders, (int) ($data['size'] ?? 80));
+        $pdf = app(WaybillPdfService::class)->render($orders, (int) ($data['size'] ?? 80));
 
         return $pdf->stream('waybills.pdf')
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');

@@ -48,6 +48,14 @@
   .muted { color: #4a5563; font-size: {{ $pageWidthMm == 58 ? '7.5px' : '8.5px' }}; }
   .section-label { font-size: {{ $pageWidthMm == 58 ? '7px' : '8px' }}; color: #4a5563; text-transform: uppercase; letter-spacing: 0.5px; }
   .to-name { font-size: {{ $pageWidthMm == 58 ? '17px' : '20px' }}; font-weight: bold; margin-top: 1px; }
+  {{-- Real-shaped Bengali fields (courier_waybill_context.md §4.7) render
+       as an <img> instead of text — these just match the margin-top of
+       their text-based sibling class so the two look identical whichever
+       path a given field takes (shaping succeeded vs. plain-text fallback). --}}
+  .to-name-img { display: block; margin-top: 1px; }
+  .to-address-img { display: block; margin-top: 1px; }
+  .from-line-img { display: block; }
+  .muted-img { display: block; }
   .to-phone { font-size: {{ $pageWidthMm == 58 ? '15px' : '17px' }}; font-weight: bold; }
   .to-address { font-size: {{ $pageWidthMm == 58 ? '9px' : '10px' }}; margin-top: 1px; }
   .from-line { font-size: {{ $pageWidthMm == 58 ? '9px' : '10px' }}; }
