@@ -77,6 +77,10 @@ class Bsol_Api {
 		return $this->remote_post( 'orders/sync', $order_data );
 	}
 
+	public function sync_product( $product_data ) {
+		return $this->remote_post( 'products/sync', $product_data );
+	}
+
 	public function sync_order_status( $wc_order_id, $status, $note = null ) {
 		return $this->remote_post(
 			'orders/sync-status',

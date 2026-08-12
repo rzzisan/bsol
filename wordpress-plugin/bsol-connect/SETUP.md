@@ -23,6 +23,22 @@ a real WooCommerce staging site before rolling out to sellers.
 3. Expect "Connected successfully!" and the Dashboard tab to show the shop
    name/domain. A domain mismatch shows BSOL's own error message directly.
 
+## Product sync
+
+1. Create a simple WooCommerce product (name, SKU, regular price, a sale
+   price, stock quantity) and publish it.
+2. In BSOL dashboard → Products, confirm it appears with matching
+   name/price/discount/stock, tagged as synced from WooCommerce.
+3. Create a **variable** product with 2+ variations (different SKUs/prices/
+   stock per variation), publish it.
+4. Confirm the parent product and all variants appear in BSOL, with
+   `has_variants` on and each variant's own stock/price.
+5. Edit the price or stock of the simple product (or a variation) and save
+   — confirm BSOL updates the *same* product/variant, not a duplicate.
+6. Place a WooCommerce order using a SKU that was already synced — confirm
+   the resulting BSOL order's line item is linked to the real product (not
+   just an unlinked ad-hoc entry).
+
 ## Order sync
 
 1. Place a test order on the WooCommerce store (any payment method).
