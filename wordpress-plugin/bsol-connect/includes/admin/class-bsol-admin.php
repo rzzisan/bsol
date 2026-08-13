@@ -48,27 +48,45 @@ class Bsol_Admin {
 		$active_tab   = $is_connected && isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : 'dashboard';
 		?>
 		<div class="wrap bsol-wrap">
-			<h1><?php esc_html_e( 'BSOL Connect', 'bsol-connect' ); ?></h1>
+			<h1 class="bsol-page-title"><?php esc_html_e( 'BSOL Connect', 'bsol-connect' ); ?></h1>
+
+			<div class="bsol-header">
+				<div class="bsol-header-left">
+					<span class="bsol-logo-mark" aria-hidden="true">B</span>
+					<div>
+						<p class="bsol-header-title"><?php esc_html_e( 'BSOL Connect', 'bsol-connect' ); ?></p>
+						<p class="bsol-header-sub"><?php esc_html_e( 'Order sync, product sync, courier booking & fraud checks', 'bsol-connect' ); ?></p>
+					</div>
+				</div>
+				<div class="bsol-header-right">
+					<?php if ( $is_connected ) : ?>
+						<span class="bsol-pill bsol-pill-connected"><span class="bsol-dot"></span><?php esc_html_e( 'Connected', 'bsol-connect' ); ?></span>
+					<?php else : ?>
+						<span class="bsol-pill bsol-pill-disconnected"><span class="bsol-dot"></span><?php esc_html_e( 'Not connected', 'bsol-connect' ); ?></span>
+					<?php endif; ?>
+				</div>
+			</div>
+
 			<?php settings_errors( 'bsol_messages' ); ?>
 
 			<?php if ( $is_connected ) : ?>
-				<h2 class="nav-tab-wrapper">
-					<a href="?page=bsol_connect&tab=dashboard" class="nav-tab <?php echo 'dashboard' === $active_tab ? 'nav-tab-active' : ''; ?>">
+				<div class="bsol-tabs">
+					<a href="?page=bsol_connect&tab=dashboard" class="bsol-tab <?php echo 'dashboard' === $active_tab ? 'is-active' : ''; ?>">
 						<?php esc_html_e( 'Dashboard', 'bsol-connect' ); ?>
 					</a>
-					<a href="?page=bsol_connect&tab=log" class="nav-tab <?php echo 'log' === $active_tab ? 'nav-tab-active' : ''; ?>">
+					<a href="?page=bsol_connect&tab=log" class="bsol-tab <?php echo 'log' === $active_tab ? 'is-active' : ''; ?>">
 						<?php esc_html_e( 'Activity Log', 'bsol-connect' ); ?>
 					</a>
-					<a href="?page=bsol_connect&tab=sync" class="nav-tab <?php echo 'sync' === $active_tab ? 'nav-tab-active' : ''; ?>">
+					<a href="?page=bsol_connect&tab=sync" class="bsol-tab <?php echo 'sync' === $active_tab ? 'is-active' : ''; ?>">
 						<?php esc_html_e( 'Sync Data', 'bsol-connect' ); ?>
 					</a>
-					<a href="?page=bsol_connect&tab=settings" class="nav-tab <?php echo 'settings' === $active_tab ? 'nav-tab-active' : ''; ?>">
+					<a href="?page=bsol_connect&tab=settings" class="bsol-tab <?php echo 'settings' === $active_tab ? 'is-active' : ''; ?>">
 						<?php esc_html_e( 'Settings', 'bsol-connect' ); ?>
 					</a>
-				</h2>
+				</div>
 			<?php endif; ?>
 
-			<div class="bsol-card" style="margin-top:16px;max-width:<?php echo in_array( $active_tab, array( 'log', 'sync' ), true ) ? '900px' : '640px'; ?>;">
+			<div class="bsol-card" style="max-width:<?php echo in_array( $active_tab, array( 'log', 'sync' ), true ) ? '900px' : '680px'; ?>;">
 				<?php
 				if ( ! $is_connected || 'settings' === $active_tab ) {
 					$this->render_settings_tab();
@@ -97,11 +115,17 @@ class Bsol_Admin {
 		$connected = ! empty( $domain );
 		?>
 		<?php if ( $connected ) : ?>
-			<p><strong><?php esc_html_e( 'Status:', 'bsol-connect' ); ?></strong>
-				<span style="color:#1a7f37;"><?php esc_html_e( 'Connected', 'bsol-connect' ); ?></span>
-				<?php echo esc_html( ' — ' . $domain ); ?>
-			</p>
-			<p><?php esc_html_e( 'This site is syncing orders and fraud checks with BSOL.', 'bsol-connect' ); ?></p>
+			<div class="bsol-stat-grid">
+				<div class="bsol-stat-card">
+					<span class="bsol-stat-label"><?php esc_html_e( 'Status', 'bsol-connect' ); ?></span>
+					<span class="bsol-stat-value" style="color:#1a7f37;"><?php esc_html_e( 'Connected', 'bsol-connect' ); ?></span>
+				</div>
+				<div class="bsol-stat-card">
+					<span class="bsol-stat-label"><?php esc_html_e( 'Domain', 'bsol-connect' ); ?></span>
+					<span class="bsol-stat-value"><?php echo esc_html( $domain ); ?></span>
+				</div>
+			</div>
+			<p class="description"><?php esc_html_e( 'This site is syncing orders and fraud checks with BSOL.', 'bsol-connect' ); ?></p>
 			<form method="post" action="" onsubmit="return confirm('<?php echo esc_js( __( 'Disconnect this site from BSOL? New orders will stop syncing until you reconnect.', 'bsol-connect' ) ); ?>');">
 				<?php wp_nonce_field( 'bsol_disconnect_action' ); ?>
 				<button type="submit" name="bsol_disconnect" class="button button-secondary">
@@ -179,64 +203,65 @@ class Bsol_Admin {
 		$domain        = get_option( 'bsol_domain', '' );
 		$connected_at  = get_option( 'bsol_connected_at', '' );
 		?>
-		<table class="form-table" role="presentation">
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Shop', 'bsol-connect' ); ?></th>
-				<td><?php echo esc_html( $shop_name ?: '—' ); ?></td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Domain', 'bsol-connect' ); ?></th>
-				<td><?php echo esc_html( $domain ); ?></td>
-			</tr>
-			<tr>
-				<th scope="row"><?php esc_html_e( 'Connected since', 'bsol-connect' ); ?></th>
-				<td><?php echo esc_html( $connected_at ?: '—' ); ?></td>
-			</tr>
-		</table>
+		<div class="bsol-stat-grid">
+			<div class="bsol-stat-card">
+				<span class="bsol-stat-label"><?php esc_html_e( 'Shop', 'bsol-connect' ); ?></span>
+				<span class="bsol-stat-value"><?php echo esc_html( $shop_name ?: '—' ); ?></span>
+			</div>
+			<div class="bsol-stat-card">
+				<span class="bsol-stat-label"><?php esc_html_e( 'Domain', 'bsol-connect' ); ?></span>
+				<span class="bsol-stat-value"><?php echo esc_html( $domain ); ?></span>
+			</div>
+			<div class="bsol-stat-card">
+				<span class="bsol-stat-label"><?php esc_html_e( 'Connected since', 'bsol-connect' ); ?></span>
+				<span class="bsol-stat-value"><?php echo esc_html( $connected_at ?: '—' ); ?></span>
+			</div>
+		</div>
 
-		<hr />
+		<div class="bsol-section">
+			<h3 class="bsol-section-title"><?php esc_html_e( 'Test Fraud Check', 'bsol-connect' ); ?></h3>
+			<p class="description"><?php esc_html_e( 'Look up a phone number to confirm the connection is working — the same check runs automatically on your WooCommerce orders list.', 'bsol-connect' ); ?></p>
+			<form method="post" action="?page=bsol_connect&tab=dashboard" class="bsol-inline-form">
+				<?php wp_nonce_field( 'bsol_fraud_check_action' ); ?>
+				<input type="text" name="bsol_fraud_phone" placeholder="01XXXXXXXXX" class="regular-text" />
+				<button type="submit" name="bsol_check_fraud" class="button"><?php esc_html_e( 'Check', 'bsol-connect' ); ?></button>
+			</form>
 
-		<h3><?php esc_html_e( 'Test Fraud Check', 'bsol-connect' ); ?></h3>
-		<p class="description"><?php esc_html_e( 'Look up a phone number to confirm the connection is working — the same check runs automatically on your WooCommerce orders list.', 'bsol-connect' ); ?></p>
-		<form method="post" action="?page=bsol_connect&tab=dashboard">
-			<?php wp_nonce_field( 'bsol_fraud_check_action' ); ?>
-			<input type="text" name="bsol_fraud_phone" placeholder="01XXXXXXXXX" class="regular-text" />
-			<button type="submit" name="bsol_check_fraud" class="button"><?php esc_html_e( 'Check', 'bsol-connect' ); ?></button>
-		</form>
-
-		<?php if ( $fraud_result ) : ?>
-			<?php if ( ! empty( $fraud_result['success'] ) ) : ?>
-				<?php $data = $fraud_result['data']; ?>
-				<p style="margin-top:12px;">
-					<strong><?php esc_html_e( 'Risk level:', 'bsol-connect' ); ?></strong>
-					<?php echo esc_html( ucfirst( $data['risk_level'] ) ); ?>
-					(<?php echo esc_html( 'score ' . $data['fraud_score'] . '/100' ); ?>)
-					<?php if ( ! empty( $data['is_blacklisted'] ) ) : ?>
-						— <span style="color:#b32d2e;"><?php esc_html_e( 'Blacklisted', 'bsol-connect' ); ?></span>
-					<?php endif; ?>
-				</p>
-			<?php else : ?>
-				<p style="margin-top:12px;color:#b32d2e;"><?php echo esc_html( $fraud_result['message'] ?? __( 'Check failed.', 'bsol-connect' ) ); ?></p>
+			<?php if ( $fraud_result ) : ?>
+				<?php if ( ! empty( $fraud_result['success'] ) ) : ?>
+					<?php $data = $fraud_result['data']; ?>
+					<div class="bsol-result bsol-result-ok">
+						<strong><?php esc_html_e( 'Risk level:', 'bsol-connect' ); ?></strong>
+						<?php echo esc_html( ucfirst( $data['risk_level'] ) ); ?>
+						(<?php echo esc_html( 'score ' . $data['fraud_score'] . '/100' ); ?>)
+						<?php if ( ! empty( $data['is_blacklisted'] ) ) : ?>
+							— <strong><?php esc_html_e( 'Blacklisted', 'bsol-connect' ); ?></strong>
+						<?php endif; ?>
+					</div>
+				<?php else : ?>
+					<div class="bsol-result bsol-result-error"><?php echo esc_html( $fraud_result['message'] ?? __( 'Check failed.', 'bsol-connect' ) ); ?></div>
+				<?php endif; ?>
 			<?php endif; ?>
-		<?php endif; ?>
+		</div>
 
-		<hr />
+		<div class="bsol-section">
+			<h3 class="bsol-section-title"><?php esc_html_e( 'Steadfast Balance', 'bsol-connect' ); ?></h3>
+			<form method="post" action="?page=bsol_connect&tab=dashboard" class="bsol-inline-form">
+				<?php wp_nonce_field( 'bsol_check_balance_action' ); ?>
+				<button type="submit" name="bsol_check_balance" class="button"><?php esc_html_e( 'Check Balance', 'bsol-connect' ); ?></button>
+			</form>
 
-		<h3><?php esc_html_e( 'Steadfast Balance', 'bsol-connect' ); ?></h3>
-		<form method="post" action="?page=bsol_connect&tab=dashboard">
-			<?php wp_nonce_field( 'bsol_check_balance_action' ); ?>
-			<button type="submit" name="bsol_check_balance" class="button"><?php esc_html_e( 'Check Balance', 'bsol-connect' ); ?></button>
-		</form>
-
-		<?php if ( $balance_result ) : ?>
-			<?php if ( ! empty( $balance_result['success'] ) && isset( $balance_result['data']['current_balance'] ) ) : ?>
-				<p style="margin-top:12px;"><strong><?php esc_html_e( 'Balance:', 'bsol-connect' ); ?></strong>
-					<?php echo esc_html( number_format( (float) $balance_result['data']['current_balance'], 2 ) ); ?> &#2547;
-				</p>
-			<?php else : ?>
-				<p style="margin-top:12px;color:#b32d2e;"><?php echo esc_html( $balance_result['message'] ?? __( 'Steadfast credentials are not configured on your BSOL dashboard.', 'bsol-connect' ) ); ?></p>
+			<?php if ( $balance_result ) : ?>
+				<?php if ( ! empty( $balance_result['success'] ) && isset( $balance_result['data']['current_balance'] ) ) : ?>
+					<div class="bsol-result bsol-result-ok">
+						<strong><?php esc_html_e( 'Balance:', 'bsol-connect' ); ?></strong>
+						<?php echo esc_html( number_format( (float) $balance_result['data']['current_balance'], 2 ) ); ?> &#2547;
+					</div>
+				<?php else : ?>
+					<div class="bsol-result bsol-result-error"><?php echo esc_html( $balance_result['message'] ?? __( 'Steadfast credentials are not configured on your BSOL dashboard.', 'bsol-connect' ) ); ?></div>
+				<?php endif; ?>
 			<?php endif; ?>
-		<?php endif; ?>
+		</div>
 		<?php
 	}
 
@@ -265,12 +290,12 @@ class Bsol_Admin {
 					<?php foreach ( $entries as $entry ) : ?>
 						<tr>
 							<td><?php echo esc_html( $entry['time'] ); ?></td>
-							<td><?php echo esc_html( $entry['type'] ); ?></td>
+							<td><span class="bsol-log-type"><?php echo esc_html( $entry['type'] ); ?></span></td>
 							<td>
 								<?php if ( ! empty( $entry['success'] ) ) : ?>
-									<span style="color:#1a7f37;">&#10003;</span>
+									<span class="bsol-log-status-ok">&#10003;</span>
 								<?php else : ?>
-									<span style="color:#b32d2e;">&#10007;</span>
+									<span class="bsol-log-status-fail">&#10007;</span>
 								<?php endif; ?>
 							</td>
 							<td><?php echo esc_html( mb_strimwidth( (string) $entry['message'], 0, 120, '…' ) ); ?></td>
@@ -299,30 +324,32 @@ class Bsol_Admin {
 	 */
 	private function render_sync_data_tab() {
 		?>
-		<h3><?php esc_html_e( 'Sync existing products', 'bsol-connect' ); ?></h3>
-		<p class="description">
-			<?php esc_html_e( 'Push every existing WooCommerce product into BSOL. New products already sync automatically as you save them — this is only for products that existed before connecting.', 'bsol-connect' ); ?>
-		</p>
-		<button type="button" class="button button-primary" id="bsol-bulk-sync-products-btn">
-			<?php esc_html_e( 'Sync All Products', 'bsol-connect' ); ?>
-		</button>
-		<div class="bsol-bulk-sync-progress" id="bsol-bulk-sync-products-progress" style="display:none;">
-			<div class="bsol-progress-bar-outer"><div class="bsol-progress-bar-inner"></div></div>
-			<p class="bsol-progress-status"></p>
+		<div class="bsol-section">
+			<h3 class="bsol-section-title"><?php esc_html_e( 'Sync existing products', 'bsol-connect' ); ?></h3>
+			<p class="description">
+				<?php esc_html_e( 'Push every existing WooCommerce product into BSOL. New products already sync automatically as you save them — this is only for products that existed before connecting.', 'bsol-connect' ); ?>
+			</p>
+			<button type="button" class="button button-primary" id="bsol-bulk-sync-products-btn">
+				<?php esc_html_e( 'Sync All Products', 'bsol-connect' ); ?>
+			</button>
+			<div class="bsol-bulk-sync-progress" id="bsol-bulk-sync-products-progress" style="display:none;">
+				<div class="bsol-progress-bar-outer"><div class="bsol-progress-bar-inner"></div></div>
+				<p class="bsol-progress-status"></p>
+			</div>
 		</div>
 
-		<hr />
-
-		<h3><?php esc_html_e( 'Sync existing orders', 'bsol-connect' ); ?></h3>
-		<p class="description">
-			<?php esc_html_e( 'Push every existing WooCommerce order into BSOL, with its current status. Backfilled orders do not trigger a checkout-OTP SMS or a Facebook Purchase event.', 'bsol-connect' ); ?>
-		</p>
-		<button type="button" class="button button-primary" id="bsol-bulk-sync-orders-btn">
-			<?php esc_html_e( 'Sync All Orders', 'bsol-connect' ); ?>
-		</button>
-		<div class="bsol-bulk-sync-progress" id="bsol-bulk-sync-orders-progress" style="display:none;">
-			<div class="bsol-progress-bar-outer"><div class="bsol-progress-bar-inner"></div></div>
-			<p class="bsol-progress-status"></p>
+		<div class="bsol-section">
+			<h3 class="bsol-section-title"><?php esc_html_e( 'Sync existing orders', 'bsol-connect' ); ?></h3>
+			<p class="description">
+				<?php esc_html_e( 'Push every existing WooCommerce order into BSOL, with its current status. Backfilled orders do not trigger a checkout-OTP SMS or a Facebook Purchase event.', 'bsol-connect' ); ?>
+			</p>
+			<button type="button" class="button button-primary" id="bsol-bulk-sync-orders-btn">
+				<?php esc_html_e( 'Sync All Orders', 'bsol-connect' ); ?>
+			</button>
+			<div class="bsol-bulk-sync-progress" id="bsol-bulk-sync-orders-progress" style="display:none;">
+				<div class="bsol-progress-bar-outer"><div class="bsol-progress-bar-inner"></div></div>
+				<p class="bsol-progress-status"></p>
+			</div>
 		</div>
 		<?php
 	}

@@ -1,41 +1,348 @@
-.bsol-health-bar {
-	display: inline-flex;
-	align-items: center;
-	padding: 3px 8px;
-	border-radius: 4px;
-	font-size: 12px;
-	font-weight: 600;
-	background: #f0f0f1;
-	color: #50575e;
+/*
+ * BSOL Connect admin UI — matches the BSOL dashboard's own visual language
+ * (frontend/src/app/globals.css: teal accent, warm-cream surface, pill nav,
+ * soft-shadow cards) instead of generic wp-admin chrome. This stylesheet
+ * only ever loads on the plugin's own settings screen and the WooCommerce
+ * orders screen (see enqueue_assets() in class-bsol-fraud-check.php /
+ * class-bsol-bulk-sync.php), so scoping tokens to :root here is safe — it
+ * never reaches any other wp-admin screen.
+ */
+
+:root {
+	--bsol-accent: #0f7c7b;
+	--bsol-accent-light: #27c0ae;
+	--bsol-accent-soft: #e3f4f2;
+	--bsol-fg: #1b1f2a;
+	--bsol-muted: #657089;
+	--bsol-border: rgba(199, 203, 215, 0.6);
+	--bsol-surface: #ffffff;
+	--bsol-surface-soft: #fff8ef;
+	--bsol-radius-lg: 16px;
+	--bsol-radius-md: 10px;
+	--bsol-shadow: 0 14px 30px rgba(17, 27, 44, 0.12);
+}
+
+/* ── Settings page shell ────────────────────────────────────────────────── */
+
+.bsol-wrap {
+	max-width: 980px;
+}
+
+.bsol-wrap .bsol-page-title {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
 	white-space: nowrap;
 }
 
-.bsol-health-bar.bsol-health-low {
+.bsol-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+	background: linear-gradient(135deg, var(--bsol-accent), var(--bsol-accent-light));
+	color: #fff;
+	border-radius: var(--bsol-radius-lg);
+	padding: 1.3rem 1.6rem;
+	margin: 18px 0 20px;
+	box-shadow: var(--bsol-shadow);
+}
+
+.bsol-header-left {
+	display: flex;
+	align-items: center;
+	gap: 0.9rem;
+	min-width: 0;
+}
+
+.bsol-logo-mark {
+	flex-shrink: 0;
+	width: 44px;
+	height: 44px;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.18);
+	display: grid;
+	place-items: center;
+	font-size: 1.1rem;
+	font-weight: 800;
+	letter-spacing: 0.02em;
+}
+
+.bsol-header-title {
+	margin: 0;
+	font-size: 1.15rem;
+	font-weight: 700;
+	color: #fff;
+	line-height: 1.2;
+}
+
+.bsol-header-sub {
+	margin: 3px 0 0;
+	font-size: 0.82rem;
+	opacity: 0.92;
+}
+
+.bsol-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	border-radius: 999px;
+	padding: 0.4rem 0.85rem;
+	font-size: 0.78rem;
+	font-weight: 700;
+	background: rgba(255, 255, 255, 0.18);
+	color: #fff;
+	white-space: nowrap;
+}
+
+.bsol-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: #34d399;
+	flex-shrink: 0;
+}
+
+.bsol-pill-disconnected .bsol-dot {
+	background: #f87171;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+
+.bsol-tabs {
+	display: flex;
+	gap: 0.4rem;
+	flex-wrap: wrap;
+	margin: 0 0 1.1rem;
+	padding: 0;
+	border: 0;
+}
+
+.bsol-tab {
+	display: inline-flex;
+	align-items: center;
+	border-radius: 999px;
+	padding: 0.5rem 1.05rem;
+	font-size: 0.84rem;
+	font-weight: 600;
+	color: var(--bsol-muted);
+	background: var(--bsol-surface);
+	border: 1px solid var(--bsol-border);
+	text-decoration: none;
+	transition: all 0.15s ease;
+}
+
+.bsol-tab:hover {
+	color: var(--bsol-fg);
+	background: var(--bsol-surface-soft);
+	border-color: var(--bsol-accent);
+}
+
+.bsol-tab.is-active,
+.bsol-tab.is-active:hover {
+	background: var(--bsol-accent);
+	border-color: var(--bsol-accent);
+	color: #fff;
+}
+
+/* ── Cards / panels ─────────────────────────────────────────────────────── */
+
+.bsol-wrap .bsol-card {
+	background: var(--bsol-surface);
+	border: 1px solid var(--bsol-border);
+	border-radius: var(--bsol-radius-lg);
+	box-shadow: var(--bsol-shadow);
+	padding: 1.5rem 1.6rem;
+}
+
+.bsol-section {
+	margin-top: 1.5rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid var(--bsol-border);
+}
+
+.bsol-section:first-child {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: 0;
+}
+
+.bsol-section-title {
+	margin: 0 0 0.35rem;
+	font-size: 0.98rem;
+	font-weight: 700;
+	color: var(--bsol-fg);
+}
+
+.bsol-wrap .description {
+	color: var(--bsol-muted);
+}
+
+/* ── Stat grid (dashboard tab) ──────────────────────────────────────────── */
+
+.bsol-stat-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 0.8rem;
+	margin-bottom: 1.5rem;
+}
+
+.bsol-stat-card {
+	background: var(--bsol-surface-soft);
+	border: 1px solid var(--bsol-border);
+	border-radius: 12px;
+	padding: 0.85rem 1rem;
+	display: grid;
+	gap: 0.25rem;
+}
+
+.bsol-stat-label {
+	font-size: 0.72rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--bsol-muted);
+}
+
+.bsol-stat-value {
+	font-size: 0.95rem;
+	font-weight: 600;
+	color: var(--bsol-fg);
+	word-break: break-word;
+}
+
+/* ── Buttons + inputs ───────────────────────────────────────────────────── */
+
+.bsol-wrap .button,
+.bsol-wrap .button-secondary {
+	border-radius: var(--bsol-radius-md);
+	border-color: var(--bsol-border);
+	color: var(--bsol-fg);
+	background: var(--bsol-surface);
+	box-shadow: none;
+	font-weight: 600;
+}
+
+.bsol-wrap .button:hover {
+	border-color: var(--bsol-accent);
+	color: var(--bsol-accent);
+	background: var(--bsol-surface-soft);
+}
+
+.bsol-wrap .button-primary,
+.bsol-wrap .button-primary:hover,
+.bsol-wrap .button-primary:focus {
+	background: var(--bsol-accent);
+	border-color: var(--bsol-accent);
+	color: #fff;
+	border-radius: var(--bsol-radius-md);
+	box-shadow: none;
+	font-weight: 700;
+}
+
+.bsol-wrap .button-primary:hover {
+	background: color-mix(in srgb, var(--bsol-accent) 88%, #000000);
+}
+
+.bsol-inline-form {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	margin-top: 0.6rem;
+}
+
+.bsol-wrap .form-table th {
+	color: var(--bsol-fg);
+	font-weight: 700;
+}
+
+.bsol-wrap input.regular-text,
+.bsol-wrap input[type="text"],
+.bsol-wrap input[type="password"] {
+	border-radius: var(--bsol-radius-md);
+	border-color: var(--bsol-border);
+}
+
+.bsol-wrap input.regular-text:focus,
+.bsol-wrap input[type="text"]:focus,
+.bsol-wrap input[type="password"]:focus {
+	border-color: var(--bsol-accent);
+	box-shadow: 0 0 0 2px var(--bsol-accent-soft);
+}
+
+/* ── Result banners (fraud check / balance check) ──────────────────────── */
+
+.bsol-result {
+	margin-top: 0.9rem;
+	border-radius: 10px;
+	padding: 0.6rem 0.8rem;
+	font-size: 0.85rem;
+}
+
+.bsol-result-ok {
 	background: #edfaef;
 	color: #1a7f37;
 }
 
-.bsol-health-bar.bsol-health-medium {
-	background: #fff8e5;
-	color: #996800;
-}
-
-.bsol-health-bar.bsol-health-high {
+.bsol-result-error {
 	background: #fcf0f1;
 	color: #b32d2e;
 }
 
-.bsol-health-bar.bsol-health-error {
-	background: #f0f0f1;
-	color: #8c8f94;
+/* ── Notices ────────────────────────────────────────────────────────────── */
+
+.bsol-wrap .notice {
+	border-radius: 10px;
+	border-left-width: 4px;
 }
 
-.bsol-wrap .bsol-card {
-	background: #fff;
-	border: 1px solid #dcdcde;
-	border-radius: 6px;
-	padding: 20px;
+/* ── Activity log ───────────────────────────────────────────────────────── */
+
+.bsol-wrap .widefat.striped {
+	border: 1px solid var(--bsol-border);
+	border-radius: 12px;
+	overflow: hidden;
+	border-spacing: 0;
 }
+
+.bsol-wrap .widefat thead th {
+	background: var(--bsol-surface-soft);
+	color: var(--bsol-muted);
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	border-bottom: 1px solid var(--bsol-border);
+}
+
+.bsol-wrap .widefat.striped tbody tr:nth-child(odd) {
+	background: var(--bsol-surface-soft);
+}
+
+.bsol-log-status-ok {
+	color: #1a7f37;
+	font-weight: 700;
+}
+
+.bsol-log-status-fail {
+	color: #b32d2e;
+	font-weight: 700;
+}
+
+.bsol-log-type {
+	display: inline-block;
+	background: var(--bsol-accent-soft);
+	color: var(--bsol-accent);
+	border-radius: 999px;
+	padding: 0.15rem 0.55rem;
+	font-size: 0.75rem;
+	font-weight: 700;
+}
+
+/* ── Sync Data progress ─────────────────────────────────────────────────── */
 
 .bsol-bulk-sync-progress {
 	margin-top: 12px;
@@ -44,20 +351,247 @@
 
 .bsol-progress-bar-outer {
 	height: 10px;
-	border-radius: 5px;
-	background: #f0f0f1;
+	border-radius: 999px;
+	background: var(--bsol-surface-soft);
+	border: 1px solid var(--bsol-border);
 	overflow: hidden;
 }
 
 .bsol-progress-bar-inner {
 	height: 100%;
 	width: 0%;
-	background: #2271b1;
+	background: linear-gradient(90deg, var(--bsol-accent), var(--bsol-accent-light));
 	transition: width 0.3s ease;
 }
 
 .bsol-progress-status {
 	margin: 6px 0 0;
 	font-size: 12px;
+	color: var(--bsol-muted);
+}
+
+/* ── Customer Health column (WooCommerce orders list) ──────────────────── */
+
+.bsol-health-bar {
+	display: inline-flex;
+	align-items: center;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 700;
+	background: #f0f0f1;
 	color: #50575e;
+	white-space: nowrap;
+	border: 1px solid transparent;
+}
+
+.bsol-health-bar.bsol-health-low {
+	background: #edfaef;
+	color: #1a7f37;
+	border-color: rgba(26, 127, 55, 0.15);
+}
+
+.bsol-health-bar.bsol-health-medium {
+	background: #fff8e5;
+	color: #996800;
+	border-color: rgba(153, 104, 0, 0.15);
+}
+
+.bsol-health-bar.bsol-health-high {
+	background: #fcf0f1;
+	color: #b32d2e;
+	border-color: rgba(179, 45, 46, 0.15);
+}
+
+.bsol-health-bar.bsol-health-error {
+	background: #f0f0f1;
+	color: #8c8f94;
+}
+
+/* ── Courier column (WooCommerce orders list) ───────────────────────────
+ * One "Book to Courier" pill button that opens a dropdown of couriers,
+ * instead of five separate buttons crowding the column.
+ */
+
+.bsol-courier-column {
+	position: relative;
+}
+
+.bsol-courier-picker {
+	position: relative;
+	display: inline-block;
+}
+
+.bsol-courier-book-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	border: 0;
+	border-radius: 999px;
+	padding: 0.4rem 0.85rem;
+	font-size: 12px;
+	font-weight: 700;
+	background: var(--bsol-accent);
+	color: #fff;
+	cursor: pointer;
+	box-shadow: none;
+	white-space: nowrap;
+}
+
+.bsol-courier-book-toggle:hover,
+.bsol-courier-book-toggle:focus {
+	background: color-mix(in srgb, var(--bsol-accent) 88%, #000000);
+	color: #fff;
+}
+
+.bsol-courier-book-toggle .dashicons {
+	font-size: 15px;
+	width: 15px;
+	height: 15px;
+}
+
+.bsol-courier-caret {
+	font-size: 9px;
+	transition: transform 0.15s ease;
+}
+
+.bsol-courier-picker.is-open .bsol-courier-caret {
+	transform: rotate(180deg);
+}
+
+.bsol-courier-picker.is-booking .bsol-courier-book-toggle {
+	opacity: 0.65;
+	cursor: default;
+}
+
+.bsol-courier-dropdown {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	z-index: 50;
+	min-width: 175px;
+	background: var(--bsol-surface);
+	border: 1px solid var(--bsol-border);
+	border-radius: 12px;
+	box-shadow: 0 14px 24px rgba(7, 14, 24, 0.18);
+	padding: 0.35rem;
+}
+
+.bsol-courier-dropdown-label {
+	padding: 0.3rem 0.6rem 0.15rem;
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--bsol-muted);
+}
+
+.bsol-courier-option {
+	display: block;
+	width: 100%;
+	text-align: left;
+	border: 0;
+	background: transparent;
+	color: var(--bsol-fg);
+	border-radius: 8px;
+	padding: 0.45rem 0.6rem;
+	font-size: 12.5px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.bsol-courier-option:hover {
+	background: var(--bsol-accent-soft);
+	color: var(--bsol-accent);
+}
+
+.bsol-consignment-card {
+	min-width: 150px;
+	background: var(--bsol-surface-soft);
+	border: 1px solid var(--bsol-border);
+	border-radius: 10px;
+	padding: 0.5rem 0.6rem;
+}
+
+.bsol-consignment-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.4rem;
+	margin-bottom: 0.3rem;
+}
+
+.bsol-provider-badge {
+	font-size: 10px;
+	font-weight: 800;
+	letter-spacing: 0.03em;
+	color: var(--bsol-accent);
+}
+
+.bsol-status-badge {
+	display: inline-block;
+	border-radius: 999px;
+	padding: 0.1rem 0.5rem;
+	font-size: 10.5px;
+	font-weight: 700;
+	background: #f0f0f1;
+	color: #50575e;
+	white-space: nowrap;
+}
+
+.bsol-status-badge.bsol-status-booked,
+.bsol-status-badge.bsol-status-pending {
+	background: #fff8e5;
+	color: #996800;
+}
+
+.bsol-status-badge.bsol-status-delivered {
+	background: #edfaef;
+	color: #1a7f37;
+}
+
+.bsol-status-badge.bsol-status-cancelled,
+.bsol-status-badge.bsol-status-returned,
+.bsol-status-badge.bsol-status-lost {
+	background: #fcf0f1;
+	color: #b32d2e;
+}
+
+.bsol-consignment-id {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--bsol-fg);
+	word-break: break-all;
+}
+
+.bsol-consignment-actions {
+	margin-top: 0.4rem;
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+}
+
+.bsol-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 7px;
+	background: var(--bsol-surface);
+	border: 1px solid var(--bsol-border);
+	color: var(--bsol-muted);
+	text-decoration: none;
+}
+
+.bsol-icon-btn:hover {
+	color: var(--bsol-accent);
+	border-color: var(--bsol-accent);
+	background: var(--bsol-accent-soft);
+}
+
+.bsol-icon-btn .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
 }

@@ -220,3 +220,20 @@ a real WooCommerce staging site before rolling out to sellers.
    "HPOS incompatible / untested" notice (requires WooCommerce's
    High-Performance Order Storage feature enabled under WooCommerce →
    Settings → Advanced → Features).
+
+## Admin UI redesign + courier picker (1.12.0)
+
+1. **BSOL Connect** settings page — confirm the header banner, pill tabs,
+   and cards render with the teal/cream BSOL look (not default wp-admin
+   gray) on Dashboard, Activity Log, Sync Data, and Settings tabs.
+2. WooCommerce orders list, an order with no courier booked yet — confirm
+   a single **Book to Courier** button appears (not 5 separate buttons).
+   Click it, confirm a dropdown opens listing Steadfast/Paperfly/Pathao/
+   RedX/CarryBee; click outside or press Escape to confirm it closes.
+3. Pick a courier from the dropdown — confirm the column replaces itself
+   with a consignment card (provider + status badge + tracking id) and
+   refresh/cancel/print icon buttons, with no page reload.
+4. Click the refresh icon — confirm the status badge updates. Click
+   cancel — confirm it flips to a red "Cancelled" badge.
+5. Click the print icon — confirm the waybill PDF still opens (this proxy
+   path is unchanged by the redesign).

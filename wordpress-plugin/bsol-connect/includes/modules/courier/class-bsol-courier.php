@@ -11,6 +11,13 @@
  * Uses HPOS-native order meta (WC_Order::get_meta()/update_meta_data()) —
  * unlike zayroo-connect's update_post_meta()/get_post_meta(), which isn't
  * actually HPOS-safe despite that plugin registering HPOS column hooks too.
+ *
+ * UI: a single "Book to Courier" pill button opens a small dropdown listing
+ * the 5 couriers, instead of 5 separate buttons crowding the column (each
+ * courier used to get its own always-visible button). The booked/unbooked
+ * markup is built by render_unbooked_markup()/render_booked_markup() and
+ * reused as-is by the AJAX book handler so the column updates to the exact
+ * same HTML the next page load would render — no separate JS template.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -63,46 +70,78 @@ class Bsol_Courier {
 			return;
 		}
 
+		echo '<div class="bsol-courier-column" data-order-id="' . esc_attr( $order->get_id() ) . '">';
+		echo $order->get_meta( self::META_CONSIGNMENT_ID ) // phpcs:ignore WordPress.Security.EscapeOutput -- both render_* methods already escape their own output.
+			? $this->render_booked_markup( $order )
+			: $this->render_unbooked_markup();
+		echo '</div>';
+	}
+
+	/** The 5 couriers offered in the "Book to Courier" dropdown, value => label. */
+	private function courier_options() {
+		return array(
+			'steadfast' => __( 'Steadfast', 'bsol-connect' ),
+			'paperfly'  => __( 'Paperfly', 'bsol-connect' ),
+			'pathao'    => __( 'Pathao', 'bsol-connect' ),
+			'redx'      => __( 'RedX', 'bsol-connect' ),
+			'carrybee'  => __( 'CarryBee', 'bsol-connect' ),
+		);
+	}
+
+	/** Not-yet-booked state: one toggle button + a dropdown of couriers. */
+	private function render_unbooked_markup() {
+		ob_start();
+		?>
+		<div class="bsol-courier-picker">
+			<button type="button" class="bsol-courier-book-toggle">
+				<span class="dashicons dashicons-car"></span>
+				<?php esc_html_e( 'Book to Courier', 'bsol-connect' ); ?>
+				<span class="bsol-courier-caret">&#9662;</span>
+			</button>
+			<div class="bsol-courier-dropdown" hidden>
+				<div class="bsol-courier-dropdown-label"><?php esc_html_e( 'Select courier', 'bsol-connect' ); ?></div>
+				<?php foreach ( $this->courier_options() as $value => $label ) : ?>
+					<button type="button" class="bsol-courier-option" data-courier="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $label ); ?></button>
+				<?php endforeach; ?>
+			</div>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	 * Already-booked state — consignment card with a status badge and
+	 * refresh/cancel/print icon buttons. Shared by render_courier_column()
+	 * (page load) and ajax_book() (booked just now, no reload needed).
+	 */
+	private function render_booked_markup( $order ) {
 		$consignment_id = $order->get_meta( self::META_CONSIGNMENT_ID );
 		$provider       = $order->get_meta( self::META_PROVIDER );
 		$status         = $order->get_meta( self::META_STATUS );
+		$status_slug    = $status ? sanitize_html_class( strtolower( $status ) ) : 'pending';
 
-		echo '<div class="bsol-courier-column" data-order-id="' . esc_attr( $order->get_id() ) . '">';
-
-		if ( $consignment_id ) {
-			$waybill_url = wp_nonce_url(
-				admin_url( 'admin-post.php?action=bsol_download_waybill&order_id=' . $order->get_id() ),
-				'bsol_waybill_download'
-			);
-			printf(
-				'<div class="bsol-consignment-info"><strong>%s:</strong> %s<br><span class="bsol-courier-status">%s</span> ' .
-				'<a href="#" class="bsol-courier-track-btn" title="%s"><span class="dashicons dashicons-update"></span></a> ' .
-				'<a href="#" class="bsol-courier-cancel-btn" title="%s"><span class="dashicons dashicons-no"></span></a> ' .
-				'<a href="%s" target="_blank" title="%s"><span class="dashicons dashicons-printer"></span></a></div>',
-				esc_html( strtoupper( $provider ) ),
-				esc_html( $consignment_id ),
-				esc_html( $status ? ucfirst( $status ) : '—' ),
-				esc_attr__( 'Refresh status', 'bsol-connect' ),
-				esc_attr__( 'Cancel booking', 'bsol-connect' ),
-				esc_url( $waybill_url ),
-				esc_attr__( 'Print waybill', 'bsol-connect' )
-			);
-		} else {
-			printf(
-				'<button class="button bsol-courier-book-btn" data-courier="steadfast">%s</button> ' .
-				'<button class="button bsol-courier-book-btn" data-courier="paperfly">%s</button> ' .
-				'<button class="button bsol-courier-book-btn" data-courier="pathao">%s</button> ' .
-				'<button class="button bsol-courier-book-btn" data-courier="redx">%s</button> ' .
-				'<button class="button bsol-courier-book-btn" data-courier="carrybee">%s</button>',
-				esc_html__( 'Send via Steadfast', 'bsol-connect' ),
-				esc_html__( 'Send via Paperfly', 'bsol-connect' ),
-				esc_html__( 'Send via Pathao', 'bsol-connect' ),
-				esc_html__( 'Send via RedX', 'bsol-connect' ),
-				esc_html__( 'Send via CarryBee', 'bsol-connect' )
-			);
-		}
-
-		echo '</div>';
+		$waybill_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=bsol_download_waybill&order_id=' . $order->get_id() ),
+			'bsol_waybill_download'
+		);
+		ob_start();
+		?>
+		<div class="bsol-consignment-card">
+			<div class="bsol-consignment-head">
+				<span class="bsol-provider-badge"><?php echo esc_html( strtoupper( $provider ) ); ?></span>
+				<span class="bsol-status-badge bsol-courier-status bsol-status-<?php echo esc_attr( $status_slug ); ?>">
+					<?php echo esc_html( $status ? ucfirst( $status ) : '—' ); ?>
+				</span>
+			</div>
+			<div class="bsol-consignment-id"><?php echo esc_html( $consignment_id ); ?></div>
+			<div class="bsol-consignment-actions">
+				<a href="#" class="bsol-icon-btn bsol-courier-track-btn" title="<?php esc_attr_e( 'Refresh status', 'bsol-connect' ); ?>"><span class="dashicons dashicons-update"></span></a>
+				<a href="#" class="bsol-icon-btn bsol-courier-cancel-btn" title="<?php esc_attr_e( 'Cancel booking', 'bsol-connect' ); ?>"><span class="dashicons dashicons-no"></span></a>
+				<a href="<?php echo esc_url( $waybill_url ); ?>" target="_blank" class="bsol-icon-btn" title="<?php esc_attr_e( 'Print waybill', 'bsol-connect' ); ?>"><span class="dashicons dashicons-printer"></span></a>
+			</div>
+		</div>
+		<?php
+		return ob_get_clean();
 	}
 
 	public function ajax_book() {
@@ -131,7 +170,10 @@ class Bsol_Courier {
 		$order->update_meta_data( self::META_STATUS, 'booked' );
 		$order->save();
 
-		wp_send_json_success( $response );
+		// Return the exact HTML a page reload would render, so the column
+		// updates in place (waybill link, track/cancel icons, badge) instead
+		// of the JS hand-assembling a partial substitute.
+		wp_send_json_success( array_merge( $response, array( 'html' => $this->render_booked_markup( $order ) ) ) );
 	}
 
 	public function ajax_track() {

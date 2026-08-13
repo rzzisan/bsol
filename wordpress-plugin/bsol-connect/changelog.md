@@ -1,5 +1,20 @@
 # BSOL Connect — Changelog
 
+## 1.12.0 — 2026-08-13
+
+UI/UX pass — no backend changes:
+
+- **Admin UI redesigned** to match BSOL's own dashboard (teal accent,
+  pill nav tabs, card layout, status pill) instead of generic wp-admin
+  chrome — settings, dashboard, activity log, and sync-data tabs.
+- **Courier column, WooCommerce orders list**: the 5 separate
+  "Send via ..." buttons are replaced with one "Book to Courier" button
+  that opens a dropdown to pick the courier. The booked state now shows
+  a status badge + refresh/cancel/print icon buttons instead of plain
+  text links.
+- Customer Health badge restyled to match (pill shape, same semantic
+  colors).
+
 ## 1.11.0 — 2026-08-13
 
 Distribution/polish pass — no new sync features:

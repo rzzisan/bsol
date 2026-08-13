@@ -27,6 +27,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১১ | Bulk/historical sync UI (v1.9.0) | `8de63b6` |
 | ১২ | Order invoice PDF (v1.10.0) | `e1dfa2a` |
 | ১৩ | Distribution/polish — self-update notice, .pot, readme.txt (v1.11.0) | `1c06c5a` |
+| ১৪ | Admin UI redesign (BSOL brand) + courier column "Book to Courier" picker (v1.12.0) | `f2c8f9a` |
 
 ---
 
@@ -83,7 +84,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.11.0)
+wordpress-plugin/bsol-connect/          (v1.12.0)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
