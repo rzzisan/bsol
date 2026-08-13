@@ -47,6 +47,12 @@ class ConnectCheckoutOtpTest extends TestCase
 
     private function orderWithOtp(User $user, array $otpOverrides = []): array
     {
+        // findOrder() in ConnectCheckoutOtpController scopes by the
+        // requesting site's platform_api_key_id (Phase 16) — every caller
+        // here only ever creates one key per merchant via connectedMerchant(),
+        // so resolving it is unambiguous.
+        $apiKey = PlatformApiKey::where('user_id', $user->id)->first();
+
         $order = Order::create([
             'user_id' => $user->id,
             'order_number' => 'ORD-' . uniqid(),
@@ -55,6 +61,7 @@ class ConnectCheckoutOtpTest extends TestCase
             'customer_phone' => '01755443322',
             'source' => 'woocommerce',
             'source_ref' => 'wc-order-1',
+            'platform_api_key_id' => $apiKey?->id,
             'total' => 500,
             'status' => 'pending',
             'otp_required' => true,

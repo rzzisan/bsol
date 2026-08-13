@@ -13,25 +13,24 @@ use Symfony\Component\HttpFoundation\Response;
 use ZipArchive;
 
 /**
- * Dashboard-facing management of the seller's WordPress/WooCommerce connector
- * API key (Sanctum + owner_only — Pattern B, staff_team_role_context.md §3.3).
- * Distinct from the plugin-facing /api/connect/v1/* surface, which is
- * API-key-authenticated instead of Sanctum-authenticated.
- * See bsol_history_and_new_context.md §5.
+ * Dashboard-facing management of the seller's WordPress/WooCommerce
+ * connector API keys — a list, not a singleton, since Phase 16 (a seller
+ * may connect more than one WooCommerce site). (Sanctum + owner_only —
+ * Pattern B, staff_team_role_context.md §3.3). Distinct from the
+ * plugin-facing /api/connect/v1/* surface, which is API-key-authenticated
+ * instead of Sanctum-authenticated. See bsol_history_and_new_context.md §5
+ * and wordpress_connect_context.md (Phase 16).
  */
 class WordpressApiKeyController extends Controller
 {
-    public function show(): JsonResponse
+    public function index(): JsonResponse
     {
-        $key = PlatformApiKey::where('user_id', auth()->user()->shopOwnerId())->first();
-
-        if (! $key) {
-            return response()->json(['success' => true, 'data' => null]);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => [
+        $keys = PlatformApiKey::where('user_id', auth()->user()->shopOwnerId())
+            ->where('platform', 'woocommerce')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (PlatformApiKey $key) => [
+                'id'            => $key->id,
                 'platform'      => $key->platform,
                 'domain'        => $key->domain,
                 'masked_key'    => $key->masked(),
@@ -39,22 +38,23 @@ class WordpressApiKeyController extends Controller
                 'last_used_at'  => $key->last_used_at,
                 'created_at'    => $key->created_at,
                 'otp_verification_enabled' => (bool) $key->otp_verification_enabled,
-            ],
-        ]);
+            ]);
+
+        return response()->json(['success' => true, 'data' => $keys]);
     }
 
     /**
-     * Toggle checkout OTP verification for WooCommerce orders on this
+     * Toggle checkout OTP verification for WooCommerce orders on this one
      * connection — independent of the key itself, so flipping it never
      * requires regenerating/reconnecting. See CheckoutOtpService, Phase 9.
      */
-    public function updateOtpSetting(Request $request): JsonResponse
+    public function updateOtpSetting(Request $request, int $id): JsonResponse
     {
         $data = $request->validate([
             'enabled' => 'required|boolean',
         ]);
 
-        $key = PlatformApiKey::where('user_id', auth()->user()->shopOwnerId())->first();
+        $key = PlatformApiKey::where('user_id', auth()->user()->shopOwnerId())->find($id);
 
         if (! $key) {
             return response()->json(['success' => false, 'message' => 'No WordPress connection found.'], 404);
@@ -66,8 +66,11 @@ class WordpressApiKeyController extends Controller
     }
 
     /**
-     * Generate a new key or regenerate/reconnect an existing one — an
-     * idempotent upsert on the owner's single row. The raw key is returned
+     * Generate a key for a new domain, or regenerate/reconnect an existing
+     * one — an idempotent upsert keyed on (owner, domain), so reconnecting
+     * the same site updates its row in place (id — and therefore every
+     * order/product already tagged with it — stays stable) while a new
+     * domain adds an additional connection. The raw key is returned
      * exactly once, here; it is never persisted or re-derivable afterward.
      */
     public function store(Request $request): JsonResponse
@@ -78,12 +81,12 @@ class WordpressApiKeyController extends Controller
 
         $ownerId = auth()->user()->shopOwnerId();
         $rawKey = PlatformApiKey::generateRawKey();
+        $domain = PlatformApiKey::normalizeHost($data['domain']);
 
         $key = PlatformApiKey::updateOrCreate(
-            ['user_id' => $ownerId],
+            ['user_id' => $ownerId, 'domain' => $domain],
             [
                 'platform'    => 'woocommerce',
-                'domain'      => PlatformApiKey::normalizeHost($data['domain']),
                 'key_hash'    => PlatformApiKey::hashKey($rawKey),
                 'key_prefix'  => substr($rawKey, 0, 12),
                 'status'      => 'pending',
@@ -95,6 +98,7 @@ class WordpressApiKeyController extends Controller
             'success' => true,
             'message' => 'API key generated. Save it now — it will not be shown again.',
             'data' => [
+                'id'         => $key->id,
                 'api_key'    => $rawKey,
                 'platform'   => $key->platform,
                 'domain'     => $key->domain,
@@ -104,10 +108,10 @@ class WordpressApiKeyController extends Controller
         ], 201);
     }
 
-    public function destroy(): JsonResponse
+    public function destroy(int $id): JsonResponse
     {
         $ownerId = auth()->user()->shopOwnerId();
-        $key = PlatformApiKey::where('user_id', $ownerId)->first();
+        $key = PlatformApiKey::where('user_id', $ownerId)->find($id);
 
         if (! $key) {
             return response()->json(['success' => false, 'message' => 'No API key found.'], 404);

@@ -34,6 +34,7 @@ const t = {
     noOrders: "কোনো অর্ডার নেই।",
     search: "অর্ডার নম্বর / নাম / ফোন",
     allStatuses: "সব স্ট্যাটাস",
+    allSites: "সব সাইট",
     bulkUpdate: "বাল্ক স্ট্যাটাস পরিবর্তন",
     applyBulk: "প্রয়োগ করুন",
     orderNo: "অর্ডার নং",
@@ -68,6 +69,7 @@ const t = {
     noOrders: "No orders found.",
     search: "Order no / name / phone",
     allStatuses: "All Statuses",
+    allSites: "All Sites",
     bulkUpdate: "Bulk Status Update",
     applyBulk: "Apply",
     orderNo: "Order #",
@@ -102,8 +104,10 @@ type Order = {
   customer_phone: string; total: string; status: Status;
   risk_level: string; created_at: string; payment_status: string;
   otp_verified_at: string | null;
+  platform_api_key_id: number | null;
 };
 type Stats = { total: number; today: number; pending: number; delivered: number };
+type WpSite = { id: number; domain: string; status: string };
 
 export default function OrdersPage() {
   const [locale] = useState<Locale>(getStoredLocale);
@@ -114,6 +118,8 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterSite, setFilterSite] = useState<string>("all");
+  const [wpSites, setWpSites] = useState<WpSite[]>([]);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -140,6 +146,7 @@ export default function OrdersPage() {
       const params = new URLSearchParams({ page: String(page), per_page: "15" });
       if (search) params.set("search", search);
       if (filterStatus !== "all") params.set("status", filterStatus);
+      if (filterSite !== "all") params.set("platform_api_key_id", filterSite);
 
       const [ordRes, statRes] = await Promise.all([
         fetch(`${API}/orders?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -159,10 +166,33 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterStatus, token]);
+  }, [page, search, filterStatus, filterSite, token]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
-  useEffect(() => { setPage(1); setSelected(new Set()); }, [search, filterStatus]);
+  useEffect(() => { setPage(1); setSelected(new Set()); }, [search, filterStatus, filterSite]);
+
+  // Loaded once for the site filter dropdown + to resolve each order's
+  // platform_api_key_id into a domain badge — reuses the same endpoint the
+  // WordPress settings page uses, no new backend surface needed.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API}/wordpress/api-keys`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const d = await res.json();
+          setWpSites((d.data ?? []).filter((s: WpSite) => s.status !== "revoked"));
+        }
+      } catch {
+        // silent — filter/badges just stay empty
+      }
+    })();
+  }, [token]);
+
+  const siteDomainById = useMemo(() => {
+    const map = new Map<number, string>();
+    wpSites.forEach((s) => map.set(s.id, s.domain));
+    return map;
+  }, [wpSites]);
 
   const toggleSelect = (id: number) => setSelected(prev => {
     const next = new Set(prev);
@@ -246,6 +276,14 @@ export default function OrdersPage() {
           {STATUSES.map(s => <option key={s} value={s}>{txt.statusNames[s]}</option>)}
         </select>
 
+        {wpSites.length > 0 && (
+          <select value={filterSite} onChange={e => setFilterSite(e.target.value)}
+            className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+            <option value="all">{txt.allSites}</option>
+            {wpSites.map(s => <option key={s.id} value={s.id}>{s.domain}</option>)}
+          </select>
+        )}
+
         {/* Bulk update strip */}
         {selected.size > 0 && (
           <div className="flex items-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-1.5 text-sm">
@@ -314,6 +352,14 @@ export default function OrdersPage() {
                         className="rounded-full bg-teal-500/15 px-2 py-0.5 text-xs font-semibold text-teal-400"
                       >
                         OTP
+                      </span>
+                    ) : null}
+                    {o.platform_api_key_id && siteDomainById.get(o.platform_api_key_id) ? (
+                      <span
+                        title={siteDomainById.get(o.platform_api_key_id)}
+                        className="rounded-full bg-[var(--muted)]/15 px-2 py-0.5 text-xs font-medium text-[var(--muted)]"
+                      >
+                        {siteDomainById.get(o.platform_api_key_id)}
                       </span>
                     ) : null}
                   </div>

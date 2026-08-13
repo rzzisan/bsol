@@ -10,7 +10,7 @@ const t = {
   bn: {
     pageTitle: "ওয়ার্ডপ্রেস কানেক্ট",
     intro:
-      "আপনার WooCommerce ওয়েবসাইট BSOL-এর সাথে কানেক্ট করতে প্রথমে নিচে থেকে প্লাগিন ডাউনলোড করে WordPress-এ ইনস্টল করুন, তারপর আপনার ডোমেইন দিয়ে একটি API Key তৈরি করে প্লাগিনে বসান।",
+      "আপনার WooCommerce ওয়েবসাইট BSOL-এর সাথে কানেক্ট করতে প্রথমে নিচে থেকে প্লাগিন ডাউনলোড করে WordPress-এ ইনস্টল করুন, তারপর আপনার ডোমেইন দিয়ে একটি API Key তৈরি করে প্লাগিনে বসান। একাধিক ওয়েবসাইট কানেক্ট করা যাবে।",
     downloadTitle: "BSOL Connect প্লাগিন",
     downloadDesc: "ডাউনলোড করে WordPress Admin → Plugins → Add New → Upload Plugin থেকে ইনস্টল করুন।",
     downloadBtn: "প্লাগিন ডাউনলোড করুন",
@@ -19,12 +19,13 @@ const t = {
     domainPlaceholder: "example.com",
     generateBtn: "API Key তৈরি করুন",
     regenerateBtn: "নতুন Key তৈরি করুন",
+    addAnotherBtn: "আরেকটি সাইট কানেক্ট করুন",
     generating: "তৈরি হচ্ছে...",
     revokeBtn: "বাতিল করুন",
     revoking: "বাতিল হচ্ছে...",
     regenerateConfirm:
-      "এটি বর্তমান API Key অকার্যকর করে দেবে — WordPress প্লাগিনেও নতুন Key বসাতে হবে। চালিয়ে যাবেন?",
-    revokeConfirm: "API Key বাতিল করলে প্লাগিন থেকে সিঙ্ক বন্ধ হয়ে যাবে। চালিয়ে যাবেন?",
+      "এটি এই সাইটের বর্তমান API Key অকার্যকর করে দেবে — WordPress প্লাগিনেও নতুন Key বসাতে হবে। চালিয়ে যাবেন?",
+    revokeConfirm: "এই সাইটের API Key বাতিল করলে সেই সাইট থেকে সিঙ্ক বন্ধ হয়ে যাবে। চালিয়ে যাবেন?",
     statusPending: "সংযুক্ত হয়নি",
     statusConnected: "কানেক্টেড",
     statusRevoked: "বাতিল করা হয়েছে",
@@ -39,12 +40,15 @@ const t = {
     genericError: "কিছু একটা সমস্যা হয়েছে, আবার চেষ্টা করুন।",
     domainRequired: "ডোমেইন লিখুন।",
     otpTitle: "চেকআউট OTP ভেরিফিকেশন",
-    otpDesc: "চালু থাকলে, WooCommerce থেকে আসা প্রতিটি অর্ডারে কাস্টমারের ফোন নম্বর OTP দিয়ে ভেরিফাই করতে হবে। এসএমএস গেটওয়ে ও ব্যালেন্স আগে থেকে কনফিগার থাকতে হবে।",
+    otpDesc: "চালু থাকলে, এই সাইট থেকে আসা প্রতিটি অর্ডারে কাস্টমারের ফোন নম্বর OTP দিয়ে ভেরিফাই করতে হবে। এসএমএস গেটওয়ে ও ব্যালেন্স আগে থেকে কনফিগার থাকতে হবে।",
+    connectedSitesTitle: "কানেক্টেড সাইট",
+    noSitesYet: "এখনো কোনো সাইট কানেক্ট করা হয়নি।",
+    connectFormTitle: "নতুন সাইট কানেক্ট করুন",
   },
   en: {
     pageTitle: "WordPress Connect",
     intro:
-      "To connect your WooCommerce site to BSOL, first download the plugin below and install it on WordPress, then generate an API Key for your domain and enter it in the plugin.",
+      "To connect your WooCommerce site to BSOL, first download the plugin below and install it on WordPress, then generate an API Key for your domain and enter it in the plugin. You can connect more than one site.",
     downloadTitle: "BSOL Connect Plugin",
     downloadDesc: "Download it, then install via WordPress Admin → Plugins → Add New → Upload Plugin.",
     downloadBtn: "Download Plugin",
@@ -53,12 +57,13 @@ const t = {
     domainPlaceholder: "example.com",
     generateBtn: "Generate API Key",
     regenerateBtn: "Generate New Key",
+    addAnotherBtn: "Connect Another Site",
     generating: "Generating...",
     revokeBtn: "Revoke",
     revoking: "Revoking...",
     regenerateConfirm:
-      "This will invalidate the current API key — you'll need to update it in the WordPress plugin too. Continue?",
-    revokeConfirm: "Revoking the API key will stop the plugin from syncing. Continue?",
+      "This will invalidate this site's current API key — you'll need to update it in the WordPress plugin too. Continue?",
+    revokeConfirm: "Revoking this site's API key will stop it from syncing. Continue?",
     statusPending: "Not connected",
     statusConnected: "Connected",
     statusRevoked: "Revoked",
@@ -74,11 +79,15 @@ const t = {
     domainRequired: "Please enter a domain.",
     otpTitle: "Checkout OTP Verification",
     otpDesc:
-      "When enabled, every order synced from WooCommerce requires the customer's phone number to be OTP-verified. Requires an SMS gateway with sufficient balance already configured.",
+      "When enabled, every order synced from this site requires the customer's phone number to be OTP-verified. Requires an SMS gateway with sufficient balance already configured.",
+    connectedSitesTitle: "Connected Sites",
+    noSitesYet: "No sites connected yet.",
+    connectFormTitle: "Connect a new site",
   },
 };
 
-type ApiKeyStatus = {
+type Site = {
+  id: number;
   platform: string;
   domain: string;
   masked_key: string;
@@ -92,32 +101,27 @@ export default function WordpressConnectPage() {
   const [locale] = useState<Locale>(getStoredLocale);
   const tr = t[locale];
 
-  const [status, setStatus] = useState<ApiKeyStatus | null>(null);
+  const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const [domainInput, setDomainInput] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [revoking, setRevoking] = useState(false);
-  const [rawKey, setRawKey] = useState<string | null>(null);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
+  const [rawKey, setRawKey] = useState<{ domain: string; key: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [otpEnabled, setOtpEnabled] = useState(false);
-  const [otpSaving, setOtpSaving] = useState(false);
+  const [otpSavingId, setOtpSavingId] = useState<number | null>(null);
 
   const authHeaders = useCallback(() => {
     const token = getStoredToken();
     return { Authorization: `Bearer ${token}` };
   }, []);
 
-  const loadStatus = useCallback(async () => {
+  const loadSites = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/wordpress/api-key`, { headers: authHeaders() });
+      const res = await fetch(`${API}/wordpress/api-keys`, { headers: authHeaders() });
       const json = await res.json();
-      if (json.success) {
-        setStatus(json.data);
-        if (json.data?.domain) setDomainInput(json.data.domain);
-        setOtpEnabled(Boolean(json.data?.otp_verification_enabled));
-      }
+      if (json.success) setSites(json.data ?? []);
     } catch {
       // silent — panel just stays empty, retry on next visit
     } finally {
@@ -126,29 +130,32 @@ export default function WordpressConnectPage() {
   }, [authHeaders]);
 
   useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
+    void loadSites();
+  }, [loadSites]);
 
-  async function handleGenerate() {
-    if (!domainInput.trim()) {
+  async function handleConnect() {
+    const domain = domainInput.trim();
+    if (!domain) {
       setMessage({ type: "error", text: tr.domainRequired });
       return;
     }
-    if (status && !window.confirm(tr.regenerateConfirm)) return;
+    const existing = sites.find((s) => s.domain === domain.replace(/^https?:\/\//, "").replace(/\/$/, ""));
+    if (existing && !window.confirm(tr.regenerateConfirm)) return;
 
     setGenerating(true);
     setMessage(null);
     try {
-      const res = await fetch(`${API}/wordpress/api-key`, {
+      const res = await fetch(`${API}/wordpress/api-keys`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ domain: domainInput.trim() }),
+        body: JSON.stringify({ domain }),
       });
       const json = await res.json();
       if (json.success) {
-        setRawKey(json.data.api_key);
+        setRawKey({ domain: json.data.domain, key: json.data.api_key });
         setCopied(false);
-        void loadStatus();
+        setDomainInput("");
+        void loadSites();
       } else {
         setMessage({ type: "error", text: json.message ?? tr.genericError });
       }
@@ -159,72 +166,65 @@ export default function WordpressConnectPage() {
     }
   }
 
-  async function handleRevoke() {
+  async function handleRevoke(id: number) {
     if (!window.confirm(tr.revokeConfirm)) return;
 
-    setRevoking(true);
+    setRevokingId(id);
     setMessage(null);
     try {
-      const res = await fetch(`${API}/wordpress/api-key`, { method: "DELETE", headers: authHeaders() });
+      const res = await fetch(`${API}/wordpress/api-keys/${id}`, { method: "DELETE", headers: authHeaders() });
       const json = await res.json();
       if (json.success) {
-        setRawKey(null);
-        void loadStatus();
+        void loadSites();
       } else {
         setMessage({ type: "error", text: json.message ?? tr.genericError });
       }
     } catch {
       setMessage({ type: "error", text: tr.genericError });
     } finally {
-      setRevoking(false);
+      setRevokingId(null);
     }
   }
 
   async function handleCopy() {
     if (!rawKey) return;
     try {
-      await navigator.clipboard.writeText(rawKey);
+      await navigator.clipboard.writeText(rawKey.key);
       setCopied(true);
     } catch {
       // clipboard API unavailable — the key is still visible to copy manually
     }
   }
 
-  async function handleToggleOtp(next: boolean) {
-    setOtpSaving(true);
-    setOtpEnabled(next); // optimistic — reverted below on failure
+  async function handleToggleOtp(id: number, next: boolean) {
+    setOtpSavingId(id);
+    setSites((prev) => prev.map((s) => (s.id === id ? { ...s, otp_verification_enabled: next } : s))); // optimistic
     try {
-      const res = await fetch(`${API}/wordpress/otp-settings`, {
+      const res = await fetch(`${API}/wordpress/api-keys/${id}/otp-settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ enabled: next }),
       });
       const json = await res.json();
       if (!json.success) {
-        setOtpEnabled(!next);
+        setSites((prev) => prev.map((s) => (s.id === id ? { ...s, otp_verification_enabled: !next } : s)));
         setMessage({ type: "error", text: json.message ?? tr.genericError });
       }
     } catch {
-      setOtpEnabled(!next);
+      setSites((prev) => prev.map((s) => (s.id === id ? { ...s, otp_verification_enabled: !next } : s)));
       setMessage({ type: "error", text: tr.genericError });
     } finally {
-      setOtpSaving(false);
+      setOtpSavingId(null);
     }
   }
 
-  const statusDot =
-    status?.status === "connected"
-      ? "bg-green-500"
-      : status?.status === "revoked"
-        ? "bg-red-500"
-        : "bg-[var(--muted)]";
+  function statusDot(status: Site["status"]) {
+    return status === "connected" ? "bg-green-500" : status === "revoked" ? "bg-red-500" : "bg-[var(--muted)]";
+  }
 
-  const statusLabel =
-    status?.status === "connected"
-      ? tr.statusConnected
-      : status?.status === "revoked"
-        ? tr.statusRevoked
-        : tr.statusPending;
+  function statusLabel(status: Site["status"]) {
+    return status === "connected" ? tr.statusConnected : status === "revoked" ? tr.statusRevoked : tr.statusPending;
+  }
 
   return (
     <UserShell activeKey="wordpress-connect" defaultExpandedKey="settings" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
@@ -259,10 +259,11 @@ export default function WordpressConnectPage() {
 
         {rawKey && (
           <div className="rounded-xl border border-amber-600/30 bg-amber-600/10 p-4">
+            <p className="mb-1 text-xs font-semibold text-amber-700 dark:text-amber-400">{rawKey.domain}</p>
             <p className="mb-2 text-sm font-semibold text-amber-700 dark:text-amber-400">{tr.saveKeyWarning}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-xs text-[var(--foreground)]">
-                {rawKey}
+                {rawKey.key}
               </code>
               <button
                 onClick={() => void handleCopy()}
@@ -271,96 +272,101 @@ export default function WordpressConnectPage() {
                 {copied ? tr.copiedBtn : tr.copyBtn}
               </button>
             </div>
+            <p className="mt-2 text-xs text-amber-700/80 dark:text-amber-400/80">{tr.pluginNote}</p>
           </div>
         )}
 
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <h3 className="mb-3 text-sm font-semibold text-[var(--foreground)]">{tr.connectedSitesTitle}</h3>
+
           {loading ? (
             <p className="text-sm text-[var(--muted)]">{tr.loading}</p>
+          ) : sites.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">{tr.noSitesYet}</p>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full ${statusDot}`} />
-                <span className="text-sm font-semibold text-[var(--foreground)]">{statusLabel}</span>
-              </div>
+              {sites.map((site) => (
+                <div key={site.id} className="rounded-lg border border-[var(--border)] p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${statusDot(site.status)}`} />
+                    <span className="text-sm font-semibold text-[var(--foreground)]">{site.domain}</span>
+                    <span className="text-xs text-[var(--muted)]">— {statusLabel(site.status)}</span>
+                  </div>
 
-              {status && (
-                <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs text-[var(--muted)]">{tr.domainField}</p>
-                    <p className="text-[var(--foreground)]">{status.domain}</p>
+                  <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs text-[var(--muted)]">{tr.keyField}</p>
+                      <p className="font-mono text-[var(--foreground)]">{site.masked_key}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--muted)]">{tr.lastUsedField}</p>
+                      <p className="text-[var(--foreground)]">
+                        {site.last_used_at ? new Date(site.last_used_at).toLocaleString() : tr.neverUsed}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-[var(--muted)]">{tr.keyField}</p>
-                    <p className="font-mono text-[var(--foreground)]">{status.masked_key}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-[var(--muted)]">{tr.lastUsedField}</p>
-                    <p className="text-[var(--foreground)]">
-                      {status.last_used_at ? new Date(status.last_used_at).toLocaleString() : tr.neverUsed}
-                    </p>
-                  </div>
+
+                  {site.status !== "revoked" && (
+                    <div className="mt-3 flex items-center justify-between gap-4 rounded-lg bg-[var(--background)] p-2.5">
+                      <div>
+                        <p className="text-xs font-semibold text-[var(--foreground)]">{tr.otpTitle}</p>
+                        <p className="mt-0.5 text-[11px] text-[var(--muted)]">{tr.otpDesc}</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={site.otp_verification_enabled}
+                        disabled={otpSavingId === site.id}
+                        onClick={() => void handleToggleOtp(site.id, !site.otp_verification_enabled)}
+                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+                          site.otp_verification_enabled ? "bg-[var(--accent)]" : "bg-[var(--border)]"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                            site.otp_verification_enabled ? "translate-x-5" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
+
+                  {site.status !== "revoked" && (
+                    <button
+                      onClick={() => void handleRevoke(site.id)}
+                      disabled={revokingId === site.id}
+                      className="mt-3 rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-60"
+                    >
+                      {revokingId === site.id ? tr.revoking : tr.revokeBtn}
+                    </button>
+                  )}
                 </div>
-              )}
-
-              <div>
-                <label className="mb-1 block text-xs text-[var(--muted)]">{tr.domainLabel}</label>
-                <input
-                  value={domainInput}
-                  onChange={(e) => setDomainInput(e.target.value)}
-                  placeholder={tr.domainPlaceholder}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => void handleGenerate()}
-                  disabled={generating}
-                  className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-                >
-                  {generating ? tr.generating : status ? tr.regenerateBtn : tr.generateBtn}
-                </button>
-                {status && status.status !== "revoked" && (
-                  <button
-                    onClick={() => void handleRevoke()}
-                    disabled={revoking}
-                    className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-60"
-                  >
-                    {revoking ? tr.revoking : tr.revokeBtn}
-                  </button>
-                )}
-              </div>
-
-              <p className="text-xs text-[var(--muted)]">{tr.pluginNote}</p>
+              ))}
             </div>
           )}
         </div>
 
-        {status && status.status !== "revoked" && (
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <h3 className="mb-3 text-sm font-semibold text-[var(--foreground)]">{tr.connectFormTitle}</h3>
+          <div className="space-y-3">
             <div>
-              <h3 className="text-sm font-semibold text-[var(--foreground)]">{tr.otpTitle}</h3>
-              <p className="mt-0.5 text-xs text-[var(--muted)]">{tr.otpDesc}</p>
+              <label className="mb-1 block text-xs text-[var(--muted)]">{tr.domainLabel}</label>
+              <input
+                value={domainInput}
+                onChange={(e) => setDomainInput(e.target.value)}
+                placeholder={tr.domainPlaceholder}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
+              />
             </div>
             <button
-              type="button"
-              role="switch"
-              aria-checked={otpEnabled}
-              disabled={otpSaving}
-              onClick={() => void handleToggleOtp(!otpEnabled)}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
-                otpEnabled ? "bg-[var(--accent)]" : "bg-[var(--border)]"
-              }`}
+              onClick={() => void handleConnect()}
+              disabled={generating}
+              className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
             >
-              <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                  otpEnabled ? "translate-x-5" : "translate-x-0.5"
-                }`}
-              />
+              {generating ? tr.generating : sites.length > 0 ? tr.addAnotherBtn : tr.generateBtn}
             </button>
           </div>
-        )}
+        </div>
       </div>
     </UserShell>
   );

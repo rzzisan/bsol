@@ -55,6 +55,9 @@ class OrderController extends Controller
         if ($request->filled('source')) {
             $query->where('source', $request->source);
         }
+        if ($request->filled('platform_api_key_id')) {
+            $query->where('platform_api_key_id', $request->platform_api_key_id);
+        }
         if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->date_from);
         }

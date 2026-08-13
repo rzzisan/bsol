@@ -78,6 +78,7 @@ class ProductController extends Controller
             'images.*'         => 'string|max:500',
             'source'           => 'nullable|in:manual,woocommerce',
             'source_ref'       => 'nullable|string|max:255',
+            'platform_api_key_id' => 'nullable|integer|exists:platform_api_keys,id',
         ]);
 
         $data['user_id']     = auth()->id();
@@ -159,6 +160,7 @@ class ProductController extends Controller
             'thumbnail'       => 'nullable|string|max:500',
             'source'          => 'nullable|in:manual,woocommerce',
             'source_ref'      => 'nullable|string|max:255',
+            'platform_api_key_id' => 'nullable|integer|exists:platform_api_keys,id',
         ]);
 
         if (!empty($data['category_id'])) {

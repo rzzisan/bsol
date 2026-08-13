@@ -37,6 +37,23 @@ class ConnectProductSyncTest extends TestCase
         return ['X-API-KEY' => $rawKey, 'X-Client-Domain' => $domain];
     }
 
+    /** @return array{0: string, 1: array} raw key + headers for a second connected site (Phase 16). */
+    private function secondSiteForMerchant(User $user, string $domain = 'second-shop.com'): array
+    {
+        $rawKey = PlatformApiKey::generateRawKey();
+
+        PlatformApiKey::create([
+            'user_id'    => $user->id,
+            'platform'   => 'woocommerce',
+            'domain'     => $domain,
+            'key_hash'   => PlatformApiKey::hashKey($rawKey),
+            'key_prefix' => substr($rawKey, 0, 12),
+            'status'     => 'connected',
+        ]);
+
+        return [$rawKey, $this->connectHeaders($rawKey, $domain)];
+    }
+
     private function simplePayload(string $wcProductId = 'wc-p-1'): array
     {
         return [
@@ -175,6 +192,50 @@ class ConnectProductSyncTest extends TestCase
         $item = OrderItem::where('sku', 'TSHIRT-001')->firstOrFail();
         $this->assertSame($product->id, $item->product_id);
         $this->assertNull($item->product_variant_id);
+    }
+
+    // ── Multi-site (Phase 16) ────────────────────────────────────────────────
+
+    public function test_two_connected_sites_syncing_the_same_wc_product_id_create_two_distinct_products(): void
+    {
+        [$user, $rawKeyA] = $this->connectedMerchant();
+        [$rawKeyB, $headersB] = $this->secondSiteForMerchant($user);
+        $headersA = $this->connectHeaders($rawKeyA);
+
+        // Both sites independently number their own products starting at
+        // "1" — must not collide. Distinct SKUs (genuinely different
+        // products that happen to share a WC post id across sites) — SKU
+        // uniqueness is intentionally scoped per-seller, not per-site
+        // (BSOL's shared-stock-pool model), so two *different* real
+        // products from two sites must still use different SKUs, same as
+        // they would within a single site.
+        $payloadA = $this->simplePayload('1');
+        $payloadB = $this->simplePayload('1');
+        $payloadB['sku'] = 'TSHIRT-001-SITE-B';
+        $this->postJson('/api/connect/v1/products/sync', $payloadA, $headersA)->assertOk();
+        $this->postJson('/api/connect/v1/products/sync', $payloadB, $headersB)->assertOk();
+
+        $this->assertSame(2, Product::where('user_id', $user->id)->where('source', 'woocommerce')->count());
+
+        $keyA = PlatformApiKey::findByRawKey($rawKeyA);
+        $keyB = PlatformApiKey::findByRawKey($rawKeyB);
+
+        $this->assertDatabaseHas('products', [
+            'user_id' => $user->id, 'source_ref' => '1', 'platform_api_key_id' => $keyA->id,
+        ]);
+        $this->assertDatabaseHas('products', [
+            'user_id' => $user->id, 'source_ref' => '1', 'platform_api_key_id' => $keyB->id,
+        ]);
+
+        // Repeat-syncing the same wc_product_id on site A only updates
+        // site A's product — site B's stock stays untouched.
+        $updated = $payloadA;
+        $updated['stock_quantity'] = 5;
+        $this->postJson('/api/connect/v1/products/sync', $updated, $headersA)->assertOk();
+
+        $this->assertSame(2, Product::where('user_id', $user->id)->where('source', 'woocommerce')->count());
+        $this->assertDatabaseHas('products', ['platform_api_key_id' => $keyA->id, 'source_ref' => '1', 'stock' => 5]);
+        $this->assertDatabaseHas('products', ['platform_api_key_id' => $keyB->id, 'source_ref' => '1', 'stock' => 20]);
     }
 
     /**

@@ -43,31 +43,36 @@ class PushWooCommerceStockJob implements ShouldQueue
             if (! $variant || ! $variant->product || ! $variant->product->user) {
                 return;
             }
-            $ownerId = $variant->product->user->shopOwnerId();
             $wcId = $variant->source_ref;
             $stock = $variant->stock_qty;
+            $platformApiKeyId = $variant->product->platform_api_key_id;
         } else {
             $product = Product::with('user')->find($this->modelId);
             if (! $product || ! $product->user) {
                 return;
             }
-            $ownerId = $product->user->shopOwnerId();
             $wcId = $product->source_ref;
             $stock = $product->stock;
+            $platformApiKeyId = $product->platform_api_key_id;
         }
 
         if (! $wcId) {
             return;
         }
 
-        $apiKey = PlatformApiKey::where('user_id', $ownerId)
-            ->where('platform', 'woocommerce')
-            ->where('status', 'connected')
-            ->first();
+        // Resolve the specific connected site this product/variant came
+        // from — not just "any connected site for this seller" (the old
+        // query), which would silently push to the wrong site once a
+        // seller has more than one connected (Phase 16). A variant
+        // inherits its parent product's platform_api_key_id rather than
+        // carrying its own column — a variant's site is always its
+        // product's site.
+        $apiKey = $platformApiKeyId ? PlatformApiKey::find($platformApiKeyId) : null;
 
-        if (! $apiKey) {
-            // Not connected (or disconnected since the change happened) —
-            // nothing to push to.
+        if (! $apiKey || $apiKey->status !== 'connected') {
+            // Not connected (or disconnected since the change happened), or
+            // this row predates Phase 16 and was never backfilled — nothing
+            // to push to.
             return;
         }
 

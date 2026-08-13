@@ -29,6 +29,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১৩ | Distribution/polish — self-update notice, .pot, readme.txt (v1.11.0) | `1c06c5a` |
 | ১৪ | Admin UI redesign (BSOL brand) + courier column "Book to Courier" picker (v1.12.0) | `f2c8f9a` |
 | ১৫ | Customer Health redesign — কুরিয়ার ডেলিভারি-হিস্ট্রি প্রোগ্রেস বার + breakdown popover (v1.13.0) | `86cc12f` |
+| ১৬ | Multi-site WooCommerce connections — একাধিক সাইট, order/product site-tagging, order-list site filter (backend + frontend, প্লাগিন অপরিবর্তিত) | `4715d92` |
 
 ---
 
@@ -70,14 +71,16 @@ Dashboard-facing (Sanctum, `/api/wordpress/*`, `backend/app/Http/Controllers/Api
 
 | Method | Route | কাজ |
 |---|---|---|
-| GET | `/wordpress/api-key` | বর্তমান key স্ট্যাটাস দেখা (এখন `otp_verification_enabled`-ও রিটার্ন করে) |
-| POST | `/wordpress/api-key` | Key জেনারেট/রিজেনারেট |
-| DELETE | `/wordpress/api-key` | Key রিভোক (soft) |
-| PUT | `/wordpress/otp-settings` | চেকআউট OTP টগল অন/অফ (key regenerate ছাড়াই) |
+| GET | `/wordpress/api-keys` | কানেক্টেড সাইটগুলোর **লিস্ট** (Phase ১৬-এর আগে সিঙ্গেল অবজেক্ট ছিল) |
+| POST | `/wordpress/api-keys` | নতুন সাইটের জন্য key জেনারেট, অথবা একই domain হলে রিজেনারেট (id অপরিবর্তিত থাকে) |
+| DELETE | `/wordpress/api-keys/{id}` | নির্দিষ্ট সাইটের key রিভোক (soft) |
+| PUT | `/wordpress/api-keys/{id}/otp-settings` | নির্দিষ্ট সাইটের চেকআউট OTP টগল অন/অফ (key regenerate ছাড়াই) |
 | GET | `/wordpress/plugin-download` | (পাবলিক) প্লাগিন zip — সোর্স থেকে **প্রতি রিকোয়েস্টে dynamically তৈরি**, তাই কখনো stale হয় না |
 | GET | `/wordpress/plugin-version` | (পাবলিক) `{version, download_url}` — self-update notice-এর জন্য (Phase ১৩) |
 
 Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthController,ConnectOrderController,ConnectProductController,ConnectCourierController,ConnectFraudController}.php` + `backend/app/Models/PlatformApiKey.php` + `backend/app/Http/Middleware/AuthenticatePlatformApiKey.php`।
+
+**Multi-site (Phase ১৬)**: একজন সেলার একাধিক WooCommerce সাইট কানেক্ট করতে পারে — `platform_api_keys`-এর আগের `unique('user_id')` তুলে `unique(['user_id','domain'])` করা হয়েছে (`FacebookPageConnection`-এর precedent অনুসরণ করে)। প্রতিটা synced order/product-এ এখন `platform_api_key_id` কলাম আছে (কোন সাইট থেকে এসেছে), আর `orders`/`products`-এর `(user_id, source_ref)` unique index widen করে `(user_id, platform_api_key_id, source_ref)` করা হয়েছে — কারণ দুইটা আলাদা WooCommerce সাইট নিজেদের অর্ডার/প্রোডাক্ট ১, ২, ৩... থেকে নাম্বার করে, `platform_api_key_id` ছাড়া দ্বিতীয় সাইট কানেক্ট করলেই ডেটা কলিশন হতো। প্রতিটা Connect-surface অর্ডার/প্রোডাক্ট lookup (`ConnectOrderController`, `ConnectCourierController::findOrder()`, `ConnectCheckoutOtpController::findOrder()`, `ConnectProductController::sync()`) এখন requesting site-এর `platform_api_key_id` দিয়ে scoped। `PushWooCommerceStockJob` এখন "যেকোনো connected key" না, প্রোডাক্ট/ভ্যারিয়েন্টের নিজস্ব `platform_api_key_id` থেকে সঠিক সাইট resolve করে। ড্যাশবোর্ডে: WordPress Connect পেজ এখন একটা লিস্ট UI (`frontend/src/app/dashboard/settings/wordpress/page.tsx`), Order লিস্টে site filter + domain badge (`frontend/src/app/dashboard/orders/page.tsx`)।
 
 **উল্টো দিক — BSOL → WordPress (inbound, শুধু stock push-back, Phase ৭)**: এটা `/connect/v1/*`-এর অংশ না, বরং প্লাগিন নিজেই একটা WP REST route এক্সপোজ করে — `POST https://{seller-domain}/wp-json/bsol-connect/v1/stock-update`, body `{wc_id, stock_quantity}`, header `X-BSOL-Webhook-Secret` দিয়ে অথেন্টিকেট। BSOL-সাইড ট্রিগার: `Product::booted()`/`ProductVariant::booted()`-এর `saved` hook (`stock`/`stock_qty` পরিবর্তন + `source=woocommerce` + `source_ref` থাকলে) → `PushWooCommerceStockJob` (queued, Redis) → `WooCommerceStockPushService`। `ConnectProductController::sync()` নিজের ২টা write-কে `Product::withoutEvents()`/`ProductVariant::withoutEvents()`-এ wrap করে রাখে, নাহলে নিজের গ্রহণ করা ইনবাউন্ড sync-ই সাথে সাথে এই push আবার ট্রিগার করে ফেলত।
 

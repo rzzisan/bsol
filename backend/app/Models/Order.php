@@ -15,7 +15,7 @@ class Order extends Model
         'user_id', 'order_number', 'public_token', 'customer_name', 'customer_phone',
         'customer_address', 'customer_district', 'customer_thana', 'customer_area',
         'pathao_city_id', 'pathao_zone_id', 'pathao_area_id', 'redx_area_id',
-        'source', 'source_ref', 'status', 'payment_method', 'payment_status',
+        'source', 'source_ref', 'platform_api_key_id', 'status', 'payment_method', 'payment_status',
         'subtotal', 'shipping_charge', 'discount', 'total', 'notes', 'custom_fields',
         'fraud_score', 'risk_level',
         'courier_name', 'courier_tracking_id', 'courier_status', 'courier_charge',
@@ -46,6 +46,11 @@ class Order extends Model
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function platformApiKey(): BelongsTo
+    {
+        return $this->belongsTo(PlatformApiKey::class);
     }
 
     public function items(): HasMany

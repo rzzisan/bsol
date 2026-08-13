@@ -401,10 +401,11 @@ Route::middleware('active_subscription')->group(function () {
     // generate/revoke it. Distinct from the plugin-facing /connect/v1/* above.
     // See bsol_history_and_new_context.md §5.
     Route::middleware('owner_only')->prefix('wordpress')->group(function () {
-        Route::get('/api-key', [WordpressApiKeyController::class, 'show']);
-        Route::post('/api-key', [WordpressApiKeyController::class, 'store']);
-        Route::delete('/api-key', [WordpressApiKeyController::class, 'destroy']);
-        Route::put('/otp-settings', [WordpressApiKeyController::class, 'updateOtpSetting']);
+        // A list, not a singleton, since Phase 16 (multiple connected sites).
+        Route::get('/api-keys', [WordpressApiKeyController::class, 'index']);
+        Route::post('/api-keys', [WordpressApiKeyController::class, 'store']);
+        Route::delete('/api-keys/{id}', [WordpressApiKeyController::class, 'destroy'])->where('id', '[0-9]+');
+        Route::put('/api-keys/{id}/otp-settings', [WordpressApiKeyController::class, 'updateOtpSetting'])->where('id', '[0-9]+');
     });
 
     // ── Courier Integration ───────────────────────────────────────────────────

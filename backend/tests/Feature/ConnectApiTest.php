@@ -43,6 +43,29 @@ class ConnectApiTest extends TestCase
         return ['X-API-KEY' => $rawKey, 'X-Client-Domain' => $domain];
     }
 
+    /**
+     * Adds a second connected WooCommerce site for the same seller (Phase
+     * 16 — a seller may have more than one). Returns the raw key + headers
+     * for it, distinct from connectedMerchant()'s own 'myshop.com' key.
+     *
+     * @return array{0: string, 1: array}
+     */
+    private function secondSiteForMerchant(User $user, string $domain = 'second-shop.com'): array
+    {
+        $rawKey = PlatformApiKey::generateRawKey();
+
+        PlatformApiKey::create([
+            'user_id'    => $user->id,
+            'platform'   => 'woocommerce',
+            'domain'     => $domain,
+            'key_hash'   => PlatformApiKey::hashKey($rawKey),
+            'key_prefix' => substr($rawKey, 0, 12),
+            'status'     => 'connected',
+        ]);
+
+        return [$rawKey, $this->connectHeaders($rawKey, $domain)];
+    }
+
     private function samplePayload(string $wcOrderId = 'wc-1001'): array
     {
         return [
@@ -162,6 +185,47 @@ class ConnectApiTest extends TestCase
 
         // Still exactly one order — the second call updated, not duplicated.
         $this->assertSame(1, Order::where('user_id', $user->id)->count());
+    }
+
+    // ── Multi-site (Phase 16) ────────────────────────────────────────────────
+
+    public function test_two_connected_sites_syncing_the_same_wc_order_id_create_two_distinct_orders(): void
+    {
+        [$user, $rawKeyA] = $this->connectedMerchant();
+        [$rawKeyB, $headersB] = $this->secondSiteForMerchant($user);
+        $headersA = $this->connectHeaders($rawKeyA);
+
+        // Both sites independently number their own orders starting at "1" —
+        // this must not collide, unlike a single shared (user_id, source_ref)
+        // key would.
+        $payload = $this->samplePayload('1');
+        $this->postJson('/api/connect/v1/orders/sync', $payload, $headersA)->assertCreated();
+        $this->postJson('/api/connect/v1/orders/sync', $payload, $headersB)->assertCreated();
+
+        $this->assertSame(2, Order::where('user_id', $user->id)->where('source', 'woocommerce')->count());
+
+        $keyA = PlatformApiKey::findByRawKey($rawKeyA);
+        $keyB = PlatformApiKey::findByRawKey($rawKeyB);
+
+        $this->assertDatabaseHas('orders', [
+            'user_id' => $user->id, 'source_ref' => '1', 'platform_api_key_id' => $keyA->id,
+        ]);
+        $this->assertDatabaseHas('orders', [
+            'user_id' => $user->id, 'source_ref' => '1', 'platform_api_key_id' => $keyB->id,
+        ]);
+
+        // Repeat-syncing the same wc_order_id on site A only updates site
+        // A's order — site B's stays untouched, still exactly 2 total.
+        $updated = $payload;
+        $updated['customer_address'] = 'Updated address, site A only';
+        $this->postJson('/api/connect/v1/orders/sync', $updated, $headersA)
+            ->assertOk()
+            ->assertJsonPath('data.customer_address', 'Updated address, site A only');
+
+        $this->assertSame(2, Order::where('user_id', $user->id)->where('source', 'woocommerce')->count());
+        $this->assertDatabaseHas('orders', [
+            'platform_api_key_id' => $keyB->id, 'source_ref' => '1', 'customer_address' => 'Dhanmondi, Dhaka',
+        ]);
     }
 
     public function test_orders_sync_status_transitions_order_and_logs(): void

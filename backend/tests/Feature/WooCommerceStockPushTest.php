@@ -43,12 +43,20 @@ class WooCommerceStockPushTest extends TestCase
 
     private function wcProduct(User $user, array $overrides = []): Product
     {
+        // PushWooCommerceStockJob resolves its push target from the
+        // product's own platform_api_key_id (Phase 16), not just "any
+        // connected key for this user" — every caller here only ever
+        // creates one key per merchant via connectedMerchant(), so
+        // resolving it is unambiguous.
+        $apiKey = PlatformApiKey::where('user_id', $user->id)->first();
+
         return Product::create(array_merge([
             'user_id'      => $user->id,
             'name'         => 'Cotton T-Shirt',
             'sku'          => 'TSHIRT-001',
             'source'       => 'woocommerce',
             'source_ref'   => 'wc-p-1',
+            'platform_api_key_id' => $apiKey?->id,
             'selling_price'=> 500,
             'cost_price'   => 300,
             'stock'        => 20,

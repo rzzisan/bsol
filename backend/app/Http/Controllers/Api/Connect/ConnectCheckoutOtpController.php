@@ -108,8 +108,11 @@ class ConnectCheckoutOtpController extends Controller
 
     private function findOrder(string $wcOrderId): ?Order
     {
+        // Scoped by the specific connected site (platform_api_key_id), not
+        // just the seller — see ConnectOrderController::sync() (Phase 16).
         return Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->where('source', 'woocommerce')
+            ->where('platform_api_key_id', optional(request()->attributes->get('platform_api_key'))->id)
             ->where('source_ref', $wcOrderId)
             ->first();
     }

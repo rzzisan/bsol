@@ -15,7 +15,7 @@ class Product extends Model
     use SoftDeletes, HasFactory;
 
     protected $fillable = [
-        'user_id', 'category_id', 'name', 'sku', 'source', 'source_ref', 'description',
+        'user_id', 'category_id', 'name', 'sku', 'source', 'source_ref', 'platform_api_key_id', 'description',
         'regular_price', 'discount', 'discount_type', 'selling_price', 'cost_price', 'stock', 'low_stock_alert',
         'track_stock', 'unit', 'status', 'variants', 'thumbnail', 'has_variants',
     ];
@@ -59,6 +59,11 @@ class Product extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function platformApiKey(): BelongsTo
+    {
+        return $this->belongsTo(PlatformApiKey::class);
     }
 
     public function category(): BelongsTo

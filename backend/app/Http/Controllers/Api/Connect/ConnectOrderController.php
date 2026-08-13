@@ -33,7 +33,11 @@ class ConnectOrderController extends Controller
     ) {}
 
     /**
-     * Create-or-update, upserted on (user_id, source=woocommerce, source_ref=wc_order_id).
+     * Create-or-update, upserted on (user_id, source=woocommerce,
+     * platform_api_key_id, source_ref=wc_order_id) — scoped to the
+     * specific connected site, not just the seller, since two different
+     * WooCommerce sites both number their own orders 1, 2, 3, ... from
+     * scratch (Phase 16: a seller may have more than one connected).
      * Line items are intentionally not re-synced on update (would need
      * inventory-aware diffing — deferred to a later phase).
      */
@@ -72,9 +76,15 @@ class ConnectOrderController extends Controller
         ]);
 
         $merchant = auth()->user();
+        $apiKey   = $request->attributes->get('platform_api_key');
 
+        // Scoped by the specific site (platform_api_key_id), not just the
+        // seller — two different WooCommerce sites both number their own
+        // orders 1, 2, 3, ... from scratch, so matching on source_ref alone
+        // would collide across a seller's connected sites (Phase 16).
         $order = Order::whereIn('user_id', $merchant->shopUserIds())
             ->where('source', 'woocommerce')
+            ->where('platform_api_key_id', $apiKey?->id)
             ->where('source_ref', (string) $data['wc_order_id'])
             ->first();
 
@@ -150,7 +160,13 @@ class ConnectOrderController extends Controller
             $responseData = json_decode($response->getContent(), true);
 
             if (! empty($responseData['success'])) {
-                $apiKey = $request->attributes->get('platform_api_key');
+                // OrderController::store() has its own hardcoded field list
+                // (shared with the plain dashboard "create order manually"
+                // path, where this column must stay absent) — tag the site
+                // with a narrow follow-up write instead of threading it
+                // through there.
+                Order::whereKey($responseData['data']['id'])->update(['platform_api_key_id' => $apiKey?->id]);
+
                 $isHistorical = ! empty($data['is_historical_sync']);
                 $otpRequired = false;
 
@@ -219,9 +235,11 @@ class ConnectOrderController extends Controller
         ]);
 
         $merchant = auth()->user();
+        $apiKey   = $request->attributes->get('platform_api_key');
 
         $order = Order::whereIn('user_id', $merchant->shopUserIds())
             ->where('source', 'woocommerce')
+            ->where('platform_api_key_id', $apiKey?->id)
             ->where('source_ref', (string) $data['wc_order_id'])
             ->first();
 
@@ -265,8 +283,11 @@ class ConnectOrderController extends Controller
             'wc_order_id' => 'required|string|max:100',
         ]);
 
+        $apiKey = $request->attributes->get('platform_api_key');
+
         $order = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->where('source', 'woocommerce')
+            ->where('platform_api_key_id', $apiKey?->id)
             ->where('source_ref', (string) $data['wc_order_id'])
             ->first();
 

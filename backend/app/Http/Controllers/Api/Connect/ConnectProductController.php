@@ -57,9 +57,15 @@ class ConnectProductController extends Controller
         $merchant    = auth()->user();
         $shopUserIds = $merchant->shopUserIds();
         $isVariable  = $data['type'] === 'variable';
+        $apiKey      = $request->attributes->get('platform_api_key');
 
+        // Scoped by the specific site (platform_api_key_id), not just the
+        // seller — two different WooCommerce sites both number their own
+        // products 1, 2, 3, ... from scratch, so matching on source_ref
+        // alone would collide across a seller's connected sites (Phase 16).
         $product = Product::whereIn('user_id', $shopUserIds)
             ->where('source', 'woocommerce')
+            ->where('platform_api_key_id', $apiKey?->id)
             ->where('source_ref', $data['wc_product_id'])
             ->first();
 
@@ -86,6 +92,7 @@ class ConnectProductController extends Controller
             'has_variants'  => $isVariable,
             'source'        => 'woocommerce',
             'source_ref'    => (string) $data['wc_product_id'],
+            'platform_api_key_id' => $apiKey?->id,
         ];
 
         // withoutEvents: this write is itself an inbound WooCommerce->BSOL
