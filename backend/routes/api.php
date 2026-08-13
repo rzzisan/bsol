@@ -89,6 +89,10 @@ Route::post('/password/reset',        [PasswordResetController::class, 'resetPas
 // SaaS attribution footer + /terms page content — platform-wide, not per-merchant.
 Route::get('/public/platform-settings', [PublicPlatformSettingsController::class, 'show']);
 
+// BSOL Connect plugin zip — no secrets in it, safe as a plain public download link.
+Route::get('/wordpress/plugin-download', [WordpressApiKeyController::class, 'downloadPlugin'])
+    ->middleware('throttle:20,1');
+
 Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow'])
     ->middleware(['track_landing_page_visit', 'throttle:60,1']);
 Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder'])

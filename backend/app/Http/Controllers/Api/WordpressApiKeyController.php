@@ -4,8 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PlatformApiKey;
+use FilesystemIterator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use Symfony\Component\HttpFoundation\Response;
+use ZipArchive;
 
 /**
  * Dashboard-facing management of the seller's WordPress/WooCommerce connector
@@ -88,5 +93,40 @@ class WordpressApiKeyController extends Controller
         $key->update(['status' => 'revoked', 'revoked_at' => now()]);
 
         return response()->json(['success' => true, 'message' => 'API key revoked.']);
+    }
+
+    /**
+     * Public — the plugin zip has no secrets in it (the API key is entered
+     * by the seller after install), and a plain <a href download> link is
+     * far simpler than an authenticated blob-fetch dance for a static
+     * asset. Built on-the-fly from the plugin source on every request so
+     * it can never go stale relative to what's actually deployed.
+     */
+    public function downloadPlugin(): Response
+    {
+        $sourceDir = dirname(base_path()) . '/wordpress-plugin/bsol-connect';
+        abort_unless(is_dir($sourceDir), 404, 'Plugin source not found.');
+
+        $version = '1.0.0';
+        $mainFile = $sourceDir . '/bsol-connect.php';
+        if (is_file($mainFile) && preg_match('/^\s*\*\s*Version:\s*([0-9.]+)/mi', file_get_contents($mainFile), $m)) {
+            $version = $m[1];
+        }
+
+        $tempZip = tempnam(sys_get_temp_dir(), 'bsol-connect-') . '.zip';
+
+        $zip = new ZipArchive();
+        $zip->open($tempZip, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($sourceDir, FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($files as $file) {
+            $relativePath = substr($file->getPathname(), strlen($sourceDir) + 1);
+            $zip->addFile($file->getPathname(), 'bsol-connect/' . $relativePath);
+        }
+        $zip->close();
+
+        return response()->download($tempZip, "bsol-connect-v{$version}.zip")->deleteFileAfterSend(true);
     }
 }

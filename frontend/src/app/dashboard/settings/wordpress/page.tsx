@@ -10,7 +10,10 @@ const t = {
   bn: {
     pageTitle: "ওয়ার্ডপ্রেস কানেক্ট",
     intro:
-      "আপনার WooCommerce ওয়েবসাইট BSOL-এর সাথে কানেক্ট করতে নিচে আপনার ডোমেইন দিয়ে একটি API Key তৈরি করুন — এই Key এবং ডোমেইন BSOL WordPress প্লাগিনে বসাতে হবে। প্লাগিনটি আসছে পরবর্তী ধাপে।",
+      "আপনার WooCommerce ওয়েবসাইট BSOL-এর সাথে কানেক্ট করতে প্রথমে নিচে থেকে প্লাগিন ডাউনলোড করে WordPress-এ ইনস্টল করুন, তারপর আপনার ডোমেইন দিয়ে একটি API Key তৈরি করে প্লাগিনে বসান।",
+    downloadTitle: "BSOL Connect প্লাগিন",
+    downloadDesc: "ডাউনলোড করে WordPress Admin → Plugins → Add New → Upload Plugin থেকে ইনস্টল করুন।",
+    downloadBtn: "প্লাগিন ডাউনলোড করুন",
     loading: "লোড হচ্ছে...",
     domainLabel: "ওয়েবসাইট ডোমেইন",
     domainPlaceholder: "example.com",
@@ -32,14 +35,17 @@ const t = {
     saveKeyWarning: "সংরক্ষণ করুন — এটা আর দেখানো হবে না।",
     copyBtn: "কপি করুন",
     copiedBtn: "কপি হয়েছে",
-    pluginNote: "এই Key ও ডোমেইন আসন্ন BSOL WordPress প্লাগিনে ব্যবহার হবে।",
+    pluginNote: "এই Key ও ডোমেইন BSOL WordPress প্লাগিনে বসাতে হবে।",
     genericError: "কিছু একটা সমস্যা হয়েছে, আবার চেষ্টা করুন।",
     domainRequired: "ডোমেইন লিখুন।",
   },
   en: {
     pageTitle: "WordPress Connect",
     intro:
-      "Connect your WooCommerce site to BSOL by generating an API Key for your domain below — the key and domain go into the BSOL WordPress plugin. The plugin itself ships in a later phase.",
+      "To connect your WooCommerce site to BSOL, first download the plugin below and install it on WordPress, then generate an API Key for your domain and enter it in the plugin.",
+    downloadTitle: "BSOL Connect Plugin",
+    downloadDesc: "Download it, then install via WordPress Admin → Plugins → Add New → Upload Plugin.",
+    downloadBtn: "Download Plugin",
     loading: "Loading...",
     domainLabel: "Website Domain",
     domainPlaceholder: "example.com",
@@ -61,7 +67,7 @@ const t = {
     saveKeyWarning: "Save this now — it will not be shown again.",
     copyBtn: "Copy",
     copiedBtn: "Copied",
-    pluginNote: "This key and domain will be used in the upcoming BSOL WordPress plugin.",
+    pluginNote: "Enter this key and domain into the BSOL WordPress plugin.",
     genericError: "Something went wrong, please try again.",
     domainRequired: "Please enter a domain.",
   },
@@ -193,6 +199,20 @@ export default function WordpressConnectPage() {
     <UserShell activeKey="wordpress-connect" defaultExpandedKey="settings" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
       <div className="mx-auto max-w-2xl space-y-4">
         <p className="text-sm text-[var(--muted)]">{tr.intro}</p>
+
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--foreground)]">{tr.downloadTitle}</h3>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">{tr.downloadDesc}</p>
+          </div>
+          <a
+            href={`${API}/wordpress/plugin-download`}
+            download
+            className="shrink-0 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white"
+          >
+            {tr.downloadBtn}
+          </a>
+        </div>
 
         {message && (
           <div
