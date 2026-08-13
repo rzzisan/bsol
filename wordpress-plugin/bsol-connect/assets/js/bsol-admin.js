@@ -5,6 +5,89 @@ jQuery( function ( $ ) {
 		return;
 	}
 
+	// ── Customer Health: delivered-vs-not progress bar + click-for-details ──
+
+	var BSOL_COURIER_COLORS = {
+		pathao: '#dc2626',
+		steadfast: '#0d9488',
+		redx: '#be123c',
+		carrybee: '#f59e0b',
+		paperfly: '#2563eb'
+	};
+	var BSOL_COURIER_LABELS = {
+		pathao: 'Pathao',
+		steadfast: 'Steadfast',
+		redx: 'RedX',
+		carrybee: 'CarryBee',
+		paperfly: 'Paperfly'
+	};
+
+	function bsolHumanize( slug ) {
+		return String( slug ).replace( /_/g, ' ' ).replace( /\b\w/g, function ( c ) {
+			return c.toUpperCase();
+		} );
+	}
+
+	function bsolHealthCourierValue( card ) {
+		if ( 'not_configured' === card.status ) {
+			return { text: 'Not set up', muted: true };
+		}
+		if ( 'error' === card.status ) {
+			return { text: 'Check failed', muted: true };
+		}
+		if ( 'rating' === card.data_type && card.rating ) {
+			return { text: bsolHumanize( card.rating ), muted: false };
+		}
+		if ( 0 === card.total ) {
+			return { text: 'No history', muted: true };
+		}
+		return { text: card.success + '/' + card.total + ' (' + card.success_rate + '%)', muted: false };
+	}
+
+	function bsolRenderHealthBar( $bar, data ) {
+		var overall = data.overall || { total: 0, success: 0, success_rate: 0 };
+		var pct = Math.round( overall.success_rate || 0 );
+		var html;
+
+		if ( overall.total > 0 ) {
+			html = '<div class="bsol-health-progress">' +
+				'<div class="bsol-health-track"><div class="bsol-health-fill" style="width:' + pct + '%"></div></div>' +
+				'<span class="bsol-health-pct">' + pct + '%</span>' +
+			'</div>';
+		} else {
+			html = '<div class="bsol-health-progress bsol-health-progress-empty">' +
+				'<div class="bsol-health-track"></div>' +
+				'<span class="bsol-health-pct">No data</span>' +
+			'</div>';
+		}
+
+		$bar.html( html );
+		$bar.data( 'health', data );
+	}
+
+	function bsolRenderHealthPopover( data ) {
+		var overall = data.overall || { total: 0, success: 0, success_rate: 0 };
+		var rows = ( data.couriers || [] ).map( function ( card ) {
+			var val = bsolHealthCourierValue( card );
+			var color = BSOL_COURIER_COLORS[ card.name ] || '#8c8f94';
+			var label = BSOL_COURIER_LABELS[ card.name ] || card.name;
+			return '<div class="bsol-health-row">' +
+				'<span class="bsol-health-dot" style="background:' + color + '"></span>' +
+				'<span class="bsol-health-row-name">' + label + '</span>' +
+				'<span class="bsol-health-row-val' + ( val.muted ? ' is-muted' : '' ) + '">' + val.text + '</span>' +
+			'</div>';
+		} ).join( '' );
+
+		var summary = overall.total > 0
+			? '<strong>' + overall.success + '/' + overall.total + '</strong> parcels delivered across all couriers'
+			: 'No delivery history found for this number yet';
+
+		return '<div class="bsol-health-popover">' +
+			'<div class="bsol-health-popover-summary">' + summary + '</div>' +
+			rows +
+		'</div>';
+	}
+
 	$( '.bsol-health-bar[data-order-id]' ).each( function () {
 		var $bar = $( this );
 		var orderId = $bar.data( 'order-id' );
@@ -15,24 +98,44 @@ jQuery( function ( $ ) {
 			order_id: orderId
 		} ).done( function ( response ) {
 			if ( ! response || ! response.success ) {
-				$bar.addClass( 'bsol-health-error' );
-				$bar.find( '.bsol-health-text' ).text(
+				$bar.find( '.bsol-health-loading' ).text(
 					( response && response.data && response.data.message ) || '—'
 				);
 				return;
 			}
-
-			var data = response.data;
-			$bar.addClass( 'bsol-health-' + data.risk_level );
-			var label = data.fraud_score + '/100';
-			if ( data.is_blacklisted ) {
-				label += ' ⛔';
-			}
-			$bar.find( '.bsol-health-text' ).text( label );
+			bsolRenderHealthBar( $bar, response.data );
 		} ).fail( function () {
-			$bar.addClass( 'bsol-health-error' );
-			$bar.find( '.bsol-health-text' ).text( '—' );
+			$bar.find( '.bsol-health-loading' ).text( '—' );
 		} );
+	} );
+
+	$( document ).on( 'click', '.bsol-health-bar', function ( e ) {
+		var $bar = $( this );
+		var data = $bar.data( 'health' );
+		if ( ! data ) {
+			return; // still loading, or the check failed — nothing to show
+		}
+		e.preventDefault();
+		e.stopPropagation();
+
+		var wasOpen = $bar.hasClass( 'is-open' );
+		$( '.bsol-health-bar.is-open' ).removeClass( 'is-open' ).find( '.bsol-health-popover' ).remove();
+
+		if ( ! wasOpen ) {
+			$bar.addClass( 'is-open' ).append( bsolRenderHealthPopover( data ) );
+		}
+	} );
+
+	$( document ).on( 'click', function ( e ) {
+		if ( ! $( e.target ).closest( '.bsol-health-bar' ).length ) {
+			$( '.bsol-health-bar.is-open' ).removeClass( 'is-open' ).find( '.bsol-health-popover' ).remove();
+		}
+	} );
+
+	$( document ).on( 'keyup', function ( e ) {
+		if ( 'Escape' === e.key ) {
+			$( '.bsol-health-bar.is-open' ).removeClass( 'is-open' ).find( '.bsol-health-popover' ).remove();
+		}
 	} );
 
 	// ── Courier book / track / cancel (event-delegated — the column re-renders

@@ -237,3 +237,18 @@ a real WooCommerce staging site before rolling out to sellers.
    cancel — confirm it flips to a red "Cancelled" badge.
 5. Click the print icon — confirm the waybill PDF still opens (this proxy
    path is unchanged by the redesign).
+
+## Customer Health redesign (1.13.0)
+
+1. WooCommerce orders list — confirm the Customer Health column shows a
+   short green/red progress bar with a percentage, not the old "X/100"
+   pill. A brand-new phone number with no delivery history anywhere
+   should show a neutral gray bar labeled "No data" (not a scary red bar).
+2. Click the bar — confirm a popover opens listing all 5 couriers with
+   either a delivered/total percentage, "Not set up" (muted, courier
+   credentials not configured on BSOL), or "Check failed".
+3. Click elsewhere (or press Escape) — confirm the popover closes.
+4. Reload the order list several times within a few minutes — confirm no
+   extra load: this should read from the WP transient cache (phone-keyed),
+   not hit BSOL again, until the 24h cache expires or a courier credential
+   changes.

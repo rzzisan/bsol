@@ -1,5 +1,17 @@
 # BSOL Connect — Changelog
 
+## 1.13.0 — 2026-08-13
+
+- **Customer Health redesigned**: was a generic 0-100 fraud score (always
+  0 for a phone with no prior BSOL order history — true for most
+  WooCommerce-only customers). Now a delivered-vs-not progress bar built
+  from live per-courier delivery history (Steadfast/Pathao/RedX/CarryBee/
+  Paperfly) — the same data BSOL's own dashboard "Courier Delivery
+  History" panel shows. Click the bar for a per-courier breakdown.
+- Still cached per phone number in a WP transient (24h) — BSOL only ever
+  sees one request per phone per cache window, no matter how many times
+  the order list is viewed. Backend: new `POST /connect/v1/fraud/courier-health`.
+
 ## 1.12.0 — 2026-08-13
 
 UI/UX pass — no backend changes:

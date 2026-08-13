@@ -181,6 +181,8 @@ Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
         Route::get('/courier/waybill', [ConnectCourierController::class, 'waybill']);
         Route::post('/fraud/check-phone', [ConnectFraudController::class, 'checkPhone'])
             ->middleware('throttle:60,1');
+        Route::post('/fraud/courier-health', [ConnectFraudController::class, 'courierHealth'])
+            ->middleware('throttle:60,1');
         Route::post('/orders/verify-otp', [ConnectCheckoutOtpController::class, 'verify'])
             ->middleware('throttle:20,1');
         Route::post('/orders/resend-otp', [ConnectCheckoutOtpController::class, 'resend'])

@@ -1,9 +1,19 @@
 <?php
 /**
- * "Customer Health" column on the WooCommerce orders list — shows the BSOL
- * fraud/delivery-history score for each order's phone number, fetched via
- * AJAX and cached in a transient (24h) to avoid re-checking on every list
- * load. Registers both the legacy (posts-table) and HPOS column hooks.
+ * "Customer Health" column on the WooCommerce orders list — a delivered-vs-
+ * not progress bar built from live per-courier delivery history (BSOL's
+ * CourierFraudCheckService — the same data the dashboard's own "Courier
+ * Delivery History" panel shows), not the generic in-house fraud_score,
+ * which reads 0 for any phone with no prior BSOL order history — true for
+ * most WooCommerce-only sellers' customers. Clicking the bar shows the
+ * per-courier breakdown.
+ *
+ * Fetched via AJAX and cached in a transient keyed by phone number (not
+ * order id) for CACHE_TTL — several orders from the same customer share
+ * one lookup, and every order-list view after the first is served entirely
+ * from this transient, so BSOL only ever sees one request per phone per
+ * cache window regardless of how often the list is viewed. Registers both
+ * the legacy (posts-table) and HPOS column hooks.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -54,7 +64,7 @@ class Bsol_Fraud_Check {
 			return;
 		}
 		printf(
-			'<div class="bsol-health-bar" data-order-id="%d"><span class="bsol-health-text">%s</span></div>',
+			'<div class="bsol-health-bar" data-order-id="%d"><span class="bsol-health-loading">%s</span></div>',
 			(int) $order->get_id(),
 			esc_html__( 'Loading…', 'bsol-connect' )
 		);
@@ -110,17 +120,13 @@ class Bsol_Fraud_Check {
 		}
 
 		$api      = new Bsol_Api();
-		$response = $api->check_fraud( $phone );
+		$response = $api->check_courier_health( $phone );
 
 		if ( empty( $response['success'] ) ) {
 			wp_send_json_error( array( 'message' => isset( $response['message'] ) ? $response['message'] : 'Check failed' ) );
 		}
 
-		$result = array(
-			'fraud_score'    => $response['data']['fraud_score'],
-			'risk_level'     => $response['data']['risk_level'],
-			'is_blacklisted' => $response['data']['is_blacklisted'],
-		);
+		$result = $response['data'];
 
 		set_transient( $cache_key, $result, self::CACHE_TTL );
 

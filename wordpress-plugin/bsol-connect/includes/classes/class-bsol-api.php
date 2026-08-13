@@ -106,6 +106,17 @@ class Bsol_Api {
 		return $this->remote_post( 'fraud/check-phone', array( 'phone_number' => $phone ) );
 	}
 
+	/**
+	 * Per-courier delivery-history breakdown (delivered/cancelled/success_rate
+	 * per courier + an aggregate) — same data BSOL's own dashboard "Courier
+	 * Delivery History" panel shows. Used by the Customer Health column
+	 * instead of check_fraud()'s generic score, which is 0 for any phone
+	 * with no prior BSOL order history (true for most WooCommerce customers).
+	 */
+	public function check_courier_health( $phone ) {
+		return $this->remote_post( 'fraud/courier-health', array( 'phone_number' => $phone ) );
+	}
+
 	public function verify_otp( $wc_order_id, $otp_code ) {
 		return $this->remote_post(
 			'orders/verify-otp',

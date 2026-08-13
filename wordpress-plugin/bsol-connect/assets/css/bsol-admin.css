@@ -370,42 +370,114 @@
 	color: var(--bsol-muted);
 }
 
-/* ── Customer Health column (WooCommerce orders list) ──────────────────── */
+/* ── Customer Health column (WooCommerce orders list) ───────────────────
+ * A delivered-vs-not progress bar (green fill = success rate, red track
+ * showing through = the rest) built from live per-courier delivery
+ * history. Click to open a popover with the per-courier breakdown.
+ */
 
 .bsol-health-bar {
-	display: inline-flex;
-	align-items: center;
-	padding: 3px 10px;
-	border-radius: 999px;
+	position: relative;
+	display: inline-block;
+	min-width: 90px;
+	cursor: pointer;
+}
+
+.bsol-health-loading {
 	font-size: 12px;
+	color: var(--bsol-muted);
+}
+
+.bsol-health-progress {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.bsol-health-track {
+	width: 60px;
+	height: 8px;
+	border-radius: 999px;
+	background: #f6c9c9;
+	overflow: hidden;
+	flex-shrink: 0;
+}
+
+.bsol-health-progress-empty .bsol-health-track {
+	background: #ececed;
+}
+
+.bsol-health-fill {
+	height: 100%;
+	background: #1a7f37;
+	border-radius: 999px;
+}
+
+.bsol-health-pct {
+	font-size: 11.5px;
 	font-weight: 700;
-	background: #f0f0f1;
-	color: #50575e;
+	color: var(--bsol-fg);
 	white-space: nowrap;
-	border: 1px solid transparent;
 }
 
-.bsol-health-bar.bsol-health-low {
-	background: #edfaef;
-	color: #1a7f37;
-	border-color: rgba(26, 127, 55, 0.15);
+.bsol-health-progress-empty .bsol-health-pct {
+	color: var(--bsol-muted);
+	font-weight: 600;
 }
 
-.bsol-health-bar.bsol-health-medium {
-	background: #fff8e5;
-	color: #996800;
-	border-color: rgba(153, 104, 0, 0.15);
+.bsol-health-popover {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	z-index: 50;
+	min-width: 220px;
+	background: var(--bsol-surface);
+	border: 1px solid var(--bsol-border);
+	border-radius: 12px;
+	box-shadow: 0 14px 24px rgba(7, 14, 24, 0.18);
+	padding: 0.55rem 0.65rem;
+	cursor: default;
+	white-space: normal;
 }
 
-.bsol-health-bar.bsol-health-high {
-	background: #fcf0f1;
-	color: #b32d2e;
-	border-color: rgba(179, 45, 46, 0.15);
+.bsol-health-popover-summary {
+	font-size: 11.5px;
+	color: var(--bsol-muted);
+	margin-bottom: 0.4rem;
+	padding-bottom: 0.4rem;
+	border-bottom: 1px solid var(--bsol-border);
 }
 
-.bsol-health-bar.bsol-health-error {
-	background: #f0f0f1;
-	color: #8c8f94;
+.bsol-health-row {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.2rem 0;
+	font-size: 12px;
+}
+
+.bsol-health-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.bsol-health-row-name {
+	flex: 1;
+	color: var(--bsol-fg);
+	font-weight: 600;
+}
+
+.bsol-health-row-val {
+	color: var(--bsol-fg);
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.bsol-health-row-val.is-muted {
+	color: var(--bsol-muted);
+	font-weight: 500;
 }
 
 /* ── Courier column (WooCommerce orders list) ───────────────────────────

@@ -2,7 +2,7 @@
 # This file is distributed under the GPL v2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: BSOL Connect 1.12.0\n"
+"Project-Id-Version: BSOL Connect 1.13.0\n"
 "Report-Msgid-Bugs-To: https://bsol.zyrotechbd.com\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -280,35 +280,35 @@ msgstr ""
 msgid "Select courier"
 msgstr ""
 
-#: includes/modules/courier/class-bsol-courier.php:137
+#: includes/modules/courier/class-bsol-courier.php:138
 msgid "Refresh status"
 msgstr ""
 
-#: includes/modules/courier/class-bsol-courier.php:138
+#: includes/modules/courier/class-bsol-courier.php:139
 msgid "Cancel booking"
 msgstr ""
 
-#: includes/modules/courier/class-bsol-courier.php:139
+#: includes/modules/courier/class-bsol-courier.php:140
 msgid "Print waybill"
 msgstr ""
 
-#: includes/modules/courier/class-bsol-courier.php:244 includes/modules/invoice/class-bsol-invoice.php:61
+#: includes/modules/courier/class-bsol-courier.php:245 includes/modules/invoice/class-bsol-invoice.php:61
 msgid "Unauthorized"
 msgstr ""
 
-#: includes/modules/courier/class-bsol-courier.php:251 includes/modules/invoice/class-bsol-invoice.php:68
+#: includes/modules/courier/class-bsol-courier.php:252 includes/modules/invoice/class-bsol-invoice.php:68
 msgid "Order not found."
 msgstr ""
 
-#: includes/modules/courier/class-bsol-courier.php:258
+#: includes/modules/courier/class-bsol-courier.php:259
 msgid "Waybill not available."
 msgstr ""
 
-#: includes/modules/fraud/class-bsol-fraud-check.php:34 includes/modules/fraud/class-bsol-fraud-check.php:38
+#: includes/modules/fraud/class-bsol-fraud-check.php:44 includes/modules/fraud/class-bsol-fraud-check.php:48
 msgid "Customer Health"
 msgstr ""
 
-#: includes/modules/fraud/class-bsol-fraud-check.php:59
+#: includes/modules/fraud/class-bsol-fraud-check.php:69
 msgid "Loading…"
 msgstr ""
 

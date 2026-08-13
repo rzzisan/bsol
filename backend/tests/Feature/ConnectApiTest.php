@@ -233,6 +233,33 @@ class ConnectApiTest extends TestCase
         ]);
     }
 
+    public function test_courier_health_returns_not_configured_cards_when_no_courier_credentials_exist(): void
+    {
+        [, $rawKey] = $this->connectedMerchant();
+
+        $response = $this->postJson('/api/connect/v1/fraud/courier-health', [
+            'phone_number' => '01755443322',
+        ], $this->connectHeaders($rawKey));
+
+        $response->assertOk()->assertJsonStructure([
+            'success',
+            'data' => ['phone', 'overall' => ['total', 'success', 'cancelled', 'success_rate'], 'couriers'],
+        ]);
+        $this->assertSame('not_configured', $response->json('data.couriers.0.status'));
+        $this->assertSame(0, $response->json('data.overall.total'));
+    }
+
+    public function test_courier_health_rejects_invalid_phone_format(): void
+    {
+        [, $rawKey] = $this->connectedMerchant();
+
+        $response = $this->postJson('/api/connect/v1/fraud/courier-health', [
+            'phone_number' => 'not-a-phone',
+        ], $this->connectHeaders($rawKey));
+
+        $response->assertStatus(422)->assertJsonPath('success', false);
+    }
+
     // ── Subscription gating ─────────────────────────────────────────────────
 
     public function test_connect_still_succeeds_but_sync_and_fraud_check_are_blocked_when_subscription_expired(): void
@@ -249,6 +276,10 @@ class ConnectApiTest extends TestCase
             ->assertJsonPath('error_code', 'subscription_expired');
 
         $this->postJson('/api/connect/v1/fraud/check-phone', ['phone_number' => '01755443322'], $headers)
+            ->assertStatus(402)
+            ->assertJsonPath('error_code', 'subscription_expired');
+
+        $this->postJson('/api/connect/v1/fraud/courier-health', ['phone_number' => '01755443322'], $headers)
             ->assertStatus(402)
             ->assertJsonPath('error_code', 'subscription_expired');
     }

@@ -28,6 +28,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১২ | Order invoice PDF (v1.10.0) | `e1dfa2a` |
 | ১৩ | Distribution/polish — self-update notice, .pot, readme.txt (v1.11.0) | `1c06c5a` |
 | ১৪ | Admin UI redesign (BSOL brand) + courier column "Book to Courier" picker (v1.12.0) | `f2c8f9a` |
+| ১৫ | Customer Health redesign — কুরিয়ার ডেলিভারি-হিস্ট্রি প্রোগ্রেস বার + breakdown popover (v1.13.0) | `86cc12f` |
 
 ---
 
@@ -60,7 +61,8 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | POST | `/connect/v1/courier/cancel` | `ConnectCourierController@cancel` | বুকিং বাতিল |
 | GET | `/connect/v1/courier/balance` | `ConnectCourierController@balance` | Steadfast ব্যালেন্স |
 | GET | `/connect/v1/courier/waybill` | `ConnectCourierController@waybill` | Waybill/sticker PDF স্ট্রিম |
-| POST | `/connect/v1/fraud/check-phone` | `ConnectFraudController@checkPhone` | ফোন ফ্রড/ডেলিভারি-হিস্ট্রি চেক |
+| POST | `/connect/v1/fraud/check-phone` | `ConnectFraudController@checkPhone` | ফোন ফ্রড/ডেলিভারি-হিস্ট্রি চেক (in-house fraud_score) |
+| POST | `/connect/v1/fraud/courier-health` | `ConnectFraudController@courierHealth` | প্রতি-কুরিয়ার ডেলিভারি breakdown (Customer Health প্রোগ্রেস বার-এর ডেটা সোর্স) |
 | POST | `/connect/v1/orders/verify-otp` | `ConnectCheckoutOtpController@verify` | চেকআউট OTP ভেরিফাই (order-received পেজ থেকে relay) |
 | POST | `/connect/v1/orders/resend-otp` | `ConnectCheckoutOtpController@resend` | OTP পুনরায় পাঠানো |
 
@@ -84,7 +86,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.12.0)
+wordpress-plugin/bsol-connect/          (v1.13.0)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
@@ -147,7 +149,9 @@ Order-list-এ "Courier" কলাম (legacy + HPOS হুক জোড়া)�
 বুক করা অর্ডারের পাশে প্রিন্টার আইকন — নতুন কোনো PDF লজিক না, BSOL-এর আগে থেকেই থাকা ২২-টেমপ্লেট `WaybillPdfService` (বারকোড/QR/বাংলা HarfBuzz শেপিং) সরাসরি reuse। **এটা AJAX না, প্লেইন লিংক + `admin-post.php` handler** — ব্রাউজার নিজে থেকে প্লাগিনের API key attach করতে পারে না, তাই WordPress সার্ভার-সাইডে PDF fetch করে (যেখানে key জানা আছে) ব্রাউজারে স্ট্রিম করে দেয় (zayroo-connect-এর CSV-export-এর মতোই standard WP প্যাটার্ন)।
 
 ### Fraud check (`class-bsol-fraud-check.php`)
-Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘণ্টা transient cache। এই ফাইলই shared `bsol-admin` script/style enqueue করে + `bsol_ajax` object localize করে (health nonce + courier nonce একসাথে) — courier মডিউল এই একই enqueue-এর উপর নির্ভর করে।
+Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ফোন-নম্বর-কী দিয়ে ২৪ ঘণ্টা transient cache (একই ফোনের একাধিক অর্ডার একটাই cache শেয়ার করে, বারবার order list view করলেও BSOL-এ নতুন রিকোয়েস্ট যায় না যতক্ষণ cache fresh থাকে)। এই ফাইলই shared `bsol-admin` script/style enqueue করে + `bsol_ajax` object localize করে (health nonce + courier nonce একসাথে) — courier মডিউল এই একই enqueue-এর উপর নির্ভর করে।
+
+**Phase ১৫ (v1.13.0)-এ redesign**: আগে `fraud/check-phone` (in-house `fraud_score`, ০-১০০) দেখাতো — এই স্কোর যেকোনো ফোনের জন্য ০ থাকে যদি সেই ফোনের কোনো আগের BSOL অর্ডার হিস্ট্রি না থাকে (WooCommerce-only সেলারদের বেশিরভাগ কাস্টমারের জন্যই সত্যি)। এখন নতুন `POST /connect/v1/fraud/courier-health` এন্ডপয়েন্ট (`ConnectFraudController@courierHealth`) ব্যবহার করে, যেটা সরাসরি `CourierFraudCheckService::check()`-কে delegate করে — dashboard-এর নিজের "Courier Delivery History" প্যানেলের (`frontend/src/components/courier/courier-delivery-report.tsx`) একই ডেটা। কলামে এখন একটা delivered-vs-not প্রোগ্রেস বার দেখায় (green = success_rate%, বাকিটা লাল), ক্লিক করলে প্রতিটা কুরিয়ারের breakdown popover-এ দেখা যায়। কোনো ডেটা না থাকলে (নতুন কাস্টমার) লাল না দেখিয়ে neutral "No data" — ভুল আতঙ্ক এড়াতে।
 
 ### Bulk/historical sync (`class-bsol-bulk-sync.php`, Phase ১১)
 "Sync Data" ট্যাব — connect করার **আগে** থেকে থাকা প্রোডাক্ট/অর্ডার ব্যাকফিল করার জন্য (নতুনগুলো এমনিতেই auto-sync হয়)। **কোনো নতুন sync লজিক নেই** — `Bsol_Master` inject করা `Bsol_Product_Sync`/`Bsol_Order_Sync` ইনস্ট্যান্সের `sync_product()`/`handle_new_order()` মেথডই আবার কল করা হয় ব্যাচে (১০টা করে, `wc_get_products()`/`wc_get_orders()`-এর `paginate=>true` মোড দিয়ে সস্তায় total count পাওয়া যায়)। **নিজে কখনো `new Bsol_Product_Sync()`/`new Bsol_Order_Sync()` করে না** — করলে তাদের constructor-এর হুক রেজিস্ট্রেশন duplicate হয়ে যেত (`save_post_product` দুইবার ফায়ার হতো প্রতি সেভে)। অর্ডার ব্যাকফিলের সময় `is_historical_sync=true` পাস করা হয় (উপরে দেখুন) + `handle_status_change()` দিয়ে অর্ডারের আসল বর্তমান status আলাদাভাবে push করা হয় (নাহলে সব অর্ডার BSOL-এ "pending"-এ আটকে থাকত)। ক্লায়েন্ট-সাইড ব্যাচ লুপে প্রতি ব্যাচের মাঝে ১ সেকেন্ড gap — `/connect/v1` গ্রুপের `throttle:120,1`-এর নিচে থাকার জন্য।
