@@ -95,4 +95,50 @@ class Bsol_Api {
 	public function check_fraud( $phone ) {
 		return $this->remote_post( 'fraud/check-phone', array( 'phone_number' => $phone ) );
 	}
+
+	/**
+	 * $courier: 'steadfast' | 'paperfly' | 'manual'. Pathao/RedX/Carrybee
+	 * are rejected server-side (they need location data a WooCommerce
+	 * order can't supply) — see ConnectCourierController.
+	 */
+	public function book_courier( $wc_order_id, $courier, $tracking_id = null ) {
+		return $this->remote_post(
+			'courier/book',
+			array(
+				'wc_order_id' => (string) $wc_order_id,
+				'courier'     => $courier,
+				'tracking_id' => $tracking_id,
+			)
+		);
+	}
+
+	public function track_courier( $wc_order_id ) {
+		return $this->remote_post( 'courier/track', array( 'wc_order_id' => (string) $wc_order_id ) );
+	}
+
+	public function cancel_courier( $wc_order_id ) {
+		return $this->remote_post( 'courier/cancel', array( 'wc_order_id' => (string) $wc_order_id ) );
+	}
+
+	public function steadfast_balance() {
+		$url = BSOL_API_URL . 'courier/balance';
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'X-API-KEY'       => $this->get_api_key(),
+					'X-Client-Domain' => Bsol_Helpers::site_domain(),
+				),
+				'timeout' => 15,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array( 'success' => false, 'message' => $response->get_error_message() );
+		}
+
+		$decoded = json_decode( wp_remote_retrieve_body( $response ), true );
+		return is_array( $decoded ) ? $decoded : array( 'success' => false, 'message' => 'Unexpected server response.' );
+	}
 }

@@ -34,4 +34,94 @@ jQuery( function ( $ ) {
 			$bar.find( '.bsol-health-text' ).text( '—' );
 		} );
 	} );
+
+	// ── Courier book / track / cancel (event-delegated — the column re-renders
+	// its own HTML on each action, so buttons are bound to the list body, not
+	// individual elements). ──────────────────────────────────────────────────
+	if ( ! bsol_ajax.courier_nonce ) {
+		return;
+	}
+
+	function bsolCourierColumn( $btn ) {
+		return $btn.closest( '.bsol-courier-column' );
+	}
+
+	function bsolCourierOrderId( $btn ) {
+		return bsolCourierColumn( $btn ).data( 'order-id' );
+	}
+
+	$( document ).on( 'click', '.bsol-courier-book-btn', function ( e ) {
+		e.preventDefault();
+		var $btn = $( this );
+		var $column = bsolCourierColumn( $btn );
+		$column.find( 'button' ).prop( 'disabled', true );
+
+		$.post( bsol_ajax.ajax_url, {
+			action: 'bsol_courier_book',
+			nonce: bsol_ajax.courier_nonce,
+			order_id: bsolCourierOrderId( $btn ),
+			courier: $btn.data( 'courier' )
+		} ).done( function ( response ) {
+			if ( response && response.success ) {
+				var data = response.data || {};
+				$column.html(
+					'<div class="bsol-consignment-info"><strong>' +
+					String( $btn.data( 'courier' ) ).toUpperCase() +
+					':</strong> ' + ( data.consignment_id || '' ) + '</div>'
+				);
+			} else {
+				window.alert( ( response && response.data && response.data.message ) || 'Booking failed.' );
+				$column.find( 'button' ).prop( 'disabled', false );
+			}
+		} ).fail( function () {
+			window.alert( 'Booking failed — please try again.' );
+			$column.find( 'button' ).prop( 'disabled', false );
+		} );
+	} );
+
+	$( document ).on( 'click', '.bsol-courier-track-btn', function ( e ) {
+		e.preventDefault();
+		var $btn = $( this );
+		var $status = bsolCourierColumn( $btn ).find( '.bsol-courier-status' );
+		$status.text( '…' );
+
+		$.post( bsol_ajax.ajax_url, {
+			action: 'bsol_courier_track',
+			nonce: bsol_ajax.courier_nonce,
+			order_id: bsolCourierOrderId( $btn )
+		} ).done( function ( response ) {
+			if ( response && response.success && response.data && response.data.status ) {
+				$status.text(
+					response.data.status.charAt( 0 ).toUpperCase() + response.data.status.slice( 1 )
+				);
+			} else {
+				$status.text( '—' );
+			}
+		} ).fail( function () {
+			$status.text( '—' );
+		} );
+	} );
+
+	$( document ).on( 'click', '.bsol-courier-cancel-btn', function ( e ) {
+		e.preventDefault();
+		if ( ! window.confirm( 'Cancel this courier booking?' ) ) {
+			return;
+		}
+		var $btn = $( this );
+		var $status = bsolCourierColumn( $btn ).find( '.bsol-courier-status' );
+
+		$.post( bsol_ajax.ajax_url, {
+			action: 'bsol_courier_cancel',
+			nonce: bsol_ajax.courier_nonce,
+			order_id: bsolCourierOrderId( $btn )
+		} ).done( function ( response ) {
+			if ( response && response.success ) {
+				$status.text( 'Cancelled' );
+			} else {
+				window.alert( ( response && response.data && response.data.message ) || 'This courier does not support cancellation via API.' );
+			}
+		} ).fail( function () {
+			window.alert( 'Cancellation failed — please try again.' );
+		} );
+	} );
 } );

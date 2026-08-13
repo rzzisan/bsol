@@ -27,6 +27,7 @@ class Bsol_Master {
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/order-sync/class-bsol-order-sync.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/fraud/class-bsol-fraud-check.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/product-sync/class-bsol-product-sync.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/courier/class-bsol-courier.php';
 
 		// Admin menu must render even when not connected (that's where the
 		// Settings/connect form lives), so this is always instantiated.
@@ -44,6 +45,7 @@ class Bsol_Master {
 		new Bsol_Order_Sync();
 		new Bsol_Fraud_Check();
 		new Bsol_Product_Sync();
+		new Bsol_Courier();
 	}
 
 	public function maybe_render_woocommerce_missing_notice() {

@@ -1,5 +1,21 @@
 # BSOL Connect — Changelog
 
+## 1.2.0 — 2026-08-13
+
+Courier booking, directly from the WooCommerce orders list:
+
+- New "Courier" column (legacy + HPOS) — "Send via Steadfast"/"Send via
+  Paperfly" buttons before booking; consignment ID + status + refresh/
+  cancel links after.
+- **Restricted to Steadfast and Paperfly.** Pathao, RedX, and Carrybee all
+  need their own city/zone/area *ID* that a WooCommerce order has no way to
+  supply — BSOL rejects those cleanly server-side rather than surfacing a
+  confusing remote-API failure. A real address→location-ID resolver for
+  those three is a separate, later feature.
+- A "Steadfast Balance" widget on the plugin's Dashboard tab.
+- Order-list meta is stored via `WC_Order::update_meta_data()` (HPOS-native),
+  not `update_post_meta()`.
+
 ## 1.1.0 — 2026-08-12
 
 Product sync (outbound only — WooCommerce → BSOL):

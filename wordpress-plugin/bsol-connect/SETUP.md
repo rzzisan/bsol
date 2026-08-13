@@ -39,6 +39,21 @@ a real WooCommerce staging site before rolling out to sellers.
    the resulting BSOL order's line item is linked to the real product (not
    just an unlinked ad-hoc entry).
 
+## Courier booking
+
+1. On a synced order, open **WooCommerce → Orders** — under the **Courier**
+   column, click **Send via Steadfast** (or **Send via Paperfly** — these
+   are the only two supported for WooCommerce orders; Pathao/RedX/Carrybee
+   need location data this plugin can't supply yet).
+2. Confirm a consignment ID + status appears in the column.
+3. Click the refresh icon — confirm the status updates.
+4. Click the cancel icon — Paperfly should cancel; Steadfast should show a
+   clear "not supported" message (expected — Steadfast's API has no cancel
+   endpoint).
+5. On **BSOL Connect → Dashboard**, click **Check Balance** — confirm it
+   shows your Steadfast balance (or a clear "not configured" message if you
+   haven't added Steadfast credentials on the BSOL dashboard yet).
+
 ## Order sync
 
 1. Place a test order on the WooCommerce store (any payment method).

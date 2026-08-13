@@ -35,6 +35,12 @@ class Bsol_Admin {
 			$fraud_result = $this->handle_fraud_check_test();
 		}
 
+		$balance_result = null;
+		if ( isset( $_POST['bsol_check_balance'] ) && check_admin_referer( 'bsol_check_balance_action' ) ) {
+			$api = new Bsol_Api();
+			$balance_result = $api->steadfast_balance();
+		}
+
 		$is_connected = $this->is_connected();
 		$active_tab   = $is_connected && isset( $_GET['tab'] ) ? sanitize_text_field( wp_unslash( $_GET['tab'] ) ) : 'dashboard';
 		?>
@@ -58,7 +64,7 @@ class Bsol_Admin {
 				if ( ! $is_connected || 'settings' === $active_tab ) {
 					$this->render_settings_tab();
 				} else {
-					$this->render_dashboard_tab( $fraud_result );
+					$this->render_dashboard_tab( $fraud_result, $balance_result );
 				}
 				?>
 			</div>
@@ -150,7 +156,7 @@ class Bsol_Admin {
 
 	// ── Dashboard tab ────────────────────────────────────────────────────────
 
-	private function render_dashboard_tab( $fraud_result ) {
+	private function render_dashboard_tab( $fraud_result, $balance_result = null ) {
 		$shop_name     = get_option( 'bsol_shop_name', '' );
 		$domain        = get_option( 'bsol_domain', '' );
 		$connected_at  = get_option( 'bsol_connected_at', '' );
@@ -193,6 +199,24 @@ class Bsol_Admin {
 				</p>
 			<?php else : ?>
 				<p style="margin-top:12px;color:#b32d2e;"><?php echo esc_html( $fraud_result['message'] ?? __( 'Check failed.', 'bsol-connect' ) ); ?></p>
+			<?php endif; ?>
+		<?php endif; ?>
+
+		<hr />
+
+		<h3><?php esc_html_e( 'Steadfast Balance', 'bsol-connect' ); ?></h3>
+		<form method="post" action="?page=bsol_connect&tab=dashboard">
+			<?php wp_nonce_field( 'bsol_check_balance_action' ); ?>
+			<button type="submit" name="bsol_check_balance" class="button"><?php esc_html_e( 'Check Balance', 'bsol-connect' ); ?></button>
+		</form>
+
+		<?php if ( $balance_result ) : ?>
+			<?php if ( ! empty( $balance_result['success'] ) && isset( $balance_result['data']['current_balance'] ) ) : ?>
+				<p style="margin-top:12px;"><strong><?php esc_html_e( 'Balance:', 'bsol-connect' ); ?></strong>
+					<?php echo esc_html( number_format( (float) $balance_result['data']['current_balance'], 2 ) ); ?> &#2547;
+				</p>
+			<?php else : ?>
+				<p style="margin-top:12px;color:#b32d2e;"><?php echo esc_html( $balance_result['message'] ?? __( 'Steadfast credentials are not configured on your BSOL dashboard.', 'bsol-connect' ) ); ?></p>
 			<?php endif; ?>
 		<?php endif; ?>
 		<?php
