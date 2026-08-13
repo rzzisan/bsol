@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CourierController;
 use App\Models\Order;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Plugin-facing courier booking — /api/connect/v1/courier/*. Delegates to
@@ -89,6 +90,31 @@ class ConnectCourierController extends Controller
     public function balance(): JsonResponse
     {
         return $this->courierController->steadfastBalance();
+    }
+
+    /**
+     * Streams the same waybill/sticker-label PDF the dashboard generates —
+     * 22 selectable templates, barcode/QR, real Bengali shaping, all
+     * resolved automatically from the order's courier + the seller's saved
+     * sticker settings. CourierController::waybill() already 404s if the
+     * order hasn't been courier-booked yet (courier_tracking_id is null),
+     * so no extra gate is needed here.
+     */
+    public function waybill(Request $request): Response
+    {
+        $data = $request->validate([
+            'wc_order_id' => 'required|string|max:100',
+            'size'        => 'nullable|integer|in:58,80',
+        ]);
+
+        $order = $this->findOrder($data['wc_order_id']);
+        if (! $order) {
+            return $this->orderNotFound();
+        }
+
+        $waybillRequest = Request::create('/api/courier/waybill/' . $order->id, 'GET', collect($data)->except('wc_order_id')->all());
+
+        return $this->courierController->waybill($waybillRequest, $order->id);
     }
 
     private function findOrder(string $wcOrderId): ?Order

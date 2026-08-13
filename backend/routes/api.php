@@ -174,6 +174,7 @@ Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
         Route::post('/courier/track', [ConnectCourierController::class, 'track']);
         Route::post('/courier/cancel', [ConnectCourierController::class, 'cancel']);
         Route::get('/courier/balance', [ConnectCourierController::class, 'balance']);
+        Route::get('/courier/waybill', [ConnectCourierController::class, 'waybill']);
         Route::post('/fraud/check-phone', [ConnectFraudController::class, 'checkPhone'])
             ->middleware('throttle:60,1');
     });

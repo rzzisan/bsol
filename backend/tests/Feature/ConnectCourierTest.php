@@ -182,4 +182,36 @@ class ConnectCourierTest extends TestCase
 
         $response->assertOk()->assertJsonPath('data.current_balance', 1234.5);
     }
+
+    public function test_waybill_404s_before_the_order_is_courier_booked(): void
+    {
+        [$user, $rawKey] = $this->connectedMerchant();
+        $this->syncedOrder($user, $rawKey);
+
+        $this->getJson('/api/connect/v1/courier/waybill?wc_order_id=wc-order-1', $this->connectHeaders($rawKey))
+            ->assertStatus(404);
+    }
+
+    public function test_waybill_streams_a_pdf_after_booking(): void
+    {
+        [$user, $rawKey] = $this->connectedMerchant();
+        $this->syncedOrder($user, $rawKey);
+
+        CourierSetting::create([
+            'user_id' => $user->id,
+            'steadfast_api_key' => 'sf-key',
+            'steadfast_secret_key' => 'sf-secret',
+        ]);
+        Http::fake(['portal.packzy.com/api/v1/create_order' => Http::response(['consignment_id' => 999888])]);
+
+        $this->postJson('/api/connect/v1/courier/book', [
+            'wc_order_id' => 'wc-order-1',
+            'courier' => 'steadfast',
+        ], $this->connectHeaders($rawKey))->assertOk();
+
+        $response = $this->get('/api/connect/v1/courier/waybill?wc_order_id=wc-order-1', $this->connectHeaders($rawKey));
+
+        $response->assertOk();
+        $this->assertStringContainsString('application/pdf', $response->headers->get('Content-Type'));
+    }
 }
