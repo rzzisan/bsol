@@ -1,5 +1,29 @@
 # BSOL Connect — Changelog
 
+## 1.4.0 — 2026-08-13
+
+Reliability and hygiene pass — no new outward features, hardens the five
+modules already shipped:
+
+- **HPOS compatibility declared** (`FeaturesUtil::declare_compatibility`)
+  — the plugin already only used `WC_Order::get_meta()`/
+  `update_meta_data()`, this just tells WooCommerce so, removing the
+  "untested" badge on the Plugins page.
+- **Activity Log tab** — every call to BSOL (connect, order/product/status
+  sync, fraud check, courier book/track/cancel) now records a success/
+  fail entry (last 50, `BSOL Connect → Activity Log`), so a sync that
+  silently failed is finally visible instead of just... not showing up.
+- **Automatic retry** for failed order sync (3 attempts, 5 min apart) and
+  product sync (3 attempts, 2 min apart) via WP-Cron, tracked in the
+  order/product's own meta. Gives up and logs a permanent-failure entry
+  after the 3rd attempt rather than retrying forever.
+- **`uninstall.php`** — deleting the plugin now revokes the API key on
+  BSOL's side and removes every option/transient it created. Previously
+  nothing was cleaned up.
+- Trashing or permanently deleting a WooCommerce product now syncs it to
+  BSOL as inactive — previously a deleted product stayed "active" in
+  BSOL forever.
+
 ## 1.3.0 — 2026-08-13
 
 Print the courier waybill/sticker label PDF for a booked order — same

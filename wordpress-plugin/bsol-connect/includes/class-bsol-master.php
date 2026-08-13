@@ -22,6 +22,7 @@ class Bsol_Master {
 
 	private function load_dependencies() {
 		require_once BSOL_PLUGIN_PATH . 'includes/classes/class-bsol-helpers.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/classes/class-bsol-activity-log.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/classes/class-bsol-api.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/admin/class-bsol-admin.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/order-sync/class-bsol-order-sync.php';

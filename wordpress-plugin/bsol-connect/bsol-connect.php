@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       BSOL Connect
  * Description:       Connects your WooCommerce store to BSOL for order sync, product sync, courier booking + waybill printing, phone fraud checking, and marketing tools.
- * Version:           1.3.0
+ * Version:           1.4.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
@@ -18,8 +18,24 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'BSOL_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BSOL_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'BSOL_PLUGIN_VERSION', '1.3.0' );
+define( 'BSOL_PLUGIN_VERSION', '1.4.0' );
 define( 'BSOL_API_URL', 'https://bsol.zyrotechbd.com/api/connect/v1/' );
+
+/**
+ * Every order/product meta read-write in this plugin already goes through
+ * WC_Order::get_meta()/update_meta_data()+save() or WC product getters —
+ * never get_post_meta()/update_post_meta() — so it's safe to declare full
+ * High-Performance Order Storage compatibility rather than leaving
+ * WooCommerce's Plugins-page status column showing "untested".
+ */
+add_action(
+	'before_woocommerce_init',
+	function () {
+		if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
+			\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+		}
+	}
+);
 
 /**
  * The code that runs during plugin activation.

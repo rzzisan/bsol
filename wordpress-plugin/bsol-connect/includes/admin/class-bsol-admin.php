@@ -33,6 +33,9 @@ class Bsol_Admin {
 			$this->handle_disconnect_request();
 		} elseif ( isset( $_POST['bsol_check_fraud'] ) && check_admin_referer( 'bsol_fraud_check_action' ) ) {
 			$fraud_result = $this->handle_fraud_check_test();
+		} elseif ( isset( $_POST['bsol_clear_log'] ) && check_admin_referer( 'bsol_clear_log_action' ) ) {
+			Bsol_Activity_Log::clear();
+			add_settings_error( 'bsol_messages', 'bsol_message', __( 'Activity log cleared.', 'bsol-connect' ), 'success' );
 		}
 
 		$balance_result = null;
@@ -53,16 +56,21 @@ class Bsol_Admin {
 					<a href="?page=bsol_connect&tab=dashboard" class="nav-tab <?php echo 'dashboard' === $active_tab ? 'nav-tab-active' : ''; ?>">
 						<?php esc_html_e( 'Dashboard', 'bsol-connect' ); ?>
 					</a>
+					<a href="?page=bsol_connect&tab=log" class="nav-tab <?php echo 'log' === $active_tab ? 'nav-tab-active' : ''; ?>">
+						<?php esc_html_e( 'Activity Log', 'bsol-connect' ); ?>
+					</a>
 					<a href="?page=bsol_connect&tab=settings" class="nav-tab <?php echo 'settings' === $active_tab ? 'nav-tab-active' : ''; ?>">
 						<?php esc_html_e( 'Settings', 'bsol-connect' ); ?>
 					</a>
 				</h2>
 			<?php endif; ?>
 
-			<div class="bsol-card" style="margin-top:16px;max-width:640px;">
+			<div class="bsol-card" style="margin-top:16px;max-width:<?php echo 'log' === $active_tab ? '900px' : '640px'; ?>;">
 				<?php
 				if ( ! $is_connected || 'settings' === $active_tab ) {
 					$this->render_settings_tab();
+				} elseif ( 'log' === $active_tab ) {
+					$this->render_activity_log_tab();
 				} else {
 					$this->render_dashboard_tab( $fraud_result, $balance_result );
 				}
@@ -218,6 +226,55 @@ class Bsol_Admin {
 			<?php else : ?>
 				<p style="margin-top:12px;color:#b32d2e;"><?php echo esc_html( $balance_result['message'] ?? __( 'Steadfast credentials are not configured on your BSOL dashboard.', 'bsol-connect' ) ); ?></p>
 			<?php endif; ?>
+		<?php endif; ?>
+		<?php
+	}
+
+	// ── Activity Log tab ─────────────────────────────────────────────────────
+
+	private function render_activity_log_tab() {
+		$entries = Bsol_Activity_Log::get_recent();
+		?>
+		<p class="description">
+			<?php esc_html_e( 'The last 50 calls this site made to BSOL — use this to see why an order or product sync didn\'t go through.', 'bsol-connect' ); ?>
+		</p>
+
+		<?php if ( empty( $entries ) ) : ?>
+			<p><?php esc_html_e( 'No activity yet.', 'bsol-connect' ); ?></p>
+		<?php else : ?>
+			<table class="widefat striped" style="margin-top:8px;">
+				<thead>
+					<tr>
+						<th style="width:160px;"><?php esc_html_e( 'Time', 'bsol-connect' ); ?></th>
+						<th style="width:160px;"><?php esc_html_e( 'Event', 'bsol-connect' ); ?></th>
+						<th style="width:60px;"><?php esc_html_e( 'Status', 'bsol-connect' ); ?></th>
+						<th><?php esc_html_e( 'Message', 'bsol-connect' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $entries as $entry ) : ?>
+						<tr>
+							<td><?php echo esc_html( $entry['time'] ); ?></td>
+							<td><?php echo esc_html( $entry['type'] ); ?></td>
+							<td>
+								<?php if ( ! empty( $entry['success'] ) ) : ?>
+									<span style="color:#1a7f37;">&#10003;</span>
+								<?php else : ?>
+									<span style="color:#b32d2e;">&#10007;</span>
+								<?php endif; ?>
+							</td>
+							<td><?php echo esc_html( mb_strimwidth( (string) $entry['message'], 0, 120, '…' ) ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+
+			<form method="post" action="?page=bsol_connect&tab=log" style="margin-top:12px;" onsubmit="return confirm('<?php echo esc_js( __( 'Clear the activity log?', 'bsol-connect' ) ); ?>');">
+				<?php wp_nonce_field( 'bsol_clear_log_action' ); ?>
+				<button type="submit" name="bsol_clear_log" class="button button-secondary">
+					<?php esc_html_e( 'Clear Log', 'bsol-connect' ); ?>
+				</button>
+			</form>
 		<?php endif; ?>
 		<?php
 	}

@@ -44,23 +44,33 @@ class Bsol_Api {
 		$response = wp_remote_post( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
-			return array(
+			$result = array(
 				'success'    => false,
 				'message'    => $response->get_error_message(),
 				'error_code' => 'network_error',
 			);
+			Bsol_Activity_Log::record( $endpoint, false, $result['message'] );
+			return $result;
 		}
 
 		$response_body = wp_remote_retrieve_body( $response );
 		$decoded       = json_decode( $response_body, true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $decoded ) ) {
-			return array(
+			$result = array(
 				'success'    => false,
 				'message'    => 'Unexpected server response: ' . substr( $response_body, 0, 150 ),
 				'error_code' => 'invalid_response',
 			);
+			Bsol_Activity_Log::record( $endpoint, false, $result['message'] );
+			return $result;
 		}
+
+		Bsol_Activity_Log::record(
+			$endpoint,
+			! empty( $decoded['success'] ),
+			! empty( $decoded['success'] ) ? 'OK' : ( isset( $decoded['message'] ) ? $decoded['message'] : 'Failed' )
+		);
 
 		return $decoded;
 	}

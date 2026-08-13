@@ -81,3 +81,27 @@ a real WooCommerce staging site before rolling out to sellers.
 2. Place another test order — confirm it does **not** sync to BSOL.
 3. In BSOL dashboard → Settings → WordPress Connect, confirm the key shows
    as revoked.
+
+## Activity log, retry, and uninstall (1.4.0)
+
+1. Open **BSOL Connect → Activity Log** — confirm it lists recent sync/
+   connect calls with a time, event name, ✓/✗, and message.
+2. Temporarily break the connection (edit the `bsol_api_key` option to a
+   wrong value directly in the DB, or just wait for the key to be revoked
+   on BSOL's side), then place a test order — confirm a ✗ entry appears
+   in the log within a few seconds.
+3. Wait ~5 minutes (or run `wp cron event run bsol_retry_order_sync` if
+   using WP-CLI) — confirm a retry attempt appears in the log. Restore
+   the correct API key and confirm the next retry succeeds and the order
+   appears in BSOL.
+4. Trash a synced product — confirm (via a temporary debug log line, or
+   just watching the Activity Log) a `products/sync` call fires with
+   `status: inactive`.
+5. **Plugins → Delete** the plugin on a disposable staging site — confirm
+   in BSOL dashboard → Settings → WordPress Connect that the key shows as
+   revoked, and check `wp_options` directly to confirm no `bsol_*` rows
+   remain.
+6. **Plugins → Plugins list** — confirm BSOL Connect no longer shows an
+   "HPOS incompatible / untested" notice (requires WooCommerce's
+   High-Performance Order Storage feature enabled under WooCommerce →
+   Settings → Advanced → Features).

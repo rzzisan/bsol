@@ -5,6 +5,11 @@
  * zayroo-connect's proven trigger set (class-zayroo-product-sync.php).
  * Only instantiated by Bsol_Master when the site is connected and
  * WooCommerce is active.
+ *
+ * A failed sync is retried via WP-Cron (up to MAX_RETRIES, 2 minutes
+ * apart — faster than the order-sync retry, no customer waiting on a
+ * product update). Trashing or permanently deleting a product also syncs
+ * it as inactive, so BSOL doesn't keep offering a product that's gone.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -13,10 +18,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Bsol_Product_Sync {
 
+	const META_RETRY_COUNT = '_bsol_sync_retry_count';
+	const MAX_RETRIES       = 3;
+	const RETRY_DELAY       = 2 * MINUTE_IN_SECONDS;
+
 	public function __construct() {
 		add_action( 'save_post_product', array( $this, 'handle_product_save' ), 10, 3 );
 		add_action( 'woocommerce_product_quick_edit_save', array( $this, 'handle_quick_edit_save' ), 10, 1 );
 		add_action( 'woocommerce_reduce_order_stock', array( $this, 'handle_order_stock_reduction' ), 10, 1 );
+		add_action( 'bsol_retry_product_sync', array( $this, 'handle_retry' ), 10, 1 );
+		add_action( 'trashed_post', array( $this, 'handle_trashed_or_deleted' ), 10, 1 );
+		add_action( 'before_delete_post', array( $this, 'handle_trashed_or_deleted' ), 10, 1 );
+	}
+
+	public function handle_retry( $product_id ) {
+		$product = wc_get_product( $product_id );
+		if ( $product ) {
+			$this->sync_product( $product );
+		}
+	}
+
+	public function handle_trashed_or_deleted( $post_id ) {
+		if ( 'product' !== get_post_type( $post_id ) ) {
+			return;
+		}
+		$product = wc_get_product( $post_id );
+		if ( $product ) {
+			$this->sync_product( $product );
+		}
 	}
 
 	public function handle_product_save( $post_id, $post, $update ) {
@@ -74,8 +103,32 @@ class Bsol_Product_Sync {
 			$payload['variants'] = $this->build_variants_payload( $product );
 		}
 
-		$api = new Bsol_Api();
-		$api->sync_product( $payload );
+		$api      = new Bsol_Api();
+		$response = $api->sync_product( $payload );
+		$this->handle_sync_result( $product, $response );
+	}
+
+	private function handle_sync_result( $product, $response ) {
+		$product_id = $product->get_id();
+
+		if ( ! empty( $response['success'] ) ) {
+			delete_post_meta( $product_id, self::META_RETRY_COUNT );
+			return;
+		}
+
+		$retry_count = (int) get_post_meta( $product_id, self::META_RETRY_COUNT, true );
+
+		if ( $retry_count >= self::MAX_RETRIES ) {
+			Bsol_Activity_Log::record(
+				'products/sync',
+				false,
+				sprintf( 'Product #%d permanently failed to sync after %d attempts.', $product_id, self::MAX_RETRIES )
+			);
+			return;
+		}
+
+		update_post_meta( $product_id, self::META_RETRY_COUNT, $retry_count + 1 );
+		wp_schedule_single_event( time() + self::RETRY_DELAY, 'bsol_retry_product_sync', array( $product_id ) );
 	}
 
 	private function build_variants_payload( $product ) {
