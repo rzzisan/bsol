@@ -1,0 +1,113 @@
+=== BSOL Connect ===
+Contributors: zyrotechbd
+Tags: woocommerce, order management, courier, sms otp, facebook conversions api
+Requires at least: 6.0
+Tested up to: 6.6
+Requires PHP: 7.4
+Stable tag: 1.11.0
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+
+Connects your WooCommerce store to BSOL — order/product sync, courier booking, waybill and invoice printing, checkout OTP, phone fraud checking, and Facebook Conversions API.
+
+== Description ==
+
+BSOL Connect is a thin client: it collects data from WooCommerce and sends it to your BSOL account, and shows you what BSOL sends back. All business logic — pricing rules, fraud scoring, courier dispatch, PDF generation, SMS sending — runs on BSOL's servers, not on your WordPress site. This keeps the plugin small and means every improvement to BSOL applies to your store automatically, with no plugin update required for backend-only changes.
+
+**What it does:**
+
+* **Order sync** — every WooCommerce order (and its status changes) is pushed to BSOL automatically.
+* **Product sync** — simple and variable products, including stock and pricing, both ways: WooCommerce → BSOL on save, and BSOL → WooCommerce when a unit sells through another BSOL channel (Facebook, manual entry), so you never oversell.
+* **Courier booking** — book Steadfast, Paperfly, Pathao, RedX, or CarryBee for a synced order directly from the WooCommerce orders list, no need to switch to the BSOL dashboard.
+* **Waybill & invoice printing** — print the courier sticker label or the customer sales invoice straight from the orders list.
+* **Customer Health** — a fraud/delivery-history score for every order's phone number, right in the orders list.
+* **Checkout OTP** (optional, off by default) — verify a customer's phone number by SMS before an order is confirmed.
+* **Facebook Conversions API** (optional) — a server-side Purchase event for every order, for ad-attribution that survives ad blockers and iOS tracking limits.
+* **Bulk sync** — a one-time "Sync Data" tool to push products/orders that existed before you connected.
+
+= Requirements =
+
+* A BSOL account with an active subscription.
+* WooCommerce active on this site.
+* PHP 7.4+.
+
+== Installation ==
+
+1. Download the plugin from your BSOL dashboard: **Settings → WordPress Connect → Download Plugin**.
+2. In WordPress, go to **Plugins → Add New → Upload Plugin**, choose the downloaded zip, and activate.
+3. On the BSOL dashboard, go to **Settings → WordPress Connect**, enter this site's exact domain, and click **Generate API Key**.
+4. In WordPress, go to **BSOL Connect → Settings**, paste the key, and click **Save & Connect**.
+5. (Optional) If you have products/orders that existed before connecting, go to **BSOL Connect → Sync Data** and run the two bulk-sync buttons once.
+
+== Frequently Asked Questions ==
+
+= Do I need a BSOL account? =
+
+Yes — this plugin only connects an existing BSOL account to WooCommerce. Sign up at your BSOL dashboard first.
+
+= Will this slow down my checkout? =
+
+No. Every BSOL call happens after checkout completes (via WooCommerce's own order hooks), and heavier calls (Facebook CAPI, checkout-OTP SMS) run through a background job on BSOL's side — nothing blocks the customer.
+
+= Does it work with High-Performance Order Storage (HPOS)? =
+
+Yes — fully compatible, declared via `FeaturesUtil::declare_compatibility()`. Every order-meta read/write in this plugin uses `WC_Order::get_meta()`/`update_meta_data()`, never the legacy post-meta functions.
+
+= What happens if I deactivate or delete the plugin? =
+
+Deactivating just stops the sync hooks — nothing is deleted. Deleting the plugin (via **Plugins → Delete**) revokes the API key on BSOL's side and removes every option/transient this plugin created.
+
+= Which couriers are supported? =
+
+Steadfast, Paperfly, Pathao, RedX, and CarryBee. For Pathao/RedX/CarryBee, BSOL does a best-effort match of the order's address to determine the courier's required location IDs — if it can't determine this confidently, booking fails with a clear message rather than a cryptic remote error.
+
+== Screenshots ==
+
+1. BSOL Connect settings — connect/disconnect.
+2. WooCommerce orders list — Courier, Customer Health, and Invoice columns.
+3. Checkout OTP verification card on the order-received page.
+
+== Changelog ==
+
+= 1.11.0 =
+Self-update notice in wp-admin (checks BSOL for a newer version, cached), translation-ready strings (`languages/bsol-connect.pot`), this readme.
+
+= 1.10.0 =
+Order invoice PDF — a new "Invoice" column, no courier-booking required.
+
+= 1.9.0 =
+Bulk/historical sync — a "Sync Data" tab to backfill products/orders that existed before connecting.
+
+= 1.8.0 =
+Facebook Conversions API — a server-side Purchase event for every synced order.
+
+= 1.7.0 =
+Checkout OTP verification, optional, off by default.
+
+= 1.6.0 =
+Pathao, RedX, and CarryBee courier booking (in addition to Steadfast/Paperfly).
+
+= 1.5.0 =
+Inbound stock push-back — BSOL pushes stock changes from other sales channels back to WooCommerce.
+
+= 1.4.0 =
+Reliability pass: HPOS compatibility declaration, Activity Log tab, automatic sync retry, proper uninstall cleanup.
+
+= 1.3.0 =
+Print the courier waybill/sticker label PDF for a booked order.
+
+= 1.2.0 =
+Courier booking (Steadfast/Paperfly) directly from the WooCommerce orders list.
+
+= 1.1.0 =
+Product sync (WooCommerce → BSOL), simple and variable products.
+
+= 1.0.0 =
+Initial release — connect/disconnect, order sync, Customer Health fraud-check column.
+
+(Full details for every version: `changelog.md` in the plugin folder.)
+
+== Upgrade Notice ==
+
+= 1.5.0 =
+Sites connected before this version should reconnect once (Settings → Disconnect, then reconnect) to receive a webhook secret required for inbound stock push-back.

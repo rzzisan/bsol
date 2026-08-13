@@ -102,6 +102,24 @@ a real WooCommerce staging site before rolling out to sellers.
 7. Turn the toggle back off — confirm a new test order does **not**
    trigger an SMS or show the verification card.
 
+## Self-update notice (1.11.0)
+
+1. In a local copy, temporarily change `BSOL_PLUGIN_VERSION` in
+   `bsol-connect.php` to something lower than the live backend's actual
+   version (e.g. `1.0.0`), and delete the `bsol_update_check` transient
+   (or just wait — first admin page load after activation triggers a
+   fresh check).
+2. Load any wp-admin page — confirm a dismissible notice appears:
+   "BSOL Connect 1.0.0 is installed; version X.X.X is available." with a
+   working download link.
+3. Restore the real version number — confirm the notice disappears
+   (after the transient expires, or delete it manually to see
+   immediately).
+4. Confirm the notice does **not** make a fresh remote call on every
+   single page load — only after the transient expires (check via a
+   temporary `error_log()` in `get_latest_version_info()`, or just trust
+   the transient TTL).
+
 ## Order invoice (1.10.0)
 
 1. On **WooCommerce → Orders**, find the **Invoice** column on any synced

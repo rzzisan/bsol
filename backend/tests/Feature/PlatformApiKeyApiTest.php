@@ -95,4 +95,20 @@ class PlatformApiKeyApiTest extends TestCase
             ->assertStatus(403)
             ->assertJsonPath('error_code', 'owner_only');
     }
+
+    // ── Self-update notice (Phase 13) ────────────────────────────────────────
+
+    public function test_plugin_version_is_public_and_reads_the_real_plugin_header(): void
+    {
+        // No auth headers at all — this endpoint must be public.
+        $response = $this->getJson('/api/wordpress/plugin-version');
+
+        $response->assertOk()->assertJsonStructure(['success', 'data' => ['version', 'download_url']]);
+
+        $mainFile = base_path('../wordpress-plugin/bsol-connect/bsol-connect.php');
+        preg_match('/^\s*\*\s*Version:\s*([0-9.]+)/mi', file_get_contents($mainFile), $m);
+
+        $response->assertJsonPath('data.version', $m[1]);
+        $this->assertStringContainsString('/api/wordpress/plugin-download', $response->json('data.download_url'));
+    }
 }

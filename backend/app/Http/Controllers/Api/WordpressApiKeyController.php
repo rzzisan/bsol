@@ -130,11 +130,7 @@ class WordpressApiKeyController extends Controller
         $sourceDir = dirname(base_path()) . '/wordpress-plugin/bsol-connect';
         abort_unless(is_dir($sourceDir), 404, 'Plugin source not found.');
 
-        $version = '1.0.0';
-        $mainFile = $sourceDir . '/bsol-connect.php';
-        if (is_file($mainFile) && preg_match('/^\s*\*\s*Version:\s*([0-9.]+)/mi', file_get_contents($mainFile), $m)) {
-            $version = $m[1];
-        }
+        $version = $this->resolvePluginVersion($sourceDir);
 
         $tempZip = tempnam(sys_get_temp_dir(), 'bsol-connect-') . '.zip';
 
@@ -151,5 +147,36 @@ class WordpressApiKeyController extends Controller
         $zip->close();
 
         return response()->download($tempZip, "bsol-connect-v{$version}.zip")->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Public — same trust level as downloadPlugin() (no secrets, just a
+     * version string), lets the plugin's own self-update notice
+     * (class-bsol-update-checker.php) check without needing an API key.
+     * download_url is returned rather than hardcoded plugin-side, so
+     * there's only one URL for the plugin to know about.
+     */
+    public function pluginVersion(): JsonResponse
+    {
+        $sourceDir = dirname(base_path()) . '/wordpress-plugin/bsol-connect';
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'version' => $this->resolvePluginVersion($sourceDir),
+                'download_url' => url('/api/wordpress/plugin-download'),
+            ],
+        ]);
+    }
+
+    private function resolvePluginVersion(string $sourceDir): string
+    {
+        $version = '1.0.0';
+        $mainFile = $sourceDir . '/bsol-connect.php';
+        if (is_file($mainFile) && preg_match('/^\s*\*\s*Version:\s*([0-9.]+)/mi', file_get_contents($mainFile), $m)) {
+            $version = $m[1];
+        }
+
+        return $version;
     }
 }

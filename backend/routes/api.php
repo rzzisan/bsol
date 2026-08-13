@@ -94,6 +94,8 @@ Route::get('/public/platform-settings', [PublicPlatformSettingsController::class
 // BSOL Connect plugin zip — no secrets in it, safe as a plain public download link.
 Route::get('/wordpress/plugin-download', [WordpressApiKeyController::class, 'downloadPlugin'])
     ->middleware('throttle:20,1');
+Route::get('/wordpress/plugin-version', [WordpressApiKeyController::class, 'pluginVersion'])
+    ->middleware('throttle:60,1');
 
 Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow'])
     ->middleware(['track_landing_page_visit', 'throttle:60,1']);

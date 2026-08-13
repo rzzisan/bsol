@@ -1,0 +1,314 @@
+# Copyright (C) 2026 ZyrotechBD
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: BSOL Connect 1.11.0\n"
+"Report-Msgid-Bugs-To: https://bsol.zyrotechbd.com\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-08-13T00:00:00+00:00\n"
+"X-Generator: hand-rolled (no wp-cli in build environment)\n"
+"X-Domain: bsol-connect\n"
+
+#: includes/admin/class-bsol-admin.php:38
+msgid "Activity log cleared."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:51
+msgid "BSOL Connect"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:57
+msgid "Dashboard"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:60
+msgid "Activity Log"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:63
+msgid "Sync Data"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:66
+msgid "Settings"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:100 includes/admin/class-bsol-admin.php:112
+msgid "Status:"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:101
+msgid "Connected"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:104
+msgid "This site is syncing orders and fraud checks with BSOL."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:105
+msgid "Disconnect this site from BSOL? New orders will stop syncing until you reconnect."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:108
+msgid "Disconnect"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:113
+msgid "Not connected"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:119
+msgid "API Key"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:124
+msgid "Generate this key from your BSOL dashboard: Settings → WordPress Connect. The key is bound to this site's domain."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:130
+msgid "Save & Connect"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:152
+msgid "Connected successfully!"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:155
+msgid "Connection failed. Please check your API key."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:172
+msgid "Disconnected."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:184
+msgid "Shop"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:188
+msgid "Domain"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:192
+msgid "Connected since"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:199
+msgid "Test Fraud Check"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:200
+msgid "Look up a phone number to confirm the connection is working — the same check runs automatically on your WooCommerce orders list."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:204
+msgid "Check"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:211
+msgid "Risk level:"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:215
+msgid "Blacklisted"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:219
+msgid "Check failed."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:225
+msgid "Steadfast Balance"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:228
+msgid "Check Balance"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:233
+msgid "Balance:"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:237
+msgid "Steadfast credentials are not configured on your BSOL dashboard."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:249
+msgid "The last 50 calls this site made to BSOL — use this to see why an order or product sync didn't go through."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:253
+msgid "No activity yet."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:258
+msgid "Time"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:259
+msgid "Event"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:260
+msgid "Status"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:261
+msgid "Message"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:282
+msgid "Clear the activity log?"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:285
+msgid "Clear Log"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:302
+msgid "Sync existing products"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:304
+msgid "Push every existing WooCommerce product into BSOL. New products already sync automatically as you save them — this is only for products that existed before connecting."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:307
+msgid "Sync All Products"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:316
+msgid "Sync existing orders"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:318
+msgid "Push every existing WooCommerce order into BSOL, with its current status. Backfilled orders do not trigger a checkout-OTP SMS or a Facebook Purchase event."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:321
+msgid "Sync All Orders"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:337
+msgid "Enter a valid Bangladeshi phone number (01XXXXXXXXX)."
+msgstr ""
+
+#: includes/class-bsol-master.php:84
+msgid "BSOL Connect requires WooCommerce to be installed and active."
+msgstr ""
+
+#. translators: 1: currently installed version, 2: latest available version
+#: includes/classes/class-bsol-update-checker.php:45
+msgid "BSOL Connect %1$s is installed; version %2$s is available."
+msgstr ""
+
+#: includes/classes/class-bsol-update-checker.php:50
+msgid "Download the update"
+msgstr ""
+
+#: includes/modules/checkout-otp/class-bsol-checkout-otp.php:47
+msgid "Verify your phone number"
+msgstr ""
+
+#: includes/modules/checkout-otp/class-bsol-checkout-otp.php:48
+msgid "Enter the code sent to your phone to confirm this order."
+msgstr ""
+
+#: includes/modules/checkout-otp/class-bsol-checkout-otp.php:51
+msgid "Verify"
+msgstr ""
+
+#: includes/modules/checkout-otp/class-bsol-checkout-otp.php:52
+msgid "Resend code"
+msgstr ""
+
+#: includes/modules/checkout-otp/class-bsol-checkout-otp.php:73
+msgid "Network error. Please try again."
+msgstr ""
+
+#: includes/modules/checkout-otp/class-bsol-checkout-otp.php:74
+msgid "A new code has been sent."
+msgstr ""
+
+#: includes/modules/checkout-otp/class-bsol-checkout-otp.php:89 includes/modules/checkout-otp/class-bsol-checkout-otp.php:117
+msgid "Invalid request."
+msgstr ""
+
+#: includes/modules/checkout-otp/class-bsol-checkout-otp.php:98
+msgid "Verification failed."
+msgstr ""
+
+#: includes/modules/checkout-otp/class-bsol-checkout-otp.php:126
+msgid "Could not resend the code."
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:47 includes/modules/courier/class-bsol-courier.php:51
+msgid "Courier"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:85
+msgid "Refresh status"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:86
+msgid "Cancel booking"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:88
+msgid "Print waybill"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:97
+msgid "Send via Steadfast"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:98
+msgid "Send via Paperfly"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:99
+msgid "Send via Pathao"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:100
+msgid "Send via RedX"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:101
+msgid "Send via CarryBee"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:203 includes/modules/invoice/class-bsol-invoice.php:61
+msgid "Unauthorized"
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:210 includes/modules/invoice/class-bsol-invoice.php:68
+msgid "Order not found."
+msgstr ""
+
+#: includes/modules/courier/class-bsol-courier.php:217
+msgid "Waybill not available."
+msgstr ""
+
+#: includes/modules/fraud/class-bsol-fraud-check.php:34 includes/modules/fraud/class-bsol-fraud-check.php:38
+msgid "Customer Health"
+msgstr ""
+
+#: includes/modules/fraud/class-bsol-fraud-check.php:59
+msgid "Loading…"
+msgstr ""
+
+#: includes/modules/invoice/class-bsol-invoice.php:31
+msgid "Invoice"
+msgstr ""
+
+#: includes/modules/invoice/class-bsol-invoice.php:53
+msgid "Print invoice"
+msgstr ""
+
+#: includes/modules/invoice/class-bsol-invoice.php:75
+msgid "Invoice not available."
+msgstr ""
+

@@ -1,5 +1,21 @@
 # BSOL Connect — Changelog
 
+## 1.11.0 — 2026-08-13
+
+Distribution/polish pass — no new sync features:
+
+- **Self-update notice**: an admin notice appears in wp-admin when a
+  newer version is available on BSOL, with a direct download link.
+  Checked at most once every 12 hours (transient-cached), not on every
+  page load. Runs regardless of connection status.
+- **Translation-ready**: `languages/bsol-connect.pot` — every
+  user-facing PHP string already went through `__()`/`_e()`/
+  `esc_html__()`/etc. with the `bsol-connect` text domain since day
+  one; this adds the actual template file a translator would use.
+- **`readme.txt`** — standard WordPress plugin readme format, alongside
+  the existing `changelog.md` (full history) and `SETUP.md` (QA
+  checklist).
+
 ## 1.10.0 — 2026-08-13
 
 Order invoice PDF — a seller→customer sales invoice, distinct from the

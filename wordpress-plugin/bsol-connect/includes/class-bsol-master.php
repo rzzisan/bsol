@@ -30,6 +30,7 @@ class Bsol_Master {
 		require_once BSOL_PLUGIN_PATH . 'includes/classes/class-bsol-helpers.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/classes/class-bsol-activity-log.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/classes/class-bsol-api.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/classes/class-bsol-update-checker.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/admin/class-bsol-admin.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/order-sync/class-bsol-order-sync.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/fraud/class-bsol-fraud-check.php';
@@ -42,6 +43,11 @@ class Bsol_Master {
 		// Admin menu must render even when not connected (that's where the
 		// Settings/connect form lives), so this is always instantiated.
 		$this->admin = new Bsol_Admin();
+
+		// Unlike every module in define_hooks() below, this runs regardless
+		// of connection status — a disconnected-but-installed site still
+		// needs to know about updates.
+		new Bsol_Update_Checker();
 	}
 
 	private function define_hooks() {

@@ -10,7 +10,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 
 `bsol_history_and_new_context.md`-এ আলোচিত হয়েছিল যে BSOL-এর সবচেয়ে বড় গ্যাপ হলো "যাদের নিজের WooCommerce ওয়েবসাইট আছে" — তাদের জন্য কোনো কানেক্টর ছিল না। ডিজাইন সরাসরি adapt করা হয়েছে `zyro/wordpress_plugin/zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (WordPress প্লাগিন কোনো বিজনেস লজিক রাখে না, শুধু WooCommerce থেকে ডেটা তুলে BSOL API-তে পাঠায়, ফলাফল দেখায়) থেকে — সেই legacy প্লাগিনের প্রতিটা মডিউলের exact hook/nonce/AJAX-action/payload-shape আলাদাভাবে explore করে BSOL-এর নিজের backend API-র উপর বসানো হয়েছে।
 
-১২টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
+১৩টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
 
 | ফেজ | বিষয় | মূল কমিট |
 |---|---|---|
@@ -26,6 +26,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১০ | Facebook CAPI for WooCommerce (v1.8.0) | `3a5162a` |
 | ১১ | Bulk/historical sync UI (v1.9.0) | `8de63b6` |
 | ১২ | Order invoice PDF (v1.10.0) | `e1dfa2a` |
+| ১৩ | Distribution/polish — self-update notice, .pot, readme.txt (v1.11.0) | `1c06c5a` |
 
 ---
 
@@ -71,6 +72,7 @@ Dashboard-facing (Sanctum, `/api/wordpress/*`, `backend/app/Http/Controllers/Api
 | DELETE | `/wordpress/api-key` | Key রিভোক (soft) |
 | PUT | `/wordpress/otp-settings` | চেকআউট OTP টগল অন/অফ (key regenerate ছাড়াই) |
 | GET | `/wordpress/plugin-download` | (পাবলিক) প্লাগিন zip — সোর্স থেকে **প্রতি রিকোয়েস্টে dynamically তৈরি**, তাই কখনো stale হয় না |
+| GET | `/wordpress/plugin-version` | (পাবলিক) `{version, download_url}` — self-update notice-এর জন্য (Phase ১৩) |
 
 Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthController,ConnectOrderController,ConnectProductController,ConnectCourierController,ConnectFraudController}.php` + `backend/app/Models/PlatformApiKey.php` + `backend/app/Http/Middleware/AuthenticatePlatformApiKey.php`।
 
@@ -81,7 +83,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.10.0)
+wordpress-plugin/bsol-connect/          (v1.11.0)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
@@ -91,6 +93,7 @@ wordpress-plugin/bsol-connect/          (v1.10.0)
       class-bsol-api.php                — HTTP ক্লায়েন্ট (সব BSOL কলের একমাত্র জায়গা, প্রতিটা কল Bsol_Activity_Log-এ লগ হয়)
       class-bsol-activity-log.php       — শেষ ৫০টা sync কলের success/fail লগ (capped option, Activity Log ট্যাবে দেখা যায়)
       class-bsol-helpers.php            — BD ফোন ক্লিনিং, site_domain(), WC→BSOL status map
+      class-bsol-update-checker.php     — self-update notice; `is_connected()` গেটের **বাইরে**, সবসময় সক্রিয় (Phase ১৩)
     admin/
       class-bsol-admin.php              — Settings + Dashboard + Activity Log + Sync Data ট্যাব (connect/disconnect ফর্ম, fraud-check tester, Steadfast balance widget, bulk-sync বাটন)
     modules/
@@ -104,7 +107,8 @@ wordpress-plugin/bsol-connect/          (v1.10.0)
   assets/
     css/bsol-admin.css, js/bsol-admin.js       — wp-admin-only (health-bar polling, courier বাটন হ্যান্ডলার, bulk-sync progress bar — এই দুটোর জন্য আলাদা স্বাধীন jQuery(ready) ব্লক, যেহেতু `bsol_ajax`/`bsol_bulk_sync` আলাদা স্ক্রিনে লোকালাইজ হয়)
     css/bsol-checkout-otp.css, js/bsol-checkout-otp.js — storefront-only, শুধু order-received পেজে enqueue হয়
-  changelog.md, SETUP.md
+  languages/bsol-connect.pot            — hand-রোল করা (এই ডেভ এনভায়রনমেন্টে `wp-cli` নেই, তাই `wp i18n make-pot` চালানো যায়নি) — নতুন স্ট্রিং যোগ হলে regenerate করতে হবে, হাতে মেইনটেইন না
+  changelog.md, SETUP.md, readme.txt
 ```
 
 `Bsol_Master::load_dependencies()`-এ সব require + `Bsol_Admin` সবসময় ইনস্ট্যান্শিয়েট (menu সবসময় দেখা যায়), বাকি ৭টা মডিউল (`Bsol_Order_Sync`, `Bsol_Fraud_Check`, `Bsol_Product_Sync`, `Bsol_Courier`, `Bsol_Checkout_Otp`, `Bsol_Bulk_Sync`, `Bsol_Invoice`) শুধু `is_connected() && class_exists('WooCommerce')` হলে। `Bsol_Order_Sync`/`Bsol_Product_Sync` এখন `$this->admin`-এর মতোই `Bsol_Master`-এ property হিসেবে রাখা হয় (আগে create-then-discard ছিল) — `Bsol_Bulk_Sync`-এর constructor-এ inject করার জন্য, যাতে সেই ২টা ক্লাস দ্বিতীয়বার `new` না করতে হয় (করলে তাদের constructor-এর hook রেজিস্ট্রেশন duplicate হয়ে যেত)।
@@ -153,6 +157,9 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 ### Plugin download (`WordpressApiKeyController::downloadPlugin()`, backend)
 `/dashboard/settings/wordpress` পেজের "Download Plugin" বাটন এই এন্ডপয়েন্টে যায়। **প্রতি রিকোয়েস্টে `wordpress-plugin/bsol-connect/` সোর্স থেকে zip ডায়নামিকভাবে তৈরি হয়** (ভার্সন নাম্বার প্লাগিন হেডার থেকে regex দিয়ে পড়া) — একটা আলাদা pre-built zip মেইনটেইন করার দরকার নেই, কখনো stale হবে না। পাবলিক (কোনো secret নেই zip-এ), শুধু `throttle:20,1`।
 
+### Self-update notice (`class-bsol-update-checker.php`, Phase ১৩)
+প্লাগিন WordPress.org-এ নেই, তাই নতুন ভার্সন এলে wp-admin-এ notice দেখানো ছাড়া জানার উপায় নেই। `is_connected()` গেটের বাইরে সবসময় সক্রিয় (disconnected সাইটও আপডেট দরকার হতে পারে)। BSOL-সাইড: `WordpressApiKeyController::pluginVersion()` — `downloadPlugin()`-এর সাথে শেয়ার করা `resolvePluginVersion()` হেল্পার ব্যবহার করে, `{version, download_url}` রিটার্ন করে (প্লাগিনকে ২টা আলাদা URL হার্ডকোড করতে হয় না)। WP-সাইড: transient-cached (হিট হলে ১২ ঘণ্টা, miss/unreachable হলে ১ ঘণ্টা — যাতে BSOL সাময়িক ডাউন থাকলেও প্রতি admin পেজ লোডে রিমোট কল না হয়)।
+
 ### Checkout OTP (`class-bsol-checkout-otp.php`, Phase ৯)
 এই প্লাগিনের **প্রথম storefront-facing মডিউল** — বাকি সব শুধু wp-admin-এ কাজ করে। `platform_api_keys.otp_verification_enabled` টগল দিয়ে per-connection অন/অফ (ডিফল্ট off), BSOL dashboard → Settings → WordPress Connect থেকে টগল করা যায়।
 
@@ -181,7 +188,9 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 
 ## ৭. যা এখনো বাকি
 
-মূল ফিচার-গ্যাপ লিস্ট (bsol_history_and_new_context.md-এ প্রথম চিহ্নিত করা) Phase ১২-তে শেষ — connect/disconnect, order/product sync, fraud check, courier booking (Steadfast/Paperfly/Pathao/RedX/CarryBee সবগুলো), waybill, stock push-back, checkout OTP, Facebook CAPI, bulk sync, invoice — সবই লাইভ। বাকি যা আছে তা সবই **polish/distribution** স্তরের, ফিচার-গ্যাপ না — plan ফাইলের "Group C" (self-update notice, আসল WooCommerce স্টেজিং-এ পূর্ণ QA পাস, translation-ready strings, `readme.txt`)।
+মূল ফিচার-গ্যাপ লিস্ট (bsol_history_and_new_context.md-এ প্রথম চিহ্নিত করা) Phase ১২-তে শেষ — connect/disconnect, order/product sync, fraud check, courier booking (Steadfast/Paperfly/Pathao/RedX/CarryBee সবগুলো), waybill, stock push-back, checkout OTP, Facebook CAPI, bulk sync, invoice — সবই লাইভ।
+
+"Group C" (polish/distribution)-এর ৪টার মধ্যে ৩টা Phase ১৩-তে শেষ: self-update notice, translation-ready `.pot`, `readme.txt`। **বাকি ১টা — আসল WooCommerce স্টেজিং সাইটে পূর্ণ end-to-end QA পাস — এই ডেভ এনভায়রনমেন্টে করা সম্ভব না** (এখানে কোনো WordPress/WooCommerce ইনস্টল নেই, Phase ১ থেকে প্রতিটা `SETUP.md` নোটে এটা বারবার স্পষ্ট করা হয়েছে) — এটা ব্যবহারকারীকে নিজে একটা real staging সাইটে `SETUP.md`-এর পুরো চেকলিস্ট ধরে করতে হবে।
 
 ---
 
