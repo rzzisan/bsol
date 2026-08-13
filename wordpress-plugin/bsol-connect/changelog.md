@@ -1,5 +1,23 @@
 # BSOL Connect — Changelog
 
+## 1.5.0 — 2026-08-13
+
+Inbound stock push-back — the first BSOL → WordPress direction:
+
+- If a unit of a WooCommerce-linked product/variant is sold through
+  another BSOL channel (Facebook, manual order), BSOL now pushes the
+  updated stock quantity back to this site automatically, so WooCommerce
+  never oversells a unit that's already gone.
+- New REST endpoint `wp-json/bsol-connect/v1/stock-update`, authenticated
+  by a dedicated webhook secret issued at connect time (separate from the
+  API key, which BSOL never stores in reversible form) — reconnect after
+  updating if the site was connected before this version.
+- Guarded against an echo-loop the same way the legacy zayroo-connect
+  plugin did: this plugin's own save hooks are unhooked for the instant
+  it writes a stock value that came from BSOL.
+- A dashboard-side stock edit or a WooCommerce-side sale still work
+  exactly as before — untouched by this change.
+
 ## 1.4.0 — 2026-08-13
 
 Reliability and hygiene pass — no new outward features, hardens the five

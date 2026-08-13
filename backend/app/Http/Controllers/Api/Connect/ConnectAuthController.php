@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ShopProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * Plugin-facing connect handshake — /api/connect/v1/connect. Authenticated by
@@ -23,6 +24,16 @@ class ConnectAuthController extends Controller
 
         $shopProfile = ShopProfile::where('user_id', $merchant->shopOwnerId())->first();
 
+        // Regenerated on every successful connect, same as the API key
+        // itself — shown to the plugin exactly once here, then held in
+        // reversible (encrypted-at-rest) form on both sides. Needed for
+        // the *reverse* direction (BSOL -> WordPress stock push-back,
+        // see PushWooCommerceStockJob) — unlike the API key, BSOL only
+        // ever stores a one-way hash of that, so it has nothing else it
+        // could send back to prove its own identity to WordPress.
+        $webhookSecret = Str::random(48);
+        $apiKey->update(['webhook_secret' => $webhookSecret]);
+
         return response()->json([
             'success' => true,
             'message' => 'Connected successfully.',
@@ -31,6 +42,7 @@ class ConnectAuthController extends Controller
                 'platform' => $apiKey->platform,
                 'shop_name' => $shopProfile?->shop_name,
                 'subscription_active' => ! $merchant->isSubscriptionExpired(),
+                'webhook_secret' => $webhookSecret,
             ],
         ]);
     }

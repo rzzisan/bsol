@@ -1,15 +1,20 @@
 <?php
 /**
- * Syncs WooCommerce products (and variations) to BSOL, outbound only —
- * inbound stock push-back (BSOL -> WooCommerce) is a later phase. Adapts
- * zayroo-connect's proven trigger set (class-zayroo-product-sync.php).
- * Only instantiated by Bsol_Master when the site is connected and
- * WooCommerce is active.
+ * Syncs WooCommerce products (and variations) to BSOL (outbound), and
+ * receives stock push-back FROM BSOL (inbound) — a unit sold through
+ * another BSOL sales channel (Facebook, manual) needs to reduce the same
+ * stock a WooCommerce customer sees. Adapts zayroo-connect's proven
+ * trigger set (class-zayroo-product-sync.php) for the outbound half, and
+ * its REST-receiver + remove_action/add_action loop-guard
+ * (class-zayroo-master.php, class-zayroo-product-sync.php) for the
+ * inbound half. Only instantiated by Bsol_Master when the site is
+ * connected and WooCommerce is active — so the REST route below is only
+ * ever registered on a connected site.
  *
- * A failed sync is retried via WP-Cron (up to MAX_RETRIES, 2 minutes
- * apart — faster than the order-sync retry, no customer waiting on a
- * product update). Trashing or permanently deleting a product also syncs
- * it as inactive, so BSOL doesn't keep offering a product that's gone.
+ * A failed outbound sync is retried via WP-Cron (up to MAX_RETRIES, 2
+ * minutes apart — faster than the order-sync retry, no customer waiting
+ * on a product update). Trashing or permanently deleting a product also
+ * syncs it as inactive, so BSOL doesn't keep offering a product that's gone.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -29,6 +34,7 @@ class Bsol_Product_Sync {
 		add_action( 'bsol_retry_product_sync', array( $this, 'handle_retry' ), 10, 1 );
 		add_action( 'trashed_post', array( $this, 'handle_trashed_or_deleted' ), 10, 1 );
 		add_action( 'before_delete_post', array( $this, 'handle_trashed_or_deleted' ), 10, 1 );
+		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 	}
 
 	public function handle_retry( $product_id ) {
@@ -177,5 +183,69 @@ class Bsol_Product_Sync {
 
 		$sale = (float) $sale;
 		return $sale < $regular ? round( $regular - $sale, 2 ) : 0.0;
+	}
+
+	// ── Inbound: stock push-back FROM BSOL ──────────────────────────────────
+
+	public function register_rest_routes() {
+		register_rest_route(
+			'bsol-connect/v1',
+			'/stock-update',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_stock_update_webhook' ),
+				'permission_callback' => array( $this, 'verify_webhook_auth' ),
+			)
+		);
+	}
+
+	/**
+	 * BSOL never persists this site's raw API key (only a one-way hash —
+	 * see PlatformApiKey), so it can't send that back as proof of identity
+	 * on this reverse-direction call. A separate webhook secret (received
+	 * once, at connect time — see Bsol_Admin::handle_connection_request())
+	 * is compared instead. Same hash_equals()-header pattern zayroo-connect
+	 * used for its own REST receiver (class-zayroo-master.php).
+	 */
+	public function verify_webhook_auth( $request ) {
+		$saved_secret = get_option( 'bsol_webhook_secret' );
+		$sent_secret  = $request->get_header( 'X-BSOL-Webhook-Secret' );
+
+		return ! empty( $saved_secret ) && ! empty( $sent_secret ) && hash_equals( $saved_secret, (string) $sent_secret );
+	}
+
+	/**
+	 * wc_get_product() resolves either a simple/variable product's own
+	 * post ID or a variation's post ID — no need to distinguish the two.
+	 * Unhooks this class's own save hooks around the write, exactly like
+	 * zayroo-connect's handle_api_sync() — otherwise this save would
+	 * immediately re-trigger handle_product_save() and sync the same
+	 * value straight back out to BSOL.
+	 */
+	public function handle_stock_update_webhook( $request ) {
+		$params = $request->get_json_params();
+		$wc_id  = isset( $params['wc_id'] ) ? sanitize_text_field( $params['wc_id'] ) : '';
+		$stock  = isset( $params['stock_quantity'] ) ? $params['stock_quantity'] : null;
+
+		if ( '' === $wc_id || ! is_numeric( $stock ) ) {
+			return new WP_Error( 'invalid_params', 'wc_id and stock_quantity are required.', array( 'status' => 400 ) );
+		}
+
+		$product = wc_get_product( (int) $wc_id );
+		if ( ! $product ) {
+			return new WP_Error( 'not_found', 'Product or variation not found.', array( 'status' => 404 ) );
+		}
+
+		remove_action( 'save_post_product', array( $this, 'handle_product_save' ), 10 );
+		remove_action( 'woocommerce_product_quick_edit_save', array( $this, 'handle_quick_edit_save' ), 10 );
+
+		$product->set_manage_stock( true );
+		$product->set_stock_quantity( (int) $stock );
+		$product->save();
+
+		add_action( 'save_post_product', array( $this, 'handle_product_save' ), 10, 3 );
+		add_action( 'woocommerce_product_quick_edit_save', array( $this, 'handle_quick_edit_save' ), 10, 1 );
+
+		return array( 'success' => true, 'message' => 'Stock updated.' );
 	}
 }

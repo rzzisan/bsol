@@ -17,15 +17,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PlatformApiKey extends Model
 {
     protected $fillable = [
-        'user_id', 'platform', 'domain', 'key_hash', 'key_prefix',
+        'user_id', 'platform', 'domain', 'key_hash', 'key_prefix', 'webhook_secret',
         'status', 'last_used_at', 'last_connected_ip', 'revoked_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'last_used_at' => 'datetime',
-            'revoked_at'   => 'datetime',
+            'last_used_at'   => 'datetime',
+            'revoked_at'     => 'datetime',
+            'webhook_secret' => 'encrypted',
         ];
     }
 

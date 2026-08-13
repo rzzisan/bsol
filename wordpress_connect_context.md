@@ -10,7 +10,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 
 `bsol_history_and_new_context.md`-এ আলোচিত হয়েছিল যে BSOL-এর সবচেয়ে বড় গ্যাপ হলো "যাদের নিজের WooCommerce ওয়েবসাইট আছে" — তাদের জন্য কোনো কানেক্টর ছিল না। ডিজাইন সরাসরি adapt করা হয়েছে `zyro/wordpress_plugin/zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (WordPress প্লাগিন কোনো বিজনেস লজিক রাখে না, শুধু WooCommerce থেকে ডেটা তুলে BSOL API-তে পাঠায়, ফলাফল দেখায়) থেকে — সেই legacy প্লাগিনের প্রতিটা মডিউলের exact hook/nonce/AJAX-action/payload-shape আলাদাভাবে explore করে BSOL-এর নিজের backend API-র উপর বসানো হয়েছে।
 
-৫টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
+৭টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
 
 | ফেজ | বিষয় | মূল কমিট |
 |---|---|---|
@@ -19,6 +19,8 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ৩ | Product/Variant sync (v1.1.0) | `3136143`, `e28d52f` |
 | ৪ | Courier booking — book/track/cancel/balance (v1.2.0) | `ee578e8`, `c4eab5e` |
 | ৫ | Waybill/sticker PDF প্রিন্ট (v1.3.0) | `8d6b627`, `8937026` |
+| ৬ | Reliability/hygiene — HPOS compat, Activity Log, sync retry, uninstall.php, product trash sync (v1.4.0) | `8376732` |
+| ৭ | Inbound stock push-back (BSOL→WooCommerce, v1.5.0) | `90d711d` |
 
 ---
 
@@ -63,24 +65,28 @@ Dashboard-facing (Sanctum, `/api/wordpress/*`, `backend/app/Http/Controllers/Api
 
 Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthController,ConnectOrderController,ConnectProductController,ConnectCourierController,ConnectFraudController}.php` + `backend/app/Models/PlatformApiKey.php` + `backend/app/Http/Middleware/AuthenticatePlatformApiKey.php`।
 
+**উল্টো দিক — BSOL → WordPress (inbound, শুধু stock push-back, Phase ৭)**: এটা `/connect/v1/*`-এর অংশ না, বরং প্লাগিন নিজেই একটা WP REST route এক্সপোজ করে — `POST https://{seller-domain}/wp-json/bsol-connect/v1/stock-update`, body `{wc_id, stock_quantity}`, header `X-BSOL-Webhook-Secret` দিয়ে অথেন্টিকেট। BSOL-সাইড ট্রিগার: `Product::booted()`/`ProductVariant::booted()`-এর `saved` hook (`stock`/`stock_qty` পরিবর্তন + `source=woocommerce` + `source_ref` থাকলে) → `PushWooCommerceStockJob` (queued, Redis) → `WooCommerceStockPushService`। `ConnectProductController::sync()` নিজের ২টা write-কে `Product::withoutEvents()`/`ProductVariant::withoutEvents()`-এ wrap করে রাখে, নাহলে নিজের গ্রহণ করা ইনবাউন্ড sync-ই সাথে সাথে এই push আবার ট্রিগার করে ফেলত।
+
 ---
 
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.3.0)
-  bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি)
+wordpress-plugin/bsol-connect/          (v1.5.0)
+  bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
+  uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
-    class-bsol-activator.php            — activation hook: bsol_api_key/domain/shop_name/connected_at options seed
+    class-bsol-activator.php            — activation hook: bsol_api_key/domain/shop_name/connected_at/webhook_secret options seed
     class-bsol-master.php               — module loader + is_connected() গেট + WooCommerce-active গার্ড
     classes/
-      class-bsol-api.php                — HTTP ক্লায়েন্ট (সব BSOL কলের একমাত্র জায়গা)
+      class-bsol-api.php                — HTTP ক্লায়েন্ট (সব BSOL কলের একমাত্র জায়গা, প্রতিটা কল Bsol_Activity_Log-এ লগ হয়)
+      class-bsol-activity-log.php       — শেষ ৫০টা sync কলের success/fail লগ (capped option, Activity Log ট্যাবে দেখা যায়)
       class-bsol-helpers.php            — BD ফোন ক্লিনিং, site_domain(), WC→BSOL status map
     admin/
-      class-bsol-admin.php              — Settings + Dashboard ট্যাব (connect/disconnect ফর্ম, fraud-check tester, Steadfast balance widget)
+      class-bsol-admin.php              — Settings + Dashboard + Activity Log ট্যাব (connect/disconnect ফর্ম, fraud-check tester, Steadfast balance widget)
     modules/
-      order-sync/class-bsol-order-sync.php     — woocommerce_new_order / order_status_changed hooks
-      product-sync/class-bsol-product-sync.php — save_post_product / quick_edit / reduce_order_stock hooks
+      order-sync/class-bsol-order-sync.php     — woocommerce_new_order / order_status_changed hooks + ব্যর্থ sync retry (WP-Cron, ৩ বার, ৫ মিনিট পরপর)
+      product-sync/class-bsol-product-sync.php — outbound: save_post_product / quick_edit / reduce_order_stock / trashed-deleted hooks + retry (২ মিনিট পরপর); inbound: `rest_api_init`-এ `/wp-json/bsol-connect/v1/stock-update` রুট রেজিস্টার (stock push-back, §৩ দেখুন)
       courier/class-bsol-courier.php           — Courier কলাম, book/track/cancel AJAX, waybill admin-post proxy
       fraud/class-bsol-fraud-check.php         — Customer Health কলাম + AJAX (shared bsol-admin script/style এখানেই enqueue হয়)
   assets/
@@ -102,7 +108,9 @@ wordpress-plugin/bsol-connect/          (v1.3.0)
 `woocommerce_new_order` → `/orders/sync` (create), `woocommerce_order_status_changed` → status map দিয়ে ট্রান্সলেট করে (`Bsol_Helpers::status_map()`, filterable via `bsol_connect_status_map`) → `/orders/sync-status`। **WC স্ট্যাটাস ভোকাবুলারি ট্রান্সলেশন প্লাগিনের দায়িত্ব** — backend শুধু BSOL-canonical স্ট্যাটাস (`pending,confirmed,processing,shipped,delivered,cancelled,returned`) নেয়, যাতে API ভবিষ্যতে অন্য প্ল্যাটফর্মের জন্যও স্থিতিশীল থাকে।
 
 ### Product sync (`class-bsol-product-sync.php`)
-`save_post_product`/`quick_edit_save`/`reduce_order_stock` হুক (zayroo-connect-এর প্রমাণিত trigger সেট)। Simple + variable — variable প্রোডাক্টের প্রতিটা variation আলাদা payload এন্ট্রি। WC-এর regular/sale price BSOL-এর amount-discount মডেলে ট্রান্সলেট হয়। SKU না থাকলে `WC-{id}` fallback (BSOL-এ SKU required)। **শুধু outbound (WC→BSOL)** — inbound stock push-back (BSOL→WC) এখনো তৈরি হয়নি (§৭ দেখুন)।
+**Outbound**: `save_post_product`/`quick_edit_save`/`reduce_order_stock` হুক (zayroo-connect-এর প্রমাণিত trigger সেট), + trashed/deleted হলে inactive sync। Simple + variable — variable প্রোডাক্টের প্রতিটা variation আলাদা payload এন্ট্রি। WC-এর regular/sale price BSOL-এর amount-discount মডেলে ট্রান্সলেট হয়। SKU না থাকলে `WC-{id}` fallback (BSOL-এ SKU required)। ব্যর্থ sync WP-Cron দিয়ে ৩ বার রিট্রাই হয় (২ মিনিট পরপর), তারপর Activity Log-এ permanent-failure এন্ট্রি।
+
+**Inbound (Phase ৭, stock push-back)**: অন্য চ্যানেলে (Facebook/manual) বিক্রি হয়ে গেলে BSOL এই সাইটের `/wp-json/bsol-connect/v1/stock-update` কল করে স্টক আপডেট করে দেয় — WooCommerce কখনো oversell করে না। `X-BSOL-Webhook-Secret` হেডার দিয়ে অথেন্টিকেট (API key-এর মতো না — API key BSOL-সাইডে শুধু hash আকারে থাকে, তাই BSOL-এর কাছে ফেরত পাঠানোর মতো কিছু নেই; connect handshake-এ আলাদা একটা `webhook_secret` ইস্যু হয়, দুই পাশেই plaintext/encrypted আকারে থাকে)। নিজের `save_post_product`/`quick_edit_save` হুক সাময়িকভাবে `remove_action()` করে রাখে যাতে এই write আবার BSOL-এ ফেরত সিঙ্ক না হয় (zayroo-connect-এর `handle_api_sync()`-এর প্রমাণিত প্যাটার্ন)।
 
 ### Courier booking (`class-bsol-courier.php`)
 Order-list-এ "Courier" কলাম (legacy + HPOS হুক জোড়া)। বুক না হলে "Send via Steadfast"/"Send via Paperfly" বাটন; বুক হলে consignment info + refresh/cancel/print লিংক। **শুধু Steadfast আর Paperfly সাপোর্টেড** — Pathao/RedX/Carrybee-এর নিজস্ব city/zone/area **ID** লাগে যা একটা WooCommerce অর্ডারে থাকে না (§৭-এ বিস্তারিত)। Meta HPOS-native (`WC_Order::get_meta()`/`update_meta_data()`, zayroo-connect-এর `update_post_meta()`-এর চেয়ে ভালো — legacy কোডটা HPOS হুক রেজিস্টার করেও আসলে HPOS-safe ছিল না)।
@@ -120,14 +128,15 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 
 ## ৬. টেস্টিং কনভেনশন (এই কানেক্টরের জন্য প্রতিষ্ঠিত)
 
-- Feature test ফাইল: `backend/tests/Feature/{ConnectApiTest,PlatformApiKeyApiTest,ConnectProductSyncTest,ConnectCourierTest}.php`।
+- Feature test ফাইল: `backend/tests/Feature/{ConnectApiTest,PlatformApiKeyApiTest,ConnectProductSyncTest,ConnectCourierTest,WooCommerceStockPushTest}.php`।
 - সব টেস্ট **isolated Postgres schema**-তে যাচাই করা হয়েছে, `hybrid_platform` প্রোডাকশন DB কখনো টাচ হয়নি:
   ```bash
   PGPASSWORD='...' psql -U hybrid_app -h 127.0.0.1 -d hybrid_platform -c "CREATE SCHEMA IF NOT EXISTS test_xxx;"
   # config/database.php-এর pgsql.search_path সাময়িকভাবে env('DB_SCHEMA','public') করে
-  DB_SCHEMA=test_xxx php artisan test ...
+  DB_CONNECTION=pgsql DB_DATABASE=hybrid_platform DB_SCHEMA=test_xxx php artisan test ...
   # তারপর schema DROP + config/database.php রিভার্ট
   ```
+  **`phpunit.xml`-এ `DB_CONNECTION=sqlite`/`DB_DATABASE=:memory:` হার্ডকোড করা আছে** — শুধু `DB_SCHEMA` শেল-এ export করলে যথেষ্ট না, `DB_CONNECTION=pgsql` আর `DB_DATABASE=hybrid_platform`-ও একসাথে override করতে হয় (Phase ৭-এ প্রথমবার এই পুরো তিনটা লাগল, courier_settings-এর মতো migration-এ raw `ALTER COLUMN ... TYPE` থাকায় sqlite-এ সবসময় fail করে)।
 - প্রতিটা নতুন migration-এর পর **`php artisan migrate --force` প্রোডাকশনে আলাদাভাবে রান করতে হয়** — Phase ১-এ একবার ভুলে যাওয়ায় লাইভ সাইটে 500 হয়েছিল (দেখুন memory: `deploy-checklist-bsol`)।
 - Plugin ফাইল: `php -l` সব ফাইলে + hook-name/nonce-action/AJAX-action name cross-check (`grep` দিয়ে PHP আর JS-এর মধ্যে মিল যাচাই) — কোনো WordPress ইনস্টল এই ডেভ এনভায়রনমেন্টে নেই, তাই real end-to-end QA-এর জন্য `SETUP.md`-এর চেকলিস্ট ব্যবহার করতে হয় আসল WooCommerce স্টাজিং সাইটে।
 
@@ -137,7 +146,6 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 
 | ফিচার | কেন এখনো নেই |
 |---|---|
-| Inbound stock push-back (BSOL→WooCommerce) | BSOL-কে নতুন করে সেলারের নিজস্ব ডোমেইনে outbound HTTP client হতে হবে (নতুন `Http::post()` কল, queue job, আর প্লাগিনে একটা reverse-auth ইনবাউন্ড REST route — zayroo-connect-এর `handle_api_sync()` + hook-unhook infinite-loop-প্রতিরোধ প্যাটার্ন)। আলাদা ফেজের যোগ্য স্কোপ। |
 | Pathao/RedX/Carrybee কুরিয়ার বুকিং (WooCommerce অর্ডারের জন্য) | এই ৩টা কুরিয়ারের নিজস্ব city/zone/area **ID** লাগে যা WooCommerce অর্ডারে কখনো থাকে না। দরকার: address→location-ID resolver (reverse-geocode/fuzzy-match)। |
 | OTP (চেকআউট) | ব্যাকএন্ডে `CheckoutOtpController` আছে কিন্তু `landing_page_id`-স্কোপড, WC-এর জন্য জেনারেলাইজ করতে হবে। |
 | Facebook CAPI (WooCommerce অর্ডার থেকে) | বর্তমান `FacebookCapiClient`/`SendFacebookCapiPurchaseEventJob` শুধু ল্যান্ডিং-পেজ চেকআউট থেকে ফায়ার করে, external order source নিতে জেনারেলাইজ করতে হবে। |
@@ -155,3 +163,5 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 5. **HPOS-native মেটা** — `WC_Order::get_meta()`/`update_meta_data()`, কখনো `update_post_meta()` না, এমনকি legacy hook variant রেজিস্টার করলেও।
 6. **ফাইল-ডাউনলোড এন্ডপয়েন্ট ≠ JSON এন্ডপয়েন্ট** — ব্রাউজার থেকে trigger হওয়া যেকোনো কিছু (waybill PDF) এর API key ব্রাউজারে পাঠানো যাবে না; সার্ভার-সাইড proxy (`admin-post.php`) লাগবেই।
 7. **Dynamic generation যেখানেই সম্ভব, pre-built artifact না** — প্লাগিন zip প্রতি রিকোয়েস্টে সোর্স থেকে বানানো হয়, কখনো stale হয় না।
+8. **উল্টো দিকের (BSOL→WordPress) কলের জন্য একটা আলাদা secret লাগবে, API key reuse করা যাবে না** — API key BSOL-সাইডে এক-মুখী hash আকারে থাকে (সিকিউরিটি সিদ্ধান্ত, Phase ১), তাই ফেরত পাঠানোর মতো raw কিছু নেই। `webhook_secret` (connect handshake-এ ইস্যু, দুই পাশেই reversible) এই প্যাটার্নের জন্য টেমপ্লেট — ভবিষ্যতে BSOL→WordPress অন্য কোনো ফিচার লাগলেও একই secret reuse করা যায়, নতুন করে বানানোর দরকার নেই।
+9. **Multi-write-site সিঙ্ক হুকের জন্য model event, প্রতিটা controller আলাদা করে প্যাচ না** — stock ৪+ জায়গা থেকে (ড্যাশবোর্ড এডিট, adjust-stock এন্ডপয়েন্ট, `OrderStatusService`-এর reserve/restore) বদলাতে পারে; প্রতিটা কল-সাইট আলাদা প্যাচ না করে `Product`/`ProductVariant`-এর `booted()`-এ একটা কেন্দ্রীয় `saved` hook বসানো হয়েছে (`ProductVariant`-এ আগে থেকেই থাকা `saving` hook-এর একই idiom অনুসরণ করে) — নতুন কোনো write-site যোগ হলেও স্বয়ংক্রিয়ভাবে কভার হয়ে যাবে।

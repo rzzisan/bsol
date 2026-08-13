@@ -16,5 +16,6 @@ class Bsol_Activator {
 		add_option( 'bsol_domain', '' );
 		add_option( 'bsol_shop_name', '' );
 		add_option( 'bsol_connected_at', '' );
+		add_option( 'bsol_webhook_secret', '' );
 	}
 }

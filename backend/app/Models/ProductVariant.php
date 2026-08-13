@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\PushWooCommerceStockJob;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -28,9 +29,9 @@ class ProductVariant extends Model
         'position'           => 'integer',
     ];
 
-    // Auto-compute selling_price before every save
     protected static function booted(): void
     {
+        // Auto-compute selling_price before every save.
         static::saving(function (self $variant) {
             $regular  = (float) ($variant->regular_price ?? 0);
             $discount = (float) ($variant->discount ?? 0);
@@ -39,6 +40,19 @@ class ProductVariant extends Model
                 $variant->selling_price = max(0, $regular * (1 - $discount / 100));
             } else {
                 $variant->selling_price = max(0, $regular - $discount);
+            }
+        });
+
+        // Push a stock change on a WooCommerce-linked variant back out to
+        // WordPress — see Product::booted() for the full rationale (same
+        // pattern, per-variant instead of per-product).
+        static::saved(function (self $variant) {
+            if (
+                $variant->wasChanged('stock_qty')
+                && $variant->source === 'woocommerce'
+                && $variant->source_ref
+            ) {
+                PushWooCommerceStockJob::dispatch('variant', $variant->id);
             }
         });
     }

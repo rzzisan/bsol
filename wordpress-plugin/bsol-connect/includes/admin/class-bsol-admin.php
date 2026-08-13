@@ -140,6 +140,10 @@ class Bsol_Admin {
 			update_option( 'bsol_domain', isset( $response['data']['domain'] ) ? $response['data']['domain'] : Bsol_Helpers::site_domain() );
 			update_option( 'bsol_shop_name', isset( $response['data']['shop_name'] ) ? $response['data']['shop_name'] : '' );
 			update_option( 'bsol_connected_at', current_time( 'mysql' ) );
+			// Used to verify inbound stock-push-back calls FROM BSOL —
+			// see Bsol_Product_Sync::verify_webhook_auth(). Shown once,
+			// same as the API key itself.
+			update_option( 'bsol_webhook_secret', isset( $response['data']['webhook_secret'] ) ? $response['data']['webhook_secret'] : '' );
 			add_settings_error( 'bsol_messages', 'bsol_message', __( 'Connected successfully!', 'bsol-connect' ), 'success' );
 		} else {
 			update_option( 'bsol_api_key', '' );
@@ -158,6 +162,7 @@ class Bsol_Admin {
 		delete_option( 'bsol_domain' );
 		delete_option( 'bsol_shop_name' );
 		delete_option( 'bsol_connected_at' );
+		delete_option( 'bsol_webhook_secret' );
 
 		add_settings_error( 'bsol_messages', 'bsol_message', __( 'Disconnected.', 'bsol-connect' ), 'success' );
 	}

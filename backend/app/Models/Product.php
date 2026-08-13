@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\PushWooCommerceStockJob;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,6 +30,31 @@ class Product extends Model
         'has_variants'  => 'boolean',
         'variants'      => 'array',
     ];
+
+    /**
+     * Pushes a stock change on a WooCommerce-linked product back out to
+     * WordPress (any writer — dashboard edit, order reservation/restore in
+     * OrderStatusService, the stock-adjustment endpoint — all funnel
+     * through here). ConnectProductController::sync() wraps its own
+     * inbound WooCommerce->BSOL writes in Product::withoutEvents() so this
+     * doesn't echo straight back to where it came from. Variable-product
+     * parents don't carry real stock in WooCommerce (it lives per
+     * variation — see ConnectProductController), so they're skipped here;
+     * ProductVariant::booted() covers those.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function (self $product) {
+            if (
+                $product->wasChanged('stock')
+                && $product->source === 'woocommerce'
+                && $product->source_ref
+                && ! $product->has_variants
+            ) {
+                PushWooCommerceStockJob::dispatch('product', $product->id);
+            }
+        });
+    }
 
     public function user(): BelongsTo
     {

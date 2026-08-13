@@ -17,8 +17,12 @@ use Illuminate\Validation\ValidationException;
  * Delegates to the existing ProductController::store()/update() and
  * ProductVariantController::store()/update() rather than duplicating
  * pricing/validation logic — same pattern as ConnectOrderController.
- * Outbound (WooCommerce -> BSOL) only; inbound stock push-back is a
- * separate, later phase. See bsol_history_and_new_context.md §5.
+ * This endpoint itself is outbound (WooCommerce -> BSOL) only; the reverse
+ * direction (BSOL -> WooCommerce stock push-back, for stock consumed by a
+ * non-WooCommerce order) is handled separately by
+ * Product::booted()/ProductVariant::booted() + PushWooCommerceStockJob —
+ * this controller wraps its own writes in withoutEvents() below so they
+ * don't loop back into that. See bsol_history_and_new_context.md §5.
  */
 class ConnectProductController extends Controller
 {
@@ -77,12 +81,18 @@ class ConnectProductController extends Controller
             'source_ref'    => (string) $data['wc_product_id'],
         ];
 
+        // withoutEvents: this write is itself an inbound WooCommerce->BSOL
+        // sync — without this it would immediately trigger
+        // Product::booted()'s stock-push-back and echo straight back to
+        // the same site that just told us this value. A *dashboard*
+        // stock edit on the same product still pushes normally (untouched
+        // by this suppression, which is scoped to just these two calls).
         if (! $product) {
             $productRequest = Request::create('/api/products', 'POST', $productPayload);
-            $response = $this->productController->store($productRequest);
+            $response = Product::withoutEvents(fn () => $this->productController->store($productRequest));
         } else {
             $productRequest = Request::create('/api/products/' . $product->id, 'PUT', $productPayload);
-            $response = $this->productController->update($productRequest, $product->id);
+            $response = Product::withoutEvents(fn () => $this->productController->update($productRequest, $product->id));
         }
 
         $responseData = json_decode($response->getContent(), true);
@@ -118,10 +128,10 @@ class ConnectProductController extends Controller
             try {
                 if (! $variant) {
                     $variantRequest = Request::create("/api/products/{$productId}/variants", 'POST', $variantPayload);
-                    $this->productVariantController->store($variantRequest, $productModel);
+                    ProductVariant::withoutEvents(fn () => $this->productVariantController->store($variantRequest, $productModel));
                 } else {
                     $variantRequest = Request::create("/api/products/{$productId}/variants/{$variant->id}", 'PUT', $variantPayload);
-                    $this->productVariantController->update($variantRequest, $productModel, $variant);
+                    ProductVariant::withoutEvents(fn () => $this->productVariantController->update($variantRequest, $productModel, $variant));
                 }
                 $variantsSynced++;
             } catch (UniqueConstraintViolationException) {

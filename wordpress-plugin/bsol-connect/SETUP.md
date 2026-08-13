@@ -82,6 +82,25 @@ a real WooCommerce staging site before rolling out to sellers.
 3. In BSOL dashboard → Settings → WordPress Connect, confirm the key shows
    as revoked.
 
+## Stock push-back (1.5.0)
+
+1. Sync a WooCommerce product to BSOL (see "Product sync" above), note
+   its stock quantity.
+2. On BSOL dashboard → Products, edit that same product's stock to a
+   different number and save. Within a few seconds (queue worker
+   dependent), confirm the WooCommerce product's stock updates to match.
+3. Place a **manual** (non-WooCommerce) BSOL order for the same product
+   and confirm it — confirm WooCommerce's stock decreases by the same
+   amount once the order reaches a stock-consuming status.
+4. Repeat steps 2–3 for a **variation** of a variable product.
+5. Confirm this doesn't loop: after step 2, check BSOL dashboard →
+   Products again — the stock value should NOT have changed again (no
+   ping-pong back and forth).
+6. If a site connected before upgrading to 1.5.0 sees stock-update calls
+   silently fail, reconnect once (**BSOL Connect → Settings →
+   Disconnect**, then reconnect) to receive a webhook secret — sites
+   connected on an older version don't have one yet.
+
 ## Activity log, retry, and uninstall (1.4.0)
 
 1. Open **BSOL Connect → Activity Log** — confirm it lists recent sync/
