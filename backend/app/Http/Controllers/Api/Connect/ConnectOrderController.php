@@ -8,6 +8,7 @@ use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\CheckoutOtpService;
 use App\Services\OrderStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class ConnectOrderController extends Controller
     public function __construct(
         private readonly OrderController $orderController,
         private readonly OrderStatusService $orderStatusService,
+        private readonly CheckoutOtpService $checkoutOtpService,
     ) {}
 
     /**
@@ -126,7 +128,27 @@ class ConnectOrderController extends Controller
             $formRequest->setContainer(app())->setRedirector(app('redirect'));
             $formRequest->validateResolved();
 
-            return $this->orderController->store($formRequest);
+            $response = $this->orderController->store($formRequest);
+            $responseData = json_decode($response->getContent(), true);
+
+            if (! empty($responseData['success'])) {
+                $apiKey = $request->attributes->get('platform_api_key');
+                $otpRequired = false;
+
+                if ($apiKey && $apiKey->otp_verification_enabled) {
+                    $newOrder = Order::find($responseData['data']['id']);
+                    if ($newOrder) {
+                        $this->checkoutOtpService->maybeSendForOrder(['otp_verification_enabled' => true], $newOrder);
+                        $otpRequired = (bool) $newOrder->fresh()->otp_required;
+                    }
+                }
+
+                $responseData['data']['otp_required'] = $otpRequired;
+
+                return response()->json($responseData, $response->getStatusCode());
+            }
+
+            return $response;
         }
 
         $updatePayload = array_filter([

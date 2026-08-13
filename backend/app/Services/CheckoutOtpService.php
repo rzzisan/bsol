@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use App\Models\LandingPage;
 use App\Models\Order;
 use App\Models\PhoneOtpVerification;
 use App\Models\SmsGateway;
 use App\Models\SmsHistory;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class CheckoutOtpService
 {
@@ -40,18 +40,26 @@ class CheckoutOtpService
         ],
     ];
 
-    public function __construct(private readonly SmsCreditService $creditService) {}
+    public function __construct(
+        private readonly SmsCreditService $creditService,
+        private readonly OrderStatusService $orderStatusService,
+    ) {}
 
     /**
-     * Send a checkout-verification OTP for a freshly-created order, if the
-     * landing page has the feature enabled and the merchant can actually
-     * receive the SMS (gateway configured + enough credit). Any failure here
-     * (no gateway, no credit, send failure) leaves the order untouched —
-     * behaving exactly as if OTP verification were off for this order.
+     * Send a checkout-verification OTP for a freshly-created order, if this
+     * order's channel (landing page or WooCommerce connection) has the
+     * feature enabled and the merchant can actually receive the SMS
+     * (gateway configured + enough credit). Any failure here (no gateway,
+     * no credit, send failure) leaves the order untouched — behaving
+     * exactly as if OTP verification were off for this order.
+     *
+     * $settings is whatever channel-specific config the caller has —
+     * a landing page's `content.settings` array, or a flat
+     * ['otp_verification_enabled' => true] for a WooCommerce connection
+     * (which has no per-order language/template settings today).
      */
-    public function maybeSendForOrder(LandingPage $page, Order $order): void
+    public function maybeSendForOrder(array $settings, Order $order): void
     {
-        $settings = $page->content['settings'] ?? [];
         if (!(bool) ($settings['otp_verification_enabled'] ?? false)) {
             return;
         }
@@ -97,6 +105,16 @@ class CheckoutOtpService
             note: "Checkout OTP for order {$order->order_number}",
         );
 
+        // Landing-page orders already get a public_token from
+        // LandingPageOrderService::create() (needed for the public
+        // thank-you page URL); WooCommerce-sourced orders never had a
+        // reason to have one until now — phone_otp_verifications.token is
+        // NOT NULL+unique, so generate one on demand rather than assuming
+        // every order source already set it.
+        if (! $order->public_token) {
+            $order->update(['public_token' => Str::random(48)]);
+        }
+
         PhoneOtpVerification::create([
             'token' => $order->public_token,
             'order_id' => $order->id,
@@ -115,12 +133,13 @@ class CheckoutOtpService
     /**
      * Resend a fresh OTP for an order that already has an active verification
      * flow. Returns a result array the controller can turn into a response.
+     * $settings — see maybeSendForOrder() above.
      *
      * @return array{ok: bool, message?: string, retry_after_seconds?: int}
      */
-    public function resend(LandingPage $page, Order $order, PhoneOtpVerification $record): array
+    public function resend(array $settings, Order $order, PhoneOtpVerification $record): array
     {
-        $language = ($page->content['settings'] ?? [])['language'] ?? 'bn';
+        $language = $settings['language'] ?? 'bn';
         $messages = self::RESEND_MESSAGES[$language] ?? self::RESEND_MESSAGES['bn'];
 
         if ($record->blocked_until && now()->lt($record->blocked_until)) {
@@ -159,7 +178,6 @@ class CheckoutOtpService
         }
 
         $otp = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        $settings = $page->content['settings'] ?? [];
         $message = $this->renderOtpMessage($settings['otp_sms_template'] ?? null, $order, $otp, $language);
 
         $creditsRequired = $this->creditService->calculateCreditsRequired($message);
@@ -188,6 +206,59 @@ class CheckoutOtpService
             'next_resend_at' => $nextResendCount === 1 ? now()->addMinutes(2) : null,
             'expires_at' => now()->addMinutes(5),
         ]);
+
+        return ['ok' => true];
+    }
+
+    /**
+     * The verify state machine, shared by every checkout-OTP surface
+     * (landing page and WooCommerce today) — extracted from what used to
+     * be inline in CheckoutOtpController::verify() so a new caller
+     * doesn't have to reimplement the attempts/expiry/success handling.
+     * $messages is the caller's own localized message set (see
+     * CheckoutOtpController::MESSAGES for the shape: session_not_found,
+     * expired, max_attempts, wrong_code).
+     *
+     * @return array{ok: bool, message?: string, remaining_attempts?: int, already_verified?: bool}
+     */
+    public function verify(Order $order, string $otpCode, array $messages): array
+    {
+        if ($order->otp_verified_at) {
+            return ['ok' => true, 'already_verified' => true];
+        }
+
+        $record = PhoneOtpVerification::query()
+            ->where('order_id', $order->id)
+            ->where('purpose', 'checkout_verification')
+            ->whereNull('verified_at')
+            ->latest('id')
+            ->first();
+
+        if (!$record) {
+            return ['ok' => false, 'message' => $messages['session_not_found']];
+        }
+
+        if ($record->isExpired()) {
+            return ['ok' => false, 'message' => $messages['expired']];
+        }
+
+        if ($record->attempts >= 5) {
+            return ['ok' => false, 'message' => $messages['max_attempts']];
+        }
+
+        $record->increment('attempts');
+
+        if ($record->otp_code !== $otpCode) {
+            return [
+                'ok' => false,
+                'message' => $messages['wrong_code'],
+                'remaining_attempts' => max(0, 5 - $record->attempts),
+            ];
+        }
+
+        $record->update(['verified_at' => now()]);
+        $order->update(['otp_verified_at' => now()]);
+        $this->orderStatusService->transition($order, 'confirmed', 'Verified via checkout OTP.');
 
         return ['ok' => true];
     }

@@ -10,7 +10,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 
 `bsol_history_and_new_context.md`-এ আলোচিত হয়েছিল যে BSOL-এর সবচেয়ে বড় গ্যাপ হলো "যাদের নিজের WooCommerce ওয়েবসাইট আছে" — তাদের জন্য কোনো কানেক্টর ছিল না। ডিজাইন সরাসরি adapt করা হয়েছে `zyro/wordpress_plugin/zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (WordPress প্লাগিন কোনো বিজনেস লজিক রাখে না, শুধু WooCommerce থেকে ডেটা তুলে BSOL API-তে পাঠায়, ফলাফল দেখায়) থেকে — সেই legacy প্লাগিনের প্রতিটা মডিউলের exact hook/nonce/AJAX-action/payload-shape আলাদাভাবে explore করে BSOL-এর নিজের backend API-র উপর বসানো হয়েছে।
 
-৮টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
+৯টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
 
 | ফেজ | বিষয় | মূল কমিট |
 |---|---|---|
@@ -22,6 +22,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ৬ | Reliability/hygiene — HPOS compat, Activity Log, sync retry, uninstall.php, product trash sync (v1.4.0) | `8376732` |
 | ৭ | Inbound stock push-back (BSOL→WooCommerce, v1.5.0) | `90d711d` |
 | ৮ | Pathao/RedX/CarryBee location resolver (v1.6.0) | `6a687d1` |
+| ৯ | Checkout OTP for WooCommerce (v1.7.0) | `eb312f1` |
 
 ---
 
@@ -54,14 +55,17 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | GET | `/connect/v1/courier/balance` | `ConnectCourierController@balance` | Steadfast ব্যালেন্স |
 | GET | `/connect/v1/courier/waybill` | `ConnectCourierController@waybill` | Waybill/sticker PDF স্ট্রিম |
 | POST | `/connect/v1/fraud/check-phone` | `ConnectFraudController@checkPhone` | ফোন ফ্রড/ডেলিভারি-হিস্ট্রি চেক |
+| POST | `/connect/v1/orders/verify-otp` | `ConnectCheckoutOtpController@verify` | চেকআউট OTP ভেরিফাই (order-received পেজ থেকে relay) |
+| POST | `/connect/v1/orders/resend-otp` | `ConnectCheckoutOtpController@resend` | OTP পুনরায় পাঠানো |
 
 Dashboard-facing (Sanctum, `/api/wordpress/*`, `backend/app/Http/Controllers/Api/WordpressApiKeyController.php`):
 
 | Method | Route | কাজ |
 |---|---|---|
-| GET | `/wordpress/api-key` | বর্তমান key স্ট্যাটাস দেখা |
+| GET | `/wordpress/api-key` | বর্তমান key স্ট্যাটাস দেখা (এখন `otp_verification_enabled`-ও রিটার্ন করে) |
 | POST | `/wordpress/api-key` | Key জেনারেট/রিজেনারেট |
 | DELETE | `/wordpress/api-key` | Key রিভোক (soft) |
+| PUT | `/wordpress/otp-settings` | চেকআউট OTP টগল অন/অফ (key regenerate ছাড়াই) |
 | GET | `/wordpress/plugin-download` | (পাবলিক) প্লাগিন zip — সোর্স থেকে **প্রতি রিকোয়েস্টে dynamically তৈরি**, তাই কখনো stale হয় না |
 
 Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthController,ConnectOrderController,ConnectProductController,ConnectCourierController,ConnectFraudController}.php` + `backend/app/Models/PlatformApiKey.php` + `backend/app/Http/Middleware/AuthenticatePlatformApiKey.php`।
@@ -73,7 +77,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.5.0)
+wordpress-plugin/bsol-connect/          (v1.7.0)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
@@ -86,17 +90,18 @@ wordpress-plugin/bsol-connect/          (v1.5.0)
     admin/
       class-bsol-admin.php              — Settings + Dashboard + Activity Log ট্যাব (connect/disconnect ফর্ম, fraud-check tester, Steadfast balance widget)
     modules/
-      order-sync/class-bsol-order-sync.php     — woocommerce_new_order / order_status_changed hooks + ব্যর্থ sync retry (WP-Cron, ৩ বার, ৫ মিনিট পরপর)
+      order-sync/class-bsol-order-sync.php     — woocommerce_new_order / order_status_changed hooks + ব্যর্থ sync retry (WP-Cron, ৩ বার, ৫ মিনিট পরপর) + OTP-required মেটা সেভ
       product-sync/class-bsol-product-sync.php — outbound: save_post_product / quick_edit / reduce_order_stock / trashed-deleted hooks + retry (২ মিনিট পরপর); inbound: `rest_api_init`-এ `/wp-json/bsol-connect/v1/stock-update` রুট রেজিস্টার (stock push-back, §৩ দেখুন)
-      courier/class-bsol-courier.php           — Courier কলাম, book/track/cancel AJAX, waybill admin-post proxy
+      courier/class-bsol-courier.php           — Courier কলাম (৫ কুরিয়ার বাটন), book/track/cancel AJAX, waybill admin-post proxy
       fraud/class-bsol-fraud-check.php         — Customer Health কলাম + AJAX (shared bsol-admin script/style এখানেই enqueue হয়)
+      checkout-otp/class-bsol-checkout-otp.php — **প্রথম storefront (wp-admin না) মডিউল** — order-received পেজে OTP গেট, nopriv AJAX verify/resend (Phase ৯)
   assets/
-    css/bsol-admin.css
-    js/bsol-admin.js                    — health-bar polling + courier book/track/cancel বাটন হ্যান্ডলার (delegated events)
+    css/bsol-admin.css, js/bsol-admin.js       — wp-admin-only (health-bar polling, courier বাটন হ্যান্ডলার)
+    css/bsol-checkout-otp.css, js/bsol-checkout-otp.js — storefront-only, শুধু order-received পেজে enqueue হয়
   changelog.md, SETUP.md
 ```
 
-`Bsol_Master::load_dependencies()`-এ সব require + `Bsol_Admin` সবসময় ইনস্ট্যান্শিয়েট (menu সবসময় দেখা যায়), বাকি ৪টা মডিউল (`Bsol_Order_Sync`, `Bsol_Fraud_Check`, `Bsol_Product_Sync`, `Bsol_Courier`) শুধু `is_connected() && class_exists('WooCommerce')` হলে।
+`Bsol_Master::load_dependencies()`-এ সব require + `Bsol_Admin` সবসময় ইনস্ট্যান্শিয়েট (menu সবসময় দেখা যায়), বাকি ৫টা মডিউল (`Bsol_Order_Sync`, `Bsol_Fraud_Check`, `Bsol_Product_Sync`, `Bsol_Courier`, `Bsol_Checkout_Otp`) শুধু `is_connected() && class_exists('WooCommerce')` হলে।
 
 ---
 
@@ -132,11 +137,19 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 ### Plugin download (`WordpressApiKeyController::downloadPlugin()`, backend)
 `/dashboard/settings/wordpress` পেজের "Download Plugin" বাটন এই এন্ডপয়েন্টে যায়। **প্রতি রিকোয়েস্টে `wordpress-plugin/bsol-connect/` সোর্স থেকে zip ডায়নামিকভাবে তৈরি হয়** (ভার্সন নাম্বার প্লাগিন হেডার থেকে regex দিয়ে পড়া) — একটা আলাদা pre-built zip মেইনটেইন করার দরকার নেই, কখনো stale হবে না। পাবলিক (কোনো secret নেই zip-এ), শুধু `throttle:20,1`।
 
+### Checkout OTP (`class-bsol-checkout-otp.php`, Phase ৯)
+এই প্লাগিনের **প্রথম storefront-facing মডিউল** — বাকি সব শুধু wp-admin-এ কাজ করে। `platform_api_keys.otp_verification_enabled` টগল দিয়ে per-connection অন/অফ (ডিফল্ট off), BSOL dashboard → Settings → WordPress Connect থেকে টগল করা যায়।
+
+- **BSOL-সাইড ইঞ্জিন পুরোপুরি reuse** — landing-page checkout OTP-এর জন্য যে `CheckoutOtpService`/`phone_otp_verifications` মেকানিজম আগে থেকেই ছিল, সেটাই এখন WooCommerce-এর জন্যও কাজ করে। শুধু `LandingPage $page` প্যারামিটার সরিয়ে প্লেইন `array $settings` করা হয়েছে (attempts/expiry/resend-cooldown লজিক অপরিবর্তিত)। নতুন `ConnectCheckoutOtpController` একই `CheckoutOtpService::verify()`/`resend()` কল করে, শুধু order resolution আলাদা (token-based না, `wc_order_id` + API key)।
+- **Flow**: `ConnectOrderController::sync()`-এ অর্ডার create হলে (update-এ না), toggle অন থাকলে SMS পাঠানো হয় + response-এ `otp_required: true` আসে → প্লাগিন `_bsol_otp_required` order meta সেভ করে → `woocommerce_before_thankyou` হুকে order-received পেজে একটা কোড-ইনপুট কার্ড দেখায় (মেটা true + `_bsol_otp_verified` false হলেই)।
+- **ব্রাউজার থেকে সরাসরি BSOL-এ যাওয়া যায় না** (শপার-এর কাছে API key নেই) — verify/resend `wp_ajax_nopriv_*` হ্যান্ডলার দিয়ে সার্ভার-সাইড relay হয় (চেকআউট সাধারণত anonymous), অন্য সব মডিউলের wp-admin AJAX relay-র একই প্যাটার্ন, শুধু storefront থেকে ট্রিগার হওয়া।
+- **`public_token` bug fix**: `phone_otp_verifications.token` NOT NULL+unique, কিন্তু WooCommerce-সোর্সড অর্ডারে কখনো `public_token` সেট হতো না (শুধু landing-page order creation flow সেটা সেট করত) — `CheckoutOtpService::maybeSendForOrder()` এখন প্রয়োজনে on-demand একটা জেনারেট করে দেয়।
+
 ---
 
 ## ৬. টেস্টিং কনভেনশন (এই কানেক্টরের জন্য প্রতিষ্ঠিত)
 
-- Feature test ফাইল: `backend/tests/Feature/{ConnectApiTest,PlatformApiKeyApiTest,ConnectProductSyncTest,ConnectCourierTest,WooCommerceStockPushTest}.php`।
+- Feature test ফাইল: `backend/tests/Feature/{ConnectApiTest,PlatformApiKeyApiTest,ConnectProductSyncTest,ConnectCourierTest,WooCommerceStockPushTest,CourierLocationResolverTest,ConnectCheckoutOtpTest}.php`।
 - সব টেস্ট **isolated Postgres schema**-তে যাচাই করা হয়েছে, `hybrid_platform` প্রোডাকশন DB কখনো টাচ হয়নি:
   ```bash
   PGPASSWORD='...' psql -U hybrid_app -h 127.0.0.1 -d hybrid_platform -c "CREATE SCHEMA IF NOT EXISTS test_xxx;"
@@ -154,7 +167,6 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 
 | ফিচার | কেন এখনো নেই |
 |---|---|
-| OTP (চেকআউট) | ব্যাকএন্ডে `CheckoutOtpController` আছে কিন্তু `landing_page_id`-স্কোপড, WC-এর জন্য জেনারেলাইজ করতে হবে। |
 | Facebook CAPI (WooCommerce অর্ডার থেকে) | বর্তমান `FacebookCapiClient`/`SendFacebookCapiPurchaseEventJob` শুধু ল্যান্ডিং-পেজ চেকআউট থেকে ফায়ার করে, external order source নিতে জেনারেলাইজ করতে হবে। |
 | WP-admin bulk/historical sync UI | zayroo-connect-এর "Sync Data" ট্যাব (progress bar-সহ bulk historical sync) — ভালো UX কিন্তু নতুন প্রোডাক্ট/অর্ডার সিঙ্ক শুরু করার জন্য জরুরি না। |
 | Order invoice PDF (waybill থেকে আলাদা, seller→customer sales invoice) | `OrderController::invoicePdf()` একই delegate প্যাটার্নে সহজেই এক্সপোজ করা যায়, শুধু এখনো করা হয়নি। |
@@ -173,3 +185,5 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 8. **উল্টো দিকের (BSOL→WordPress) কলের জন্য একটা আলাদা secret লাগবে, API key reuse করা যাবে না** — API key BSOL-সাইডে এক-মুখী hash আকারে থাকে (সিকিউরিটি সিদ্ধান্ত, Phase ১), তাই ফেরত পাঠানোর মতো raw কিছু নেই। `webhook_secret` (connect handshake-এ ইস্যু, দুই পাশেই reversible) এই প্যাটার্নের জন্য টেমপ্লেট — ভবিষ্যতে BSOL→WordPress অন্য কোনো ফিচার লাগলেও একই secret reuse করা যায়, নতুন করে বানানোর দরকার নেই।
 9. **Multi-write-site সিঙ্ক হুকের জন্য model event, প্রতিটা controller আলাদা করে প্যাচ না** — stock ৪+ জায়গা থেকে (ড্যাশবোর্ড এডিট, adjust-stock এন্ডপয়েন্ট, `OrderStatusService`-এর reserve/restore) বদলাতে পারে; প্রতিটা কল-সাইট আলাদা প্যাচ না করে `Product`/`ProductVariant`-এর `booted()`-এ একটা কেন্দ্রীয় `saved` hook বসানো হয়েছে (`ProductVariant`-এ আগে থেকেই থাকা `saving` hook-এর একই idiom অনুসরণ করে) — নতুন কোনো write-site যোগ হলেও স্বয়ংক্রিয়ভাবে কভার হয়ে যাবে।
 10. **ফিজিক্যাল/অপরিবর্তনীয় action-এ "ম্যাচ না পাওয়া" সবসময় "ভুল ম্যাচ"-এর চেয়ে নিরাপদ** — `CourierLocationResolverService`-এর `MIN_CONFIDENCE` threshold-এর নিচে কিছু পেলে চুপচাপ একটা আন্দাজি city/zone বেছে নেয় না, বরং resolve-ই করে না (parcel ভুল জায়গায় চলে যাওয়ার চেয়ে booking fail হওয়া ভালো) — এটা decision #3-এরই একটা কঠোরতর সংস্করণ, যেখানে ভুল হওয়ার real-world cost শুধু একটা confusing এরর মেসেজের চেয়ে বেশি।
+11. **অন্য চ্যানেলের জন্য জেনারেলাইজ করার সময় rebuild না, narrow decoupling** — checkout OTP আগে থেকেই `order_id`-স্কোপড ছিল, শুধু enable-toggle টা `LandingPage $page` অবজেক্টে বাঁধা ছিল; সেই একটা প্যারামিটার `array $settings`-এ বদলে দেওয়াই যথেষ্ট হয়েছে, পুরো verify/resend state machine অক্ষত রেখে (Phase ৯)। নতুন কোনো channel জেনারেলাইজ করার আগে — Facebook CAPI-ও একই রকম ল্যান্ডিং-পেজ-বাঁধা (§৭ দেখুন) — আগে জিজ্ঞেস করা উচিত "এটা কি সত্যিই landing-page-নির্দিষ্ট, নাকি শুধু একটা প্যারামিটার landing-page দিয়ে resolve হচ্ছে?"।
+12. **Storefront-facing রিলে wp-admin রিলে-রই এক্সটেনশন, নতুন প্যাটার্ন না** — শপারের ব্রাউজারে API key নেই বলে checkout OTP verify/resend WP AJAX দিয়ে সার্ভার-সাইড relay হয় (`wp_ajax_nopriv_*`) — ঠিক সেই একই browser→WP-AJAX→BSOL শেপ যেটা courier book/track/cancel-এর জন্য wp-admin-এ আগে থেকেই ব্যবহৃত হচ্ছিল, শুধু ট্রিগার পয়েন্ট storefront-এ (Phase ৯, `class-bsol-checkout-otp.php` — এই প্লাগিনের প্রথম non-admin মডিউল)।

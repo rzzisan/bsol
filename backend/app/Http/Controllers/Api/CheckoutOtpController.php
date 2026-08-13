@@ -7,7 +7,6 @@ use App\Models\LandingPage;
 use App\Models\Order;
 use App\Models\PhoneOtpVerification;
 use App\Services\CheckoutOtpService;
-use App\Services\OrderStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -35,7 +34,6 @@ class CheckoutOtpController extends Controller
 
     public function __construct(
         private readonly CheckoutOtpService $checkoutOtpService,
-        private readonly OrderStatusService $orderStatusService,
     ) {}
 
     private function messages(LandingPage $page): array
@@ -55,45 +53,15 @@ class CheckoutOtpController extends Controller
         $order = $this->resolveOrder($page, $orderId, $validated['token']);
         $messages = $this->messages($page);
 
-        if ($order->otp_verified_at) {
-            return response()->json([
-                'success' => true,
-                'data' => ['status' => $order->status, 'otp_verified' => true],
-            ]);
-        }
+        $result = $this->checkoutOtpService->verify($order, $validated['otp_code'], $messages);
 
-        $record = PhoneOtpVerification::query()
-            ->where('order_id', $order->id)
-            ->where('purpose', 'checkout_verification')
-            ->whereNull('verified_at')
-            ->latest('id')
-            ->first();
-
-        if (!$record) {
-            return response()->json(['success' => false, 'message' => $messages['session_not_found']], 422);
-        }
-
-        if ($record->isExpired()) {
-            return response()->json(['success' => false, 'message' => $messages['expired']], 422);
-        }
-
-        if ($record->attempts >= 5) {
-            return response()->json(['success' => false, 'message' => $messages['max_attempts']], 422);
-        }
-
-        $record->increment('attempts');
-
-        if ($record->otp_code !== $validated['otp_code']) {
-            return response()->json([
+        if (!$result['ok']) {
+            return response()->json(array_filter([
                 'success' => false,
-                'message' => $messages['wrong_code'],
-                'remaining_attempts' => max(0, 5 - $record->attempts),
-            ], 422);
+                'message' => $result['message'],
+                'remaining_attempts' => $result['remaining_attempts'] ?? null,
+            ], fn ($v) => $v !== null), 422);
         }
-
-        $record->update(['verified_at' => now()]);
-        $order->update(['otp_verified_at' => now()]);
-        $this->orderStatusService->transition($order, 'confirmed', 'Verified via checkout OTP.');
 
         return response()->json([
             'success' => true,
@@ -126,7 +94,7 @@ class CheckoutOtpController extends Controller
             return response()->json(['success' => false, 'message' => $messages['session_not_found']], 422);
         }
 
-        $result = $this->checkoutOtpService->resend($page, $order, $record);
+        $result = $this->checkoutOtpService->resend($page->content['settings'] ?? [], $order, $record);
 
         if (!$result['ok']) {
             return response()->json([

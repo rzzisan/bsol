@@ -18,15 +18,16 @@ class PlatformApiKey extends Model
 {
     protected $fillable = [
         'user_id', 'platform', 'domain', 'key_hash', 'key_prefix', 'webhook_secret',
-        'status', 'last_used_at', 'last_connected_ip', 'revoked_at',
+        'otp_verification_enabled', 'status', 'last_used_at', 'last_connected_ip', 'revoked_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'last_used_at'   => 'datetime',
-            'revoked_at'     => 'datetime',
-            'webhook_secret' => 'encrypted',
+            'last_used_at'              => 'datetime',
+            'revoked_at'                => 'datetime',
+            'webhook_secret'            => 'encrypted',
+            'otp_verification_enabled'  => 'boolean',
         ];
     }
 

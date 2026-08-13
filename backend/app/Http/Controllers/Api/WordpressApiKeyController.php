@@ -38,8 +38,31 @@ class WordpressApiKeyController extends Controller
                 'status'        => $key->status,
                 'last_used_at'  => $key->last_used_at,
                 'created_at'    => $key->created_at,
+                'otp_verification_enabled' => (bool) $key->otp_verification_enabled,
             ],
         ]);
+    }
+
+    /**
+     * Toggle checkout OTP verification for WooCommerce orders on this
+     * connection — independent of the key itself, so flipping it never
+     * requires regenerating/reconnecting. See CheckoutOtpService, Phase 9.
+     */
+    public function updateOtpSetting(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'enabled' => 'required|boolean',
+        ]);
+
+        $key = PlatformApiKey::where('user_id', auth()->user()->shopOwnerId())->first();
+
+        if (! $key) {
+            return response()->json(['success' => false, 'message' => 'No WordPress connection found.'], 404);
+        }
+
+        $key->update(['otp_verification_enabled' => $data['enabled']]);
+
+        return response()->json(['success' => true, 'data' => ['otp_verification_enabled' => $key->otp_verification_enabled]]);
     }
 
     /**

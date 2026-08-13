@@ -1,0 +1,48 @@
+/* Storefront-side checkout OTP gate — order-received page only. */
+
+.bsol-otp-gate {
+	max-width: 480px;
+	margin: 0 0 24px;
+	padding: 20px;
+	border: 1px solid #f0b429;
+	background: #fffaf0;
+	border-radius: 8px;
+}
+
+.bsol-otp-gate h2 {
+	margin: 0 0 8px;
+	font-size: 18px;
+}
+
+.bsol-otp-gate p {
+	margin: 0 0 12px;
+}
+
+.bsol-otp-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.bsol-otp-input {
+	width: 140px;
+	padding: 8px 10px;
+	font-size: 16px;
+	letter-spacing: 2px;
+}
+
+.bsol-otp-resend-btn {
+	background: none;
+	border: none;
+	color: #2271b1;
+	cursor: pointer;
+	text-decoration: underline;
+	padding: 0;
+	font-size: 13px;
+}
+
+.bsol-otp-message {
+	margin-top: 10px;
+	font-size: 13px;
+}

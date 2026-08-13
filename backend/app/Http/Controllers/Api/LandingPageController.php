@@ -97,7 +97,7 @@ class LandingPageController extends Controller
         }
 
         $order = app(LandingPageOrderService::class)->create($page, $validated, $lineItems, $resolvedFields);
-        app(CheckoutOtpService::class)->maybeSendForOrder($page, $order);
+        app(CheckoutOtpService::class)->maybeSendForOrder($page->content['settings'] ?? [], $order);
         app(AbandonedCheckoutService::class)->convertMatching(
             $page,
             $order,

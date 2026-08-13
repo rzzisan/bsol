@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\AbandonedCheckoutController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\CheckoutOtpController;
 use App\Http\Controllers\Api\Connect\ConnectAuthController;
+use App\Http\Controllers\Api\Connect\ConnectCheckoutOtpController;
 use App\Http\Controllers\Api\Connect\ConnectCourierController;
 use App\Http\Controllers\Api\Connect\ConnectFraudController;
 use App\Http\Controllers\Api\Connect\ConnectOrderController;
@@ -177,6 +178,10 @@ Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
         Route::get('/courier/waybill', [ConnectCourierController::class, 'waybill']);
         Route::post('/fraud/check-phone', [ConnectFraudController::class, 'checkPhone'])
             ->middleware('throttle:60,1');
+        Route::post('/orders/verify-otp', [ConnectCheckoutOtpController::class, 'verify'])
+            ->middleware('throttle:20,1');
+        Route::post('/orders/resend-otp', [ConnectCheckoutOtpController::class, 'resend'])
+            ->middleware('throttle:20,1');
     });
 });
 
@@ -394,6 +399,7 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/api-key', [WordpressApiKeyController::class, 'show']);
         Route::post('/api-key', [WordpressApiKeyController::class, 'store']);
         Route::delete('/api-key', [WordpressApiKeyController::class, 'destroy']);
+        Route::put('/otp-settings', [WordpressApiKeyController::class, 'updateOtpSetting']);
     });
 
     // ── Courier Integration ───────────────────────────────────────────────────

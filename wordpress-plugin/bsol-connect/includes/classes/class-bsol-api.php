@@ -106,10 +106,27 @@ class Bsol_Api {
 		return $this->remote_post( 'fraud/check-phone', array( 'phone_number' => $phone ) );
 	}
 
+	public function verify_otp( $wc_order_id, $otp_code ) {
+		return $this->remote_post(
+			'orders/verify-otp',
+			array(
+				'wc_order_id' => (string) $wc_order_id,
+				'otp_code'    => $otp_code,
+			)
+		);
+	}
+
+	public function resend_otp( $wc_order_id ) {
+		return $this->remote_post( 'orders/resend-otp', array( 'wc_order_id' => (string) $wc_order_id ) );
+	}
+
 	/**
-	 * $courier: 'steadfast' | 'paperfly' | 'manual'. Pathao/RedX/Carrybee
-	 * are rejected server-side (they need location data a WooCommerce
-	 * order can't supply) — see ConnectCourierController.
+	 * $courier: 'steadfast' | 'paperfly' | 'manual' | 'pathao' | 'redx' |
+	 * 'carrybee'. For the last three, BSOL derives the location IDs a
+	 * WooCommerce order can't supply on a best-effort basis — see
+	 * CourierLocationResolverService server-side. A booking can still fail
+	 * with a clean 'location_unresolved' error if it can't do so
+	 * confidently.
 	 */
 	public function book_courier( $wc_order_id, $courier, $tracking_id = null ) {
 		return $this->remote_post(

@@ -17,7 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Bsol_Order_Sync {
 
-	const META_RETRY_COUNT = '_bsol_sync_retry_count';
+	const META_RETRY_COUNT  = '_bsol_sync_retry_count';
+	const META_OTP_REQUIRED = '_bsol_otp_required';
 	const MAX_RETRIES       = 3;
 	const RETRY_DELAY       = 5 * MINUTE_IN_SECONDS;
 
@@ -38,6 +39,9 @@ class Bsol_Order_Sync {
 
 		if ( ! empty( $response['success'] ) ) {
 			$order->delete_meta_data( self::META_RETRY_COUNT );
+			if ( ! empty( $response['data']['otp_required'] ) ) {
+				$order->update_meta_data( self::META_OTP_REQUIRED, true );
+			}
 			$order->save();
 			return;
 		}

@@ -38,6 +38,8 @@ const t = {
     pluginNote: "এই Key ও ডোমেইন BSOL WordPress প্লাগিনে বসাতে হবে।",
     genericError: "কিছু একটা সমস্যা হয়েছে, আবার চেষ্টা করুন।",
     domainRequired: "ডোমেইন লিখুন।",
+    otpTitle: "চেকআউট OTP ভেরিফিকেশন",
+    otpDesc: "চালু থাকলে, WooCommerce থেকে আসা প্রতিটি অর্ডারে কাস্টমারের ফোন নম্বর OTP দিয়ে ভেরিফাই করতে হবে। এসএমএস গেটওয়ে ও ব্যালেন্স আগে থেকে কনফিগার থাকতে হবে।",
   },
   en: {
     pageTitle: "WordPress Connect",
@@ -70,6 +72,9 @@ const t = {
     pluginNote: "Enter this key and domain into the BSOL WordPress plugin.",
     genericError: "Something went wrong, please try again.",
     domainRequired: "Please enter a domain.",
+    otpTitle: "Checkout OTP Verification",
+    otpDesc:
+      "When enabled, every order synced from WooCommerce requires the customer's phone number to be OTP-verified. Requires an SMS gateway with sufficient balance already configured.",
   },
 };
 
@@ -80,6 +85,7 @@ type ApiKeyStatus = {
   status: "pending" | "connected" | "revoked";
   last_used_at: string | null;
   created_at: string;
+  otp_verification_enabled: boolean;
 };
 
 export default function WordpressConnectPage() {
@@ -94,6 +100,8 @@ export default function WordpressConnectPage() {
   const [rawKey, setRawKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [otpEnabled, setOtpEnabled] = useState(false);
+  const [otpSaving, setOtpSaving] = useState(false);
 
   const authHeaders = useCallback(() => {
     const token = getStoredToken();
@@ -108,6 +116,7 @@ export default function WordpressConnectPage() {
       if (json.success) {
         setStatus(json.data);
         if (json.data?.domain) setDomainInput(json.data.domain);
+        setOtpEnabled(Boolean(json.data?.otp_verification_enabled));
       }
     } catch {
       // silent — panel just stays empty, retry on next visit
@@ -178,6 +187,28 @@ export default function WordpressConnectPage() {
       setCopied(true);
     } catch {
       // clipboard API unavailable — the key is still visible to copy manually
+    }
+  }
+
+  async function handleToggleOtp(next: boolean) {
+    setOtpSaving(true);
+    setOtpEnabled(next); // optimistic — reverted below on failure
+    try {
+      const res = await fetch(`${API}/wordpress/otp-settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setOtpEnabled(!next);
+        setMessage({ type: "error", text: json.message ?? tr.genericError });
+      }
+    } catch {
+      setOtpEnabled(!next);
+      setMessage({ type: "error", text: tr.genericError });
+    } finally {
+      setOtpSaving(false);
     }
   }
 
@@ -305,6 +336,31 @@ export default function WordpressConnectPage() {
             </div>
           )}
         </div>
+
+        {status && status.status !== "revoked" && (
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">{tr.otpTitle}</h3>
+              <p className="mt-0.5 text-xs text-[var(--muted)]">{tr.otpDesc}</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={otpEnabled}
+              disabled={otpSaving}
+              onClick={() => void handleToggleOtp(!otpEnabled)}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+                otpEnabled ? "bg-[var(--accent)]" : "bg-[var(--border)]"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                  otpEnabled ? "translate-x-5" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </div>
+        )}
       </div>
     </UserShell>
   );

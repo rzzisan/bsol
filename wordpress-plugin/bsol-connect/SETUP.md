@@ -82,6 +82,26 @@ a real WooCommerce staging site before rolling out to sellers.
 3. In BSOL dashboard → Settings → WordPress Connect, confirm the key shows
    as revoked.
 
+## Checkout OTP (1.7.0)
+
+1. On BSOL dashboard → Settings → WordPress Connect, confirm an SMS
+   gateway is configured with a positive balance, then turn on
+   **Checkout OTP Verification**.
+2. Place a test order on the WooCommerce store with a valid Bangladeshi
+   phone number.
+3. Confirm an SMS with a 4-digit code arrives, and the order-received
+   page shows a "Verify your phone number" card — confirm nothing else
+   on the page is hidden/broken by it.
+4. Enter the wrong code — confirm a clear error appears and the page
+   doesn't reload/break.
+5. Enter the right code — confirm the card disappears and, in BSOL
+   dashboard → Orders, the order's status is `confirmed`.
+6. Click **Resend code** twice in a row — confirm the second attempt is
+   blocked with a cooldown message (matches the existing landing-page OTP
+   resend limits — 2 resends, then a 1-hour block).
+7. Turn the toggle back off — confirm a new test order does **not**
+   trigger an SMS or show the verification card.
+
 ## Pathao/RedX/CarryBee booking (1.6.0)
 
 1. Make sure Pathao/RedX/CarryBee credentials are configured on the BSOL

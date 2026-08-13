@@ -1,5 +1,23 @@
 # BSOL Connect — Changelog
 
+## 1.7.0 — 2026-08-13
+
+Checkout OTP verification for WooCommerce orders — the first storefront
+(not wp-admin) feature in this plugin:
+
+- Off by default. Turn it on from BSOL dashboard → Settings → WordPress
+  Connect (requires an SMS gateway with balance already configured).
+- When on, a synced order gets a code texted to the customer's phone; a
+  small verification card appears on WooCommerce's own order-received
+  page, blocking nothing else on that page. Entering the right code
+  confirms the order (`pending` → `confirmed`) on BSOL.
+- Reuses BSOL's existing landing-page checkout-OTP engine end to end
+  (same attempts/expiry/resend-cooldown rules) — no new verification
+  logic, just a new surface for it.
+- The verify/resend AJAX handlers are registered `nopriv` (checkout is
+  normally anonymous) and only ever enqueue their JS/CSS on the
+  order-received page itself.
+
 ## 1.6.0 — 2026-08-13
 
 Pathao, RedX, and CarryBee booking, for orders synced from WooCommerce:
