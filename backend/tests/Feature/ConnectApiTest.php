@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendFacebookCapiPurchaseEventJob;
 use App\Models\Order;
 use App\Models\PlatformApiKey;
 use App\Models\SubscriptionPackage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use ReflectionProperty;
 use Tests\TestCase;
 
 class ConnectApiTest extends TestCase
@@ -244,5 +247,74 @@ class ConnectApiTest extends TestCase
         $this->postJson('/api/connect/v1/fraud/check-phone', ['phone_number' => '01755443322'], $headers)
             ->assertStatus(402)
             ->assertJsonPath('error_code', 'subscription_expired');
+    }
+
+    // ── Facebook CAPI (Phase 10) ─────────────────────────────────────────────
+
+    public function test_sync_dispatches_capi_job_with_forwarded_ip_and_user_agent_on_create(): void
+    {
+        Queue::fake();
+        [$user, $rawKey] = $this->connectedMerchant();
+
+        $payload = $this->samplePayload('wc-capi-1');
+        $payload['client_ip'] = '203.0.113.7';
+        $payload['user_agent'] = 'Mozilla/5.0 (Test Browser)';
+        $payload['event_source_url'] = 'https://myshop.com/checkout/';
+
+        $this->postJson('/api/connect/v1/orders/sync', $payload, $this->connectHeaders($rawKey))->assertCreated();
+
+        $order = Order::where('user_id', $user->id)->where('source_ref', 'wc-capi-1')->firstOrFail();
+
+        Queue::assertPushed(
+            SendFacebookCapiPurchaseEventJob::class,
+            function ($job) use ($order) {
+                return $this->jobProperty($job, 'orderId') === $order->id
+                    && $this->jobProperty($job, 'clientIp') === '203.0.113.7'
+                    && $this->jobProperty($job, 'userAgent') === 'Mozilla/5.0 (Test Browser)'
+                    && $this->jobProperty($job, 'eventSourceUrl') === 'https://myshop.com/checkout/';
+            }
+        );
+    }
+
+    public function test_sync_dispatches_capi_job_with_domain_fallback_url_when_plugin_omits_it(): void
+    {
+        Queue::fake();
+        [, $rawKey] = $this->connectedMerchant();
+
+        $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload('wc-capi-2'), $this->connectHeaders($rawKey))
+            ->assertCreated();
+
+        Queue::assertPushed(
+            SendFacebookCapiPurchaseEventJob::class,
+            function ($job) {
+                return $this->jobProperty($job, 'clientIp') === null
+                    && $this->jobProperty($job, 'eventSourceUrl') === 'https://myshop.com/';
+            }
+        );
+    }
+
+    public function test_sync_does_not_redispatch_capi_job_on_update(): void
+    {
+        Queue::fake();
+        [, $rawKey] = $this->connectedMerchant();
+        $headers = $this->connectHeaders($rawKey);
+
+        $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload('wc-capi-3'), $headers)->assertCreated();
+        Queue::assertPushed(SendFacebookCapiPurchaseEventJob::class, 1);
+
+        $updated = $this->samplePayload('wc-capi-3');
+        $updated['is_paid'] = true;
+        $this->postJson('/api/connect/v1/orders/sync', $updated, $headers)->assertOk();
+
+        // Still exactly 1 — the update branch never dispatches again.
+        Queue::assertPushed(SendFacebookCapiPurchaseEventJob::class, 1);
+    }
+
+    /** Jobs' properties are constructor-promoted + private; reflection is the only way to assert on them. */
+    private function jobProperty($job, string $name)
+    {
+        $ref = new ReflectionProperty($job, $name);
+        $ref->setAccessible(true);
+        return $ref->getValue($job);
     }
 }

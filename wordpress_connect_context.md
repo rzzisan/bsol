@@ -10,7 +10,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 
 `bsol_history_and_new_context.md`-এ আলোচিত হয়েছিল যে BSOL-এর সবচেয়ে বড় গ্যাপ হলো "যাদের নিজের WooCommerce ওয়েবসাইট আছে" — তাদের জন্য কোনো কানেক্টর ছিল না। ডিজাইন সরাসরি adapt করা হয়েছে `zyro/wordpress_plugin/zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (WordPress প্লাগিন কোনো বিজনেস লজিক রাখে না, শুধু WooCommerce থেকে ডেটা তুলে BSOL API-তে পাঠায়, ফলাফল দেখায়) থেকে — সেই legacy প্লাগিনের প্রতিটা মডিউলের exact hook/nonce/AJAX-action/payload-shape আলাদাভাবে explore করে BSOL-এর নিজের backend API-র উপর বসানো হয়েছে।
 
-৯টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
+১০টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
 
 | ফেজ | বিষয় | মূল কমিট |
 |---|---|---|
@@ -23,6 +23,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ৭ | Inbound stock push-back (BSOL→WooCommerce, v1.5.0) | `90d711d` |
 | ৮ | Pathao/RedX/CarryBee location resolver (v1.6.0) | `6a687d1` |
 | ৯ | Checkout OTP for WooCommerce (v1.7.0) | `eb312f1` |
+| ১০ | Facebook CAPI for WooCommerce (v1.8.0) | `3a5162a` |
 
 ---
 
@@ -46,7 +47,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 |---|---|---|---|
 | POST | `/connect/v1/connect` | `ConnectAuthController@connect` | হ্যান্ডশেক — key+domain ভেরিফাই |
 | POST | `/connect/v1/disconnect` | `ConnectAuthController@disconnect` | self-revoke (একই key দিয়ে) |
-| POST | `/connect/v1/orders/sync` | `ConnectOrderController@sync` | অর্ডার create/update, SKU দিয়ে product/variant লিংক |
+| POST | `/connect/v1/orders/sync` | `ConnectOrderController@sync` | অর্ডার create/update, SKU দিয়ে product/variant লিংক; create-এ OTP send + Facebook CAPI Purchase event dispatch (উভয়ই টগল/সেটিংসের উপর নির্ভরশীল, no-op ডিফল্ট) |
 | POST | `/connect/v1/orders/sync-status` | `ConnectOrderController@syncStatus` | BSOL-canonical status ট্রানজিশন |
 | POST | `/connect/v1/products/sync` | `ConnectProductController@sync` | Simple/variable প্রোডাক্ট + ভ্যারিয়েন্ট create/update |
 | POST | `/connect/v1/courier/book` | `ConnectCourierController@book` | Steadfast/Paperfly/manual বুকিং |
@@ -77,7 +78,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.7.0)
+wordpress-plugin/bsol-connect/          (v1.8.0)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
@@ -112,6 +113,8 @@ wordpress-plugin/bsol-connect/          (v1.7.0)
 
 ### Order sync (`class-bsol-order-sync.php`)
 `woocommerce_new_order` → `/orders/sync` (create), `woocommerce_order_status_changed` → status map দিয়ে ট্রান্সলেট করে (`Bsol_Helpers::status_map()`, filterable via `bsol_connect_status_map`) → `/orders/sync-status`। **WC স্ট্যাটাস ভোকাবুলারি ট্রান্সলেশন প্লাগিনের দায়িত্ব** — backend শুধু BSOL-canonical স্ট্যাটাস (`pending,confirmed,processing,shipped,delivered,cancelled,returned`) নেয়, যাতে API ভবিষ্যতে অন্য প্ল্যাটফর্মের জন্যও স্থিতিশীল থাকে।
+
+**Facebook CAPI (Phase ১০)**: `build_order_payload()` এ ৩টা এক্সট্রা ফিল্ড — `client_ip`, `user_agent` (`WC_Order::get_customer_ip_address()`/`get_customer_user_agent()`, WooCommerce নিজেই checkout-এ ক্যাপচার করে, প্লাগিনের নতুন কিছু ট্র্যাক করার দরকার নেই), আর `event_source_url` (`wc_get_checkout_url()`)। BSOL-সাইড: `ConnectOrderController::sync()` এই ৩টা দিয়ে `SendFacebookCapiPurchaseEventJob::dispatch()` করে (create-এ, একবারই) — এটাই আগে থেকে ল্যান্ডিং-পেজ checkout-এর জন্য থাকা একমাত্র job/client, নতুন কিছু বানাতে হয়নি; `FacebookPixelSetting` আগে থেকেই shop-wide (`landing_page_id` স্কোপড না), তাই কনফিগ-লেয়ারেও কোনো কাজ লাগেনি।
 
 ### Product sync (`class-bsol-product-sync.php`)
 **Outbound**: `save_post_product`/`quick_edit_save`/`reduce_order_stock` হুক (zayroo-connect-এর প্রমাণিত trigger সেট), + trashed/deleted হলে inactive sync। Simple + variable — variable প্রোডাক্টের প্রতিটা variation আলাদা payload এন্ট্রি। WC-এর regular/sale price BSOL-এর amount-discount মডেলে ট্রান্সলেট হয়। SKU না থাকলে `WC-{id}` fallback (BSOL-এ SKU required)। ব্যর্থ sync WP-Cron দিয়ে ৩ বার রিট্রাই হয় (২ মিনিট পরপর), তারপর Activity Log-এ permanent-failure এন্ট্রি।
@@ -167,7 +170,6 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 
 | ফিচার | কেন এখনো নেই |
 |---|---|
-| Facebook CAPI (WooCommerce অর্ডার থেকে) | বর্তমান `FacebookCapiClient`/`SendFacebookCapiPurchaseEventJob` শুধু ল্যান্ডিং-পেজ চেকআউট থেকে ফায়ার করে, external order source নিতে জেনারেলাইজ করতে হবে। |
 | WP-admin bulk/historical sync UI | zayroo-connect-এর "Sync Data" ট্যাব (progress bar-সহ bulk historical sync) — ভালো UX কিন্তু নতুন প্রোডাক্ট/অর্ডার সিঙ্ক শুরু করার জন্য জরুরি না। |
 | Order invoice PDF (waybill থেকে আলাদা, seller→customer sales invoice) | `OrderController::invoicePdf()` একই delegate প্যাটার্নে সহজেই এক্সপোজ করা যায়, শুধু এখনো করা হয়নি। |
 
@@ -187,3 +189,4 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 10. **ফিজিক্যাল/অপরিবর্তনীয় action-এ "ম্যাচ না পাওয়া" সবসময় "ভুল ম্যাচ"-এর চেয়ে নিরাপদ** — `CourierLocationResolverService`-এর `MIN_CONFIDENCE` threshold-এর নিচে কিছু পেলে চুপচাপ একটা আন্দাজি city/zone বেছে নেয় না, বরং resolve-ই করে না (parcel ভুল জায়গায় চলে যাওয়ার চেয়ে booking fail হওয়া ভালো) — এটা decision #3-এরই একটা কঠোরতর সংস্করণ, যেখানে ভুল হওয়ার real-world cost শুধু একটা confusing এরর মেসেজের চেয়ে বেশি।
 11. **অন্য চ্যানেলের জন্য জেনারেলাইজ করার সময় rebuild না, narrow decoupling** — checkout OTP আগে থেকেই `order_id`-স্কোপড ছিল, শুধু enable-toggle টা `LandingPage $page` অবজেক্টে বাঁধা ছিল; সেই একটা প্যারামিটার `array $settings`-এ বদলে দেওয়াই যথেষ্ট হয়েছে, পুরো verify/resend state machine অক্ষত রেখে (Phase ৯)। নতুন কোনো channel জেনারেলাইজ করার আগে — Facebook CAPI-ও একই রকম ল্যান্ডিং-পেজ-বাঁধা (§৭ দেখুন) — আগে জিজ্ঞেস করা উচিত "এটা কি সত্যিই landing-page-নির্দিষ্ট, নাকি শুধু একটা প্যারামিটার landing-page দিয়ে resolve হচ্ছে?"।
 12. **Storefront-facing রিলে wp-admin রিলে-রই এক্সটেনশন, নতুন প্যাটার্ন না** — শপারের ব্রাউজারে API key নেই বলে checkout OTP verify/resend WP AJAX দিয়ে সার্ভার-সাইড relay হয় (`wp_ajax_nopriv_*`) — ঠিক সেই একই browser→WP-AJAX→BSOL শেপ যেটা courier book/track/cancel-এর জন্য wp-admin-এ আগে থেকেই ব্যবহৃত হচ্ছিল, শুধু ট্রিগার পয়েন্ট storefront-এ (Phase ৯, `class-bsol-checkout-otp.php` — এই প্লাগিনের প্রথম non-admin মডিউল)।
+13. **নতুন channel জেনারেলাইজ করার আগে চেক করো configuration layer আসলেই re-scope লাগবে কিনা** — decision #11-এর (OTP) বিপরীত উদাহরণ: Facebook CAPI-র জন্য `FacebookPixelSetting` already shop-wide ছিল (`unique('user_id')`, কোনো `landing_page_id` না) — তাই Phase ১০-এ কোনো নতুন migration/toggle/UI লাগেইনি, শুধু একটা নতুন dispatch call site আর প্লাগিন থেকে WooCommerce-এর নিজস্ব capture করা IP/UA ফরওয়ার্ড করা লাগল। একই "জেনারেলাইজ করো" কাজ ভিন্ন ফিচারে সম্পূর্ণ ভিন্ন পরিমাণ কাজ হতে পারে — অনুমান না করে প্রতিটার actual scoping যাচাই করা জরুরি।

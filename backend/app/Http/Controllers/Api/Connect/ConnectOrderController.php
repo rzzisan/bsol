@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Connect;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Requests\StoreOrderRequest;
+use App\Jobs\SendFacebookCapiPurchaseEventJob;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -51,6 +52,14 @@ class ConnectOrderController extends Controller
             'line_items.*.quantity'=> 'required|integer|min:1',
             'line_items.*.total'   => 'required|numeric|min:0',
             'line_items.*.sku'     => 'nullable|string|max:100',
+            // Forwarded from WC_Order::get_customer_ip_address()/
+            // get_customer_user_agent() — captured by WooCommerce itself at
+            // checkout, not derivable from this server-to-server sync
+            // request (which would just be the WordPress server's own IP).
+            // Used for Facebook CAPI match quality — see the dispatch below.
+            'client_ip'            => 'nullable|ip',
+            'user_agent'           => 'nullable|string|max:500',
+            'event_source_url'     => 'nullable|string|max:500',
         ]);
 
         $merchant = auth()->user();
@@ -144,6 +153,17 @@ class ConnectOrderController extends Controller
                 }
 
                 $responseData['data']['otp_required'] = $otpRequired;
+
+                // Purchase event only — fires once, on creation, same as the
+                // landing-page checkout flow (LandingPageController). A safe
+                // no-op for any seller who hasn't configured Facebook CAPI
+                // (the job's own FacebookPixelSetting gate handles that).
+                SendFacebookCapiPurchaseEventJob::dispatch(
+                    $responseData['data']['id'],
+                    $data['client_ip'] ?? null,
+                    $data['user_agent'] ?? null,
+                    $data['event_source_url'] ?? ($apiKey ? "https://{$apiKey->domain}/" : ''),
+                );
 
                 return response()->json($responseData, $response->getStatusCode());
             }

@@ -109,6 +109,15 @@ class Bsol_Order_Sync {
 			'discount'         => (float) $order->get_discount_total(),
 			'notes'            => $order->get_customer_note(),
 			'line_items'       => $line_items,
+			// Facebook CAPI match-quality data — WooCommerce captures these
+			// itself at checkout (WC_Checkout::process_checkout()), so this
+			// is just forwarding what's already on the order, not tracking
+			// anything new. BSOL uses these to fire a Purchase event server
+			// -side; see ConnectOrderController::sync() and Phase 10 in
+			// wordpress_connect_context.md.
+			'client_ip'        => $order->get_customer_ip_address(),
+			'user_agent'       => $order->get_customer_user_agent(),
+			'event_source_url' => wc_get_checkout_url(),
 		);
 	}
 }

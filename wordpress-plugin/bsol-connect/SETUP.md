@@ -102,6 +102,19 @@ a real WooCommerce staging site before rolling out to sellers.
 7. Turn the toggle back off — confirm a new test order does **not**
    trigger an SMS or show the verification card.
 
+## Facebook CAPI (1.8.0)
+
+1. On BSOL dashboard → Settings → Facebook, configure a Pixel ID + Access
+   Token (and optionally a Test Event Code for Meta's Test Events tool),
+   make sure it's enabled.
+2. Place a test order on the WooCommerce store.
+3. In Meta Events Manager (or the Test Events tool if a test event code
+   is set), confirm a `Purchase` event appears within a minute or two,
+   with `client_ip_address`/`client_user_agent`/a hashed phone number
+   attached, and `event_source_url` pointing at the store's checkout URL.
+4. Sync the same order again (e.g. change its status in WooCommerce) —
+   confirm a second Purchase event does **not** fire.
+
 ## Pathao/RedX/CarryBee booking (1.6.0)
 
 1. Make sure Pathao/RedX/CarryBee credentials are configured on the BSOL

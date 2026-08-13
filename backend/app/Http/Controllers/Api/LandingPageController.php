@@ -105,10 +105,13 @@ class LandingPageController extends Controller
             $validated['customer_phone'] ?? null
         );
 
-        // Facebook Conversions API — §6 item 4. Only landing-page checkouts
-        // count as ad-attributable Purchase events; dashboard-entered orders
-        // don't fire this. No-ops for sellers who haven't set up CAPI (job
-        // checks facebook_pixel_settings.enabled and returns early).
+        // Facebook Conversions API — §6 item 4. Dashboard-entered orders
+        // still don't fire this (no ad-attributable checkout event to
+        // report); WooCommerce-synced orders do, via the equivalent
+        // dispatch in ConnectOrderController::sync() — see Phase 10 in
+        // wordpress_connect_context.md. No-ops for sellers who haven't set
+        // up CAPI (job checks facebook_pixel_settings.enabled and returns
+        // early).
         SendFacebookCapiPurchaseEventJob::dispatch(
             $order->id,
             $request->ip(),

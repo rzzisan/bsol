@@ -1,5 +1,22 @@
 # BSOL Connect — Changelog
 
+## 1.8.0 — 2026-08-13
+
+Facebook Conversions API (CAPI) — a Purchase event now fires on BSOL's
+side for every WooCommerce order synced here, same as BSOL's landing
+pages already do:
+
+- No setup on the WordPress side — configure Facebook Pixel ID + Access
+  Token once on the BSOL dashboard (Settings → Facebook), and it applies
+  automatically to every synced order.
+- The plugin forwards the customer IP address and user agent WooCommerce
+  already records at checkout (`WC_Order::get_customer_ip_address()` /
+  `get_customer_user_agent()`) plus the checkout page URL — nothing new
+  is collected, just relayed — so Meta's ad-attribution match quality is
+  as good as it would be from a native Facebook-for-WooCommerce plugin.
+- Only fires once, when an order is first synced — never on updates.
+- No-op if Facebook CAPI isn't configured for the shop.
+
 ## 1.7.0 — 2026-08-13
 
 Checkout OTP verification for WooCommerce orders — the first storefront
