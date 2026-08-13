@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\AbandonedCheckoutController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\CheckoutOtpController;
 use App\Http\Controllers\Api\Connect\ConnectAuthController;
+use App\Http\Controllers\Api\Connect\ConnectCourierController;
 use App\Http\Controllers\Api\Connect\ConnectFraudController;
 use App\Http\Controllers\Api\Connect\ConnectOrderController;
 use App\Http\Controllers\Api\Connect\ConnectProductController;
@@ -169,6 +170,10 @@ Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
         Route::post('/orders/sync', [ConnectOrderController::class, 'sync']);
         Route::post('/orders/sync-status', [ConnectOrderController::class, 'syncStatus']);
         Route::post('/products/sync', [ConnectProductController::class, 'sync']);
+        Route::post('/courier/book', [ConnectCourierController::class, 'book']);
+        Route::post('/courier/track', [ConnectCourierController::class, 'track']);
+        Route::post('/courier/cancel', [ConnectCourierController::class, 'cancel']);
+        Route::get('/courier/balance', [ConnectCourierController::class, 'balance']);
         Route::post('/fraud/check-phone', [ConnectFraudController::class, 'checkPhone'])
             ->middleware('throttle:60,1');
     });
