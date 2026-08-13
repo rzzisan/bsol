@@ -141,4 +141,51 @@ class Bsol_Api {
 		$decoded = json_decode( wp_remote_retrieve_body( $response ), true );
 		return is_array( $decoded ) ? $decoded : array( 'success' => false, 'message' => 'Unexpected server response.' );
 	}
+
+	/**
+	 * Returns the raw waybill PDF bytes (not JSON) — a browser needs to
+	 * open this, and the plugin's API key never reaches the browser, so
+	 * class-bsol-courier.php proxies it through an admin-post handler
+	 * rather than linking straight to BSOL.
+	 *
+	 * @return array{success:bool,body?:string,content_type?:string,message?:string}
+	 */
+	public function get_waybill_pdf( $wc_order_id, $size = null ) {
+		$url = BSOL_API_URL . 'courier/waybill?wc_order_id=' . rawurlencode( (string) $wc_order_id );
+		if ( $size ) {
+			$url .= '&size=' . rawurlencode( (string) $size );
+		}
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'X-API-KEY'       => $this->get_api_key(),
+					'X-Client-Domain' => Bsol_Helpers::site_domain(),
+				),
+				'timeout' => 20,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array( 'success' => false, 'message' => $response->get_error_message() );
+		}
+
+		$status = wp_remote_retrieve_response_code( $response );
+		$body   = wp_remote_retrieve_body( $response );
+
+		if ( $status !== 200 ) {
+			$decoded = json_decode( $body, true );
+			return array(
+				'success' => false,
+				'message' => is_array( $decoded ) && isset( $decoded['message'] ) ? $decoded['message'] : 'Waybill not available yet — book a courier first.',
+			);
+		}
+
+		return array(
+			'success'      => true,
+			'body'         => $body,
+			'content_type' => wp_remote_retrieve_header( $response, 'content-type' ) ?: 'application/pdf',
+		);
+	}
 }

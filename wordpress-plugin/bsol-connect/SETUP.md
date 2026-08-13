@@ -53,6 +53,9 @@ a real WooCommerce staging site before rolling out to sellers.
 5. On **BSOL Connect → Dashboard**, click **Check Balance** — confirm it
    shows your Steadfast balance (or a clear "not configured" message if you
    haven't added Steadfast credentials on the BSOL dashboard yet).
+6. On the same booked order, click the printer icon in the **Courier**
+   column — confirm a waybill PDF opens in a new tab, matching whatever
+   sticker template is set as default on your BSOL dashboard.
 
 ## Order sync
 

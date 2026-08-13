@@ -1,5 +1,18 @@
 # BSOL Connect — Changelog
 
+## 1.3.0 — 2026-08-13
+
+Print the courier waybill/sticker label PDF for a booked order — same
+22-template system, barcode/QR, and real Bengali shaping the BSOL
+dashboard already generates, no new logic on either side.
+
+- A print icon appears next to a booked order's tracking info in the
+  **Courier** column, opening the PDF in a new tab.
+- Implemented as a plain link + `admin-post.php` handler, not AJAX — the
+  browser can't attach the plugin's API key itself, so WordPress fetches
+  the PDF server-side (where the key is known) and streams it back. Same
+  standard WP pattern as a CSV-export download link.
+
 ## 1.2.0 — 2026-08-13
 
 Courier booking, directly from the WooCommerce orders list:
