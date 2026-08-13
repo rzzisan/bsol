@@ -125,3 +125,72 @@ jQuery( function ( $ ) {
 		} );
 	} );
 } );
+
+// ── Bulk/historical sync (Sync Data tab) ────────────────────────────────────
+// Separate top-level block, not folded into the one above — that one exits
+// early when `bsol_ajax` isn't localized (only true on the WooCommerce
+// orders screen), but this runs on the plugin's own settings page, which
+// localizes its own `bsol_bulk_sync` object instead (class-bsol-bulk-sync.php).
+jQuery( function ( $ ) {
+	'use strict';
+
+	if ( typeof bsol_bulk_sync === 'undefined' ) {
+		return;
+	}
+
+	var BATCH_DELAY_MS = 1000; // paces batches under the /connect/v1 throttle.
+
+	function runBulkSync( action, $button, $progress ) {
+		var $bar = $progress.find( '.bsol-progress-bar-inner' );
+		var $status = $progress.find( '.bsol-progress-status' );
+		var page = 1;
+		var totalProcessed = 0;
+
+		$button.prop( 'disabled', true );
+		$progress.show();
+		$bar.css( 'width', '0%' );
+		$status.text( '…' );
+
+		function nextBatch() {
+			$.post( bsol_bulk_sync.ajax_url, {
+				action: action,
+				nonce: bsol_bulk_sync.nonce,
+				page: page
+			} ).done( function ( response ) {
+				if ( ! response || ! response.success ) {
+					$status.text( ( response && response.data && response.data.message ) || 'Sync failed.' );
+					$button.prop( 'disabled', false );
+					return;
+				}
+
+				var data = response.data;
+				totalProcessed += data.processed;
+				var pct = data.total > 0 ? Math.round( ( totalProcessed / data.total ) * 100 ) : 100;
+				$bar.css( 'width', pct + '%' );
+				$status.text( totalProcessed + ' / ' + data.total );
+
+				if ( data.done ) {
+					$status.text( 'Done — ' + totalProcessed + ' synced.' );
+					$button.prop( 'disabled', false );
+					return;
+				}
+
+				page++;
+				setTimeout( nextBatch, BATCH_DELAY_MS );
+			} ).fail( function () {
+				$status.text( 'Network error — stopped at ' + totalProcessed + ' synced.' );
+				$button.prop( 'disabled', false );
+			} );
+		}
+
+		nextBatch();
+	}
+
+	$( '#bsol-bulk-sync-products-btn' ).on( 'click', function () {
+		runBulkSync( 'bsol_bulk_sync_products', $( this ), $( '#bsol-bulk-sync-products-progress' ) );
+	} );
+
+	$( '#bsol-bulk-sync-orders-btn' ).on( 'click', function () {
+		runBulkSync( 'bsol_bulk_sync_orders', $( this ), $( '#bsol-bulk-sync-orders-progress' ) );
+	} );
+} );

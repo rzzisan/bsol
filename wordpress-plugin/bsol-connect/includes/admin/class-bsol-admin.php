@@ -59,18 +59,23 @@ class Bsol_Admin {
 					<a href="?page=bsol_connect&tab=log" class="nav-tab <?php echo 'log' === $active_tab ? 'nav-tab-active' : ''; ?>">
 						<?php esc_html_e( 'Activity Log', 'bsol-connect' ); ?>
 					</a>
+					<a href="?page=bsol_connect&tab=sync" class="nav-tab <?php echo 'sync' === $active_tab ? 'nav-tab-active' : ''; ?>">
+						<?php esc_html_e( 'Sync Data', 'bsol-connect' ); ?>
+					</a>
 					<a href="?page=bsol_connect&tab=settings" class="nav-tab <?php echo 'settings' === $active_tab ? 'nav-tab-active' : ''; ?>">
 						<?php esc_html_e( 'Settings', 'bsol-connect' ); ?>
 					</a>
 				</h2>
 			<?php endif; ?>
 
-			<div class="bsol-card" style="margin-top:16px;max-width:<?php echo 'log' === $active_tab ? '900px' : '640px'; ?>;">
+			<div class="bsol-card" style="margin-top:16px;max-width:<?php echo in_array( $active_tab, array( 'log', 'sync' ), true ) ? '900px' : '640px'; ?>;">
 				<?php
 				if ( ! $is_connected || 'settings' === $active_tab ) {
 					$this->render_settings_tab();
 				} elseif ( 'log' === $active_tab ) {
 					$this->render_activity_log_tab();
+				} elseif ( 'sync' === $active_tab ) {
+					$this->render_sync_data_tab();
 				} else {
 					$this->render_dashboard_tab( $fraud_result, $balance_result );
 				}
@@ -281,6 +286,44 @@ class Bsol_Admin {
 				</button>
 			</form>
 		<?php endif; ?>
+		<?php
+	}
+
+	// ── Sync Data tab ────────────────────────────────────────────────────────
+
+	/**
+	 * Plain markup only — the actual batching happens client-side
+	 * (assets/js/bsol-admin.js) against the AJAX handlers in
+	 * class-bsol-bulk-sync.php. For products/orders that already existed
+	 * before this site connected — new ones already sync automatically.
+	 */
+	private function render_sync_data_tab() {
+		?>
+		<h3><?php esc_html_e( 'Sync existing products', 'bsol-connect' ); ?></h3>
+		<p class="description">
+			<?php esc_html_e( 'Push every existing WooCommerce product into BSOL. New products already sync automatically as you save them — this is only for products that existed before connecting.', 'bsol-connect' ); ?>
+		</p>
+		<button type="button" class="button button-primary" id="bsol-bulk-sync-products-btn">
+			<?php esc_html_e( 'Sync All Products', 'bsol-connect' ); ?>
+		</button>
+		<div class="bsol-bulk-sync-progress" id="bsol-bulk-sync-products-progress" style="display:none;">
+			<div class="bsol-progress-bar-outer"><div class="bsol-progress-bar-inner"></div></div>
+			<p class="bsol-progress-status"></p>
+		</div>
+
+		<hr />
+
+		<h3><?php esc_html_e( 'Sync existing orders', 'bsol-connect' ); ?></h3>
+		<p class="description">
+			<?php esc_html_e( 'Push every existing WooCommerce order into BSOL, with its current status. Backfilled orders do not trigger a checkout-OTP SMS or a Facebook Purchase event.', 'bsol-connect' ); ?>
+		</p>
+		<button type="button" class="button button-primary" id="bsol-bulk-sync-orders-btn">
+			<?php esc_html_e( 'Sync All Orders', 'bsol-connect' ); ?>
+		</button>
+		<div class="bsol-bulk-sync-progress" id="bsol-bulk-sync-orders-progress" style="display:none;">
+			<div class="bsol-progress-bar-outer"><div class="bsol-progress-bar-inner"></div></div>
+			<p class="bsol-progress-status"></p>
+		</div>
 		<?php
 	}
 

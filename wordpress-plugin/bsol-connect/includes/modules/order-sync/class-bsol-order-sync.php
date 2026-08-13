@@ -25,17 +25,26 @@ class Bsol_Order_Sync {
 	public function __construct() {
 		add_action( 'woocommerce_new_order', array( $this, 'handle_new_order' ), 10, 1 );
 		add_action( 'woocommerce_order_status_changed', array( $this, 'handle_status_change' ), 10, 4 );
-		add_action( 'bsol_retry_order_sync', array( $this, 'handle_new_order' ), 10, 1 );
+		add_action( 'bsol_retry_order_sync', array( $this, 'handle_new_order' ), 10, 2 );
 	}
 
-	public function handle_new_order( $order_id ) {
+	/**
+	 * $is_historical_sync: true when called from the bulk/historical sync
+	 * tab (Bsol_Bulk_Sync) rather than the live woocommerce_new_order hook
+	 * — tells BSOL to skip checkout-OTP SMS and the Facebook CAPI Purchase
+	 * event for this order, both of which would be wrong for a backfilled
+	 * order that was actually placed in the past. Threaded through the
+	 * retry reschedule too, so a retried historical sync doesn't lose the
+	 * flag and fire those side effects on retry.
+	 */
+	public function handle_new_order( $order_id, $is_historical_sync = false ) {
 		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
 			return;
 		}
 
 		$api      = new Bsol_Api();
-		$response = $api->sync_order( $this->build_order_payload( $order ) );
+		$response = $api->sync_order( $this->build_order_payload( $order, $is_historical_sync ) );
 
 		if ( ! empty( $response['success'] ) ) {
 			$order->delete_meta_data( self::META_RETRY_COUNT );
@@ -59,7 +68,7 @@ class Bsol_Order_Sync {
 
 		$order->update_meta_data( self::META_RETRY_COUNT, $retry_count + 1 );
 		$order->save();
-		wp_schedule_single_event( time() + self::RETRY_DELAY, 'bsol_retry_order_sync', array( $order_id ) );
+		wp_schedule_single_event( time() + self::RETRY_DELAY, 'bsol_retry_order_sync', array( $order_id, $is_historical_sync ) );
 	}
 
 	/**
@@ -82,7 +91,7 @@ class Bsol_Order_Sync {
 		);
 	}
 
-	private function build_order_payload( $order ) {
+	private function build_order_payload( $order, $is_historical_sync = false ) {
 		$line_items = array();
 
 		foreach ( $order->get_items() as $item ) {
@@ -115,9 +124,10 @@ class Bsol_Order_Sync {
 			// anything new. BSOL uses these to fire a Purchase event server
 			// -side; see ConnectOrderController::sync() and Phase 10 in
 			// wordpress_connect_context.md.
-			'client_ip'        => $order->get_customer_ip_address(),
-			'user_agent'       => $order->get_customer_user_agent(),
-			'event_source_url' => wc_get_checkout_url(),
+			'client_ip'          => $order->get_customer_ip_address(),
+			'user_agent'         => $order->get_customer_user_agent(),
+			'event_source_url'   => wc_get_checkout_url(),
+			'is_historical_sync' => (bool) $is_historical_sync,
 		);
 	}
 }

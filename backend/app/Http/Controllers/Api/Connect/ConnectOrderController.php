@@ -60,6 +60,12 @@ class ConnectOrderController extends Controller
             'client_ip'            => 'nullable|ip',
             'user_agent'           => 'nullable|string|max:500',
             'event_source_url'     => 'nullable|string|max:500',
+            // Set by the plugin's bulk/historical sync (Phase 11) — a
+            // backfilled order that was actually placed weeks/months ago
+            // shouldn't send a fresh checkout-OTP SMS or a fresh Facebook
+            // Purchase event; both would be wrong for data that old. The
+            // order itself is still created/updated normally either way.
+            'is_historical_sync'   => 'nullable|boolean',
         ]);
 
         $merchant = auth()->user();
@@ -142,28 +148,35 @@ class ConnectOrderController extends Controller
 
             if (! empty($responseData['success'])) {
                 $apiKey = $request->attributes->get('platform_api_key');
+                $isHistorical = ! empty($data['is_historical_sync']);
                 $otpRequired = false;
 
-                if ($apiKey && $apiKey->otp_verification_enabled) {
-                    $newOrder = Order::find($responseData['data']['id']);
-                    if ($newOrder) {
-                        $this->checkoutOtpService->maybeSendForOrder(['otp_verification_enabled' => true], $newOrder);
-                        $otpRequired = (bool) $newOrder->fresh()->otp_required;
+                // Both side effects below are for a *live* new order only —
+                // skipped entirely for a historical/bulk-sync backfill (see
+                // the validation rule's docblock above).
+                if (! $isHistorical) {
+                    if ($apiKey && $apiKey->otp_verification_enabled) {
+                        $newOrder = Order::find($responseData['data']['id']);
+                        if ($newOrder) {
+                            $this->checkoutOtpService->maybeSendForOrder(['otp_verification_enabled' => true], $newOrder);
+                            $otpRequired = (bool) $newOrder->fresh()->otp_required;
+                        }
                     }
+
+                    // Purchase event only — fires once, on creation, same as
+                    // the landing-page checkout flow (LandingPageController).
+                    // A safe no-op for any seller who hasn't configured
+                    // Facebook CAPI (the job's own FacebookPixelSetting gate
+                    // handles that).
+                    SendFacebookCapiPurchaseEventJob::dispatch(
+                        $responseData['data']['id'],
+                        $data['client_ip'] ?? null,
+                        $data['user_agent'] ?? null,
+                        $data['event_source_url'] ?? ($apiKey ? "https://{$apiKey->domain}/" : ''),
+                    );
                 }
 
                 $responseData['data']['otp_required'] = $otpRequired;
-
-                // Purchase event only — fires once, on creation, same as the
-                // landing-page checkout flow (LandingPageController). A safe
-                // no-op for any seller who hasn't configured Facebook CAPI
-                // (the job's own FacebookPixelSetting gate handles that).
-                SendFacebookCapiPurchaseEventJob::dispatch(
-                    $responseData['data']['id'],
-                    $data['client_ip'] ?? null,
-                    $data['user_agent'] ?? null,
-                    $data['event_source_url'] ?? ($apiKey ? "https://{$apiKey->domain}/" : ''),
-                );
 
                 return response()->json($responseData, $response->getStatusCode());
             }

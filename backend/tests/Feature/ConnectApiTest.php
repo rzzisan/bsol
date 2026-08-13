@@ -3,11 +3,15 @@
 namespace Tests\Feature;
 
 use App\Jobs\SendFacebookCapiPurchaseEventJob;
+use App\Models\FacebookPixelSetting;
 use App\Models\Order;
 use App\Models\PlatformApiKey;
+use App\Models\SmsCredit;
+use App\Models\SmsGateway;
 use App\Models\SubscriptionPackage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use ReflectionProperty;
 use Tests\TestCase;
@@ -308,6 +312,70 @@ class ConnectApiTest extends TestCase
 
         // Still exactly 1 — the update branch never dispatches again.
         Queue::assertPushed(SendFacebookCapiPurchaseEventJob::class, 1);
+    }
+
+    // ── Bulk/historical sync (Phase 11) ─────────────────────────────────────
+
+    public function test_historical_sync_skips_otp_and_capi_even_when_both_are_configured(): void
+    {
+        Queue::fake();
+        [$user, $rawKey] = $this->connectedMerchant();
+        PlatformApiKey::where('user_id', $user->id)->update(['otp_verification_enabled' => true]);
+
+        SmsGateway::create([
+            'name' => 'Test Gateway', 'provider' => 'khudebarta',
+            'endpoint_url' => 'https://sms.example.com/send', 'api_key' => 'key', 'secret_key' => 'secret',
+            'sender_id' => 'BSOL', 'is_active' => true, 'is_enabled' => true,
+        ]);
+        $gatewayId = SmsGateway::first()->id;
+        $user->update(['sms_gateway_id' => $gatewayId]);
+        SmsCredit::create(['user_id' => $user->id, 'balance' => 1000]);
+
+        FacebookPixelSetting::create([
+            'user_id' => $user->id, 'pixel_id' => 'px-1', 'access_token' => 'tok-1', 'enabled' => true,
+        ]);
+
+        Http::fake(['sms.example.com/*' => Http::response('OK', 200)]);
+
+        $payload = $this->samplePayload('wc-historical-1');
+        $payload['is_historical_sync'] = true;
+
+        $response = $this->postJson('/api/connect/v1/orders/sync', $payload, $this->connectHeaders($rawKey));
+
+        $response->assertCreated()->assertJsonPath('data.otp_required', false);
+
+        $order = Order::where('user_id', $user->id)->where('source_ref', 'wc-historical-1')->firstOrFail();
+        $this->assertDatabaseCount('phone_otp_verifications', 0);
+        $this->assertFalse((bool) $order->otp_required);
+        Queue::assertNotPushed(SendFacebookCapiPurchaseEventJob::class);
+    }
+
+    public function test_non_historical_sync_still_fires_otp_and_capi_as_before(): void
+    {
+        Queue::fake();
+        [$user, $rawKey] = $this->connectedMerchant();
+        PlatformApiKey::where('user_id', $user->id)->update(['otp_verification_enabled' => true]);
+
+        SmsGateway::create([
+            'name' => 'Test Gateway', 'provider' => 'khudebarta',
+            'endpoint_url' => 'https://sms.example.com/send', 'api_key' => 'key', 'secret_key' => 'secret',
+            'sender_id' => 'BSOL', 'is_active' => true, 'is_enabled' => true,
+        ]);
+        $gatewayId = SmsGateway::first()->id;
+        $user->update(['sms_gateway_id' => $gatewayId]);
+        SmsCredit::create(['user_id' => $user->id, 'balance' => 1000]);
+
+        Http::fake(['sms.example.com/*' => Http::response('OK', 200)]);
+
+        // is_historical_sync deliberately omitted.
+        $response = $this->postJson(
+            '/api/connect/v1/orders/sync',
+            $this->samplePayload('wc-historical-2'),
+            $this->connectHeaders($rawKey)
+        );
+
+        $response->assertCreated()->assertJsonPath('data.otp_required', true);
+        Queue::assertPushed(SendFacebookCapiPurchaseEventJob::class);
     }
 
     /** Jobs' properties are constructor-promoted + private; reflection is the only way to assert on them. */

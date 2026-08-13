@@ -102,6 +102,22 @@ a real WooCommerce staging site before rolling out to sellers.
 7. Turn the toggle back off — confirm a new test order does **not**
    trigger an SMS or show the verification card.
 
+## Bulk/historical sync (1.9.0)
+
+1. On a site with pre-existing products and orders (created *before*
+   connecting, or before this version), go to **BSOL Connect → Sync
+   Data**.
+2. Click **Sync All Products** — confirm the progress bar reaches 100%
+   and every pre-existing product appears in BSOL dashboard → Products.
+3. Click **Sync All Orders** — confirm every pre-existing order appears
+   in BSOL dashboard → Orders, each with its **real current** status
+   (not stuck at "pending").
+4. Confirm no OTP SMS was sent and no Facebook Purchase event fired for
+   any of the backfilled orders (check Activity Log / SMS history / Meta
+   Events Manager — none should show new activity from step 3).
+5. Click **Sync All Products** again — confirm no duplicate products are
+   created (same products, same count).
+
 ## Facebook CAPI (1.8.0)
 
 1. On BSOL dashboard → Settings → Facebook, configure a Pixel ID + Access

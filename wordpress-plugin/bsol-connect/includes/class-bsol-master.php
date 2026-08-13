@@ -15,6 +15,12 @@ class Bsol_Master {
 	/** @var Bsol_Admin */
 	protected $admin;
 
+	/** @var Bsol_Product_Sync */
+	protected $product_sync;
+
+	/** @var Bsol_Order_Sync */
+	protected $order_sync;
+
 	public function __construct() {
 		$this->load_dependencies();
 		$this->define_hooks();
@@ -30,6 +36,7 @@ class Bsol_Master {
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/product-sync/class-bsol-product-sync.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/courier/class-bsol-courier.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/checkout-otp/class-bsol-checkout-otp.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/bulk-sync/class-bsol-bulk-sync.php';
 
 		// Admin menu must render even when not connected (that's where the
 		// Settings/connect form lives), so this is always instantiated.
@@ -44,11 +51,17 @@ class Bsol_Master {
 			return;
 		}
 
-		new Bsol_Order_Sync();
+		// Retained as properties (not just instantiated-and-discarded, like
+		// the modules below) — Bsol_Bulk_Sync reuses these exact instances'
+		// sync methods rather than creating its own, which would otherwise
+		// double-register their constructors' add_action() hooks.
+		$this->order_sync   = new Bsol_Order_Sync();
+		$this->product_sync = new Bsol_Product_Sync();
+
 		new Bsol_Fraud_Check();
-		new Bsol_Product_Sync();
 		new Bsol_Courier();
 		new Bsol_Checkout_Otp();
+		new Bsol_Bulk_Sync( $this->product_sync, $this->order_sync );
 	}
 
 	public function maybe_render_woocommerce_missing_notice() {

@@ -36,3 +36,28 @@
 	border-radius: 6px;
 	padding: 20px;
 }
+
+.bsol-bulk-sync-progress {
+	margin-top: 12px;
+	max-width: 480px;
+}
+
+.bsol-progress-bar-outer {
+	height: 10px;
+	border-radius: 5px;
+	background: #f0f0f1;
+	overflow: hidden;
+}
+
+.bsol-progress-bar-inner {
+	height: 100%;
+	width: 0%;
+	background: #2271b1;
+	transition: width 0.3s ease;
+}
+
+.bsol-progress-status {
+	margin: 6px 0 0;
+	font-size: 12px;
+	color: #50575e;
+}

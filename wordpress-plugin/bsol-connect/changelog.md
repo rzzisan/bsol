@@ -1,5 +1,19 @@
 # BSOL Connect — Changelog
 
+## 1.9.0 — 2026-08-13
+
+Bulk/historical sync — new **Sync Data** tab:
+
+- **Sync All Products** / **Sync All Orders** buttons push everything that
+  existed *before* this site connected — new products/orders already sync
+  automatically going forward, this is only for the backlog.
+- Batched with a progress bar (10 at a time), safe to leave running or
+  re-run — never creates duplicates (same upsert logic as live sync).
+- Backfilled orders sync with their real current WooCommerce status, but
+  deliberately do **not** trigger a checkout-OTP SMS or a Facebook
+  Purchase event — those only make sense for an order actually placed
+  just now, not one from weeks or months ago.
+
 ## 1.8.0 — 2026-08-13
 
 Facebook Conversions API (CAPI) — a Purchase event now fires on BSOL's
