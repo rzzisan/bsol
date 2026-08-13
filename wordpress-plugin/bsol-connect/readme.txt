@@ -4,7 +4,7 @@ Tags: woocommerce, order management, courier, sms otp, facebook conversions api
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.13.0
+Stable tag: 1.13.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,6 +68,9 @@ Steadfast, Paperfly, Pathao, RedX, and CarryBee. For Pathao/RedX/CarryBee, BSOL 
 3. Checkout OTP verification card on the order-received page.
 
 == Changelog ==
+
+= 1.13.1 =
+Fix: stale cached data from 1.12.0 and earlier could show "No data" for Customer Health after upgrading, until its old 24h cache expired. Cache key bumped so this can't happen.
 
 = 1.13.0 =
 Customer Health column redesigned: a delivered-vs-not progress bar from live per-courier delivery history instead of the generic fraud score, click for a per-courier breakdown.

@@ -1,5 +1,14 @@
 # BSOL Connect — Changelog
 
+## 1.13.1 — 2026-08-13
+
+Fix: sites that had viewed the orders list on 1.12.0 or earlier still had
+`bsol_health_{phone}` transients cached in the old fraud_score shape (up
+to 24h left on their TTL) — 1.13.0 read that stale shape as-is instead of
+fetching fresh courier data, so every order except whichever phone had
+already been re-checked showed "No data". Cache key bumped to
+`bsol_health_v2_{phone}`; old entries just expire unread.
+
 ## 1.13.0 — 2026-08-13
 
 - **Customer Health redesigned**: was a generic 0-100 fraud score (always

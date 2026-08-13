@@ -112,7 +112,14 @@ class Bsol_Fraud_Check {
 			wp_send_json_error( array( 'message' => 'No valid phone on this order' ) );
 		}
 
-		$cache_key = 'bsol_health_' . md5( $phone );
+		// "_v2" — 1.13.0 changed what's cached here (courier breakdown, not
+		// fraud_score/risk_level). Sites that viewed the orders list on an
+		// older version still have "bsol_health_{md5}" transients in the old
+		// shape sitting with up to 24h left on their TTL; reusing the same
+		// key would silently serve that stale shape (data.overall would be
+		// undefined) instead of a fresh courier-health lookup. A key bump
+		// sidesteps that cleanly — old entries just expire unread.
+		$cache_key = 'bsol_health_v2_' . md5( $phone );
 		$cached    = get_transient( $cache_key );
 
 		if ( false !== $cached ) {

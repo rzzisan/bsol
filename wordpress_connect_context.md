@@ -86,7 +86,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.13.0)
+wordpress-plugin/bsol-connect/          (v1.13.1)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
