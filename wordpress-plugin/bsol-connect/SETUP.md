@@ -82,6 +82,25 @@ a real WooCommerce staging site before rolling out to sellers.
 3. In BSOL dashboard → Settings → WordPress Connect, confirm the key shows
    as revoked.
 
+## Pathao/RedX/CarryBee booking (1.6.0)
+
+1. Make sure Pathao/RedX/CarryBee credentials are configured on the BSOL
+   dashboard (Settings → Courier) for the courier you're testing.
+2. Place a WooCommerce order with a **real, specific Bangladeshi address**
+   (e.g. "House 5, Road 2, Dhanmondi, Dhaka") — a vague address like "Test
+   City" has no chance of matching.
+3. On **WooCommerce → Orders**, click **Send via Pathao** (or RedX /
+   CarryBee) — confirm it books successfully and a consignment ID appears.
+4. Repeat with a deliberately vague/foreign address — confirm booking
+   fails with a specific, readable message (not a raw API error), and
+   confirm nothing is left half-booked.
+5. **CarryBee specifically**: the resolver's field-name assumptions for
+   CarryBee's `area-suggestion` response were written without a live
+   fixture (see `CourierLocationResolverService::resolveCarrybee()`) — if
+   step 3 fails for CarryBee specifically while Pathao/RedX work, check
+   the actual response shape from CarryBee's sandbox and adjust the
+   defensive key-fallback list there.
+
 ## Stock push-back (1.5.0)
 
 1. Sync a WooCommerce product to BSOL (see "Product sync" above), note

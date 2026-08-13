@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Connect;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Api\CourierController;
 use App\Models\Order;
+use App\Services\CourierLocationResolverService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,19 +16,21 @@ use Symfony\Component\HttpFoundation\Response;
  * or the order courier_* column writeback. See
  * bsol_history_and_new_context.md §5.
  *
- * Restricted to steadfast/paperfly/manual: Pathao, RedX, and Carrybee all
- * require their own city/zone/area *IDs*, which a WooCommerce-synced order
- * has no way to supply (pathao_city_id/pathao_zone_id/pathao_area_id/
- * redx_area_id are always null on such orders) — sending them anyway would
- * surface as a cryptic remote 422 instead of a clean local error. A real
- * address->location-ID resolver for those three is a separate later phase.
+ * Pathao/RedX/Carrybee need their own city/zone/area *IDs*, which a
+ * WooCommerce-synced order never carries directly (only one free-text
+ * customer_address blob) — CourierLocationResolverService makes a
+ * best-effort attempt to derive them before delegating. A confident
+ * derivation isn't always possible; when it isn't, book() returns a clean
+ * local error rather than letting the remote courier API fail cryptically.
  */
 class ConnectCourierController extends Controller
 {
-    private const SUPPORTED_COURIERS = 'steadfast,paperfly,manual';
+    private const SUPPORTED_COURIERS = 'steadfast,paperfly,manual,pathao,redx,carrybee';
+    private const LOCATION_RESOLVED_COURIERS = ['pathao', 'redx', 'carrybee'];
 
     public function __construct(
         private readonly CourierController $courierController,
+        private readonly CourierLocationResolverService $locationResolver,
     ) {}
 
     public function book(Request $request): JsonResponse
@@ -38,8 +41,6 @@ class ConnectCourierController extends Controller
             'tracking_id' => 'required_if:courier,manual|nullable|string|max:100',
             'cod_amount'  => 'nullable|numeric|min:0',
             'note'        => 'nullable|string|max:300',
-        ], [
-            'courier.in' => 'Pathao, RedX, and Carrybee need location data BSOL cannot derive from a WooCommerce order yet — use Steadfast, Paperfly, or manual tracking entry.',
         ]);
 
         $order = $this->findOrder($data['wc_order_id']);
@@ -47,7 +48,26 @@ class ConnectCourierController extends Controller
             return $this->orderNotFound();
         }
 
-        $bookRequest = Request::create('/api/courier/book/' . $order->id, 'POST', collect($data)->except('wc_order_id')->all());
+        $courier = $data['courier'] ?? 'steadfast';
+        $extraFields = [];
+
+        if (in_array($courier, self::LOCATION_RESOLVED_COURIERS, true)) {
+            $resolution = $this->locationResolver->resolveForCourier($courier, $order);
+            if (! $resolution['resolved']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $resolution['message'],
+                    'error_code' => 'location_unresolved',
+                ], 422);
+            }
+            $extraFields = $resolution['fields'];
+        }
+
+        $bookRequest = Request::create(
+            '/api/courier/book/' . $order->id,
+            'POST',
+            array_merge(collect($data)->except('wc_order_id')->all(), $extraFields)
+        );
 
         return $this->courierController->book($bookRequest, $order->id);
     }

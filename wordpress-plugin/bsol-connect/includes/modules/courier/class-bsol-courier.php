@@ -1,11 +1,12 @@
 <?php
 /**
  * "Courier" column on the WooCommerce orders list — book/track/cancel a
- * Steadfast or Paperfly shipment for an order without leaving WordPress.
- * Restricted to those two providers: Pathao/RedX/Carrybee need location
- * data (city/zone/area IDs) a WooCommerce order can't supply — BSOL
- * rejects those cleanly server-side (see ConnectCourierController), this
- * plugin just doesn't offer buttons for them.
+ * shipment for an order without leaving WordPress. Steadfast and Paperfly
+ * book directly off the free-text address; Pathao/RedX/Carrybee need their
+ * own city/zone/area IDs, which BSOL now derives server-side on a
+ * best-effort basis (CourierLocationResolverService) — if it can't
+ * confidently resolve a location, booking fails with a clear message
+ * rather than a cryptic remote error, same as before this was added.
  *
  * Uses HPOS-native order meta (WC_Order::get_meta()/update_meta_data()) —
  * unlike zayroo-connect's update_post_meta()/get_post_meta(), which isn't
@@ -89,9 +90,15 @@ class Bsol_Courier {
 		} else {
 			printf(
 				'<button class="button bsol-courier-book-btn" data-courier="steadfast">%s</button> ' .
-				'<button class="button bsol-courier-book-btn" data-courier="paperfly">%s</button>',
+				'<button class="button bsol-courier-book-btn" data-courier="paperfly">%s</button> ' .
+				'<button class="button bsol-courier-book-btn" data-courier="pathao">%s</button> ' .
+				'<button class="button bsol-courier-book-btn" data-courier="redx">%s</button> ' .
+				'<button class="button bsol-courier-book-btn" data-courier="carrybee">%s</button>',
 				esc_html__( 'Send via Steadfast', 'bsol-connect' ),
-				esc_html__( 'Send via Paperfly', 'bsol-connect' )
+				esc_html__( 'Send via Paperfly', 'bsol-connect' ),
+				esc_html__( 'Send via Pathao', 'bsol-connect' ),
+				esc_html__( 'Send via RedX', 'bsol-connect' ),
+				esc_html__( 'Send via CarryBee', 'bsol-connect' )
 			);
 		}
 

@@ -10,7 +10,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 
 `bsol_history_and_new_context.md`-এ আলোচিত হয়েছিল যে BSOL-এর সবচেয়ে বড় গ্যাপ হলো "যাদের নিজের WooCommerce ওয়েবসাইট আছে" — তাদের জন্য কোনো কানেক্টর ছিল না। ডিজাইন সরাসরি adapt করা হয়েছে `zyro/wordpress_plugin/zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (WordPress প্লাগিন কোনো বিজনেস লজিক রাখে না, শুধু WooCommerce থেকে ডেটা তুলে BSOL API-তে পাঠায়, ফলাফল দেখায়) থেকে — সেই legacy প্লাগিনের প্রতিটা মডিউলের exact hook/nonce/AJAX-action/payload-shape আলাদাভাবে explore করে BSOL-এর নিজের backend API-র উপর বসানো হয়েছে।
 
-৭টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
+৮টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
 
 | ফেজ | বিষয় | মূল কমিট |
 |---|---|---|
@@ -21,6 +21,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ৫ | Waybill/sticker PDF প্রিন্ট (v1.3.0) | `8d6b627`, `8937026` |
 | ৬ | Reliability/hygiene — HPOS compat, Activity Log, sync retry, uninstall.php, product trash sync (v1.4.0) | `8376732` |
 | ৭ | Inbound stock push-back (BSOL→WooCommerce, v1.5.0) | `90d711d` |
+| ৮ | Pathao/RedX/CarryBee location resolver (v1.6.0) | `6a687d1` |
 
 ---
 
@@ -113,7 +114,14 @@ wordpress-plugin/bsol-connect/          (v1.5.0)
 **Inbound (Phase ৭, stock push-back)**: অন্য চ্যানেলে (Facebook/manual) বিক্রি হয়ে গেলে BSOL এই সাইটের `/wp-json/bsol-connect/v1/stock-update` কল করে স্টক আপডেট করে দেয় — WooCommerce কখনো oversell করে না। `X-BSOL-Webhook-Secret` হেডার দিয়ে অথেন্টিকেট (API key-এর মতো না — API key BSOL-সাইডে শুধু hash আকারে থাকে, তাই BSOL-এর কাছে ফেরত পাঠানোর মতো কিছু নেই; connect handshake-এ আলাদা একটা `webhook_secret` ইস্যু হয়, দুই পাশেই plaintext/encrypted আকারে থাকে)। নিজের `save_post_product`/`quick_edit_save` হুক সাময়িকভাবে `remove_action()` করে রাখে যাতে এই write আবার BSOL-এ ফেরত সিঙ্ক না হয় (zayroo-connect-এর `handle_api_sync()`-এর প্রমাণিত প্যাটার্ন)।
 
 ### Courier booking (`class-bsol-courier.php`)
-Order-list-এ "Courier" কলাম (legacy + HPOS হুক জোড়া)। বুক না হলে "Send via Steadfast"/"Send via Paperfly" বাটন; বুক হলে consignment info + refresh/cancel/print লিংক। **শুধু Steadfast আর Paperfly সাপোর্টেড** — Pathao/RedX/Carrybee-এর নিজস্ব city/zone/area **ID** লাগে যা একটা WooCommerce অর্ডারে থাকে না (§৭-এ বিস্তারিত)। Meta HPOS-native (`WC_Order::get_meta()`/`update_meta_data()`, zayroo-connect-এর `update_post_meta()`-এর চেয়ে ভালো — legacy কোডটা HPOS হুক রেজিস্টার করেও আসলে HPOS-safe ছিল না)।
+Order-list-এ "Courier" কলাম (legacy + HPOS হুক জোড়া)। বুক না হলে ৫টা বাটন — Steadfast, Paperfly, Pathao, RedX, CarryBee; বুক হলে consignment info + refresh/cancel/print লিংক। Meta HPOS-native (`WC_Order::get_meta()`/`update_meta_data()`, zayroo-connect-এর `update_post_meta()`-এর চেয়ে ভালো — legacy কোডটা HPOS হুক রেজিস্টার করেও আসলে HPOS-safe ছিল না)।
+
+**Pathao/RedX/CarryBee-এর জন্য location resolution (Phase ৮)**: এই ৩টা কুরিয়ারের নিজস্ব city/zone/area **ID** লাগে, যা WooCommerce অর্ডারে কখনো থাকে না (শুধু এক টুকরো ফ্রি-টেক্সট `customer_address`)। প্লাগিন সাইডে কোনো নতুন লজিক নেই — পুরো resolution BSOL-সাইডে, `CourierLocationResolverService`-এ:
+- **Pathao**: `PathaoLocationService`-এর cached city→zone→area হায়ারার্কি-র বিপরীতে address ম্যাচ করে (substring hit → high confidence, না মিললে `similar_text()` fallback, `MIN_CONFIDENCE=60`)। City+zone দুটোই কনফিডেন্টলি না মিললে booking-ই হয় না।
+- **RedX**: address থেকে district-name candidate বের করে `RedxService::getAreas()` (live API) কল করে area লিস্ট আনে, তারপর ম্যাচ।
+- **CarryBee**: নিজস্ব free-text resolver আছে (`CarrybeeService::searchAreas()`) — BSOL শুধু top result নেয়, লোকাল ম্যাচিং লাগে না।
+
+কনফিডেন্ট ম্যাচ না পেলে `error_code: location_unresolved` + স্পষ্ট মেসেজ (কোন courier-র remote API ক্রিপ্টিক ফেইল করে না) — "কাজ না করলে পরিষ্কার লোকাল এরর দাও" নীতির সরাসরি এক্সটেনশন (§৮ item ৩)।
 
 ### Waybill PDF (`class-bsol-courier.php`-এর অংশ)
 বুক করা অর্ডারের পাশে প্রিন্টার আইকন — নতুন কোনো PDF লজিক না, BSOL-এর আগে থেকেই থাকা ২২-টেমপ্লেট `WaybillPdfService` (বারকোড/QR/বাংলা HarfBuzz শেপিং) সরাসরি reuse। **এটা AJAX না, প্লেইন লিংক + `admin-post.php` handler** — ব্রাউজার নিজে থেকে প্লাগিনের API key attach করতে পারে না, তাই WordPress সার্ভার-সাইডে PDF fetch করে (যেখানে key জানা আছে) ব্রাউজারে স্ট্রিম করে দেয় (zayroo-connect-এর CSV-export-এর মতোই standard WP প্যাটার্ন)।
@@ -146,7 +154,6 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 
 | ফিচার | কেন এখনো নেই |
 |---|---|
-| Pathao/RedX/Carrybee কুরিয়ার বুকিং (WooCommerce অর্ডারের জন্য) | এই ৩টা কুরিয়ারের নিজস্ব city/zone/area **ID** লাগে যা WooCommerce অর্ডারে কখনো থাকে না। দরকার: address→location-ID resolver (reverse-geocode/fuzzy-match)। |
 | OTP (চেকআউট) | ব্যাকএন্ডে `CheckoutOtpController` আছে কিন্তু `landing_page_id`-স্কোপড, WC-এর জন্য জেনারেলাইজ করতে হবে। |
 | Facebook CAPI (WooCommerce অর্ডার থেকে) | বর্তমান `FacebookCapiClient`/`SendFacebookCapiPurchaseEventJob` শুধু ল্যান্ডিং-পেজ চেকআউট থেকে ফায়ার করে, external order source নিতে জেনারেলাইজ করতে হবে। |
 | WP-admin bulk/historical sync UI | zayroo-connect-এর "Sync Data" ট্যাব (progress bar-সহ bulk historical sync) — ভালো UX কিন্তু নতুন প্রোডাক্ট/অর্ডার সিঙ্ক শুরু করার জন্য জরুরি না। |
@@ -158,10 +165,11 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 
 1. **Delegate, duplicate না** — প্রতিটা Connect controller বিদ্যমান dashboard controller-কে synthetic `Request::create()` দিয়ে কল করে। এতে প্ল্যান-লিমিট, stock check, accounting side-effect ফ্রি-তে আসে, আর দুই জায়গায় লজিক maintain করতে হয় না।
 2. **WC→BSOL সিমান্টিক ট্রান্সলেশন প্লাগিনের দায়িত্ব**, ব্যাকএন্ডের না — status vocabulary, price/discount মডেল অনুবাদ সব প্লাগিন সাইডে হয়, যাতে backend API ভবিষ্যতে অন্য প্ল্যাটফর্মের (Shopify ইত্যাদি) জন্যও reuse করা যায়।
-3. **যা কাজ করে না তার জন্য পরিষ্কার লোকাল এরর দাও, রিমোট API-কে ক্রিপ্টিক ফেইল করতে দিও না** — Pathao/RedX/Carrybee-এর `unsupported_courier` এরর এর সবচেয়ে ভালো উদাহরণ।
+3. **যা কাজ করে না তার জন্য পরিষ্কার লোকাল এরর দাও, রিমোট API-কে ক্রিপ্টিক ফেইল করতে দিও না** — Pathao/RedX/Carrybee এর `location_unresolved` এরর এর সবচেয়ে ভালো উদাহরণ: address থেকে confident location না পেলে booking-ই attempt করা হয় না, remote API-কে crash করতে দেওয়া হয় না (§৫ "Courier booking" দেখুন)।
 4. **Global-uniqueness collision handle করো, crash না করে** — `product_variants.sku` পুরো ইনস্টলজুড়ে ইউনিক, তাই দুই সেলারের SKU কলিশন হতে পারে; per-variant warning দিয়ে বাকি সিঙ্ক চালিয়ে যাওয়া হয় (`ConnectProductController::sync()`)।
 5. **HPOS-native মেটা** — `WC_Order::get_meta()`/`update_meta_data()`, কখনো `update_post_meta()` না, এমনকি legacy hook variant রেজিস্টার করলেও।
 6. **ফাইল-ডাউনলোড এন্ডপয়েন্ট ≠ JSON এন্ডপয়েন্ট** — ব্রাউজার থেকে trigger হওয়া যেকোনো কিছু (waybill PDF) এর API key ব্রাউজারে পাঠানো যাবে না; সার্ভার-সাইড proxy (`admin-post.php`) লাগবেই।
 7. **Dynamic generation যেখানেই সম্ভব, pre-built artifact না** — প্লাগিন zip প্রতি রিকোয়েস্টে সোর্স থেকে বানানো হয়, কখনো stale হয় না।
 8. **উল্টো দিকের (BSOL→WordPress) কলের জন্য একটা আলাদা secret লাগবে, API key reuse করা যাবে না** — API key BSOL-সাইডে এক-মুখী hash আকারে থাকে (সিকিউরিটি সিদ্ধান্ত, Phase ১), তাই ফেরত পাঠানোর মতো raw কিছু নেই। `webhook_secret` (connect handshake-এ ইস্যু, দুই পাশেই reversible) এই প্যাটার্নের জন্য টেমপ্লেট — ভবিষ্যতে BSOL→WordPress অন্য কোনো ফিচার লাগলেও একই secret reuse করা যায়, নতুন করে বানানোর দরকার নেই।
 9. **Multi-write-site সিঙ্ক হুকের জন্য model event, প্রতিটা controller আলাদা করে প্যাচ না** — stock ৪+ জায়গা থেকে (ড্যাশবোর্ড এডিট, adjust-stock এন্ডপয়েন্ট, `OrderStatusService`-এর reserve/restore) বদলাতে পারে; প্রতিটা কল-সাইট আলাদা প্যাচ না করে `Product`/`ProductVariant`-এর `booted()`-এ একটা কেন্দ্রীয় `saved` hook বসানো হয়েছে (`ProductVariant`-এ আগে থেকেই থাকা `saving` hook-এর একই idiom অনুসরণ করে) — নতুন কোনো write-site যোগ হলেও স্বয়ংক্রিয়ভাবে কভার হয়ে যাবে।
+10. **ফিজিক্যাল/অপরিবর্তনীয় action-এ "ম্যাচ না পাওয়া" সবসময় "ভুল ম্যাচ"-এর চেয়ে নিরাপদ** — `CourierLocationResolverService`-এর `MIN_CONFIDENCE` threshold-এর নিচে কিছু পেলে চুপচাপ একটা আন্দাজি city/zone বেছে নেয় না, বরং resolve-ই করে না (parcel ভুল জায়গায় চলে যাওয়ার চেয়ে booking fail হওয়া ভালো) — এটা decision #3-এরই একটা কঠোরতর সংস্করণ, যেখানে ভুল হওয়ার real-world cost শুধু একটা confusing এরর মেসেজের চেয়ে বেশি।

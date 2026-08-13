@@ -1,5 +1,20 @@
 # BSOL Connect — Changelog
 
+## 1.6.0 — 2026-08-13
+
+Pathao, RedX, and CarryBee booking, for orders synced from WooCommerce:
+
+- Three new buttons in the **Courier** column, alongside Steadfast and
+  Paperfly. No new logic on the WordPress side — the address→location-ID
+  resolution happens entirely on BSOL (`CourierLocationResolverService`).
+- Best-effort: BSOL tries to determine the delivery city/zone/area from
+  the order's address text. When it can't do so confidently, booking
+  fails with a specific message (e.g. "could not determine the zone
+  within Dhaka") instead of a cryptic remote courier error — same as the
+  message Pathao/RedX/CarryBee used to always show before this version.
+- Orders with a short, vague, or non-Bangladeshi address are unlikely to
+  resolve — this works best with a normal, specific delivery address.
+
 ## 1.5.0 — 2026-08-13
 
 Inbound stock push-back — the first BSOL → WordPress direction:
