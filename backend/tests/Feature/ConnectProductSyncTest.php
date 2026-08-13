@@ -176,4 +176,28 @@ class ConnectProductSyncTest extends TestCase
         $this->assertSame($product->id, $item->product_id);
         $this->assertNull($item->product_variant_id);
     }
+
+    /**
+     * Found via live QA against a real store (Phase 14) — a WooCommerce
+     * product with no description sends `description: ''`, which used to
+     * fail ProductController::store()'s `required` rule and silently
+     * block the whole sync.
+     */
+    public function test_sync_succeeds_for_a_product_with_no_description(): void
+    {
+        [$user, $rawKey] = $this->connectedMerchant();
+
+        $payload = $this->simplePayload('wc-p-no-desc');
+        $payload['description'] = '';
+
+        $response = $this->postJson('/api/connect/v1/products/sync', $payload, $this->connectHeaders($rawKey));
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('products', [
+            'user_id' => $user->id,
+            'source_ref' => 'wc-p-no-desc',
+            'description' => 'Cotton T-Shirt', // falls back to the product name
+        ]);
+    }
 }

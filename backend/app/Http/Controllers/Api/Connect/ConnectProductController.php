@@ -66,7 +66,14 @@ class ConnectProductController extends Controller
         $productPayload = [
             'name'          => $data['name'],
             'sku'           => $data['sku'],
-            'description'   => $data['description'] ?? '',
+            // ProductController::store() requires a non-empty description
+            // (a reasonable rule for a dashboard user manually creating a
+            // product) — but plenty of real WooCommerce products have none
+            // at all. Found via live QA against a real store (Phase 14):
+            // an empty string here failed Laravel's `required` rule and
+            // silently blocked every such product's sync. Fall back to the
+            // product name rather than leave this required field empty.
+            'description'   => ($data['description'] ?? '') !== '' ? $data['description'] : $data['name'],
             'regular_price' => $data['regular_price'] ?? 0,
             'discount'      => $data['discount'] ?? 0,
             'discount_type' => 'amount',
