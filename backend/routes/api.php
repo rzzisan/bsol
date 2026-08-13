@@ -170,6 +170,7 @@ Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
     Route::middleware(['active_subscription', 'throttle:120,1'])->group(function () {
         Route::post('/orders/sync', [ConnectOrderController::class, 'sync']);
         Route::post('/orders/sync-status', [ConnectOrderController::class, 'syncStatus']);
+        Route::get('/orders/invoice', [ConnectOrderController::class, 'invoicePdf']);
         Route::post('/products/sync', [ConnectProductController::class, 'sync']);
         Route::post('/courier/book', [ConnectCourierController::class, 'book']);
         Route::post('/courier/track', [ConnectCourierController::class, 'track']);

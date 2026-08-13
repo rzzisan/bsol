@@ -215,4 +215,48 @@ class Bsol_Api {
 			'content_type' => wp_remote_retrieve_header( $response, 'content-type' ) ?: 'application/pdf',
 		);
 	}
+
+	/**
+	 * Seller->customer sales invoice PDF — distinct from get_waybill_pdf()
+	 * (courier sticker label). No booking precondition, works for any
+	 * synced order. Same direct wp_remote_get() shape (not the JSON-only
+	 * remote_post() helper) since this returns raw PDF bytes, not JSON.
+	 *
+	 * @return array{success:bool,body?:string,content_type?:string,message?:string}
+	 */
+	public function get_invoice_pdf( $wc_order_id ) {
+		$url = BSOL_API_URL . 'orders/invoice?wc_order_id=' . rawurlencode( (string) $wc_order_id );
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'X-API-KEY'       => $this->get_api_key(),
+					'X-Client-Domain' => Bsol_Helpers::site_domain(),
+				),
+				'timeout' => 20,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array( 'success' => false, 'message' => $response->get_error_message() );
+		}
+
+		$status = wp_remote_retrieve_response_code( $response );
+		$body   = wp_remote_retrieve_body( $response );
+
+		if ( $status !== 200 ) {
+			$decoded = json_decode( $body, true );
+			return array(
+				'success' => false,
+				'message' => is_array( $decoded ) && isset( $decoded['message'] ) ? $decoded['message'] : 'Invoice not available.',
+			);
+		}
+
+		return array(
+			'success'      => true,
+			'body'         => $body,
+			'content_type' => wp_remote_retrieve_header( $response, 'content-type' ) ?: 'application/pdf',
+		);
+	}
 }

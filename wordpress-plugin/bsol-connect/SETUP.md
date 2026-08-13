@@ -102,6 +102,16 @@ a real WooCommerce staging site before rolling out to sellers.
 7. Turn the toggle back off — confirm a new test order does **not**
    trigger an SMS or show the verification card.
 
+## Order invoice (1.10.0)
+
+1. On **WooCommerce → Orders**, find the **Invoice** column on any synced
+   order — including one that was **never** courier-booked.
+2. Click the print icon — confirm a PDF opens with correct line items,
+   totals, and the shop's own info (matches what the same order's invoice
+   looks like from the BSOL dashboard).
+3. Confirm it also works for an order booked with a courier (no conflict
+   with the Courier column's own waybill print icon).
+
 ## Bulk/historical sync (1.9.0)
 
 1. On a site with pre-existing products and orders (created *before*

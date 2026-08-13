@@ -1,5 +1,21 @@
 # BSOL Connect — Changelog
 
+## 1.10.0 — 2026-08-13
+
+Order invoice PDF — a seller→customer sales invoice, distinct from the
+courier waybill/sticker label:
+
+- New "Invoice" column on the WooCommerce orders list — a print icon
+  next to any synced order, no courier-booking required (works even for
+  an order that was never sent to a courier).
+- Same 22-template-free, always-available PDF BSOL's own dashboard
+  already generates — no new logic, just a new proxy (same pattern as
+  the waybill print icon).
+
+This completes the outbound/inbound WooCommerce order lifecycle: sync,
+status, courier booking, waybill, checkout OTP, Facebook CAPI, and now
+invoicing.
+
 ## 1.9.0 — 2026-08-13
 
 Bulk/historical sync — new **Sync Data** tab:

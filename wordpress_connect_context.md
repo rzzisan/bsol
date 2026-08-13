@@ -10,7 +10,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 
 `bsol_history_and_new_context.md`-এ আলোচিত হয়েছিল যে BSOL-এর সবচেয়ে বড় গ্যাপ হলো "যাদের নিজের WooCommerce ওয়েবসাইট আছে" — তাদের জন্য কোনো কানেক্টর ছিল না। ডিজাইন সরাসরি adapt করা হয়েছে `zyro/wordpress_plugin/zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (WordPress প্লাগিন কোনো বিজনেস লজিক রাখে না, শুধু WooCommerce থেকে ডেটা তুলে BSOL API-তে পাঠায়, ফলাফল দেখায়) থেকে — সেই legacy প্লাগিনের প্রতিটা মডিউলের exact hook/nonce/AJAX-action/payload-shape আলাদাভাবে explore করে BSOL-এর নিজের backend API-র উপর বসানো হয়েছে।
 
-১১টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
+১২টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
 
 | ফেজ | বিষয় | মূল কমিট |
 |---|---|---|
@@ -25,6 +25,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ৯ | Checkout OTP for WooCommerce (v1.7.0) | `eb312f1` |
 | ১০ | Facebook CAPI for WooCommerce (v1.8.0) | `3a5162a` |
 | ১১ | Bulk/historical sync UI (v1.9.0) | `8de63b6` |
+| ১২ | Order invoice PDF (v1.10.0) | `e1dfa2a` |
 
 ---
 
@@ -50,6 +51,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | POST | `/connect/v1/disconnect` | `ConnectAuthController@disconnect` | self-revoke (একই key দিয়ে) |
 | POST | `/connect/v1/orders/sync` | `ConnectOrderController@sync` | অর্ডার create/update, SKU দিয়ে product/variant লিংক; create-এ OTP send + Facebook CAPI Purchase event dispatch (উভয়ই টগল/সেটিংসের উপর নির্ভরশীল, no-op ডিফল্ট); `is_historical_sync:true` হলে দুটোই স্কিপ (bulk-sync backfill, Phase ১১) |
 | POST | `/connect/v1/orders/sync-status` | `ConnectOrderController@syncStatus` | BSOL-canonical status ট্রানজিশন |
+| GET | `/connect/v1/orders/invoice` | `ConnectOrderController@invoicePdf` | সেলস ইনভয়েস PDF স্ট্রিম, কোনো booking precondition ছাড়াই |
 | POST | `/connect/v1/products/sync` | `ConnectProductController@sync` | Simple/variable প্রোডাক্ট + ভ্যারিয়েন্ট create/update |
 | POST | `/connect/v1/courier/book` | `ConnectCourierController@book` | Steadfast/Paperfly/manual বুকিং |
 | POST | `/connect/v1/courier/track` | `ConnectCourierController@track` | স্ট্যাটাস রিফ্রেশ |
@@ -79,7 +81,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.9.0)
+wordpress-plugin/bsol-connect/          (v1.10.0)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
@@ -98,13 +100,14 @@ wordpress-plugin/bsol-connect/          (v1.9.0)
       fraud/class-bsol-fraud-check.php         — Customer Health কলাম + AJAX (shared bsol-admin script/style এখানেই enqueue হয়)
       checkout-otp/class-bsol-checkout-otp.php — **প্রথম storefront (wp-admin না) মডিউল** — order-received পেজে OTP গেট, nopriv AJAX verify/resend (Phase ৯)
       bulk-sync/class-bsol-bulk-sync.php       — "Sync Data" ট্যাবের AJAX ব্যাকএন্ড; `Bsol_Master`-এর inject করা `Bsol_Product_Sync`/`Bsol_Order_Sync` ইনস্ট্যান্স reuse করে, নিজে কখনো `new` করে না (Phase ১১)
+      invoice/class-bsol-invoice.php           — "Invoice" কলাম, কোনো booking precondition নেই; admin-post proxy waybill-এরই মতো (Phase ১২)
   assets/
     css/bsol-admin.css, js/bsol-admin.js       — wp-admin-only (health-bar polling, courier বাটন হ্যান্ডলার, bulk-sync progress bar — এই দুটোর জন্য আলাদা স্বাধীন jQuery(ready) ব্লক, যেহেতু `bsol_ajax`/`bsol_bulk_sync` আলাদা স্ক্রিনে লোকালাইজ হয়)
     css/bsol-checkout-otp.css, js/bsol-checkout-otp.js — storefront-only, শুধু order-received পেজে enqueue হয়
   changelog.md, SETUP.md
 ```
 
-`Bsol_Master::load_dependencies()`-এ সব require + `Bsol_Admin` সবসময় ইনস্ট্যান্শিয়েট (menu সবসময় দেখা যায়), বাকি ৬টা মডিউল (`Bsol_Order_Sync`, `Bsol_Fraud_Check`, `Bsol_Product_Sync`, `Bsol_Courier`, `Bsol_Checkout_Otp`, `Bsol_Bulk_Sync`) শুধু `is_connected() && class_exists('WooCommerce')` হলে। `Bsol_Order_Sync`/`Bsol_Product_Sync` এখন `$this->admin`-এর মতোই `Bsol_Master`-এ property হিসেবে রাখা হয় (আগে create-then-discard ছিল) — `Bsol_Bulk_Sync`-এর constructor-এ inject করার জন্য, যাতে সেই ২টা ক্লাস দ্বিতীয়বার `new` না করতে হয় (করলে তাদের constructor-এর hook রেজিস্ট্রেশন duplicate হয়ে যেত)।
+`Bsol_Master::load_dependencies()`-এ সব require + `Bsol_Admin` সবসময় ইনস্ট্যান্শিয়েট (menu সবসময় দেখা যায়), বাকি ৭টা মডিউল (`Bsol_Order_Sync`, `Bsol_Fraud_Check`, `Bsol_Product_Sync`, `Bsol_Courier`, `Bsol_Checkout_Otp`, `Bsol_Bulk_Sync`, `Bsol_Invoice`) শুধু `is_connected() && class_exists('WooCommerce')` হলে। `Bsol_Order_Sync`/`Bsol_Product_Sync` এখন `$this->admin`-এর মতোই `Bsol_Master`-এ property হিসেবে রাখা হয় (আগে create-then-discard ছিল) — `Bsol_Bulk_Sync`-এর constructor-এ inject করার জন্য, যাতে সেই ২টা ক্লাস দ্বিতীয়বার `new` না করতে হয় (করলে তাদের constructor-এর hook রেজিস্ট্রেশন duplicate হয়ে যেত)।
 
 ---
 
@@ -144,6 +147,9 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 ### Bulk/historical sync (`class-bsol-bulk-sync.php`, Phase ১১)
 "Sync Data" ট্যাব — connect করার **আগে** থেকে থাকা প্রোডাক্ট/অর্ডার ব্যাকফিল করার জন্য (নতুনগুলো এমনিতেই auto-sync হয়)। **কোনো নতুন sync লজিক নেই** — `Bsol_Master` inject করা `Bsol_Product_Sync`/`Bsol_Order_Sync` ইনস্ট্যান্সের `sync_product()`/`handle_new_order()` মেথডই আবার কল করা হয় ব্যাচে (১০টা করে, `wc_get_products()`/`wc_get_orders()`-এর `paginate=>true` মোড দিয়ে সস্তায় total count পাওয়া যায়)। **নিজে কখনো `new Bsol_Product_Sync()`/`new Bsol_Order_Sync()` করে না** — করলে তাদের constructor-এর হুক রেজিস্ট্রেশন duplicate হয়ে যেত (`save_post_product` দুইবার ফায়ার হতো প্রতি সেভে)। অর্ডার ব্যাকফিলের সময় `is_historical_sync=true` পাস করা হয় (উপরে দেখুন) + `handle_status_change()` দিয়ে অর্ডারের আসল বর্তমান status আলাদাভাবে push করা হয় (নাহলে সব অর্ডার BSOL-এ "pending"-এ আটকে থাকত)। ক্লায়েন্ট-সাইড ব্যাচ লুপে প্রতি ব্যাচের মাঝে ১ সেকেন্ড gap — `/connect/v1` গ্রুপের `throttle:120,1`-এর নিচে থাকার জন্য।
 
+### Order invoice PDF (`class-bsol-invoice.php`, Phase ১২)
+Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php` proxy — কিন্তু **কোনো courier-booking precondition নেই**, যেকোনো synced অর্ডারেই কাজ করে। BSOL-সাইড: `OrderController::invoicePdf()` আগে থেকেই ছিল (dashboard-facing), `ConnectOrderController::invoicePdf()` এটাকে সরাসরি কল করে — waybill-এর `Request` দরকার হতো (`?size=`), এখানে সেটাও লাগে না (`ConnectCourierController::track()`-এর মতোই direct call, synthetic `Request::create()` ছাড়া)।
+
 ### Plugin download (`WordpressApiKeyController::downloadPlugin()`, backend)
 `/dashboard/settings/wordpress` পেজের "Download Plugin" বাটন এই এন্ডপয়েন্টে যায়। **প্রতি রিকোয়েস্টে `wordpress-plugin/bsol-connect/` সোর্স থেকে zip ডায়নামিকভাবে তৈরি হয়** (ভার্সন নাম্বার প্লাগিন হেডার থেকে regex দিয়ে পড়া) — একটা আলাদা pre-built zip মেইনটেইন করার দরকার নেই, কখনো stale হবে না। পাবলিক (কোনো secret নেই zip-এ), শুধু `throttle:20,1`।
 
@@ -173,11 +179,9 @@ Order-list-এ "Customer Health" কলাম, AJAX-লোডেড, ২৪ ঘ�
 
 ---
 
-## ৭. যা এখনো বাকি (স্পষ্টভাবে deferred, ভুলে না-করা না)
+## ৭. যা এখনো বাকি
 
-| ফিচার | কেন এখনো নেই |
-|---|---|
-| Order invoice PDF (waybill থেকে আলাদা, seller→customer sales invoice) | `OrderController::invoicePdf()` একই delegate প্যাটার্নে সহজেই এক্সপোজ করা যায়, শুধু এখনো করা হয়নি। |
+মূল ফিচার-গ্যাপ লিস্ট (bsol_history_and_new_context.md-এ প্রথম চিহ্নিত করা) Phase ১২-তে শেষ — connect/disconnect, order/product sync, fraud check, courier booking (Steadfast/Paperfly/Pathao/RedX/CarryBee সবগুলো), waybill, stock push-back, checkout OTP, Facebook CAPI, bulk sync, invoice — সবই লাইভ। বাকি যা আছে তা সবই **polish/distribution** স্তরের, ফিচার-গ্যাপ না — plan ফাইলের "Group C" (self-update notice, আসল WooCommerce স্টেজিং-এ পূর্ণ QA পাস, translation-ready strings, `readme.txt`)।
 
 ---
 

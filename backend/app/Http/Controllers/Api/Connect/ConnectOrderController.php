@@ -10,9 +10,11 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\CheckoutOtpService;
+use App\Services\OrderInvoicePdfService;
 use App\Services\OrderStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Plugin-facing order sync — /api/connect/v1/orders/{sync,sync-status}.
@@ -27,6 +29,7 @@ class ConnectOrderController extends Controller
         private readonly OrderController $orderController,
         private readonly OrderStatusService $orderStatusService,
         private readonly CheckoutOtpService $checkoutOtpService,
+        private readonly OrderInvoicePdfService $orderInvoicePdfService,
     ) {}
 
     /**
@@ -245,5 +248,36 @@ class ConnectOrderController extends Controller
                 'status'       => $order->status,
             ],
         ]);
+    }
+
+    /**
+     * Streams the seller->customer sales invoice PDF — distinct from the
+     * courier waybill/sticker label (ConnectCourierController::waybill()).
+     * Unlike waybill(), OrderController::invoicePdf() takes no Request/
+     * options at all and has no courier-booking precondition — every
+     * synced order the shop owns gets one, so this is a direct call
+     * (same shape as ConnectCourierController::track() -> trackOrder()),
+     * no synthetic Request needed.
+     */
+    public function invoicePdf(Request $request): Response
+    {
+        $data = $request->validate([
+            'wc_order_id' => 'required|string|max:100',
+        ]);
+
+        $order = Order::whereIn('user_id', auth()->user()->shopUserIds())
+            ->where('source', 'woocommerce')
+            ->where('source_ref', (string) $data['wc_order_id'])
+            ->first();
+
+        if (! $order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No synced order found for this wc_order_id.',
+                'error_code' => 'order_not_found',
+            ], 404);
+        }
+
+        return $this->orderController->invoicePdf($order->id, $this->orderInvoicePdfService);
     }
 }

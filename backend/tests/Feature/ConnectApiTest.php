@@ -385,4 +385,39 @@ class ConnectApiTest extends TestCase
         $ref->setAccessible(true);
         return $ref->getValue($job);
     }
+
+    // ── Invoice PDF (Phase 12) ───────────────────────────────────────────────
+
+    public function test_invoice_streams_a_pdf_for_a_synced_order(): void
+    {
+        [, $rawKey] = $this->connectedMerchant();
+        $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload('wc-invoice-1'), $this->connectHeaders($rawKey))
+            ->assertCreated();
+
+        $response = $this->get('/api/connect/v1/orders/invoice?wc_order_id=wc-invoice-1', $this->connectHeaders($rawKey));
+
+        $response->assertOk();
+        $this->assertStringContainsString('application/pdf', $response->headers->get('Content-Type'));
+    }
+
+    public function test_invoice_returns_order_not_found_for_unknown_wc_order_id(): void
+    {
+        [, $rawKey] = $this->connectedMerchant();
+
+        $response = $this->get('/api/connect/v1/orders/invoice?wc_order_id=no-such-order', $this->connectHeaders($rawKey));
+
+        $response->assertStatus(404)->assertJsonPath('error_code', 'order_not_found');
+    }
+
+    public function test_invoice_does_not_leak_another_shops_order(): void
+    {
+        [, $rawKeyA] = $this->connectedMerchant();
+        $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload('wc-invoice-2'), $this->connectHeaders($rawKeyA))
+            ->assertCreated();
+
+        [, $rawKeyB] = $this->connectedMerchant();
+        $response = $this->get('/api/connect/v1/orders/invoice?wc_order_id=wc-invoice-2', $this->connectHeaders($rawKeyB, 'myshop.com'));
+
+        $response->assertStatus(404)->assertJsonPath('error_code', 'order_not_found');
+    }
 }
