@@ -202,6 +202,27 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 
 ---
 
+## ৭.১ Zayroo Connect-এ ছিল, BSOL Connect-এ এখনো নেই
+
+`zyro/wordpress_plugin/zayroo-connect` (legacy precursor) এর প্রতিটা মডিউল ঘেঁটে (2026-08-13) বর্তমান `bsol-connect`-এর সাথে তুলনা করে পাওয়া গ্যাপ — কোনোটাই এখনো implement হয়নি, শুধু চিহ্নিত করা আছে এখানে যাতে ভবিষ্যতে ভুলে না যাওয়া হয় বা দুবার আবিষ্কার করতে না হয়:
+
+1. **Facebook পূর্ণাঙ্গ ফানেল ট্র্যাকিং** — zayroo-তে client-side Pixel বেস কোড ইনজেকশন (`wp_head`), PageView/ViewContent, AddToCart, আর কাস্টম-স্ট্যাটাস-ভিত্তিক ইভেন্ট (Confirmed/Shipping/Returned/Delivered — প্রতিটা আলাদা ইভেন্ট নামে) ছিল, Pixel + server-side CAPI একসাথে (`event_id` দিয়ে dedup)। BSOL-এর Phase ১০ শুধু **server-side Purchase** পাঠায় (`SendFacebookCapiPurchaseEventJob`) — client pixel install করে না, funnel-এর বাকি ধাপ ট্র্যাক করে না। *সতর্কতা: zayroo-র কোডে পিক্সেল আইডি hardcoded ছিল একটা নির্দিষ্ট সাইটের জন্য (zisan.me, Website ID 12) — as-is কপি করার মতো না; ধারণাটা জেনেরিকভাবে re-implement করতে হবে (সেলারের নিজস্ব `FacebookPixelSetting` থেকে)।*
+2. **Incomplete/Abandoned Order Tracking (WooCommerce)** — চেকআউটে টাইপ করার সময়ই (submit করার আগে) নাম/ফোন/ঠিকানা/কার্ট ক্যাপচার, WP-এর নিজস্ব টেবিলে রাখা, admin-এ লিস্ট/mark-complete/delete/CSV export, ব্যাচে SaaS-এ sync। BSOL-এর নিজের ল্যান্ডিং পেজের জন্য `abandoned_checkouts` টেবিল/UI আগে থেকেই আছে, কিন্তু WooCommerce সাইটের জন্য capture/sync কিছুই নেই। **→ Phase ১৭ হিসেবে কাজ শুরু হচ্ছে (নিচে §৯ দেখুন)।**
+3. **চেকআউট-টাইম ব্লকিং (fraud/blacklist)** — zayroo ফোন+IP দিয়ে চেকআউটের আগে SaaS-কে জিজ্ঞেস করত ("allowed" কিনা), `false` হলে সরাসরি order block করত (`woocommerce_checkout_process` হুকে `wc_add_notice()`)। BSOL-এর Customer Health কলাম শুধু তথ্যভিত্তিক (admin দেখে সিদ্ধান্ত নেয়) — কোনো ব্ল্যাকলিস্টেড/high-risk নম্বর দিয়ে আজও চেকআউট সম্পূর্ণ করা যায়, আটকায় না।
+4. **Repeat-order block** — একই ফোন নম্বর দিয়ে X ঘণ্টার মধ্যে আবার অর্ডার করলে আটকানো — সম্পূর্ণ WP-লোকাল (`wc_get_orders()` দিয়ে নিজের হিস্ট্রি চেক করে, BSOL API লাগেই না) — bsol-connect এ নেই।
+5. **BSOL vocabulary-এর কাস্টম WooCommerce order status** — zayroo WooCommerce-এর নিজস্ব status taxonomy-তে সরাসরি ৫টা কালার-কোডেড status রেজিস্টার করত (+ bulk action দিয়ে একসাথে বদলানো)। BSOL শুধু ম্যাপ করে ভেতরে ভেতরে (`Bsol_Helpers::status_map()`), WooCommerce-এর native status/UI স্পর্শ করে না — এটা আংশিক ইচ্ছাকৃত ডিজাইন-চয়েসও (native status বদলালে অন্য প্লাগিন/রিপোর্ট ভাঙতে পারে), কিন্তু সেলারের জন্য "এক জায়গায় ইউনিফাইড ভোকাবুলারি" সুবিধাটা নেই।
+6. **wp-admin থেকে সরাসরি Manual "Send SMS"** — ছোট সুবিধা, BSOL dashboard-এই আছে (`/sms/send`) কিন্তু প্লাগিন থেকে শর্টকাট নেই।
+
+**যাচাই করে "মিসিং না" বলে বাতিল করা হয়েছে** (যাতে ভুল করে আবার "গ্যাপ" মনে না হয়): SMS automation on status change — zayroo-র `trigger_sms.php` webhook-এর সমতুল্য কাজ BSOL-এ ভিন্নভাবে কভার্ড, `OrderStatusService::transition()` (যেটা `ConnectOrderController::syncStatus()`-ও ব্যবহার করে) প্রতিটা status transition-এ `SmsAutomationService` ট্রিগার করে, source নির্বিশেষে — WooCommerce অর্ডারের জন্য আলাদা কোনো ওয়্যারিং লাগে না।
+
+---
+
+## ৯. Phase ১৭ — Incomplete/Abandoned Order Tracking (WooCommerce) [চলমান]
+
+§৭.১ item ২-এর বাস্তবায়ন — WooCommerce checkout-এ শুরু হওয়া কিন্তু সম্পূর্ণ না-হওয়া অর্ডার BSOL-এ sync হবে, প্রতিটা এন্ট্রি **সাইট-ভিত্তিক ফ্ল্যাগড** (`platform_api_key_id`, Phase ১৬-এর সাথে সামঞ্জস্যপূর্ণ)। বিস্তারিত ডিজাইন প্ল্যান বানানোর পর এখানে আপডেট হবে।
+
+---
+
 ## ৮. মূল ডিজাইন সিদ্ধান্ত (ভবিষ্যতে অনুসরণ করার জন্য)
 
 1. **Delegate, duplicate না** — প্রতিটা Connect controller বিদ্যমান dashboard controller-কে synthetic `Request::create()` দিয়ে কল করে। এতে প্ল্যান-লিমিট, stock check, accounting side-effect ফ্রি-তে আসে, আর দুই জায়গায় লজিক maintain করতে হয় না।
