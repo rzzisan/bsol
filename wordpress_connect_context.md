@@ -32,7 +32,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১৬ | Multi-site WooCommerce connections — একাধিক সাইট, order/product site-tagging, order-list site filter (backend + frontend, প্লাগিন অপরিবর্তিত) | `4715d92` |
 | ১৭ | Incomplete/Abandoned Order Tracking (WooCommerce) — checkout-in-progress ক্যাপচার, সাইট-ফ্ল্যাগড, বিদ্যমান abandoned-checkouts সিস্টেম reuse (v1.14.0) | `9fe4ff8` |
 | ১৮ | Repeat order block (WooCommerce) — একই ফোন নম্বর দিয়ে X ঘণ্টার মধ্যে repeat checkout ব্লক, ক্লাসিক + block-based checkout দুটোতেই, সম্পূর্ণ WP-লোকাল (v1.15.0) | `6e28935` |
-| ১৯ | চেকআউট ব্ল্যাকলিস্ট ব্লক + BSOL order status (Confirmed/Shipped) + wp-admin থেকে Manual SMS (v1.16.0) | `PENDING_COMMIT` |
+| ১৯ | চেকআউট ব্ল্যাকলিস্ট ব্লক + BSOL order status (Confirmed/Shipped) + wp-admin থেকে Manual SMS (v1.16.0) | `d8d5cd6` |
 
 ---
 
