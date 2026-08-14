@@ -19,6 +19,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 2 | WhatsApp Business integration | ⬜ Not started | — |
 | 3 | Auto-top-up / usage-based billing | ⬜ Not started | — |
 | 5 | Courier waybill/label PDF | ✅ সম্পন্ন ও deployed — COD amount বাগ ফিক্স, Pathao-স্টাইল লেবেল, Sticker Template ফিচার (২২টা ডিজাইন, সেলার-সিলেক্টেবল, প্রিভিউ থাম্বনেইল সহ) সম্পূর্ণ, এবং ✅ বাংলা টেক্সট রেন্ডারিং বাগ ফাইনালি সমাধান (real HarfBuzz shaping — সবগুলো ২২টা sticker টেমপ্লেট + order invoice-এ) | `courier_waybill_context.md` §৪.৭, §৬ |
+| — | **Tracking Platform (Facebook CAPI + browser-side, প্যাকেজ-ভিত্তিক ইভেন্ট লিমিট)** | 🟡 পরিকল্পনা সম্পন্ন, implementation শুরু হয়নি | `tracking_capi_context.md` |
 | 6 | Custom domain সাপোর্ট (landing pages) | ⬜ Not started | — |
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
 | — | Bulk/CSV order import | ⬜ Not started | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
@@ -57,6 +58,7 @@ SMS credit ও subscription infra দুটোই এখন self-service (`SmsCr
 
 ### 6. Custom domain সাপোর্ট (landing pages)
 এখন সব পেজ platform সাবডোমেইনে। নিজের domain কানেক্ট করার সুবিধা — premium-tier subscription-এর জন্য শক্তিশালী upsell reason (ব্র্যান্ডিং চাওয়া বড় সেলাররা higher-tier প্যাকেজ কিনবে)।
+**নতুন, আরও শক্তিশালী যুক্তি (২০২৬-০৮-১৪, `tracking_capi_context.md §8`):** শেয়ার্ড ডোমেইনে Meta domain verification/AEM সেলার নিজে করতে পারে না, `_fbc` কুকি ক্রস-সেলার দূষিত হয়, এবং একজনের পলিসি-লঙ্ঘনে পুরো ডোমেইন (ড্যাশবোর্ডসহ) ঝুঁকিতে পড়ে। কাস্টম ডোমেইন এই তিনটাই সমাধান করে — অর্থাৎ এটা শুধু ব্র্যান্ডিং নয়, **পরিমাপযোগ্য ad-performance upsell** (Full vs Basic tracking tier)।
 **শুরুর পয়েন্ট:** DNS CNAME verification flow + nginx/certbot automation (server-level কাজ, `CONTEXT.md`-এর nginx/SSL সেকশন রেফারেন্স করতে হবে) — এটা তুলনামূলক বড় ops স্কোপ, অন্যগুলোর চেয়ে ভিন্ন ধরনের কাজ।
 
 ### 7. Marketing broadcast campaign (CRM-segment টার্গেটেড)
