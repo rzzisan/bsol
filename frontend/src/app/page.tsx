@@ -393,6 +393,11 @@ function AuthSection({
           ? Object.values(data.errors as Record<string, string[]>)[0]?.[0]
           : data?.message;
         setError(firstError ?? "Login failed.");
+      } else if (data?.redirect_to) {
+        // Seller owns a branded subdomain: no token was issued here, only a
+        // single-use handoff code in this URL. The destination origin mints
+        // its own token (custom_domain_context.md §6).
+        window.location.href = data.redirect_to;
       } else {
         persistAuth(data.token, data);
         setLoginEmail("");
