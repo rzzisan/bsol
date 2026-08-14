@@ -17,6 +17,8 @@ class AbandonedCheckout extends Model
     protected $fillable = [
         'user_id',
         'landing_page_id',
+        'source',
+        'platform_api_key_id',
         'session_token',
         'customer_name',
         'customer_phone',
@@ -52,6 +54,11 @@ class AbandonedCheckout extends Model
     public function landingPage(): BelongsTo
     {
         return $this->belongsTo(LandingPage::class);
+    }
+
+    public function platformApiKey(): BelongsTo
+    {
+        return $this->belongsTo(PlatformApiKey::class);
     }
 
     public function order(): BelongsTo

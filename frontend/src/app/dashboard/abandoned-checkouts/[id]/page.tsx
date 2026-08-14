@@ -46,6 +46,7 @@ const t = {
     converted: "কনভার্টেড",
     dismissed: "বাতিল",
     landingPage: "ল্যান্ডিং পেজ",
+    source: "উৎস",
     lastActivity: "সর্বশেষ কার্যকলাপ",
     createdAt: "শুরু হয়েছিল",
     viewOrder: "অর্ডার দেখুন",
@@ -90,6 +91,7 @@ const t = {
     converted: "Converted",
     dismissed: "Dismissed",
     landingPage: "Landing Page",
+    source: "Source",
     lastActivity: "Last Activity",
     createdAt: "Started",
     viewOrder: "View Order",
@@ -127,6 +129,7 @@ type AbandonedCheckoutDetail = {
   last_activity_at: string;
   created_at: string;
   landingPage: { id: number; title: string; slug: string } | null;
+  platformApiKey: { id: number; domain: string } | null;
   order: { id: number; order_number: string; status: string } | null;
   customer_value: { total_orders: number; total_spent: number; risk_level: string } | null;
 };
@@ -426,8 +429,8 @@ export default function AbandonedCheckoutDetailPage() {
           <section className="catv-panel p-5">
             <dl className="space-y-3 text-sm">
               <div>
-                <dt className="text-xs text-[var(--muted)]">{txt.landingPage}</dt>
-                <dd>{checkout.landingPage?.title ?? "—"}</dd>
+                <dt className="text-xs text-[var(--muted)]">{txt.source}</dt>
+                <dd>{checkout.landingPage?.title ?? checkout.platformApiKey?.domain ?? "—"}</dd>
               </div>
               <div>
                 <dt className="text-xs text-[var(--muted)]">{txt.createdAt}</dt>

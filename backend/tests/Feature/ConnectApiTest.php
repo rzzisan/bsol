@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\SendFacebookCapiPurchaseEventJob;
+use App\Models\AbandonedCheckout;
 use App\Models\FacebookPixelSetting;
 use App\Models\Order;
 use App\Models\PlatformApiKey;
@@ -166,6 +167,78 @@ class ConnectApiTest extends TestCase
             'source' => 'woocommerce',
             'source_ref' => 'wc-1001',
         ]);
+    }
+
+    // ── Abandoned checkout conversion (Phase 17) ────────────────────────────
+
+    public function test_orders_sync_converts_a_matching_abandoned_checkout_by_session_token(): void
+    {
+        [$user, $rawKey] = $this->connectedMerchant();
+        $apiKey = PlatformApiKey::findByRawKey($rawKey);
+
+        $checkout = AbandonedCheckout::create([
+            'user_id' => $user->id,
+            'source' => 'woocommerce',
+            'platform_api_key_id' => $apiKey->id,
+            'session_token' => 'checkout-sess-1',
+            'customer_phone' => '01700000000', // deliberately different from the order's phone
+            'status' => 'active',
+            'last_activity_at' => now(),
+        ]);
+
+        $payload = $this->samplePayload();
+        $payload['session_token'] = 'checkout-sess-1';
+
+        $response = $this->postJson('/api/connect/v1/orders/sync', $payload, $this->connectHeaders($rawKey));
+        $response->assertCreated();
+
+        $checkout->refresh();
+        $this->assertSame('converted', $checkout->status);
+        $this->assertSame($response->json('data.id'), $checkout->order_id);
+    }
+
+    public function test_orders_sync_converts_a_matching_abandoned_checkout_by_phone_when_no_session_token(): void
+    {
+        [$user, $rawKey] = $this->connectedMerchant();
+        $apiKey = PlatformApiKey::findByRawKey($rawKey);
+
+        $checkout = AbandonedCheckout::create([
+            'user_id' => $user->id,
+            'source' => 'woocommerce',
+            'platform_api_key_id' => $apiKey->id,
+            'session_token' => 'some-other-session',
+            'customer_phone' => '01755443322', // matches samplePayload()'s customer_phone
+            'status' => 'active',
+            'last_activity_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload(), $this->connectHeaders($rawKey));
+        $response->assertCreated();
+
+        $checkout->refresh();
+        $this->assertSame('converted', $checkout->status);
+    }
+
+    public function test_historical_order_sync_does_not_convert_an_abandoned_checkout(): void
+    {
+        [$user, $rawKey] = $this->connectedMerchant();
+        $apiKey = PlatformApiKey::findByRawKey($rawKey);
+
+        AbandonedCheckout::create([
+            'user_id' => $user->id,
+            'source' => 'woocommerce',
+            'platform_api_key_id' => $apiKey->id,
+            'session_token' => 'irrelevant',
+            'customer_phone' => '01755443322',
+            'status' => 'active',
+            'last_activity_at' => now(),
+        ]);
+
+        $payload = $this->samplePayload();
+        $payload['is_historical_sync'] = true;
+        $this->postJson('/api/connect/v1/orders/sync', $payload, $this->connectHeaders($rawKey))->assertCreated();
+
+        $this->assertDatabaseHas('abandoned_checkouts', ['customer_phone' => '01755443322', 'status' => 'active']);
     }
 
     public function test_orders_sync_upserts_same_order_on_repeat_call(): void

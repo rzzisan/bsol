@@ -252,3 +252,19 @@ a real WooCommerce staging site before rolling out to sellers.
    extra load: this should read from the WP transient cache (phone-keyed),
    not hit BSOL again, until the 24h cache expires or a courier credential
    changes.
+
+## Abandoned checkout tracking (1.14.0)
+
+1. Go to the WooCommerce checkout page on a real staging site (don't
+   submit the order). Fill in name, phone, or email, and let it sit for
+   ~2 seconds.
+2. On the BSOL dashboard → Abandoned Checkouts, confirm a new row
+   appears with the entered fields, the cart contents, and the correct
+   site domain shown (not a landing page).
+3. Complete the order — confirm the row flips to "Converted" and links
+   to the resulting order.
+4. Open two different browser tabs/private windows, fill different data
+   in each without submitting — confirm two separate rows appear (no
+   cross-session bleed).
+5. Confirm nothing on the checkout page visibly changes for the
+   customer (no new UI, this module is a silent background capture).

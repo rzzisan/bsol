@@ -92,6 +92,7 @@ class AbandonedCheckoutController extends Controller
         $query = AbandonedCheckout::query()
             ->whereIn('user_id', $shopUserIds)
             ->with('landingPage:id,title,slug')
+            ->with('platformApiKey:id,domain')
             ->with('order:id,order_number,status');
 
         if ($request->filled('status')) {
@@ -99,6 +100,12 @@ class AbandonedCheckoutController extends Controller
         }
         if ($request->filled('landing_page_id')) {
             $query->where('landing_page_id', (int) $request->landing_page_id);
+        }
+        if ($request->filled('source')) {
+            $query->where('source', $request->string('source'));
+        }
+        if ($request->filled('platform_api_key_id')) {
+            $query->where('platform_api_key_id', (int) $request->platform_api_key_id);
         }
         if ($request->filled('date_from')) {
             $query->whereDate('last_activity_at', '>=', $request->date('date_from'));
@@ -131,7 +138,7 @@ class AbandonedCheckoutController extends Controller
     {
         $checkout = AbandonedCheckout::query()
             ->whereIn('user_id', auth()->user()->shopUserIds())
-            ->with(['landingPage:id,title,slug', 'order:id,order_number,status'])
+            ->with(['landingPage:id,title,slug', 'platformApiKey:id,domain', 'order:id,order_number,status'])
             ->findOrFail($id);
 
         $data = $this->attachCustomerValue(collect([$checkout]), auth()->user()->shopOwnerId())->first();
@@ -210,19 +217,20 @@ class AbandonedCheckoutController extends Controller
 
         $rows = AbandonedCheckout::query()
             ->whereIn('user_id', $shopUserIds)
-            ->with('landingPage:id,title')
+            ->with(['landingPage:id,title', 'platformApiKey:id,domain'])
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->orderByDesc('last_activity_at')
             ->get();
 
-        $csv = "ID,Landing Page,Name,Phone,Email,Address,Items,Subtotal,Status,Last Activity\n";
+        $csv = "ID,Source,Name,Phone,Email,Address,Items,Subtotal,Status,Last Activity\n";
         foreach ($rows as $row) {
             $items = collect($row->items ?? [])->map(fn ($i) => "{$i['name']} x{$i['quantity']}")->join('; ');
+            $source = $row->landingPage?->title ?? $row->platformApiKey?->domain ?? $row->source;
             $csv .= implode(',', array_map(
                 fn ($v) => '"' . str_replace('"', '""', (string) $v) . '"',
                 [
                     $row->id,
-                    $row->landingPage?->title,
+                    $source,
                     $row->customer_name,
                     $row->customer_phone,
                     $row->customer_email,

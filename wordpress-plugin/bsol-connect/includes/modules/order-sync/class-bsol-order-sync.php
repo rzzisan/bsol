@@ -128,6 +128,14 @@ class Bsol_Order_Sync {
 			'user_agent'         => $order->get_customer_user_agent(),
 			'event_source_url'   => wc_get_checkout_url(),
 			'is_historical_sync' => (bool) $is_historical_sync,
+			// Set by Bsol_Abandoned_Checkout's AJAX capture into WC()->session
+			// (Phase 17) when this checkout was previously tracked as
+			// in-progress — lets BSOL flip that row to "converted" instead of
+			// it sitting abandoned forever. Null for a historical/bulk-sync
+			// backfill (no live WC session exists for an old order).
+			'session_token'      => ( ! $is_historical_sync && function_exists( 'WC' ) && WC()->session )
+				? WC()->session->get( Bsol_Abandoned_Checkout::SESSION_KEY )
+				: null,
 		);
 	}
 }

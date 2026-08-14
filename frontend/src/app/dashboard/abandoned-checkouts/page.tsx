@@ -16,6 +16,8 @@ const t = {
     converted: "কনভার্টেড",
     dismissed: "বাতিল",
     allPages: "সব ল্যান্ডিং পেজ",
+    allSites: "সব সাইট",
+    source: "উৎস",
     export: "CSV Export",
     loading: "লোড হচ্ছে...",
     noRows: "কোনো অসম্পূর্ণ চেকআউট নেই।",
@@ -48,6 +50,8 @@ const t = {
     converted: "Converted",
     dismissed: "Dismissed",
     allPages: "All landing pages",
+    allSites: "All Sites",
+    source: "Source",
     export: "CSV Export",
     loading: "Loading...",
     noRows: "No abandoned checkouts found.",
@@ -78,6 +82,7 @@ type CheckoutItem = { product_id: number; name: string; quantity: number; unit_p
 type AbandonedCheckoutRow = {
   id: number;
   session_token: string;
+  source: "landing_page" | "woocommerce";
   customer_name: string | null;
   customer_phone: string | null;
   items: CheckoutItem[] | null;
@@ -86,12 +91,14 @@ type AbandonedCheckoutRow = {
   is_abandoned: boolean;
   last_activity_at: string;
   landingPage: { id: number; title: string; slug: string } | null;
+  platformApiKey: { id: number; domain: string } | null;
   customer_value: { total_orders: number; total_spent: number; risk_level: string } | null;
 };
 
 type Stats = { active: number; abandoned: number; converted: number; dismissed: number; total: number; conversion_rate: number };
 
 type LandingPageOption = { id: number; title: string };
+type WpSite = { id: number; domain: string; status: string };
 
 export default function AbandonedCheckoutsPage() {
   const [locale] = useState<Locale>(getStoredLocale);
@@ -101,10 +108,12 @@ export default function AbandonedCheckoutsPage() {
   const [rows, setRows] = useState<AbandonedCheckoutRow[]>([]);
   const [stats, setStats] = useState<Stats>({ active: 0, abandoned: 0, converted: 0, dismissed: 0, total: 0, conversion_rate: 0 });
   const [landingPages, setLandingPages] = useState<LandingPageOption[]>([]);
+  const [wpSites, setWpSites] = useState<WpSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPage, setFilterPage] = useState("all");
+  const [filterSite, setFilterSite] = useState("all");
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -117,6 +126,7 @@ export default function AbandonedCheckoutsPage() {
       if (search) params.set("q", search);
       if (filterStatus !== "all") params.set("status", filterStatus);
       if (filterPage !== "all") params.set("landing_page_id", filterPage);
+      if (filterSite !== "all") params.set("platform_api_key_id", filterSite);
 
       const [listRes, statRes] = await Promise.all([
         fetch(`${LANDING_API_BASE}/landing/abandoned-checkouts?${params}`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -136,15 +146,23 @@ export default function AbandonedCheckoutsPage() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, filterStatus, filterPage, token]);
+  }, [page, search, filterStatus, filterPage, filterSite, token]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
-  useEffect(() => { setPage(1); }, [search, filterStatus, filterPage]);
+  useEffect(() => { setPage(1); }, [search, filterStatus, filterPage, filterSite]);
 
   useEffect(() => {
     fetch(`${LANDING_API_BASE}/landing/pages?per_page=100`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => (res.ok ? res.json() : null))
       .then((d) => setLandingPages(d?.data ?? []))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    fetch(`${LANDING_API_BASE}/wordpress/api-keys`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => setWpSites((d?.data ?? []).filter((s: WpSite) => s.status !== "revoked")))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -251,6 +269,18 @@ export default function AbandonedCheckoutsPage() {
             <option key={lp.id} value={lp.id}>{lp.title}</option>
           ))}
         </select>
+        {wpSites.length > 0 && (
+          <select
+            value={filterSite}
+            onChange={(e) => setFilterSite(e.target.value)}
+            className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+          >
+            <option value="all">{txt.allSites}</option>
+            {wpSites.map((s) => (
+              <option key={s.id} value={s.id}>{s.domain}</option>
+            ))}
+          </select>
+        )}
         <button
           onClick={handleExport}
           className="ml-auto rounded-xl border border-[var(--accent)]/40 px-4 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent)]/10"
@@ -265,7 +295,7 @@ export default function AbandonedCheckoutsPage() {
           <thead>
             <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--muted)] uppercase">
               <th className="px-4 py-3">{txt.customer}</th>
-              <th className="px-4 py-3 hidden md:table-cell">{txt.landingPage}</th>
+              <th className="px-4 py-3 hidden md:table-cell">{txt.source}</th>
               <th className="px-4 py-3 hidden lg:table-cell">{txt.items}</th>
               <th className="px-4 py-3">{txt.status}</th>
               <th className="px-4 py-3 hidden md:table-cell">{txt.lastActivity}</th>
@@ -290,7 +320,7 @@ export default function AbandonedCheckoutsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-xs">{row.landingPage?.title ?? "—"}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-xs">{row.landingPage?.title ?? row.platformApiKey?.domain ?? "—"}</td>
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-[var(--muted)]">
                     {(row.items ?? []).map((i) => `${i.name}${i.variant_label ? ` (${i.variant_label})` : ""} x${i.quantity}`).join(", ") || "—"}
                   </td>

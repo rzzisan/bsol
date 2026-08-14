@@ -10,7 +10,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 
 `bsol_history_and_new_context.md`-এ আলোচিত হয়েছিল যে BSOL-এর সবচেয়ে বড় গ্যাপ হলো "যাদের নিজের WooCommerce ওয়েবসাইট আছে" — তাদের জন্য কোনো কানেক্টর ছিল না। ডিজাইন সরাসরি adapt করা হয়েছে `zyro/wordpress_plugin/zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (WordPress প্লাগিন কোনো বিজনেস লজিক রাখে না, শুধু WooCommerce থেকে ডেটা তুলে BSOL API-তে পাঠায়, ফলাফল দেখায়) থেকে — সেই legacy প্লাগিনের প্রতিটা মডিউলের exact hook/nonce/AJAX-action/payload-shape আলাদাভাবে explore করে BSOL-এর নিজের backend API-র উপর বসানো হয়েছে।
 
-১৩টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
+১৭টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
 
 | ফেজ | বিষয় | মূল কমিট |
 |---|---|---|
@@ -30,6 +30,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১৪ | Admin UI redesign (BSOL brand) + courier column "Book to Courier" picker (v1.12.0) | `f2c8f9a` |
 | ১৫ | Customer Health redesign — কুরিয়ার ডেলিভারি-হিস্ট্রি প্রোগ্রেস বার + breakdown popover (v1.13.0) | `86cc12f` |
 | ১৬ | Multi-site WooCommerce connections — একাধিক সাইট, order/product site-tagging, order-list site filter (backend + frontend, প্লাগিন অপরিবর্তিত) | `4715d92` |
+| ১৭ | Incomplete/Abandoned Order Tracking (WooCommerce) — checkout-in-progress ক্যাপচার, সাইট-ফ্ল্যাগড, বিদ্যমান abandoned-checkouts সিস্টেম reuse (v1.14.0) | `9fe4ff8` |
 
 ---
 
@@ -57,6 +58,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | POST | `/connect/v1/orders/sync-status` | `ConnectOrderController@syncStatus` | BSOL-canonical status ট্রানজিশন |
 | GET | `/connect/v1/orders/invoice` | `ConnectOrderController@invoicePdf` | সেলস ইনভয়েস PDF স্ট্রিম, কোনো booking precondition ছাড়াই |
 | POST | `/connect/v1/products/sync` | `ConnectProductController@sync` | Simple/variable প্রোডাক্ট + ভ্যারিয়েন্ট create/update |
+| POST | `/connect/v1/checkout/abandoned` | `ConnectAbandonedCheckoutController@save` | checkout-in-progress ক্যাপচার (Phase ১৭) — best-effort, `abandoned_checkouts`-এ delegate |
 | POST | `/connect/v1/courier/book` | `ConnectCourierController@book` | Steadfast/Paperfly/manual বুকিং |
 | POST | `/connect/v1/courier/track` | `ConnectCourierController@track` | স্ট্যাটাস রিফ্রেশ |
 | POST | `/connect/v1/courier/cancel` | `ConnectCourierController@cancel` | বুকিং বাতিল |
@@ -89,7 +91,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.13.1)
+wordpress-plugin/bsol-connect/          (v1.14.0)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
@@ -110,6 +112,7 @@ wordpress-plugin/bsol-connect/          (v1.13.1)
       checkout-otp/class-bsol-checkout-otp.php — **প্রথম storefront (wp-admin না) মডিউল** — order-received পেজে OTP গেট, nopriv AJAX verify/resend (Phase ৯)
       bulk-sync/class-bsol-bulk-sync.php       — "Sync Data" ট্যাবের AJAX ব্যাকএন্ড; `Bsol_Master`-এর inject করা `Bsol_Product_Sync`/`Bsol_Order_Sync` ইনস্ট্যান্স reuse করে, নিজে কখনো `new` করে না (Phase ১১)
       invoice/class-bsol-invoice.php           — "Invoice" কলাম, কোনো booking precondition নেই; admin-post proxy waybill-এরই মতো (Phase ১২)
+      abandoned-checkout/class-bsol-abandoned-checkout.php — **দ্বিতীয় storefront মডিউল** (checkout-otp-এর পরে) — checkout-in-progress ক্যাপচার, WC()->cart থেকে সরাসরি (DOM scraping না); nopriv AJAX relay (Phase ১৭)
   assets/
     css/bsol-admin.css, js/bsol-admin.js       — wp-admin-only (health-bar polling, courier বাটন হ্যান্ডলার, bulk-sync progress bar — এই দুটোর জন্য আলাদা স্বাধীন jQuery(ready) ব্লক, যেহেতু `bsol_ajax`/`bsol_bulk_sync` আলাদা স্ক্রিনে লোকালাইজ হয়)
     css/bsol-checkout-otp.css, js/bsol-checkout-otp.js — storefront-only, শুধু order-received পেজে enqueue হয়
@@ -176,6 +179,16 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 - **ব্রাউজার থেকে সরাসরি BSOL-এ যাওয়া যায় না** (শপার-এর কাছে API key নেই) — verify/resend `wp_ajax_nopriv_*` হ্যান্ডলার দিয়ে সার্ভার-সাইড relay হয় (চেকআউট সাধারণত anonymous), অন্য সব মডিউলের wp-admin AJAX relay-র একই প্যাটার্ন, শুধু storefront থেকে ট্রিগার হওয়া।
 - **`public_token` bug fix**: `phone_otp_verifications.token` NOT NULL+unique, কিন্তু WooCommerce-সোর্সড অর্ডারে কখনো `public_token` সেট হতো না (শুধু landing-page order creation flow সেটা সেট করত) — `CheckoutOtpService::maybeSendForOrder()` এখন প্রয়োজনে on-demand একটা জেনারেট করে দেয়।
 
+### Abandoned checkout tracking (`class-bsol-abandoned-checkout.php`, Phase ১৭)
+
+**দ্বিতীয় storefront-facing মডিউল** — checkout-otp-এর পরে। WooCommerce checkout-এ কাস্টমার নাম/ফোন/ইমেইল/ঠিকানা টাইপ করার সময়ই (submit করার আগে) ক্যাপচার করে BSOL-এ পাঠায় — কোনো নতুন storage সিস্টেম না, ল্যান্ডিং পেজের `abandoned_checkouts` টেবিল/ড্যাশবোর্ড UI-ই reuse হয় (§৮ item ১, delegate-না-duplicate)।
+
+- **`abandoned_checkouts` widen করা হয়েছে, নতুন টেবিল না**: `landing_page_id` nullable করা হয়েছে, নতুন `source` (`landing_page`|`woocommerce`) আর `platform_api_key_id` (Phase ১৬-এর প্যাটার্ন) কলাম যোগ। বিদ্যমান ল্যান্ডিং-পেজ মেথড (`capture`/`resume`/`convertMatching`/`applyEdit`/`snapshotItems`) **অপরিবর্তিত** — WooCommerce-এর জন্য `AbandonedCheckoutService::captureWooCommerce()`/`convertMatchingWooCommerce()` নতুন, additive মেথড, কারণ `snapshotItems()` ল্যান্ডিং-পেজ ক্যাটালগ পিভট (`$page->products`, pinned variant/price override) রিজলভ করে — WooCommerce-এর জন্য প্রযোজ্য না (একটা WC cart line ইতিমধ্যেই WooCommerce নিজে রিজলভ করে রাখে)।
+- **DOM scraping না, `WC()->cart` সরাসরি**: legacy `zayroo-iot-checkout.js` প্রোডাক্ট নাম/লিংক checkout টেবিলের রেন্ডার করা DOM থেকে CSS সিলেক্টর দিয়ে scrape করত (theme-নির্ভর, ভঙ্গুর)। এখানে JS শুধু ফর্ম-ফিল্ড ভ্যালু পাঠায়; PHP AJAX হ্যান্ডলার সরাসরি `WC()->cart->get_cart()` থেকে item রিজলভ করে — এই প্লাগিনের বাকি সবকিছুর মতোই "WooCommerce নিজেই সোর্স অফ ট্রুথ" নীতি।
+- **ট্রিগার প্যাটার্ন legacy থেকে reuse**: `sessionStorage`-বেসড সেশন কী, ১.৫ সেকেন্ড debounce, যেকোনো checkout ফিল্ড input/change/blur + WooCommerce-এর নিজস্ব `updated_checkout` ইভেন্ট + কার্ট qty/remove ক্লিকে ট্রিগার হয় — `zayroo-iot-checkout.js`-এ প্রমাণিত শেপ, শুধু DOM-scraping অংশটা বাদ।
+- **Conversion matching, hidden form field ছাড়া**: session key browser `sessionStorage`-এ থাকে, `woocommerce_new_order` ফায়ার হওয়ার সময় সার্ভার-সাইডে দেখা যায় না। AJAX capture হ্যান্ডলার সেশন টোকেনটা `WC()->session->set()` দিয়েও সেভ করে রাখে (checkout-type-agnostic — classic আর block-based Store API checkout দুটোতেই কাজ করে, hidden ফর্ম ফিল্ড দিয়ে classic-only প্লাম্বিং করলে যা হতো না) — `build_order_payload()` পরে `WC()->session->get()` দিয়ে ফেরত পড়ে, `orders/sync`-এর `session_token` ফিল্ডে পাঠায়। BSOL-সাইড: `ConnectOrderController::sync()`-এর create ব্র্যাঞ্চে (historical sync বাদে) `convertMatchingWooCommerce()` কল হয় — session-token ম্যাচ আগে, ফোন-নম্বর fallback (cross-device completion বা পুরনো প্লাগিন ভার্সনের জন্য যেটা session_token পাঠায় না)।
+- **কোনো wp-admin UI যোগ হয়নি** — legacy zayroo নিজের admin list/CSV-export বানিয়েছিল (তখন "cloud"-এ কিছু ছিল না), BSOL-এর ড্যাশবোর্ডে আগে থেকেই পূর্ণাঙ্গ Abandoned Checkouts list/detail/stats/export UI আছে — সেলার সেখান থেকেই WooCommerce-সোর্সড এন্ট্রি ম্যানেজ করে, ল্যান্ডিং-পেজ এন্ট্রির মতোই।
+
 ---
 
 ## ৬. টেস্টিং কনভেনশন (এই কানেক্টরের জন্য প্রতিষ্ঠিত)
@@ -207,7 +220,7 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 `zyro/wordpress_plugin/zayroo-connect` (legacy precursor) এর প্রতিটা মডিউল ঘেঁটে (2026-08-13) বর্তমান `bsol-connect`-এর সাথে তুলনা করে পাওয়া গ্যাপ — কোনোটাই এখনো implement হয়নি, শুধু চিহ্নিত করা আছে এখানে যাতে ভবিষ্যতে ভুলে না যাওয়া হয় বা দুবার আবিষ্কার করতে না হয়:
 
 1. **Facebook পূর্ণাঙ্গ ফানেল ট্র্যাকিং** — zayroo-তে client-side Pixel বেস কোড ইনজেকশন (`wp_head`), PageView/ViewContent, AddToCart, আর কাস্টম-স্ট্যাটাস-ভিত্তিক ইভেন্ট (Confirmed/Shipping/Returned/Delivered — প্রতিটা আলাদা ইভেন্ট নামে) ছিল, Pixel + server-side CAPI একসাথে (`event_id` দিয়ে dedup)। BSOL-এর Phase ১০ শুধু **server-side Purchase** পাঠায় (`SendFacebookCapiPurchaseEventJob`) — client pixel install করে না, funnel-এর বাকি ধাপ ট্র্যাক করে না। *সতর্কতা: zayroo-র কোডে পিক্সেল আইডি hardcoded ছিল একটা নির্দিষ্ট সাইটের জন্য (zisan.me, Website ID 12) — as-is কপি করার মতো না; ধারণাটা জেনেরিকভাবে re-implement করতে হবে (সেলারের নিজস্ব `FacebookPixelSetting` থেকে)।*
-2. **Incomplete/Abandoned Order Tracking (WooCommerce)** — চেকআউটে টাইপ করার সময়ই (submit করার আগে) নাম/ফোন/ঠিকানা/কার্ট ক্যাপচার, WP-এর নিজস্ব টেবিলে রাখা, admin-এ লিস্ট/mark-complete/delete/CSV export, ব্যাচে SaaS-এ sync। BSOL-এর নিজের ল্যান্ডিং পেজের জন্য `abandoned_checkouts` টেবিল/UI আগে থেকেই আছে, কিন্তু WooCommerce সাইটের জন্য capture/sync কিছুই নেই। **→ Phase ১৭ হিসেবে কাজ শুরু হচ্ছে (নিচে §৯ দেখুন)।**
+2. ~~**Incomplete/Abandoned Order Tracking (WooCommerce)**~~ — **সমাধান হয়েছে, Phase ১৭ (v1.14.0)।** নিচে §৯ দেখুন।
 3. **চেকআউট-টাইম ব্লকিং (fraud/blacklist)** — zayroo ফোন+IP দিয়ে চেকআউটের আগে SaaS-কে জিজ্ঞেস করত ("allowed" কিনা), `false` হলে সরাসরি order block করত (`woocommerce_checkout_process` হুকে `wc_add_notice()`)। BSOL-এর Customer Health কলাম শুধু তথ্যভিত্তিক (admin দেখে সিদ্ধান্ত নেয়) — কোনো ব্ল্যাকলিস্টেড/high-risk নম্বর দিয়ে আজও চেকআউট সম্পূর্ণ করা যায়, আটকায় না।
 4. **Repeat-order block** — একই ফোন নম্বর দিয়ে X ঘণ্টার মধ্যে আবার অর্ডার করলে আটকানো — সম্পূর্ণ WP-লোকাল (`wc_get_orders()` দিয়ে নিজের হিস্ট্রি চেক করে, BSOL API লাগেই না) — bsol-connect এ নেই।
 5. **BSOL vocabulary-এর কাস্টম WooCommerce order status** — zayroo WooCommerce-এর নিজস্ব status taxonomy-তে সরাসরি ৫টা কালার-কোডেড status রেজিস্টার করত (+ bulk action দিয়ে একসাথে বদলানো)। BSOL শুধু ম্যাপ করে ভেতরে ভেতরে (`Bsol_Helpers::status_map()`), WooCommerce-এর native status/UI স্পর্শ করে না — এটা আংশিক ইচ্ছাকৃত ডিজাইন-চয়েসও (native status বদলালে অন্য প্লাগিন/রিপোর্ট ভাঙতে পারে), কিন্তু সেলারের জন্য "এক জায়গায় ইউনিফাইড ভোকাবুলারি" সুবিধাটা নেই।
@@ -217,9 +230,9 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 
 ---
 
-## ৯. Phase ১৭ — Incomplete/Abandoned Order Tracking (WooCommerce) [চলমান]
+## ৯. Phase ১৭ — Incomplete/Abandoned Order Tracking (WooCommerce)
 
-§৭.১ item ২-এর বাস্তবায়ন — WooCommerce checkout-এ শুরু হওয়া কিন্তু সম্পূর্ণ না-হওয়া অর্ডার BSOL-এ sync হবে, প্রতিটা এন্ট্রি **সাইট-ভিত্তিক ফ্ল্যাগড** (`platform_api_key_id`, Phase ১৬-এর সাথে সামঞ্জস্যপূর্ণ)। বিস্তারিত ডিজাইন প্ল্যান বানানোর পর এখানে আপডেট হবে।
+§৭.১ item ২-এর বাস্তবায়ন — সম্পূর্ণ, বিস্তারিত ডিজাইন §৫-এর "Abandoned checkout tracking" সাব-সেকশনে। সংক্ষেপে: WooCommerce checkout-এ শুরু হওয়া কিন্তু সম্পূর্ণ না-হওয়া চেকআউট এখন BSOL-এর বিদ্যমান `abandoned_checkouts`/ড্যাশবোর্ড UI-তে sync হয় (নতুন টেবিল/UI না — widen করা হয়েছে), প্রতিটা এন্ট্রি **সাইট-ভিত্তিক ফ্ল্যাগড** (`platform_api_key_id`, Phase ১৬-এর সাথে সামঞ্জস্যপূর্ণ), আসল অর্ডার কমপ্লিট হলে স্বয়ংক্রিয়ভাবে "Converted"-এ ফ্লিপ হয়ে যায়।
 
 ---
 

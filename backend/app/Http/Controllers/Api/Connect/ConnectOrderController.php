@@ -9,6 +9,7 @@ use App\Jobs\SendFacebookCapiPurchaseEventJob;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\AbandonedCheckoutService;
 use App\Services\CheckoutOtpService;
 use App\Services\OrderInvoicePdfService;
 use App\Services\OrderStatusService;
@@ -30,6 +31,7 @@ class ConnectOrderController extends Controller
         private readonly OrderStatusService $orderStatusService,
         private readonly CheckoutOtpService $checkoutOtpService,
         private readonly OrderInvoicePdfService $orderInvoicePdfService,
+        private readonly AbandonedCheckoutService $abandonedCheckoutService,
     ) {}
 
     /**
@@ -73,6 +75,11 @@ class ConnectOrderController extends Controller
             // Purchase event; both would be wrong for data that old. The
             // order itself is still created/updated normally either way.
             'is_historical_sync'   => 'nullable|boolean',
+            // Set by the plugin's abandoned-checkout capture (Phase 17,
+            // WC()->session-backed) when this order's checkout was
+            // previously tracked as in-progress — lets that row flip to
+            // "converted" instead of sitting abandoned forever.
+            'session_token'        => 'nullable|string|max:64',
         ]);
 
         $merchant = auth()->user();
@@ -170,16 +177,30 @@ class ConnectOrderController extends Controller
                 $isHistorical = ! empty($data['is_historical_sync']);
                 $otpRequired = false;
 
-                // Both side effects below are for a *live* new order only —
-                // skipped entirely for a historical/bulk-sync backfill (see
-                // the validation rule's docblock above).
+                // All three side effects below are for a *live* new order
+                // only — skipped entirely for a historical/bulk-sync
+                // backfill (see the validation rule's docblock above). For
+                // abandoned-checkout conversion specifically: a backfilled
+                // order has no real session_token, and phone-only matching
+                // against a bulk sync could incorrectly "convert" some
+                // unrelated old abandoned-checkout row that just happens to
+                // share a phone number.
                 if (! $isHistorical) {
-                    if ($apiKey && $apiKey->otp_verification_enabled) {
-                        $newOrder = Order::find($responseData['data']['id']);
-                        if ($newOrder) {
-                            $this->checkoutOtpService->maybeSendForOrder(['otp_verification_enabled' => true], $newOrder);
-                            $otpRequired = (bool) $newOrder->fresh()->otp_required;
-                        }
+                    $newOrder = Order::find($responseData['data']['id']);
+
+                    if ($newOrder) {
+                        $this->abandonedCheckoutService->convertMatchingWooCommerce(
+                            $merchant->shopOwnerId(),
+                            $apiKey?->id,
+                            $newOrder,
+                            $data['session_token'] ?? null,
+                            $data['customer_phone'],
+                        );
+                    }
+
+                    if ($apiKey && $apiKey->otp_verification_enabled && $newOrder) {
+                        $this->checkoutOtpService->maybeSendForOrder(['otp_verification_enabled' => true], $newOrder);
+                        $otpRequired = (bool) $newOrder->fresh()->otp_required;
                     }
 
                     // Purchase event only — fires once, on creation, same as

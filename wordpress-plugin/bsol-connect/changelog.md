@@ -1,5 +1,18 @@
 # BSOL Connect — Changelog
 
+## 1.14.0 — 2026-08-14
+
+- **Abandoned/incomplete checkout tracking**: the plugin now captures
+  name/phone/email/address + cart contents as a customer fills the
+  checkout form, before the order completes, and sends it to BSOL — a
+  new "Checkout in progress" module (`Bsol_Abandoned_Checkout`), the
+  second storefront-facing module after checkout OTP. Shows up in the
+  same BSOL dashboard → Abandoned Checkouts list/detail view landing
+  pages already use, tagged with which site it came from. Automatically
+  flips to "Converted" once the customer completes the order — no
+  wp-admin UI added to the plugin itself, the seller manages everything
+  from the BSOL dashboard.
+
 ## 1.13.1 — 2026-08-13
 
 Fix: sites that had viewed the orders list on 1.12.0 or earlier still had

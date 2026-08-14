@@ -117,6 +117,16 @@ class Bsol_Api {
 		return $this->remote_post( 'fraud/courier-health', array( 'phone_number' => $phone ) );
 	}
 
+	/**
+	 * Checkout-in-progress capture (Phase 17) — best-effort marketing
+	 * signal, not a transactional payload. $data already has session_token
+	 * + whatever customer fields/items were resolved server-side from
+	 * WC()->cart at capture time.
+	 */
+	public function sync_abandoned_checkout( $data ) {
+		return $this->remote_post( 'checkout/abandoned', $data );
+	}
+
 	public function verify_otp( $wc_order_id, $otp_code ) {
 		return $this->remote_post(
 			'orders/verify-otp',

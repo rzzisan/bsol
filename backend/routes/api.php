@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\NotificationUseCaseBindingController;
 use App\Http\Controllers\Api\AbandonedCheckoutController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\CheckoutOtpController;
+use App\Http\Controllers\Api\Connect\ConnectAbandonedCheckoutController;
 use App\Http\Controllers\Api\Connect\ConnectAuthController;
 use App\Http\Controllers\Api\Connect\ConnectCheckoutOtpController;
 use App\Http\Controllers\Api\Connect\ConnectCourierController;
@@ -174,6 +175,7 @@ Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
         Route::post('/orders/sync-status', [ConnectOrderController::class, 'syncStatus']);
         Route::get('/orders/invoice', [ConnectOrderController::class, 'invoicePdf']);
         Route::post('/products/sync', [ConnectProductController::class, 'sync']);
+        Route::post('/checkout/abandoned', [ConnectAbandonedCheckoutController::class, 'save']);
         Route::post('/courier/book', [ConnectCourierController::class, 'book']);
         Route::post('/courier/track', [ConnectCourierController::class, 'track']);
         Route::post('/courier/cancel', [ConnectCourierController::class, 'cancel']);

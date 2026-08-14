@@ -135,6 +135,99 @@ class AbandonedCheckoutService
         return $checkout;
     }
 
+    // ── WooCommerce (Phase 17) ──────────────────────────────────────────────
+    // Additive, not a generalization of the landing-page methods above —
+    // those resolve items through $page->products (landing-page catalog
+    // pivot: pinned variants, price overrides), a concept that doesn't exist
+    // for WooCommerce. A WC cart line is already fully resolved (name/sku/
+    // price) by the plugin from real WC_Cart data, so it's trusted as-is
+    // here rather than re-resolved against BSOL's own catalog.
+
+    /**
+     * Upsert the in-progress WooCommerce checkout snapshot for this browsing
+     * session, scoped by the specific connected site (platform_api_key_id)
+     * rather than landing_page_id — two different sites' checkout sessions
+     * must never collide just because a session-key generator produced the
+     * same value twice (same reasoning as Order/Product's Phase 16 scoping).
+     */
+    public function captureWooCommerce(int $userId, ?int $platformApiKeyId, array $data, ?string $ip): AbandonedCheckout
+    {
+        $checkout = AbandonedCheckout::query()
+            ->where('platform_api_key_id', $platformApiKeyId)
+            ->where('source', 'woocommerce')
+            ->where('session_token', $data['session_token'])
+            ->first();
+
+        // Already converted/dismissed — don't resurrect it with stale form
+        // input from a tab the visitor never closed.
+        if ($checkout && $checkout->status !== 'active') {
+            return $checkout;
+        }
+
+        $items = $data['items'] ?? [];
+        $subtotal = collect($items)->sum(fn (array $item) => ($item['unit_price'] ?? 0) * ($item['quantity'] ?? 1));
+
+        $attributes = [
+            'user_id' => $userId,
+            'customer_name' => $data['customer_name'] ?? null,
+            'customer_phone' => $data['customer_phone'] ?? null,
+            'customer_email' => $data['customer_email'] ?? null,
+            'customer_address' => $data['customer_address'] ?? null,
+            'items' => $items,
+            'subtotal' => $subtotal,
+            'ip_address' => $ip,
+            'status' => 'active',
+            'last_activity_at' => now(),
+        ];
+
+        if ($checkout) {
+            $checkout->update($attributes);
+
+            return $checkout;
+        }
+
+        return AbandonedCheckout::create(array_merge($attributes, [
+            'source' => 'woocommerce',
+            'platform_api_key_id' => $platformApiKeyId,
+            'session_token' => $data['session_token'],
+        ]));
+    }
+
+    /**
+     * Called right after a real WooCommerce-synced order is created — marks
+     * the matching in-progress checkout(s) as converted instead of leaving
+     * them stuck as "abandoned" forever. Session-token match is tried first
+     * (exact, single row, if the plugin forwarded one); phone match is the
+     * fallback for cross-device/cross-tab completion or an older plugin
+     * version that doesn't send a session_token yet.
+     */
+    public function convertMatchingWooCommerce(int $userId, ?int $platformApiKeyId, Order $order, ?string $sessionToken, ?string $phone): void
+    {
+        if ($sessionToken) {
+            $updated = AbandonedCheckout::query()
+                ->where('platform_api_key_id', $platformApiKeyId)
+                ->where('user_id', $userId)
+                ->where('source', 'woocommerce')
+                ->active()
+                ->where('session_token', $sessionToken)
+                ->update(['status' => 'converted', 'order_id' => $order->id]);
+
+            if ($updated > 0) {
+                return;
+            }
+        }
+
+        if ($phone) {
+            AbandonedCheckout::query()
+                ->where('platform_api_key_id', $platformApiKeyId)
+                ->where('user_id', $userId)
+                ->where('source', 'woocommerce')
+                ->active()
+                ->where('customer_phone', $phone)
+                ->update(['status' => 'converted', 'order_id' => $order->id]);
+        }
+    }
+
     public function snapshotItems(LandingPage $page, array $rawItems): array
     {
         $landingProducts = $page->products->keyBy('product_id');
