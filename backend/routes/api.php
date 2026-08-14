@@ -75,6 +75,12 @@ Route::get('/health', function () {
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+// Second half of the per-seller subdomain login handoff
+// (custom_domain_context.md §6). Public because the caller has no token yet;
+// the code is single-use, 60s, and bound to the host presenting it.
+Route::post('/auth/handoff/exchange', [AuthController::class, 'exchangeHandoff'])
+    ->middleware('throttle:20,1');
+
 // Phone OTP for registration
 Route::post('/otp/register', [OtpController::class, 'sendRegistrationOtp']);
 Route::post('/otp/verify-registration', [OtpController::class, 'verifyRegistrationOtp']);

@@ -6,12 +6,15 @@ use App\Models\EmailOtpVerification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Services\SubdomainHandoffService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly SubdomainHandoffService $handoff) {}
+
     public function register(Request $request): JsonResponse
     {
         return response()->json([
@@ -42,11 +45,58 @@ class AuthController extends Controller
             ]);
         }
 
+        // A seller with a branded subdomain finishes logging in there, not
+        // here. No token is minted on this origin — the destination mints
+        // its own after exchanging the code (custom_domain_context.md §6).
+        $targetHost = $this->handoff->redirectHostFor($user, $request->getHost());
+
+        if ($targetHost !== null) {
+            $code = $this->handoff->issue($user, $targetHost, $request->ip());
+
+            return response()->json([
+                'message' => 'Continue on your shop address.',
+                'redirect_to' => $this->handoff->redirectUrl($targetHost, $code),
+            ]);
+        }
+
         $token = $user->createToken('frontend')->plainTextToken;
 
         return response()->json([
             'message' => 'Login successful.',
             'token' => $token,
+            'user' => $user,
+            ...$this->staffAuthContext($user),
+        ]);
+    }
+
+    /**
+     * Second half of the subdomain handoff: the destination origin trades a
+     * single-use code for its own token. Public by necessity — the caller
+     * has no token yet, which is the entire point.
+     */
+    public function exchangeHandoff(Request $request): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'max:128']]);
+
+        $user = $this->handoff->redeem($data['code'], $request->getHost(), $request->ip());
+
+        if (! $user) {
+            return response()->json([
+                'message' => 'This sign-in link has expired or already been used. Please log in again.',
+                'error_code' => 'handoff_invalid',
+            ], 422);
+        }
+
+        if ($user->isStaff() && $user->staff_status !== 'active') {
+            return response()->json([
+                'message' => 'This staff account has been suspended.',
+                'error_code' => 'staff_suspended',
+            ], 403);
+        }
+
+        return response()->json([
+            'message' => 'Login successful.',
+            'token' => $user->createToken('frontend')->plainTextToken,
             'user' => $user,
             ...$this->staffAuthContext($user),
         ]);
