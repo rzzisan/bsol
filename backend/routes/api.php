@@ -99,6 +99,13 @@ Route::get('/wordpress/plugin-download', [WordpressApiKeyController::class, 'dow
 Route::get('/wordpress/plugin-version', [WordpressApiKeyController::class, 'pluginVersion'])
     ->middleware('throttle:60,1');
 
+// Host resolver for per-seller subdomains — the Next.js middleware calls
+// this to decide whether {label}.{apex} belongs to a real shop before
+// rendering anything (custom_domain_context.md §4.1). Branding only, no ids.
+Route::get('/public/shop-by-subdomain/{label}', [ShopProfileController::class, 'publicResolveSubdomain'])
+    ->where('label', '[a-zA-Z0-9-]{1,63}')
+    ->middleware('throttle:120,1');
+
 Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow'])
     ->middleware(['track_landing_page_visit', 'throttle:60,1']);
 Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder'])
@@ -390,6 +397,14 @@ Route::middleware('active_subscription')->group(function () {
     Route::middleware('owner_only')->group(function () {
         Route::get('/shop-profile', [ShopProfileController::class, 'show']);
         Route::post('/shop-profile', [ShopProfileController::class, 'update']);
+
+        // Per-seller branded subdomain (custom_domain_context.md §5).
+        // Owner-only like the rest of shop identity — staff never claim or
+        // release the shop's public address.
+        Route::get('/shop-profile/subdomain/check', [ShopProfileController::class, 'checkSubdomain'])
+            ->middleware('throttle:30,1');
+        Route::put('/shop-profile/subdomain', [ShopProfileController::class, 'setSubdomain']);
+        Route::delete('/shop-profile/subdomain', [ShopProfileController::class, 'releaseSubdomain']);
     });
 
     // ── Sticker Template (default label design + per-courier overrides) ───────

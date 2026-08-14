@@ -57,6 +57,14 @@ return [
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
 
     /*
+    | Apex under which every seller's branded subdomain is served
+    | ({label}.{apex}) — see custom_domain_context.md. Stored as config
+    | rather than hardcoded so shop_profiles holds only the label and a
+    | future apex change stays a config edit.
+    */
+    'subdomain_apex' => env('SUBDOMAIN_APEX', 'zyrotechbd.com'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

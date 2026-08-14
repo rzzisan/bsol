@@ -15,12 +15,29 @@ class ShopProfile extends Model
     protected $fillable = [
         'user_id', 'shop_name', 'phone', 'email', 'address', 'logo_path', 'logo_url',
         'show_phone_on_sticker', 'show_address_on_sticker',
+        'subdomain', 'subdomain_status', 'subdomain_set_at',
     ];
 
     protected $casts = [
         'show_phone_on_sticker'   => 'boolean',
         'show_address_on_sticker' => 'boolean',
+        'subdomain_set_at'        => 'datetime',
     ];
+
+    /**
+     * The seller's branded host, or null when they haven't claimed a
+     * subdomain (or it's been disabled). Built from the label + the
+     * platform apex so a future apex change is a config edit, not a
+     * data migration — see custom_domain_context.md §5.1.
+     */
+    public function subdomainHost(): ?string
+    {
+        if (! $this->subdomain || $this->subdomain_status !== 'active') {
+            return null;
+        }
+
+        return $this->subdomain . '.' . config('app.subdomain_apex', 'zyrotechbd.com');
+    }
 
     public function user(): BelongsTo
     {
