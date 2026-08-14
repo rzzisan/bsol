@@ -228,7 +228,8 @@ sudo certbot renew --dry-run
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
-    server_name ~^(?<seller>[a-z0-9][a-z0-9-]{1,61}[a-z0-9])\.zyrotechbd\.com$;
+    # কোট করা বাধ্যতামূলক — নিচের সতর্কতা দেখো
+    server_name "~^(?<seller>[a-z0-9][a-z0-9-]{1,61}[a-z0-9])\.zyrotechbd\.com$";
 
     ssl_certificate     /etc/letsencrypt/live/wildcard-zyrotechbd/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/wildcard-zyrotechbd/privkey.pem;
@@ -264,6 +265,9 @@ server {
 ```
 
 অজানা সাবডোমেইন nginx-এ আটকানো হবে না (nginx জানে না কোন label বৈধ) — অ্যাপ্লিকেশন স্তরে middleware 404 দেবে, কারণ বৈধতার সত্য DB-তে।
+
+**সতর্কতা (২০২৬-০৮-১৪-এ বাস্তবে ধরা পড়েছে):** nginx `{` ও `}`-কে ব্লক-ডিলিমিটার হিসেবে পার্স করে, তাই `{1,61}` কোয়ান্টিফায়ারওয়ালা regex **অবশ্যই ডাবল-কোটে** দিতে হবে। কোট ছাড়া `nginx -t` ব্যর্থ হয়:
+`[emerg] directive "server_name" is not terminated by ";"`. একই সতর্কতা ৮০ ও ৪৪৩ — দুই block-এই প্রযোজ্য।
 
 ---
 
