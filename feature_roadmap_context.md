@@ -20,6 +20,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 3 | Auto-top-up / usage-based billing | ⬜ Not started | — |
 | 5 | Courier waybill/label PDF | ✅ সম্পন্ন ও deployed — COD amount বাগ ফিক্স, Pathao-স্টাইল লেবেল, Sticker Template ফিচার (২২টা ডিজাইন, সেলার-সিলেক্টেবল, প্রিভিউ থাম্বনেইল সহ) সম্পূর্ণ, এবং ✅ বাংলা টেক্সট রেন্ডারিং বাগ ফাইনালি সমাধান (real HarfBuzz shaping — সবগুলো ২২টা sticker টেমপ্লেট + order invoice-এ) | `courier_waybill_context.md` §৪.৭, §৬ |
 | — | **Tracking Platform (Facebook CAPI + browser-side, প্যাকেজ-ভিত্তিক ইভেন্ট লিমিট)** | 🟡 পরিকল্পনা সম্পন্ন, implementation শুরু হয়নি | `tracking_capi_context.md` |
+| — | **Per-seller সাবডোমেইন (ড্যাশবোর্ড + ল্যান্ডিং পেজ, `*.zyrotechbd.com`)** | 🟡 ডিজাইন সম্পন্ন; DNS Cloudflare-এ সরানো হয়েছে (২০২৬-০৮-১৪), wildcard cert বাকি | `custom_domain_context.md` |
 | 6 | Custom domain সাপোর্ট (landing pages) | ⬜ Not started | — |
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
 | — | Bulk/CSV order import | ⬜ Not started | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
