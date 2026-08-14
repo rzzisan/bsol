@@ -128,8 +128,11 @@ type AbandonedCheckoutDetail = {
   is_abandoned: boolean;
   last_activity_at: string;
   created_at: string;
-  landingPage: { id: number; title: string; slug: string } | null;
-  platformApiKey: { id: number; domain: string } | null;
+  // snake_case — Eloquent's Model::$snakeAttributes converts relation keys
+  // (landingPage()/platformApiKey() method names) to snake_case on
+  // serialization, same as regular DB columns.
+  landing_page: { id: number; title: string; slug: string } | null;
+  platform_api_key: { id: number; domain: string } | null;
   order: { id: number; order_number: string; status: string } | null;
   customer_value: { total_orders: number; total_spent: number; risk_level: string } | null;
 };
@@ -227,8 +230,8 @@ export default function AbandonedCheckoutDetailPage() {
   };
 
   const handleCopyLink = async () => {
-    if (!checkout?.landingPage) return;
-    const link = `${window.location.origin}/lp/${checkout.landingPage.slug}?resume=${encodeURIComponent(checkout.session_token)}`;
+    if (!checkout?.landing_page) return;
+    const link = `${window.location.origin}/lp/${checkout.landing_page.slug}?resume=${encodeURIComponent(checkout.session_token)}`;
     await navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -430,7 +433,7 @@ export default function AbandonedCheckoutDetailPage() {
             <dl className="space-y-3 text-sm">
               <div>
                 <dt className="text-xs text-[var(--muted)]">{txt.source}</dt>
-                <dd>{checkout.landingPage?.title ?? checkout.platformApiKey?.domain ?? "—"}</dd>
+                <dd>{checkout.landing_page?.title ?? checkout.platform_api_key?.domain ?? "—"}</dd>
               </div>
               <div>
                 <dt className="text-xs text-[var(--muted)]">{txt.createdAt}</dt>
@@ -449,7 +452,7 @@ export default function AbandonedCheckoutDetailPage() {
             </dl>
 
             <div className="mt-4 flex flex-col gap-2">
-              {checkout.landingPage && (
+              {checkout.landing_page && (
                 <button onClick={handleCopyLink} className="w-full rounded-xl border border-[var(--border)] py-2 text-sm hover:bg-[var(--surface-soft)]">
                   {copied ? txt.linkCopied : txt.copyLink}
                 </button>

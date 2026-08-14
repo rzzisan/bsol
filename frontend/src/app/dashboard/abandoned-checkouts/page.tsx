@@ -90,8 +90,11 @@ type AbandonedCheckoutRow = {
   status: "active" | "converted" | "dismissed";
   is_abandoned: boolean;
   last_activity_at: string;
-  landingPage: { id: number; title: string; slug: string } | null;
-  platformApiKey: { id: number; domain: string } | null;
+  // snake_case — Eloquent's Model::$snakeAttributes converts relation keys
+  // (landingPage()/platformApiKey() method names) to snake_case on
+  // serialization, same as regular DB columns.
+  landing_page: { id: number; title: string; slug: string } | null;
+  platform_api_key: { id: number; domain: string } | null;
   customer_value: { total_orders: number; total_spent: number; risk_level: string } | null;
 };
 
@@ -186,8 +189,8 @@ export default function AbandonedCheckoutsPage() {
   };
 
   const handleCopyLink = async (row: AbandonedCheckoutRow) => {
-    if (!row.landingPage) return;
-    const link = `${window.location.origin}/lp/${row.landingPage.slug}?resume=${encodeURIComponent(row.session_token)}`;
+    if (!row.landing_page) return;
+    const link = `${window.location.origin}/lp/${row.landing_page.slug}?resume=${encodeURIComponent(row.session_token)}`;
     await navigator.clipboard.writeText(link);
     setCopiedId(row.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -320,7 +323,7 @@ export default function AbandonedCheckoutsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-xs">{row.landingPage?.title ?? row.platformApiKey?.domain ?? "—"}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-xs">{row.landing_page?.title ?? row.platform_api_key?.domain ?? "—"}</td>
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-[var(--muted)]">
                     {(row.items ?? []).map((i) => `${i.name}${i.variant_label ? ` (${i.variant_label})` : ""} x${i.quantity}`).join(", ") || "—"}
                   </td>
@@ -335,7 +338,7 @@ export default function AbandonedCheckoutsPage() {
                     >
                       {txt.view}
                     </Link>
-                    {row.landingPage && (
+                    {row.landing_page && (
                       <button
                         onClick={() => handleCopyLink(row)}
                         className="mr-2 rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]"
