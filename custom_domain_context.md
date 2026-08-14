@@ -315,10 +315,25 @@ server {
 
 ## 13. বাকি ধাপ (এই মুহূর্তে)
 
+**সার্ভার অ্যাক্সেসের সীমা (verified ২০২৬-০৮-১৪):** assistant যে অ্যাকাউন্টে চলে (`claude-dev`, হোস্ট `pdns` = `103.157.253.197`, অর্থাৎ এটাই সঠিক BSOL সার্ভার — হোস্টনেমটা বিভ্রান্তিকর হলেও) তার sudo অনুমতি সংকীর্ণ allowlist:
+
+```
+systemctl restart|status|is-active hybrid-frontend.service
+systemctl restart php8.3-fpm
+systemctl restart|reload nginx
+chown -R www-data:www-data /var/www/hybrid-stack/frontend/.next
+frontend/scripts/deploy-safe.sh
+(www-data) ALL
+```
+
+অর্থাৎ `apt`, `certbot`, `/etc/nginx/` বা `/etc/letsencrypt/`-এ লেখা — কিছুই assistant করতে পারে না, কিন্তু **`nginx -t` করার পর reload করতে পারে**। তাই server block assistant তৈরি করে দেবে, ফাইলটা জায়গামতো বসাতে হবে root-এ।
+
 | # | কাজ | কার |
 |---|---|---|
-| 1 | Cloudflare API token তৈরি (My Profile → API Tokens → Edit zone DNS, শুধু `zyrotechbd.com`) ও `/etc/letsencrypt/cloudflare.ini`-তে বসানো | ব্যবহারকারী |
-| 2 | `python3-certbot-dns-cloudflare` ইনস্টল + wildcard cert issue + `renew --dry-run` | ব্যবহারকারী (token হাতে থাকায়) |
-| 3 | nginx regex server block যোগ + `nginx -t` + reload | assistant |
-| 4 | Cloudflare-এ `*` A রেকর্ড যোগ (ধাপ ৩-এর পরে) | ব্যবহারকারী |
-| 5 | D2–D5 implementation | assistant |
+| 1 | Cloudflare API token তৈরি (My Profile → API Tokens → Edit zone DNS, শুধু `zyrotechbd.com`) ও `/etc/letsencrypt/cloudflare.ini`-তে বসানো | ব্যবহারকারী (root) |
+| 2 | `python3-certbot-dns-cloudflare` ইনস্টল + wildcard cert issue + `renew --dry-run` | ব্যবহারকারী (root) |
+| 3 | server block ফাইল তৈরি | assistant (সম্পন্ন) |
+| 4 | ফাইলটা `/etc/nginx/sites-available/`-এ কপি + symlink + `nginx -t` | ব্যবহারকারী (root) |
+| 5 | `systemctl reload nginx` | assistant |
+| 6 | Cloudflare-এ `*` A রেকর্ড যোগ (ধাপ ৪-৫-এর পরে) | ব্যবহারকারী |
+| 7 | D2–D5 implementation | assistant |
