@@ -4,7 +4,7 @@ Tags: woocommerce, order management, courier, sms otp, facebook conversions api
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.15.0
+Stable tag: 1.16.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,6 +26,9 @@ BSOL Connect is a thin client: it collects data from WooCommerce and sends it to
 * **Bulk sync** — a one-time "Sync Data" tool to push products/orders that existed before you connected.
 * **Abandoned checkout tracking** — captures name/phone/email/address + cart as a customer fills the checkout form, before the order completes, so you can follow up on carts that never finish.
 * **Repeat order block** (optional, off by default) — stop the same phone number from placing a second order within a set number of hours.
+* **Checkout blacklist block** (optional, off by default) — stop checkout for a phone number you've blacklisted on your BSOL dashboard.
+* **BSOL order statuses** — two extra WooCommerce order statuses ("BSOL: Confirmed", "BSOL: Shipped") for BSOL vocabulary that has no native WooCommerce equivalent, selectable from the order edit screen and as a bulk action.
+* **Manual SMS** — send an ad-hoc SMS to any order's phone number directly from the orders list, no need to switch to the BSOL dashboard.
 
 = Requirements =
 
@@ -70,6 +73,9 @@ Steadfast, Paperfly, Pathao, RedX, and CarryBee. For Pathao/RedX/CarryBee, BSOL 
 3. Checkout OTP verification card on the order-received page.
 
 == Changelog ==
+
+= 1.16.0 =
+Three additions: checkout blacklist block (optional, off by default — stop checkout for a phone number blacklisted on your BSOL dashboard); two extra WooCommerce order statuses ("BSOL: Confirmed"/"BSOL: Shipped") for BSOL vocabulary with no native WC equivalent, selectable on the order edit screen and as a bulk action; a "Send SMS" button in a new SMS column on the orders list for an ad-hoc message to any order's phone number.
 
 = 1.15.0 =
 Repeat order block (optional, off by default): stop the same phone number from placing a second order within a set number of hours (configurable in BSOL Connect → Settings). Fully local — no BSOL connection needed for the check. Works on both classic and block-based checkout.

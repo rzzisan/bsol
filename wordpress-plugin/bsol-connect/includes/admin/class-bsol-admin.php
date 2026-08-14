@@ -38,6 +38,8 @@ class Bsol_Admin {
 			add_settings_error( 'bsol_messages', 'bsol_message', __( 'Activity log cleared.', 'bsol-connect' ), 'success' );
 		} elseif ( isset( $_POST['bsol_save_repeat_block'] ) && check_admin_referer( 'bsol_repeat_block_settings_action' ) ) {
 			$this->handle_repeat_block_settings_save();
+		} elseif ( isset( $_POST['bsol_save_checkout_block'] ) && check_admin_referer( 'bsol_checkout_block_settings_action' ) ) {
+			$this->handle_checkout_block_settings_save();
 		}
 
 		$balance_result = null;
@@ -130,6 +132,7 @@ class Bsol_Admin {
 			<p class="description"><?php esc_html_e( 'This site is syncing orders and fraud checks with BSOL.', 'bsol-connect' ); ?></p>
 
 			<?php $this->render_repeat_block_settings(); ?>
+			<?php $this->render_checkout_block_settings(); ?>
 
 			<form method="post" action="" onsubmit="return confirm('<?php echo esc_js( __( 'Disconnect this site from BSOL? New orders will stop syncing until you reconnect.', 'bsol-connect' ) ); ?>');">
 				<?php wp_nonce_field( 'bsol_disconnect_action' ); ?>
@@ -246,6 +249,58 @@ class Bsol_Admin {
 		update_option( 'bsol_repeat_block_message', $message ?: Bsol_Repeat_Order_Block::DEFAULT_MESSAGE );
 
 		add_settings_error( 'bsol_messages', 'bsol_message', __( 'Repeat order block settings saved.', 'bsol-connect' ), 'success' );
+	}
+
+	/**
+	 * Needs a live BSOL call per checkout (the blacklist lives on BSOL, not
+	 * locally) — unlike Repeat Order Block, so this can't be purely
+	 * WP-local, but the settings still live here rather than on the BSOL
+	 * dashboard for consistency with that section's UX.
+	 */
+	private function render_checkout_block_settings() {
+		$enabled = get_option( 'bsol_checkout_block_enabled', '0' );
+		$message = get_option( 'bsol_checkout_block_message', Bsol_Checkout_Block::DEFAULT_MESSAGE );
+		?>
+		<div class="bsol-section">
+			<h3 class="bsol-section-title"><?php esc_html_e( 'Checkout Blacklist Block', 'bsol-connect' ); ?></h3>
+			<p class="description">
+				<?php esc_html_e( 'Stop checkout for a phone number you have blacklisted on your BSOL dashboard (Orders → Blacklist). Checked against BSOL at checkout time.', 'bsol-connect' ); ?>
+			</p>
+			<form method="post" action="">
+				<?php wp_nonce_field( 'bsol_checkout_block_settings_action' ); ?>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Enable', 'bsol-connect' ); ?></th>
+						<td>
+							<label>
+								<input type="checkbox" name="bsol_checkout_block_enabled" value="1" <?php checked( $enabled, '1' ); ?> />
+								<?php esc_html_e( 'Block checkout for blacklisted phone numbers', 'bsol-connect' ); ?>
+							</label>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="bsol_checkout_block_message"><?php esc_html_e( 'Error message', 'bsol-connect' ); ?></label></th>
+						<td>
+							<input type="text" name="bsol_checkout_block_message" id="bsol_checkout_block_message"
+								value="<?php echo esc_attr( $message ); ?>" class="large-text" />
+						</td>
+					</tr>
+				</table>
+				<button type="submit" name="bsol_save_checkout_block" class="button button-primary">
+					<?php esc_html_e( 'Save', 'bsol-connect' ); ?>
+				</button>
+			</form>
+		</div>
+		<?php
+	}
+
+	private function handle_checkout_block_settings_save() {
+		update_option( 'bsol_checkout_block_enabled', isset( $_POST['bsol_checkout_block_enabled'] ) ? '1' : '0' );
+
+		$message = isset( $_POST['bsol_checkout_block_message'] ) ? sanitize_text_field( wp_unslash( $_POST['bsol_checkout_block_message'] ) ) : '';
+		update_option( 'bsol_checkout_block_message', $message ?: Bsol_Checkout_Block::DEFAULT_MESSAGE );
+
+		add_settings_error( 'bsol_messages', 'bsol_message', __( 'Checkout block settings saved.', 'bsol-connect' ), 'success' );
 	}
 
 	private function handle_disconnect_request() {

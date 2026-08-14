@@ -142,6 +142,21 @@ class Bsol_Api {
 	}
 
 	/**
+	 * Ad-hoc SMS to any phone number — not tied to a specific order.
+	 * Gateway selection, credit balance/deduction, and history logging all
+	 * happen server-side, same as BSOL dashboard's own Send SMS page.
+	 */
+	public function send_sms( $phone, $message ) {
+		return $this->remote_post(
+			'sms/send',
+			array(
+				'phone_number' => $phone,
+				'message'      => $message,
+			)
+		);
+	}
+
+	/**
 	 * $courier: 'steadfast' | 'paperfly' | 'manual' | 'pathao' | 'redx' |
 	 * 'carrybee'. For the last three, BSOL derives the location IDs a
 	 * WooCommerce order can't supply on a best-effort basis — see

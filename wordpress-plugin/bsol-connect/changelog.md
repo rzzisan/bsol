@@ -1,5 +1,31 @@
 # BSOL Connect — Changelog
 
+## 1.16.0 — 2026-08-14
+
+- **Checkout blacklist block**: optionally stop checkout for a phone
+  number this seller has blacklisted on their BSOL dashboard (Orders
+  → Blacklist) — a new `Bsol_Checkout_Block` module, settings in
+  **BSOL Connect → Settings** (off by default). Unlike Repeat Order
+  Block, this needs a real BSOL API call (the blacklist lives on
+  BSOL), reusing the same `check_fraud()` call the Customer Health
+  column already makes. Fails open on any network error. Covers both
+  classic and block-based Store API checkout.
+- **BSOL order statuses**: two new WooCommerce order statuses,
+  "BSOL: Confirmed" and "BSOL: Shipped", for BSOL vocabulary that has
+  no native WooCommerce equivalent — selectable from the order edit
+  screen and as a bulk action on the orders list. Deliberately
+  narrower than legacy zayroo-connect's 5-status version, which
+  replaced native WC statuses (processing/completed/cancelled/
+  refunded) outright — these two only add to WooCommerce's own
+  vocabulary, nothing native is touched or reinterpreted.
+- **Manual SMS**: a new "SMS" column on the orders list with a
+  one-click "Send SMS" button — type a message, it goes out via
+  BSOL's SMS gateway immediately, no need to switch to the BSOL
+  dashboard's Send SMS page. Delegates entirely to
+  `/connect/v1/sms/send` (new) → the same
+  `AdminSmsGatewayController::send()` the dashboard itself uses —
+  same gateway selection, credit deduction, and history logging.
+
 ## 1.15.0 — 2026-08-14
 
 - **Repeat order block**: optionally stop the same phone number from

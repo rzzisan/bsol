@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\Connect\ConnectCourierController;
 use App\Http\Controllers\Api\Connect\ConnectFraudController;
 use App\Http\Controllers\Api\Connect\ConnectOrderController;
 use App\Http\Controllers\Api\Connect\ConnectProductController;
+use App\Http\Controllers\Api\Connect\ConnectSmsController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
@@ -188,6 +189,8 @@ Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
         Route::post('/orders/verify-otp', [ConnectCheckoutOtpController::class, 'verify'])
             ->middleware('throttle:20,1');
         Route::post('/orders/resend-otp', [ConnectCheckoutOtpController::class, 'resend'])
+            ->middleware('throttle:20,1');
+        Route::post('/sms/send', [ConnectSmsController::class, 'send'])
             ->middleware('throttle:20,1');
     });
 });

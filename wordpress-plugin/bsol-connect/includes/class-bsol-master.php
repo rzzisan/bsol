@@ -41,6 +41,9 @@ class Bsol_Master {
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/invoice/class-bsol-invoice.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/abandoned-checkout/class-bsol-abandoned-checkout.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/repeat-order-block/class-bsol-repeat-order-block.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/checkout-block/class-bsol-checkout-block.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/order-status/class-bsol-order-status.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/manual-sms/class-bsol-manual-sms.php';
 
 		// Admin menu must render even when not connected (that's where the
 		// Settings/connect form lives), so this is always instantiated.
@@ -74,6 +77,9 @@ class Bsol_Master {
 		new Bsol_Invoice();
 		new Bsol_Abandoned_Checkout();
 		new Bsol_Repeat_Order_Block();
+		new Bsol_Checkout_Block();
+		new Bsol_Order_Status();
+		new Bsol_Manual_Sms();
 	}
 
 	public function maybe_render_woocommerce_missing_notice() {

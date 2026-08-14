@@ -267,6 +267,38 @@ jQuery( function ( $ ) {
 			window.alert( 'Cancellation failed — please try again.' );
 		} );
 	} );
+
+	// ── Manual SMS (order-list "SMS" column) ─────────────────────────────────
+
+	$( document ).on( 'click', '.bsol-send-sms-btn', function ( e ) {
+		e.preventDefault();
+		var $btn = $( this );
+		var phone = $btn.data( 'phone' );
+		var message = window.prompt( 'Send SMS to ' + phone + ':', '' );
+
+		if ( ! message ) {
+			return;
+		}
+
+		$btn.prop( 'disabled', true );
+
+		$.post( bsol_ajax.ajax_url, {
+			action: 'bsol_send_sms',
+			nonce: bsol_ajax.sms_nonce,
+			phone: phone,
+			message: message
+		} ).done( function ( response ) {
+			if ( response && response.success ) {
+				window.alert( ( response.data && response.data.message ) || 'SMS sent.' );
+			} else {
+				window.alert( ( response && response.data && response.data.message ) || 'Failed to send SMS.' );
+			}
+		} ).fail( function () {
+			window.alert( 'Failed to send SMS — please try again.' );
+		} ).always( function () {
+			$btn.prop( 'disabled', false );
+		} );
+	} );
 } );
 
 // ── Bulk/historical sync (Sync Data tab) ────────────────────────────────────

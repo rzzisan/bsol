@@ -2,7 +2,7 @@
 # This file is distributed under the GPL v2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: BSOL Connect 1.15.0\n"
+"Project-Id-Version: BSOL Connect 1.16.0\n"
 "Report-Msgid-Bugs-To: https://bsol.zyrotechbd.com\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -15,227 +15,243 @@ msgstr ""
 msgid "Activity log cleared."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:53 includes/admin/class-bsol-admin.php:59
+#: includes/admin/class-bsol-admin.php:55 includes/admin/class-bsol-admin.php:61
 msgid "BSOL Connect"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:60
+#: includes/admin/class-bsol-admin.php:62
 msgid "Order sync, product sync, courier booking & fraud checks"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:65 includes/admin/class-bsol-admin.php:123
+#: includes/admin/class-bsol-admin.php:67 includes/admin/class-bsol-admin.php:125
 msgid "Connected"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:67 includes/admin/class-bsol-admin.php:142
+#: includes/admin/class-bsol-admin.php:69 includes/admin/class-bsol-admin.php:145
 msgid "Not connected"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:77
+#: includes/admin/class-bsol-admin.php:79
 msgid "Dashboard"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:80
+#: includes/admin/class-bsol-admin.php:82
 msgid "Activity Log"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:83
+#: includes/admin/class-bsol-admin.php:85
 msgid "Sync Data"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:86
+#: includes/admin/class-bsol-admin.php:88
 msgid "Settings"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:122 includes/admin/class-bsol-admin.php:352
+#: includes/admin/class-bsol-admin.php:124 includes/admin/class-bsol-admin.php:407
 msgid "Status"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:126 includes/admin/class-bsol-admin.php:279
+#: includes/admin/class-bsol-admin.php:128 includes/admin/class-bsol-admin.php:334
 msgid "Domain"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:130
+#: includes/admin/class-bsol-admin.php:132
 msgid "This site is syncing orders and fraud checks with BSOL."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:134
+#: includes/admin/class-bsol-admin.php:137
 msgid "Disconnect this site from BSOL? New orders will stop syncing until you reconnect."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:137
+#: includes/admin/class-bsol-admin.php:140
 msgid "Disconnect"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:141
+#: includes/admin/class-bsol-admin.php:144
 msgid "Status:"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:148
+#: includes/admin/class-bsol-admin.php:151
 msgid "API Key"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:153
+#: includes/admin/class-bsol-admin.php:156
 msgid "Generate this key from your BSOL dashboard: Settings → WordPress Connect. The key is bound to this site's domain."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:159
+#: includes/admin/class-bsol-admin.php:162
 msgid "Save & Connect"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:181
+#: includes/admin/class-bsol-admin.php:184
 msgid "Connected successfully!"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:184
+#: includes/admin/class-bsol-admin.php:187
 msgid "Connection failed. Please check your API key."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:199
+#: includes/admin/class-bsol-admin.php:202
 msgid "Repeat Order Block"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:201
+#: includes/admin/class-bsol-admin.php:204
 msgid "Stop the same phone number from placing a second order within a set number of hours. Checked instantly against this site's own order history — no BSOL connection required for the check itself."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:207
+#: includes/admin/class-bsol-admin.php:210 includes/admin/class-bsol-admin.php:273
 msgid "Enable"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:211
+#: includes/admin/class-bsol-admin.php:214
 msgid "Block repeat orders from the same phone number"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:216
+#: includes/admin/class-bsol-admin.php:219
 msgid "Block window (hours)"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:223
+#: includes/admin/class-bsol-admin.php:226 includes/admin/class-bsol-admin.php:282
 msgid "Error message"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:227
+#: includes/admin/class-bsol-admin.php:230
 msgid "Use %d to show the number of hours left before they can order again."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:232
+#: includes/admin/class-bsol-admin.php:235 includes/admin/class-bsol-admin.php:290
 msgid "Save"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:248
+#: includes/admin/class-bsol-admin.php:251
 msgid "Repeat order block settings saved."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:263
-msgid "Disconnected."
+#: includes/admin/class-bsol-admin.php:265
+msgid "Checkout Blacklist Block"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:275
-msgid "Shop"
+#: includes/admin/class-bsol-admin.php:267
+msgid "Stop checkout for a phone number you have blacklisted on your BSOL dashboard (Orders → Blacklist). Checked against BSOL at checkout time."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:283
-msgid "Connected since"
+#: includes/admin/class-bsol-admin.php:277
+msgid "Block checkout for blacklisted phone numbers"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:289
-msgid "Test Fraud Check"
-msgstr ""
-
-#: includes/admin/class-bsol-admin.php:290
-msgid "Look up a phone number to confirm the connection is working — the same check runs automatically on your WooCommerce orders list."
-msgstr ""
-
-#: includes/admin/class-bsol-admin.php:294
-msgid "Check"
-msgstr ""
-
-#: includes/admin/class-bsol-admin.php:301
-msgid "Risk level:"
-msgstr ""
-
-#: includes/admin/class-bsol-admin.php:305
-msgid "Blacklisted"
-msgstr ""
-
-#: includes/admin/class-bsol-admin.php:309
-msgid "Check failed."
-msgstr ""
-
-#: includes/admin/class-bsol-admin.php:315
-msgid "Steadfast Balance"
+#: includes/admin/class-bsol-admin.php:303
+msgid "Checkout block settings saved."
 msgstr ""
 
 #: includes/admin/class-bsol-admin.php:318
-msgid "Check Balance"
+msgid "Disconnected."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:324
-msgid "Balance:"
+#: includes/admin/class-bsol-admin.php:330
+msgid "Shop"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:328
-msgid "Steadfast credentials are not configured on your BSOL dashboard."
+#: includes/admin/class-bsol-admin.php:338
+msgid "Connected since"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:341
-msgid "The last 50 calls this site made to BSOL — use this to see why an order or product sync didn't go through."
+#: includes/admin/class-bsol-admin.php:344
+msgid "Test Fraud Check"
 msgstr ""
 
 #: includes/admin/class-bsol-admin.php:345
-msgid "No activity yet."
+msgid "Look up a phone number to confirm the connection is working — the same check runs automatically on your WooCommerce orders list."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:350
-msgid "Time"
+#: includes/admin/class-bsol-admin.php:349
+msgid "Check"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:351
-msgid "Event"
+#: includes/admin/class-bsol-admin.php:356
+msgid "Risk level:"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:353
-msgid "Message"
+#: includes/admin/class-bsol-admin.php:360
+msgid "Blacklisted"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:374
-msgid "Clear the activity log?"
+#: includes/admin/class-bsol-admin.php:364
+msgid "Check failed."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:377
-msgid "Clear Log"
+#: includes/admin/class-bsol-admin.php:370
+msgid "Steadfast Balance"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:395
-msgid "Sync existing products"
+#: includes/admin/class-bsol-admin.php:373
+msgid "Check Balance"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:397
-msgid "Push every existing WooCommerce product into BSOL. New products already sync automatically as you save them — this is only for products that existed before connecting."
+#: includes/admin/class-bsol-admin.php:379
+msgid "Balance:"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:383
+msgid "Steadfast credentials are not configured on your BSOL dashboard."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:396
+msgid "The last 50 calls this site made to BSOL — use this to see why an order or product sync didn't go through."
 msgstr ""
 
 #: includes/admin/class-bsol-admin.php:400
+msgid "No activity yet."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:405
+msgid "Time"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:406
+msgid "Event"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:408
+msgid "Message"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:429
+msgid "Clear the activity log?"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:432
+msgid "Clear Log"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:450
+msgid "Sync existing products"
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:452
+msgid "Push every existing WooCommerce product into BSOL. New products already sync automatically as you save them — this is only for products that existed before connecting."
+msgstr ""
+
+#: includes/admin/class-bsol-admin.php:455
 msgid "Sync All Products"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:409
+#: includes/admin/class-bsol-admin.php:464
 msgid "Sync existing orders"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:411
+#: includes/admin/class-bsol-admin.php:466
 msgid "Push every existing WooCommerce order into BSOL, with its current status. Backfilled orders do not trigger a checkout-OTP SMS or a Facebook Purchase event."
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:414
+#: includes/admin/class-bsol-admin.php:469
 msgid "Sync All Orders"
 msgstr ""
 
-#: includes/admin/class-bsol-admin.php:431
+#: includes/admin/class-bsol-admin.php:486
 msgid "Enter a valid Bangladeshi phone number (01XXXXXXXXX)."
 msgstr ""
 
-#: includes/class-bsol-master.php:88
+#: includes/class-bsol-master.php:94
 msgid "BSOL Connect requires WooCommerce to be installed and active."
 msgstr ""
 
@@ -328,7 +344,7 @@ msgstr ""
 msgid "Print waybill"
 msgstr ""
 
-#: includes/modules/courier/class-bsol-courier.php:245 includes/modules/invoice/class-bsol-invoice.php:61
+#: includes/modules/courier/class-bsol-courier.php:245 includes/modules/invoice/class-bsol-invoice.php:61 includes/modules/manual-sms/class-bsol-manual-sms.php:66
 msgid "Unauthorized"
 msgstr ""
 
@@ -358,5 +374,30 @@ msgstr ""
 
 #: includes/modules/invoice/class-bsol-invoice.php:75
 msgid "Invoice not available."
+msgstr ""
+
+#: includes/modules/manual-sms/class-bsol-manual-sms.php:34
+msgid "SMS"
+msgstr ""
+
+#: includes/modules/manual-sms/class-bsol-manual-sms.php:58
+msgid "Send SMS"
+msgstr ""
+
+#: includes/modules/manual-sms/class-bsol-manual-sms.php:73
+msgid "Phone and message are required."
+msgstr ""
+
+#: includes/modules/manual-sms/class-bsol-manual-sms.php:80
+msgid "SMS sent."
+msgstr ""
+
+#: includes/modules/manual-sms/class-bsol-manual-sms.php:84
+msgid "Failed to send SMS."
+msgstr ""
+
+#. translators: %s: status label, e.g. "BSOL: Confirmed"
+#: includes/modules/order-status/class-bsol-order-status.php:95
+msgid "Change status to %s"
 msgstr ""
 

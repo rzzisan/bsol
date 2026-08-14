@@ -58,16 +58,23 @@ class Bsol_Helpers {
 	 * deliberately not synced — the BSOL order simply stays at whatever
 	 * status it already has (created as "pending").
 	 *
+	 * `bsol-confirmed`/`bsol-shipped` are the two custom statuses this
+	 * plugin itself registers (class-bsol-order-status.php) for BSOL
+	 * vocabulary that has no native WC equivalent — 1:1, no translation
+	 * needed since the slug already matches BSOL's own status name.
+	 *
 	 * Filterable via `bsol_connect_status_map` if a store needs a different
 	 * mapping (e.g. a custom "shipped" status plugin).
 	 */
 	public static function status_map() {
 		$map = array(
-			'processing' => 'confirmed',
-			'completed'  => 'delivered',
-			'cancelled'  => 'cancelled',
-			'refunded'   => 'returned',
-			'failed'     => 'cancelled',
+			'processing'     => 'confirmed',
+			'completed'      => 'delivered',
+			'cancelled'      => 'cancelled',
+			'refunded'       => 'returned',
+			'failed'         => 'cancelled',
+			'bsol-confirmed' => 'confirmed',
+			'bsol-shipped'   => 'shipped',
 		);
 
 		return apply_filters( 'bsol_connect_status_map', $map );

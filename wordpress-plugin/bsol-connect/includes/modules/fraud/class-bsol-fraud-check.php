@@ -80,8 +80,8 @@ class Bsol_Fraud_Check {
 		wp_enqueue_style( 'bsol-admin', BSOL_PLUGIN_URL . 'assets/css/bsol-admin.css', array(), BSOL_PLUGIN_VERSION );
 		wp_enqueue_script( 'bsol-admin', BSOL_PLUGIN_URL . 'assets/js/bsol-admin.js', array( 'jquery' ), BSOL_PLUGIN_VERSION, true );
 		// Shared script/style handle across every order-list module (fraud
-		// check + courier) — localized once here so both modules' JS can
-		// read from the same bsol_ajax object.
+		// check + courier + manual SMS) — localized once here so each
+		// module's JS can read from the same bsol_ajax object.
 		wp_localize_script(
 			'bsol-admin',
 			'bsol_ajax',
@@ -89,6 +89,7 @@ class Bsol_Fraud_Check {
 				'ajax_url'      => admin_url( 'admin-ajax.php' ),
 				'nonce'         => wp_create_nonce( 'bsol_health_nonce' ),
 				'courier_nonce' => wp_create_nonce( 'bsol_courier_nonce' ),
+				'sms_nonce'     => wp_create_nonce( 'bsol_sms_nonce' ),
 			)
 		);
 	}

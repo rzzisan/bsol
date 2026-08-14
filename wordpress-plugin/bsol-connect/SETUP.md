@@ -287,3 +287,47 @@ a real WooCommerce staging site before rolling out to sellers.
    normally.
 6. Disable the feature in Settings — confirm the same repeat phone
    number now goes through.
+
+## Checkout blacklist block (1.16.0)
+
+1. On the BSOL dashboard, go to **Orders → Blacklist** and add a test
+   phone number.
+2. Go to **BSOL Connect → Settings**, enable "Checkout Blacklist
+   Block", save.
+3. Try to check out with the blacklisted phone number — confirm it's
+   rejected with the configured message.
+4. Repeat on the block-based checkout if the staging site uses it.
+5. Try a different (non-blacklisted) phone number — confirm it goes
+   through normally.
+6. Remove the phone from the BSOL blacklist — confirm it now goes
+   through.
+7. Disable the feature in Settings — confirm a blacklisted number now
+   goes through (fail-open confirmation).
+
+## BSOL order statuses (1.16.0)
+
+1. Open any order's edit screen — confirm "BSOL: Confirmed" and
+   "BSOL: Shipped" appear in the Status dropdown, positioned after
+   Processing.
+2. Select "BSOL: Confirmed", update the order — confirm the order-list
+   status badge shows it, and confirm this triggered the normal
+   order-sync flow (check BSOL dashboard → Orders, the order's status
+   should show as "Confirmed").
+3. From the orders list, select two orders, choose bulk action
+   "Change status to BSOL: Shipped" — confirm both flip.
+4. Confirm existing statuses (Processing, Completed, Cancelled,
+   Refunded) still behave exactly as before — nothing native was
+   changed.
+
+## Manual SMS (1.16.0)
+
+1. On the orders list, confirm a new "SMS" column with an envelope
+   icon appears for every order with a phone number.
+2. Click it — confirm a browser prompt asks for the message text.
+3. Type a message, confirm — this sends a **real SMS and deducts real
+   SMS credit**, so test with a real phone you control and a small
+   test message.
+4. Confirm a success alert appears and the SMS arrives.
+5. Try with no SMS gateway assigned / zero credit on the BSOL account
+   — confirm a clear failure message appears (not a silent failure or
+   a PHP error).

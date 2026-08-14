@@ -10,7 +10,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 
 `bsol_history_and_new_context.md`-এ আলোচিত হয়েছিল যে BSOL-এর সবচেয়ে বড় গ্যাপ হলো "যাদের নিজের WooCommerce ওয়েবসাইট আছে" — তাদের জন্য কোনো কানেক্টর ছিল না। ডিজাইন সরাসরি adapt করা হয়েছে `zyro/wordpress_plugin/zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (WordPress প্লাগিন কোনো বিজনেস লজিক রাখে না, শুধু WooCommerce থেকে ডেটা তুলে BSOL API-তে পাঠায়, ফলাফল দেখায়) থেকে — সেই legacy প্লাগিনের প্রতিটা মডিউলের exact hook/nonce/AJAX-action/payload-shape আলাদাভাবে explore করে BSOL-এর নিজের backend API-র উপর বসানো হয়েছে।
 
-১৮টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
+১৯টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
 
 | ফেজ | বিষয় | মূল কমিট |
 |---|---|---|
@@ -32,6 +32,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১৬ | Multi-site WooCommerce connections — একাধিক সাইট, order/product site-tagging, order-list site filter (backend + frontend, প্লাগিন অপরিবর্তিত) | `4715d92` |
 | ১৭ | Incomplete/Abandoned Order Tracking (WooCommerce) — checkout-in-progress ক্যাপচার, সাইট-ফ্ল্যাগড, বিদ্যমান abandoned-checkouts সিস্টেম reuse (v1.14.0) | `9fe4ff8` |
 | ১৮ | Repeat order block (WooCommerce) — একই ফোন নম্বর দিয়ে X ঘণ্টার মধ্যে repeat checkout ব্লক, ক্লাসিক + block-based checkout দুটোতেই, সম্পূর্ণ WP-লোকাল (v1.15.0) | `6e28935` |
+| ১৯ | চেকআউট ব্ল্যাকলিস্ট ব্লক + BSOL order status (Confirmed/Shipped) + wp-admin থেকে Manual SMS (v1.16.0) | `PENDING_COMMIT` |
 
 ---
 
@@ -69,6 +70,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | POST | `/connect/v1/fraud/courier-health` | `ConnectFraudController@courierHealth` | প্রতি-কুরিয়ার ডেলিভারি breakdown (Customer Health প্রোগ্রেস বার-এর ডেটা সোর্স) |
 | POST | `/connect/v1/orders/verify-otp` | `ConnectCheckoutOtpController@verify` | চেকআউট OTP ভেরিফাই (order-received পেজ থেকে relay) |
 | POST | `/connect/v1/orders/resend-otp` | `ConnectCheckoutOtpController@resend` | OTP পুনরায় পাঠানো |
+| POST | `/connect/v1/sms/send` | `ConnectSmsController@send` | Ad-hoc SMS (Phase ১৯) — `AdminSmsGatewayController::send()`-কে delegate, wp-admin অর্ডার লিস্ট থেকে Manual SMS বাটন এটাই কল করে |
 
 Dashboard-facing (Sanctum, `/api/wordpress/*`, `backend/app/Http/Controllers/Api/WordpressApiKeyController.php`):
 
@@ -81,7 +83,7 @@ Dashboard-facing (Sanctum, `/api/wordpress/*`, `backend/app/Http/Controllers/Api
 | GET | `/wordpress/plugin-download` | (পাবলিক) প্লাগিন zip — সোর্স থেকে **প্রতি রিকোয়েস্টে dynamically তৈরি**, তাই কখনো stale হয় না |
 | GET | `/wordpress/plugin-version` | (পাবলিক) `{version, download_url}` — self-update notice-এর জন্য (Phase ১৩) |
 
-Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthController,ConnectOrderController,ConnectProductController,ConnectCourierController,ConnectFraudController}.php` + `backend/app/Models/PlatformApiKey.php` + `backend/app/Http/Middleware/AuthenticatePlatformApiKey.php`।
+Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthController,ConnectOrderController,ConnectProductController,ConnectCourierController,ConnectFraudController,ConnectSmsController}.php` + `backend/app/Models/PlatformApiKey.php` + `backend/app/Http/Middleware/AuthenticatePlatformApiKey.php`।
 
 **Multi-site (Phase ১৬)**: একজন সেলার একাধিক WooCommerce সাইট কানেক্ট করতে পারে — `platform_api_keys`-এর আগের `unique('user_id')` তুলে `unique(['user_id','domain'])` করা হয়েছে (`FacebookPageConnection`-এর precedent অনুসরণ করে)। প্রতিটা synced order/product-এ এখন `platform_api_key_id` কলাম আছে (কোন সাইট থেকে এসেছে), আর `orders`/`products`-এর `(user_id, source_ref)` unique index widen করে `(user_id, platform_api_key_id, source_ref)` করা হয়েছে — কারণ দুইটা আলাদা WooCommerce সাইট নিজেদের অর্ডার/প্রোডাক্ট ১, ২, ৩... থেকে নাম্বার করে, `platform_api_key_id` ছাড়া দ্বিতীয় সাইট কানেক্ট করলেই ডেটা কলিশন হতো। প্রতিটা Connect-surface অর্ডার/প্রোডাক্ট lookup (`ConnectOrderController`, `ConnectCourierController::findOrder()`, `ConnectCheckoutOtpController::findOrder()`, `ConnectProductController::sync()`) এখন requesting site-এর `platform_api_key_id` দিয়ে scoped। `PushWooCommerceStockJob` এখন "যেকোনো connected key" না, প্রোডাক্ট/ভ্যারিয়েন্টের নিজস্ব `platform_api_key_id` থেকে সঠিক সাইট resolve করে। ড্যাশবোর্ডে: WordPress Connect পেজ এখন একটা লিস্ট UI (`frontend/src/app/dashboard/settings/wordpress/page.tsx`), Order লিস্টে site filter + domain badge (`frontend/src/app/dashboard/orders/page.tsx`)।
 
@@ -92,7 +94,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.15.0)
+wordpress-plugin/bsol-connect/          (v1.16.0)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
@@ -115,6 +117,9 @@ wordpress-plugin/bsol-connect/          (v1.15.0)
       invoice/class-bsol-invoice.php           — "Invoice" কলাম, কোনো booking precondition নেই; admin-post proxy waybill-এরই মতো (Phase ১২)
       abandoned-checkout/class-bsol-abandoned-checkout.php — **দ্বিতীয় storefront মডিউল** (checkout-otp-এর পরে) — checkout-in-progress ক্যাপচার, WC()->cart থেকে সরাসরি (DOM scraping না); nopriv AJAX relay (Phase ১৭)
       repeat-order-block/class-bsol-repeat-order-block.php — একই ফোনে repeat checkout ব্লক, সম্পূর্ণ WP-লোকাল (কোনো BSOL API কল নেই); classic (`woocommerce_checkout_process`) + block checkout (`woocommerce_store_api_checkout_update_order_from_request` + `RouteException`) দুটোই কভার্ড, সেটিংস wp-admin-এই (Phase ১৮)
+      checkout-block/class-bsol-checkout-block.php — repeat-order-block-এর মতোই dual classic+block hook, কিন্তু ব্ল্যাকলিস্ট BSOL-এ থাকায় প্রতি checkout-এ আসল `check_fraud()` কল করে; fail-open (Phase ১৯)
+      order-status/class-bsol-order-status.php — 2টা নতুন WC order status রেজিস্টার (`bsol-confirmed`, `bsol-shipped`) — BSOL vocabulary-র যে অংশের native WC সমতুল্য নেই, বিদ্যমান status ছোঁয়া হয় না; bulk action-ও যোগ (Phase ১৯)
+      manual-sms/class-bsol-manual-sms.php — অর্ডার লিস্টে "SMS" কলাম, এক-ক্লিকে ad-hoc SMS পাঠানো; `/connect/v1/sms/send`-কে delegate, নতুন কোনো sending লজিক নেই (Phase ১৯)
   assets/
     css/bsol-admin.css, js/bsol-admin.js       — wp-admin-only (health-bar polling, courier বাটন হ্যান্ডলার, bulk-sync progress bar — এই দুটোর জন্য আলাদা স্বাধীন jQuery(ready) ব্লক, যেহেতু `bsol_ajax`/`bsol_bulk_sync` আলাদা স্ক্রিনে লোকালাইজ হয়)
     css/bsol-checkout-otp.css, js/bsol-checkout-otp.js — storefront-only, শুধু order-received পেজে enqueue হয়
@@ -122,7 +127,7 @@ wordpress-plugin/bsol-connect/          (v1.15.0)
   changelog.md, SETUP.md, readme.txt
 ```
 
-`Bsol_Master::load_dependencies()`-এ সব require + `Bsol_Admin` সবসময় ইনস্ট্যান্শিয়েট (menu সবসময় দেখা যায়), বাকি মডিউলগুলো (`Bsol_Order_Sync`, `Bsol_Fraud_Check`, `Bsol_Product_Sync`, `Bsol_Courier`, `Bsol_Checkout_Otp`, `Bsol_Bulk_Sync`, `Bsol_Invoice`, `Bsol_Abandoned_Checkout`, `Bsol_Repeat_Order_Block`) শুধু `is_connected() && class_exists('WooCommerce')` হলে। `Bsol_Order_Sync`/`Bsol_Product_Sync` এখন `$this->admin`-এর মতোই `Bsol_Master`-এ property হিসেবে রাখা হয় (আগে create-then-discard ছিল) — `Bsol_Bulk_Sync`-এর constructor-এ inject করার জন্য, যাতে সেই ২টা ক্লাস দ্বিতীয়বার `new` না করতে হয় (করলে তাদের constructor-এর hook রেজিস্ট্রেশন duplicate হয়ে যেত)।
+`Bsol_Master::load_dependencies()`-এ সব require + `Bsol_Admin` সবসময় ইনস্ট্যান্শিয়েট (menu সবসময় দেখা যায়), বাকি মডিউলগুলো (`Bsol_Order_Sync`, `Bsol_Fraud_Check`, `Bsol_Product_Sync`, `Bsol_Courier`, `Bsol_Checkout_Otp`, `Bsol_Bulk_Sync`, `Bsol_Invoice`, `Bsol_Abandoned_Checkout`, `Bsol_Repeat_Order_Block`, `Bsol_Checkout_Block`, `Bsol_Order_Status`, `Bsol_Manual_Sms`) শুধু `is_connected() && class_exists('WooCommerce')` হলে। `Bsol_Order_Sync`/`Bsol_Product_Sync` এখন `$this->admin`-এর মতোই `Bsol_Master`-এ property হিসেবে রাখা হয় (আগে create-then-discard ছিল) — `Bsol_Bulk_Sync`-এর constructor-এ inject করার জন্য, যাতে সেই ২টা ক্লাস দ্বিতীয়বার `new` না করতে হয় (করলে তাদের constructor-এর hook রেজিস্ট্রেশন duplicate হয়ে যেত)।
 
 ---
 
@@ -199,11 +204,30 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 - **বাকি সময় দেখায়, পুরো window না**: `ceil($hours - $hours_since_last_order)` — legacy zayroo সবসময় পুরো configured window দেখাত, elapsed time যাই হোক না কেন।
 - **ফোন নরমালাইজ করে ম্যাচ করা হয়** (`Bsol_Helpers::clean_bd_phone_number()`), raw `$_POST`/`$order->get_billing_phone()` না — `+880`/স্পেস/ড্যাশ ভ্যারিয়েশনেও আগের প্লেইন `01XXXXXXXXX` অর্ডারের সাথে ম্যাচ করে (legacy zayroo raw ভ্যালু দিয়ে সরাসরি কোয়েরি করত)।
 
+### Checkout blacklist block (`class-bsol-checkout-block.php`, Phase ১৯)
+
+Repeat-order-block-এরই দুই-হুক প্যাটার্ন (classic + block checkout), কিন্তু ভিন্ন ডেটা সোর্স — ব্ল্যাকলিস্ট BSOL-এ থাকে (Orders → Blacklist), এই সাইটের নিজের ডেটা না, তাই প্রতি checkout-এ আসল BSOL কল লাগে। নতুন কোনো API মেথড না — Customer Health কলাম আর Settings-এর "Test Fraud Check" টুল যে `check_fraud()` ব্যবহার করে সেটাই reuse, `is_blacklisted` ফ্ল্যাগ পড়ে। ব্যাকএন্ডে ব্ল্যাকলিস্ট শুধু ফোন-ভিত্তিক (কোনো IP ব্ল্যাকলিস্ট নেই) — legacy zayroo IP-ও পাঠাত, backend কখনো সেটা পড়ত না বলে এখানে বাদ। যেকোনো নেটওয়ার্ক এরর/ফেইলড রেসপন্সে fail-open — কখনো checkout ভাঙে না।
+
+### BSOL order statuses (`class-bsol-order-status.php`, Phase ১৯)
+
+দুটো নতুন WC order status রেজিস্টার করে — `bsol-confirmed`, `bsol-shipped` — যেগুলোর কোনো native WooCommerce সমতুল্য নেই। **ইচ্ছাকৃতভাবে legacy zayroo-র চেয়ে সংকীর্ণ**: zayroo ৫টা কাস্টম স্ট্যাটাস রেজিস্টার করে native processing/completed/cancelled/refunded-এর ব্যবহার পুরোপুরি প্রতিস্থাপন করত (§৭.১ item ৫-এ ফ্ল্যাগ করা রিস্ক — native status-এর অর্থ হাইজ্যাক করলে অন্য প্লাগিন/রিপোর্ট ভাঙতে পারে)। এখানে শুধু ২টা নতুন স্ট্যাটাস *যোগ* হয় — Processing/Completed-এর অর্থ অপরিবর্তিত।
+
+- বিশুদ্ধ **আউটবাউন্ড-দিকের সুবিধা** — BSOL কখনো order status ওয়ার্ডপ্রেসে push back করে না (stock push-back-এর মতো কোনো ইনবাউন্ড চ্যানেল নেই এই ফিচারে)। সেলার wp-admin-এ "BSOL: Confirmed" সিলেক্ট করলে সেটা `woocommerce_order_status_changed`-এই ফায়ার করে, `class-bsol-order-sync.php`-এর বিদ্যমান `handle_status_change()` হুকই ধরে — `Bsol_Helpers::status_map()`-এ শুধু ২টা 1:1 এন্ট্রি (`bsol-confirmed => confirmed`, `bsol-shipped => shipped`) যোগ করা লাগল, নতুন কোনো sync লজিক না।
+- Order edit স্ক্রিনের status dropdown-এ Processing-এর ঠিক পরে বসে + অর্ডার লিস্টে bulk action ("Change status to BSOL: Confirmed"/"...Shipped") — dual legacy+HPOS `bulk_actions-*`/`handle_bulk_actions-*` ফিল্টার।
+
+### Manual SMS (`class-bsol-manual-sms.php`, Phase ১৯)
+
+অর্ডার লিস্টে নতুন "SMS" কলাম — একটা বাটন, ক্লিক করলে `window.prompt()`-এ মেসেজ লিখে পাঠানো যায় (এই প্লাগিনে কোনো কাস্টম মোডাল ফ্রেমওয়ার্ক নেই কোথাও, তাই এখানেও কাস্টম মোডাল বানানো হয়নি — courier/health বাটনের মতোই native browser prompt/alert)।
+
+- **নতুন backend endpoint**: `POST /connect/v1/sms/send` (`ConnectSmsController`) — dashboard-এর বিদ্যমান `AdminSmsGatewayController::send()`-কে delegate করে (gateway selection, credit deduction, `SmsHistory` লগ — সব ফ্রি-তে ইনহেরিট, নতুন কোনো sending লজিক লেখা হয়নি)।
+- **নতুন gotcha, প্রথমবার এই ধরনের delegate-এ**: `AdminSmsGatewayController::send()` `auth()->user()` না, `$request->user()` পড়ে — synthetic `Request::create()`-এর নিজস্ব কোনো user resolver থাকে না ডিফল্টে, তাই `$sendRequest->setUserResolver(fn () => auth()->user())` explicit সেট করা লাগে, নাহলে `$actor` চুপচাপ `null` হয়ে "no gateway assigned" এরর দিত even একজন merchant-এর যার আসলে gateway assigned আছে। বাকি সব Connect controller-এর delegate টার্গেট `auth()->user()` (গ্লোবাল হেল্পার) পড়ে বলে এই সমস্যা হয়নি — বিস্তারিত §৮ item ১৫-এ।
+- **কোনো real SMS পাঠিয়ে যাচাই করা হয়নি** এই ফিচারের QA-তে — সেটা real credit খরচ করত + real ফোনে মেসেজ যেত। PHPUnit-এ `Http::fake()` দিয়ে পুরো flow (delegate, auth resolution, validation, gateway/credit যাচাই, history লগ) কভার্ড; wp-admin বাটন নিজে হাতে টেস্ট করতে হবে (`SETUP.md`)।
+
 ---
 
 ## ৬. টেস্টিং কনভেনশন (এই কানেক্টরের জন্য প্রতিষ্ঠিত)
 
-- Feature test ফাইল: `backend/tests/Feature/{ConnectApiTest,PlatformApiKeyApiTest,ConnectProductSyncTest,ConnectCourierTest,WooCommerceStockPushTest,CourierLocationResolverTest,ConnectCheckoutOtpTest}.php`।
+- Feature test ফাইল: `backend/tests/Feature/{ConnectApiTest,PlatformApiKeyApiTest,ConnectProductSyncTest,ConnectCourierTest,WooCommerceStockPushTest,CourierLocationResolverTest,ConnectCheckoutOtpTest,ConnectAbandonedCheckoutTest,ConnectSmsTest}.php`।
 - সব টেস্ট **isolated Postgres schema**-তে যাচাই করা হয়েছে, `hybrid_platform` প্রোডাকশন DB কখনো টাচ হয়নি:
   ```bash
   PGPASSWORD='...' psql -U hybrid_app -h 127.0.0.1 -d hybrid_platform -c "CREATE SCHEMA IF NOT EXISTS test_xxx;"
@@ -227,14 +251,14 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 
 ## ৭.১ Zayroo Connect-এ ছিল, BSOL Connect-এ এখনো নেই
 
-`zyro/wordpress_plugin/zayroo-connect` (legacy precursor) এর প্রতিটা মডিউল ঘেঁটে (2026-08-13) বর্তমান `bsol-connect`-এর সাথে তুলনা করে পাওয়া গ্যাপ — কোনোটাই এখনো implement হয়নি, শুধু চিহ্নিত করা আছে এখানে যাতে ভবিষ্যতে ভুলে না যাওয়া হয় বা দুবার আবিষ্কার করতে না হয়:
+`zyro/wordpress_plugin/zayroo-connect` (legacy precursor) এর প্রতিটা মডিউল ঘেঁটে (2026-08-13) বর্তমান `bsol-connect`-এর সাথে তুলনা করে পাওয়া গ্যাপ। ৬টার মধ্যে ৫টা সমাধান হয়ে গেছে (Phase ১৭-১৯) — শুধু item ১ (Facebook পূর্ণাঙ্গ ফানেল) বাকি:
 
 1. **Facebook পূর্ণাঙ্গ ফানেল ট্র্যাকিং** — zayroo-তে client-side Pixel বেস কোড ইনজেকশন (`wp_head`), PageView/ViewContent, AddToCart, আর কাস্টম-স্ট্যাটাস-ভিত্তিক ইভেন্ট (Confirmed/Shipping/Returned/Delivered — প্রতিটা আলাদা ইভেন্ট নামে) ছিল, Pixel + server-side CAPI একসাথে (`event_id` দিয়ে dedup)। BSOL-এর Phase ১০ শুধু **server-side Purchase** পাঠায় (`SendFacebookCapiPurchaseEventJob`) — client pixel install করে না, funnel-এর বাকি ধাপ ট্র্যাক করে না। *সতর্কতা: zayroo-র কোডে পিক্সেল আইডি hardcoded ছিল একটা নির্দিষ্ট সাইটের জন্য (zisan.me, Website ID 12) — as-is কপি করার মতো না; ধারণাটা জেনেরিকভাবে re-implement করতে হবে (সেলারের নিজস্ব `FacebookPixelSetting` থেকে)।*
 2. ~~**Incomplete/Abandoned Order Tracking (WooCommerce)**~~ — **সমাধান হয়েছে, Phase ১৭ (v1.14.0)।** নিচে §৯ দেখুন।
-3. **চেকআউট-টাইম ব্লকিং (fraud/blacklist)** — zayroo ফোন+IP দিয়ে চেকআউটের আগে SaaS-কে জিজ্ঞেস করত ("allowed" কিনা), `false` হলে সরাসরি order block করত (`woocommerce_checkout_process` হুকে `wc_add_notice()`)। BSOL-এর Customer Health কলাম শুধু তথ্যভিত্তিক (admin দেখে সিদ্ধান্ত নেয়) — কোনো ব্ল্যাকলিস্টেড/high-risk নম্বর দিয়ে আজও চেকআউট সম্পূর্ণ করা যায়, আটকায় না।
+3. ~~**চেকআউট-টাইম ব্লকিং (fraud/blacklist)**~~ — **সমাধান হয়েছে, Phase ১৯ (v1.16.0)।** নিচে §৫-এর "Checkout blacklist block" সাব-সেকশনে।
 4. ~~**Repeat-order block**~~ — **সমাধান হয়েছে, Phase ১৮ (v1.15.0)।** উপরে §১০ দেখুন।
-5. **BSOL vocabulary-এর কাস্টম WooCommerce order status** — zayroo WooCommerce-এর নিজস্ব status taxonomy-তে সরাসরি ৫টা কালার-কোডেড status রেজিস্টার করত (+ bulk action দিয়ে একসাথে বদলানো)। BSOL শুধু ম্যাপ করে ভেতরে ভেতরে (`Bsol_Helpers::status_map()`), WooCommerce-এর native status/UI স্পর্শ করে না — এটা আংশিক ইচ্ছাকৃত ডিজাইন-চয়েসও (native status বদলালে অন্য প্লাগিন/রিপোর্ট ভাঙতে পারে), কিন্তু সেলারের জন্য "এক জায়গায় ইউনিফাইড ভোকাবুলারি" সুবিধাটা নেই।
-6. **wp-admin থেকে সরাসরি Manual "Send SMS"** — ছোট সুবিধা, BSOL dashboard-এই আছে (`/sms/send`) কিন্তু প্লাগিন থেকে শর্টকাট নেই।
+5. ~~**BSOL vocabulary-এর কাস্টম WooCommerce order status**~~ — **সমাধান হয়েছে, Phase ১৯ (v1.16.0)।** নিচে §৫-এর "BSOL order statuses" সাব-সেকশনে — legacy zayroo-র চেয়ে সংকীর্ণ স্কোপে (native status touch করা হয়নি, শুধু ২টা নতুন যোগ)।
+6. ~~**wp-admin থেকে সরাসরি Manual "Send SMS"**~~ — **সমাধান হয়েছে, Phase ১৯ (v1.16.0)।** নিচে §৫-এর "Manual SMS" সাব-সেকশনে।
 
 **যাচাই করে "মিসিং না" বলে বাতিল করা হয়েছে** (যাতে ভুল করে আবার "গ্যাপ" মনে না হয়): SMS automation on status change — zayroo-র `trigger_sms.php` webhook-এর সমতুল্য কাজ BSOL-এ ভিন্নভাবে কভার্ড, `OrderStatusService::transition()` (যেটা `ConnectOrderController::syncStatus()`-ও ব্যবহার করে) প্রতিটা status transition-এ `SmsAutomationService` ট্রিগার করে, source নির্বিশেষে — WooCommerce অর্ডারের জন্য আলাদা কোনো ওয়্যারিং লাগে না।
 
@@ -259,6 +283,18 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 
 ---
 
+## ১১. Phase ১৯ — Checkout Blacklist Block + BSOL Order Statuses + Manual SMS (WooCommerce)
+
+§৭.১ item ৩, ৫, ৬-এর বাস্তবায়ন — একসাথে এক ফেজে (তিনটাই ছোট, wp-admin/checkout-focused)। বিস্তারিত ডিজাইন §৫-এর তিনটা সাব-সেকশনে ("Checkout blacklist block", "BSOL order statuses", "Manual SMS")। সংক্ষেপে:
+
+- **Checkout blacklist block**: repeat-order-block-এর dual classic+block hook shape পুনরায় ব্যবহার, কিন্তু এবার আসল BSOL কল করে (`check_fraud()` reuse) — ব্ল্যাকলিস্ট BSOL-এ থাকে, লোকাল না। ফোন-ভিত্তিক শুধু (কোনো IP ব্ল্যাকলিস্ট backend-এ নেই)। Fail-open।
+- **BSOL order statuses**: `bsol-confirmed`/`bsol-shipped` — legacy zayroo-র চেয়ে সংকীর্ণ (native status touch না করে শুধু নতুন যোগ)। বিশুদ্ধ আউটবাউন্ড সুবিধা — `Bsol_Helpers::status_map()`-এ ২টা 1:1 এন্ট্রি যোগ ছাড়া কোনো নতুন sync লজিক লাগেনি।
+- **Manual SMS**: নতুন `POST /connect/v1/sms/send` (`ConnectSmsController`) `AdminSmsGatewayController::send()`-কে delegate করে — একটা নতুন গটচা ধরা পড়ল এই delegate-এ, যেটা আগের কোনো Connect controller-এ হয়নি: `send()` `$request->user()` পড়ে (`auth()->user()` না), তাই synthetic request-এ explicit `setUserResolver()` লাগে (§৮ item ১৫)।
+
+কোনো real SMS পাঠিয়ে যাচাই করা হয়নি (real credit খরচ + real ফোনে মেসেজ যেত বলে) — PHPUnit `Http::fake()`-এ পুরো ফ্লো কভার্ড, wp-admin বাটন ম্যানুয়ালি টেস্ট করতে হবে।
+
+---
+
 ## ৮. মূল ডিজাইন সিদ্ধান্ত (ভবিষ্যতে অনুসরণ করার জন্য)
 
 1. **Delegate, duplicate না** — প্রতিটা Connect controller বিদ্যমান dashboard controller-কে synthetic `Request::create()` দিয়ে কল করে। এতে প্ল্যান-লিমিট, stock check, accounting side-effect ফ্রি-তে আসে, আর দুই জায়গায় লজিক maintain করতে হয় না।
@@ -275,3 +311,4 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 12. **Storefront-facing রিলে wp-admin রিলে-রই এক্সটেনশন, নতুন প্যাটার্ন না** — শপারের ব্রাউজারে API key নেই বলে checkout OTP verify/resend WP AJAX দিয়ে সার্ভার-সাইড relay হয় (`wp_ajax_nopriv_*`) — ঠিক সেই একই browser→WP-AJAX→BSOL শেপ যেটা courier book/track/cancel-এর জন্য wp-admin-এ আগে থেকেই ব্যবহৃত হচ্ছিল, শুধু ট্রিগার পয়েন্ট storefront-এ (Phase ৯, `class-bsol-checkout-otp.php` — এই প্লাগিনের প্রথম non-admin মডিউল)।
 13. **নতুন channel জেনারেলাইজ করার আগে চেক করো configuration layer আসলেই re-scope লাগবে কিনা** — decision #11-এর (OTP) বিপরীত উদাহরণ: Facebook CAPI-র জন্য `FacebookPixelSetting` already shop-wide ছিল (`unique('user_id')`, কোনো `landing_page_id` না) — তাই Phase ১০-এ কোনো নতুন migration/toggle/UI লাগেইনি, শুধু একটা নতুন dispatch call site আর প্লাগিন থেকে WooCommerce-এর নিজস্ব capture করা IP/UA ফরওয়ার্ড করা লাগল। একই "জেনারেলাইজ করো" কাজ ভিন্ন ফিচারে সম্পূর্ণ ভিন্ন পরিমাণ কাজ হতে পারে — অনুমান না করে প্রতিটার actual scoping যাচাই করা জরুরি।
 14. **Eloquent eager-loaded relation key JSON-এ snake_case হয়ে যায়, ফ্রন্টএন্ড টাইপ camelCase লিখলে চুপচাপ `undefined`** — `Model::$snakeAttributes` (ডিফল্ট `true`) DB কলামের মতোই relation method নামও সিরিয়ালাইজেশনে snake_case করে দেয় (`landingPage()` → `"landing_page"`, `platformApiKey()` → `"platform_api_key"`)। Phase ১৭-এ ধরা পড়েছিল: dashboard-এর Abandoned Checkouts পেজ (list + detail) camelCase key পড়ছিল, তাই Source কলাম সবসময় "—" দেখাচ্ছিল — নতুন WooCommerce রো-তে চোখে পড়ল (সাইট-ফ্ল্যাগ না দেখানো স্পষ্ট ভুল লাগে), কিন্তু আসলে **প্রি-এক্সিস্টিং landing-page রো-গুলোও একই বাগে ভুগছিল**, শুধু ফাঁকা লেবেল স্বাভাবিক লাগে বলে চোখে পড়েনি। ফিক্স: `frontend/src/app/dashboard/abandoned-checkouts/{page.tsx,[id]/page.tsx}` — টাইপ + সব ব্যবহার snake_case-এ। শেখা: backend থেকে নতুন eager-loaded relation ফ্রন্টএন্ডে ব্যবহার করার আগে actual JSON response (curl/tinker `toArray()`) চেক করো, method নাম থেকে অনুমান কোরো না।
+15. **Delegate টার্গেট controller `$request->user()` পড়লে synthetic `Request::create()`-এ explicit `setUserResolver()` লাগে** — এতদিনের প্রতিটা Connect controller যে dashboard controller-কে delegate করেছে (OrderController, ProductController, CourierController...) সেগুলো সবাই গ্লোবাল `auth()->user()` হেল্পার পড়ে, যেটা container-bound আসল request-এর সাথে বাঁধা, তাই synthetic request-এও কাজ করে যায় বিনা বাড়তি কাজে। Phase ১৯-এ প্রথমবার একটা ব্যতিক্রম পাওয়া গেল — `AdminSmsGatewayController::send()` `$request->user()` পড়ে (instance-bound, ডিফল্টে কোনো resolver নেই একটা fresh `Request::create()`-এ) — `$sendRequest->setUserResolver(fn () => auth()->user())` explicit না করলে `$actor` নীরবে `null` হতো, merchant-এর gateway assigned থাকা সত্ত্বেও "no gateway assigned" এরর দিত। শেখা: নতুন কোনো controller delegate করার আগে সেটা `$request->user()` না `auth()->user()` পড়ে সেটা grep করে দেখে নেওয়া উচিত।

@@ -30,6 +30,8 @@ delete_option( 'bsol_webhook_secret' );
 delete_option( 'bsol_repeat_block_enabled' );
 delete_option( 'bsol_repeat_block_hours' );
 delete_option( 'bsol_repeat_block_message' );
+delete_option( 'bsol_checkout_block_enabled' );
+delete_option( 'bsol_checkout_block_message' );
 
 global $wpdb;
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( '_transient_bsol_health_' ) . '%' ) );
