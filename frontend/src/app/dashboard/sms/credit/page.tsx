@@ -5,16 +5,14 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
   CreditCard,
-  Download,
   FileText,
   Loader2,
   MessageSquare,
   Wallet,
-  XCircle,
 } from "lucide-react";
 import UserShell from "@/components/user-shell";
+import { GlowBackdrop, HistoryRow, ReceiptCard, ReceiptRow, SectionHeader } from "@/components/billing-ui";
 import { getStoredLocale, getStoredToken, openAuthenticatedPdf, type Locale } from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -136,21 +134,6 @@ const text = {
     paymentStatus: { pending: "Pending", approved: "Paid", rejected: "Rejected" } as Record<string, string>,
   },
 };
-
-function StatusPill({ status, label }: { status: "pending" | "approved" | "rejected"; label: string }) {
-  const cls =
-    status === "approved"
-      ? "bg-emerald-100 text-emerald-700"
-      : status === "rejected"
-      ? "bg-rose-100 text-rose-700"
-      : "bg-amber-100 text-amber-700";
-  const Icon = status === "approved" ? CheckCircle2 : status === "rejected" ? XCircle : Clock;
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${cls}`}>
-      <Icon size={12} /> {label}
-    </span>
-  );
-}
 
 export default function Page() {
   const [locale] = useState<Locale>(getStoredLocale);
@@ -410,23 +393,27 @@ export default function Page() {
       ) : (
         <>
           {/* Balance hero */}
-          <section className="catv-panel mx-4 mb-4 overflow-hidden">
+          <section className="catv-panel relative mx-4 mb-4 overflow-hidden">
             <div
-              className="p-5 sm:p-6"
+              className="relative p-5 sm:p-6"
               style={{
                 background:
-                  "linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--surface)) 0%, var(--surface) 65%)",
+                  "linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--surface)) 0%, var(--surface) 70%)",
               }}
             >
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent)] text-white">
-                  <Wallet size={20} />
+              <GlowBackdrop />
+              <div className="relative flex items-center gap-4">
+                <div
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-md"
+                  style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #27c0ae))" }}
+                >
+                  <Wallet size={24} />
                 </div>
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{t.balance}</div>
-                  <div className="text-2xl font-bold text-[var(--foreground)]">
+                  <div className="text-3xl font-extrabold text-[var(--foreground)]">
                     {(rateInfo?.balance ?? 0).toLocaleString()}
-                    <span className="ml-1 text-sm font-normal text-[var(--muted)]">{t.credits}</span>
+                    <span className="ml-1.5 text-sm font-medium text-[var(--muted)]">{t.credits}</span>
                   </div>
                 </div>
               </div>
@@ -435,24 +422,27 @@ export default function Page() {
 
           {/* Amount picker */}
           <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
-            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[var(--muted)]">
-              <MessageSquare size={15} /> {t.quickPick}
-            </h3>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {QUICK_AMOUNTS.map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => setCreditsInput(String(amt))}
-                  className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
-                    creditsInput === String(amt)
-                      ? "border-[var(--accent)] bg-[var(--surface-soft)] text-[var(--foreground)] shadow-sm ring-1 ring-[var(--accent)]"
-                      : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent)]"
-                  }`}
-                >
-                  {amt.toLocaleString()}
-                </button>
-              ))}
+            <SectionHeader icon={MessageSquare}>{t.quickPick}</SectionHeader>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {QUICK_AMOUNTS.map((amt) => {
+                const selected = creditsInput === String(amt);
+                return (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setCreditsInput(String(amt))}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                      selected
+                        ? "border-transparent text-white"
+                        : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--foreground)]"
+                    }`}
+                    style={selected ? { background: "var(--accent)" } : undefined}
+                  >
+                    {selected ? <CheckCircle2 size={14} /> : null}
+                    {amt.toLocaleString()}
+                  </button>
+                );
+              })}
             </div>
             <label className="mb-1 block text-xs text-[var(--muted)]">{t.customAmount}</label>
             <input
@@ -469,24 +459,19 @@ export default function Page() {
             ) : null}
 
             {rateInfo && isValidAmount ? (
-              <div className="mt-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-soft)] p-4 text-sm">
-                <div className="flex justify-between py-1">
-                  <span className="text-[var(--muted)]">{t.rate}</span>
-                  <span className="font-medium">৳{rateInfo.rate_per_credit}</span>
-                </div>
-                <div className="mt-1 flex justify-between border-t border-[var(--border)] pt-2 text-base font-bold text-[var(--foreground)]">
-                  <span>{t.totalPrice}</span>
-                  <span>৳{totalPrice.toLocaleString()}</span>
-                </div>
+              <div className="mt-4">
+                <ReceiptCard>
+                  <ReceiptRow label={t.rate} value={`৳${rateInfo.rate_per_credit}`} tone="muted" />
+                  <div className="my-2 border-t border-dashed" style={{ borderColor: "var(--border)" }} />
+                  <ReceiptRow label={t.totalPrice} value={`৳${totalPrice.toLocaleString()}`} bold />
+                </ReceiptCard>
               </div>
             ) : null}
           </section>
 
           {/* Bill payment */}
           <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
-            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[var(--muted)]">
-              <CreditCard size={15} /> {t.payTitle}
-            </h3>
+            <SectionHeader icon={CreditCard}>{t.payTitle}</SectionHeader>
 
             {rateInfo?.bkash_gateway_enabled && rateInfo.bkash_api_type === "pgw" && (
               <div className="mb-3">
@@ -503,7 +488,8 @@ export default function Page() {
                   type="button"
                   id="bKash_button"
                   disabled={!isValidAmount || !pgwScriptLoaded}
-                  className="w-full rounded-xl bg-[#E2136E] px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-105 disabled:opacity-60"
+                  className="w-full rounded-xl px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
+                  style={{ background: "linear-gradient(135deg, #E2136E, #b90f59)" }}
                 >
                   {t.payWithBkash}
                 </button>
@@ -515,7 +501,8 @@ export default function Page() {
                 type="button"
                 onClick={() => void payWithBkash()}
                 disabled={bkashPaying || !isValidAmount}
-                className="mb-3 w-full rounded-xl bg-[#E2136E] px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-105 disabled:opacity-60"
+                className="mb-3 w-full rounded-xl px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
+                style={{ background: "linear-gradient(135deg, #E2136E, #b90f59)" }}
               >
                 {bkashPaying ? t.payingWithBkash : t.payWithBkash}
               </button>
@@ -559,7 +546,7 @@ export default function Page() {
                     type="file"
                     accept="image/*"
                     onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)}
-                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--accent)] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
                   />
                   <button
                     type="submit"
@@ -578,46 +565,26 @@ export default function Page() {
 
           {/* History */}
           <section className="catv-panel mx-4 mb-6 overflow-hidden">
-            <h3 className="flex items-center gap-1.5 p-4 pb-3 text-sm font-semibold text-[var(--muted)] sm:px-5">
-              <FileText size={15} /> {t.history}
-            </h3>
+            <div className="p-4 pb-1 sm:px-5">
+              <SectionHeader icon={FileText}>{t.history}</SectionHeader>
+            </div>
             {purchases.length === 0 ? (
               <p className="px-4 pb-6 text-center text-sm text-[var(--muted)] sm:px-5">{t.noHistory}</p>
             ) : (
               <div className="divide-y divide-[var(--border)]">
                 {purchases.map((p) => (
-                  <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                    <div>
-                      <div className="text-sm font-semibold text-[var(--foreground)]">
-                        {p.credits.toLocaleString()} {t.credits}
-                      </div>
-                      <div className="text-xs text-[var(--muted)]">
-                        {new Date(p.created_at).toLocaleDateString()}
-                        {p.trx_id ? ` · ${p.trx_id}` : ""}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-[var(--foreground)]">
-                          ৳{Number(p.amount).toLocaleString()}
-                        </div>
-                        <StatusPill status={p.status} label={t.paymentStatus[p.status] ?? p.status} />
-                      </div>
-                      <button
-                        type="button"
-                        title={t.downloadInvoice}
-                        onClick={() => void downloadInvoice(p.id)}
-                        disabled={downloadingId === p.id}
-                        className="rounded-lg border border-[var(--border)] p-2 text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-60"
-                      >
-                        {downloadingId === p.id ? (
-                          <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                          <Download size={16} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                  <HistoryRow
+                    key={p.id}
+                    icon={MessageSquare}
+                    title={`${p.credits.toLocaleString()} ${t.credits}`}
+                    subtitle={`${new Date(p.created_at).toLocaleDateString()}${p.trx_id ? ` · ${p.trx_id}` : ""}`}
+                    amount={`৳${Number(p.amount).toLocaleString()}`}
+                    status={p.status}
+                    statusLabel={t.paymentStatus[p.status] ?? p.status}
+                    onDownload={() => void downloadInvoice(p.id)}
+                    downloading={downloadingId === p.id}
+                    downloadTitle={t.downloadInvoice}
+                  />
                 ))}
               </div>
             )}

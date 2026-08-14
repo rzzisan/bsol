@@ -7,16 +7,22 @@ import {
   ChevronUp,
   Clock,
   CreditCard,
-  Download,
   FileText,
   Layers,
   Loader2,
   Lock,
   Receipt,
   Sparkles,
-  XCircle,
 } from "lucide-react";
 import UserShell from "@/components/user-shell";
+import {
+  GlowBackdrop,
+  HistoryRow,
+  ProgressRing,
+  ReceiptCard,
+  ReceiptRow,
+  SectionHeader,
+} from "@/components/billing-ui";
 import { getStoredLocale, getStoredToken, openAuthenticatedPdf, type Locale } from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -108,7 +114,7 @@ const text = {
     remainingDays: "দিন",
     remainingHours: "ঘণ্টা",
     remainingMinutes: "মিনিট",
-    features: "সুবিধাসমূহ",
+    recommended: "সবচেয়ে জনপ্রিয়",
     currentBadge: "বর্তমান",
     upgradeBadge: "আপগ্রেড",
     selectCta: "নির্বাচন করুন",
@@ -168,7 +174,7 @@ const text = {
     remainingDays: "d",
     remainingHours: "h",
     remainingMinutes: "m",
-    features: "Features",
+    recommended: "Most Popular",
     currentBadge: "Current",
     upgradeBadge: "Upgrade",
     selectCta: "Select",
@@ -213,21 +219,6 @@ const text = {
     paymentStatus: { pending: "Pending", approved: "Paid", rejected: "Rejected" } as Record<string, string>,
   },
 };
-
-function StatusPill({ status, label }: { status: "pending" | "approved" | "rejected"; label: string }) {
-  const cls =
-    status === "approved"
-      ? "bg-emerald-100 text-emerald-700"
-      : status === "rejected"
-      ? "bg-rose-100 text-rose-700"
-      : "bg-amber-100 text-amber-700";
-  const Icon = status === "approved" ? CheckCircle2 : status === "rejected" ? XCircle : Clock;
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${cls}`}>
-      <Icon size={12} /> {label}
-    </span>
-  );
-}
 
 export default function Page() {
   const [locale] = useState<Locale>(getStoredLocale);
@@ -549,6 +540,29 @@ export default function Page() {
       : null;
   const manualVisible = showManualForm || !subscription?.bkash_gateway_enabled;
 
+  // Purely presentational: how much of the current cycle is left, for the
+  // hero's progress ring — assumes the active package's own duration_days as
+  // the cycle length, which matches how ends_at is actually computed server-side.
+  const totalDurationSeconds = subscription?.package ? subscription.package.duration_days * 86400 : null;
+  const remainingPercent =
+    liveRemainingSeconds !== null && totalDurationSeconds
+      ? Math.min(100, Math.max(0, (liveRemainingSeconds / totalDurationSeconds) * 100))
+      : 0;
+
+  // Purely presentational: nudge sellers toward the cheapest available
+  // upgrade, or the middle-priced plan for a first-time subscriber.
+  const recommendedId = useMemo(() => {
+    const upgrades = plans.filter((p) => p.is_upgrade);
+    if (upgrades.length > 0) {
+      return upgrades.reduce((min, p) => (Number(p.price) < Number(min.price) ? p : min), upgrades[0]).id;
+    }
+    if (plans.length >= 3) {
+      const sorted = [...plans].sort((a, b) => Number(a.price) - Number(b.price));
+      return sorted[Math.floor(sorted.length / 2)].id;
+    }
+    return null;
+  }, [plans]);
+
   return (
     <UserShell
       activeKey="subscription"
@@ -561,21 +575,22 @@ export default function Page() {
       ) : (
         <>
           {/* Current plan hero */}
-          <section className="catv-panel mx-4 mb-4 overflow-hidden">
+          <section className="catv-panel relative mx-4 mb-4 overflow-hidden">
             <div
-              className="p-5 sm:p-6"
+              className="relative p-5 sm:p-6"
               style={{
                 background:
-                  "linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--surface)) 0%, var(--surface) 65%)",
+                  "linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--surface)) 0%, var(--surface) 70%)",
               }}
             >
-              <div className="flex flex-wrap items-center justify-between gap-4">
+              <GlowBackdrop />
+              <div className="relative flex flex-wrap items-center justify-between gap-6">
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
                     <Layers size={14} /> {t.currentPlan}
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
-                    <span className="text-2xl font-bold text-[var(--foreground)]">
+                    <span className="text-2xl font-extrabold text-[var(--foreground)]">
                       {subscription?.package?.name ?? t.noPlan}
                     </span>
                     <span
@@ -592,26 +607,34 @@ export default function Page() {
                 </div>
 
                 {liveRemaining && !subscription?.is_expired ? (
-                  <div>
-                    <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                      <Clock size={13} /> {t.remainingTitle}
+                  <div className="flex items-center gap-4">
+                    <div className="relative flex h-[88px] w-[88px] shrink-0 items-center justify-center">
+                      <ProgressRing percent={remainingPercent} />
+                      <span className="absolute text-sm font-bold text-[var(--foreground)]">
+                        {Math.round(remainingPercent)}%
+                      </span>
                     </div>
-                    <div className="flex gap-2">
-                      {[
-                        { v: liveRemaining.days, l: t.remainingDays },
-                        { v: liveRemaining.hours, l: t.remainingHours },
-                        { v: liveRemaining.minutes, l: t.remainingMinutes },
-                      ].map((seg, i) => (
-                        <div
-                          key={i}
-                          className="flex min-w-[58px] flex-col items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-                        >
-                          <span className="text-xl font-bold tabular-nums text-[var(--foreground)]">
-                            {String(seg.v).padStart(2, "0")}
-                          </span>
-                          <span className="text-[10px] uppercase text-[var(--muted)]">{seg.l}</span>
-                        </div>
-                      ))}
+                    <div>
+                      <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                        <Clock size={13} /> {t.remainingTitle}
+                      </div>
+                      <div className="flex gap-2">
+                        {[
+                          { v: liveRemaining.days, l: t.remainingDays },
+                          { v: liveRemaining.hours, l: t.remainingHours },
+                          { v: liveRemaining.minutes, l: t.remainingMinutes },
+                        ].map((seg, i) => (
+                          <div
+                            key={i}
+                            className="flex min-w-[58px] flex-col items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+                          >
+                            <span className="text-xl font-bold tabular-nums text-[var(--foreground)]">
+                              {String(seg.v).padStart(2, "0")}
+                            </span>
+                            <span className="text-[10px] uppercase text-[var(--muted)]">{seg.l}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -621,33 +644,53 @@ export default function Page() {
 
           {/* Plan picker */}
           <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
-            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[var(--muted)]">
-              <Sparkles size={15} /> {t.plans}
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <SectionHeader icon={Sparkles}>{t.plans}</SectionHeader>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {plans.map((p) => {
                 const selected = String(p.id) === form.package_id;
                 const locked = p.is_downgrade_blocked;
+                const isRecommended = p.id === recommendedId && !p.is_current && !locked;
                 return (
                   <label
                     key={p.id}
                     title={locked ? t.downgradeLocked : undefined}
-                    className={`relative flex flex-col rounded-2xl border p-4 text-sm transition ${
+                    className={`group relative flex flex-col rounded-2xl border p-5 transition ${
                       locked
-                        ? "cursor-not-allowed border-[var(--border)] opacity-50"
+                        ? "cursor-not-allowed border-[var(--border)] opacity-55"
                         : selected
-                        ? "cursor-pointer border-[var(--accent)] bg-[var(--surface-soft)] shadow-md ring-1 ring-[var(--accent)]"
-                        : "cursor-pointer border-[var(--border)] hover:border-[var(--accent)] hover:shadow-sm"
+                        ? "cursor-pointer border-transparent"
+                        : "cursor-pointer border-[var(--border)] hover:-translate-y-0.5 hover:border-[var(--accent)] hover:shadow-md"
                     }`}
+                    style={
+                      selected
+                        ? {
+                            background: "color-mix(in srgb, var(--accent) 8%, var(--surface))",
+                            boxShadow:
+                              "0 0 0 2px var(--accent), 0 18px 30px -14px color-mix(in srgb, var(--accent) 55%, transparent)",
+                          }
+                        : undefined
+                    }
                   >
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <input
-                        type="radio"
-                        name="package_id"
-                        disabled={locked}
-                        checked={selected}
-                        onChange={() => setForm((f) => ({ ...f, package_id: String(p.id) }))}
-                      />
+                    <input
+                      type="radio"
+                      name="package_id"
+                      className="sr-only"
+                      disabled={locked}
+                      checked={selected}
+                      onChange={() => setForm((f) => ({ ...f, package_id: String(p.id) }))}
+                    />
+
+                    {isRecommended ? (
+                      <span
+                        className="absolute -top-2.5 left-4 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
+                        style={{ background: "var(--accent)" }}
+                      >
+                        {t.recommended}
+                      </span>
+                    ) : null}
+
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-[var(--foreground)]">{p.name}</span>
                       {p.is_current ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-white">
                           <CheckCircle2 size={10} /> {t.currentBadge}
@@ -660,31 +703,50 @@ export default function Page() {
                         <Lock size={13} className="text-[var(--muted)]" />
                       ) : null}
                     </div>
-                    <span className="font-semibold text-[var(--foreground)]">{p.name}</span>
-                    <div className="mt-1 text-2xl font-bold text-[var(--foreground)]">
-                      ৳{Number(p.price).toLocaleString()}
-                      <span className="text-xs font-normal text-[var(--muted)]">{t.perMonth}</span>
+
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-extrabold tracking-tight text-[var(--foreground)]">
+                        ৳{Number(p.price).toLocaleString()}
+                      </span>
+                      <span className="text-xs font-medium text-[var(--muted)]">{t.perMonth}</span>
                     </div>
-                    <div className="mt-0.5 text-xs text-[var(--muted)]">
+                    <div className="mt-1 text-xs text-[var(--muted)]">
                       {p.max_orders ? `${p.max_orders} ${t.orders}` : `${t.unlimited} ${t.orders}`}
                     </div>
+
                     {p.features && p.features.length > 0 ? (
-                      <ul className="mt-3 space-y-1 text-xs text-[var(--muted)]">
+                      <ul className="mt-4 flex-1 space-y-2 text-xs text-[var(--foreground)]">
                         {p.features.map((f, i) => (
-                          <li key={i} className="flex items-start gap-1.5">
-                            <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+                          <li key={i} className="flex items-start gap-2">
+                            <CheckCircle2 size={14} className="mt-0.5 shrink-0" style={{ color: "var(--accent)" }} />
                             <span>{f}</span>
                           </li>
                         ))}
                       </ul>
-                    ) : null}
-                    <div className="mt-3 border-t border-[var(--border)] pt-2 text-center text-xs font-semibold">
+                    ) : (
+                      <div className="flex-1" />
+                    )}
+
+                    <div
+                      className="mt-4 rounded-xl px-3 py-2.5 text-center text-xs font-bold"
+                      style={
+                        locked
+                          ? { background: "color-mix(in srgb, var(--muted) 14%, transparent)", color: "var(--muted)" }
+                          : selected
+                          ? { background: "var(--accent)", color: "#fff" }
+                          : { background: "color-mix(in srgb, var(--muted) 10%, transparent)", color: "var(--muted)" }
+                      }
+                    >
                       {locked ? (
-                        <span className="text-rose-600">{t.downgradeLocked}</span>
+                        <span className="inline-flex items-center gap-1">
+                          <Lock size={12} /> {t.downgradeLocked}
+                        </span>
                       ) : selected ? (
-                        <span className="text-[var(--accent)]">{t.selectedCta}</span>
+                        <span className="inline-flex items-center gap-1">
+                          <CheckCircle2 size={13} /> {t.selectedCta}
+                        </span>
                       ) : (
-                        <span className="text-[var(--muted)]">{t.selectCta}</span>
+                        t.selectCta
                       )}
                     </div>
                   </label>
@@ -696,9 +758,7 @@ export default function Page() {
           {/* Invoice preview */}
           {form.package_id && (
             <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
-              <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[var(--muted)]">
-                <Receipt size={15} /> {t.invoiceTitle}
-              </h3>
+              <SectionHeader icon={Receipt}>{t.invoiceTitle}</SectionHeader>
               {invoiceLoading || !invoice ? (
                 <p className="flex items-center gap-2 text-xs text-[var(--muted)]">
                   <Loader2 size={14} className="animate-spin" /> {t.invoiceLoading}
@@ -708,38 +768,32 @@ export default function Page() {
                   <Lock size={15} /> {t.downgradeLocked}
                 </p>
               ) : (
-                <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-soft)] p-4 text-sm">
-                  <div className="flex justify-between py-1">
-                    <span className="text-[var(--muted)]">{t.invoiceBase}</span>
-                    <span className="font-medium">৳{invoice.base_amount.toLocaleString()}</span>
-                  </div>
+                <ReceiptCard>
+                  <ReceiptRow label={t.invoiceBase} value={`৳${invoice.base_amount.toLocaleString()}`} tone="muted" />
                   {invoice.is_upgrade && invoice.proration_credit > 0 ? (
-                    <div className="flex justify-between py-1 text-emerald-600">
-                      <span>{t.invoiceProration}</span>
-                      <span className="font-medium">−৳{invoice.proration_credit.toLocaleString()}</span>
-                    </div>
+                    <ReceiptRow
+                      label={t.invoiceProration}
+                      value={`−৳${invoice.proration_credit.toLocaleString()}`}
+                      tone="positive"
+                    />
                   ) : null}
-                  <div className="mt-1 flex justify-between border-t border-[var(--border)] pt-2 text-base font-bold text-[var(--foreground)]">
-                    <span>{t.invoicePayable}</span>
-                    <span>৳{invoice.payable_amount.toLocaleString()}</span>
-                  </div>
-                  <div className="mt-2 flex justify-between text-xs text-[var(--muted)]">
+                  <div className="my-2 border-t border-dashed" style={{ borderColor: "var(--border)" }} />
+                  <ReceiptRow label={t.invoicePayable} value={`৳${invoice.payable_amount.toLocaleString()}`} bold />
+                  <div className="mt-3 flex justify-between text-xs text-[var(--muted)]">
                     <span>{t.invoiceNewExpiry}</span>
                     <span>{new Date(invoice.new_ends_at_preview).toLocaleString()}</span>
                   </div>
-                  <p className="mt-2 border-t border-[var(--border)] pt-2 text-xs text-[var(--muted)]">
+                  <p className="mt-3 border-t pt-3 text-xs text-[var(--muted)]" style={{ borderColor: "var(--border)" }}>
                     {invoice.is_upgrade ? t.invoiceUpgradeNote : t.invoiceRenewalNote}
                   </p>
-                </div>
+                </ReceiptCard>
               )}
             </section>
           )}
 
           {/* Bill payment */}
           <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
-            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-[var(--muted)]">
-              <CreditCard size={15} /> {t.payTitle}
-            </h3>
+            <SectionHeader icon={CreditCard}>{t.payTitle}</SectionHeader>
 
             {subscription?.bkash_gateway_enabled && subscription.bkash_api_type === "pgw" && (
               <div className="mb-3">
@@ -758,7 +812,8 @@ export default function Page() {
                   type="button"
                   id="bKash_button"
                   disabled={!form.package_id || !pgwScriptLoaded || !invoice || invoice.is_downgrade_blocked}
-                  className="w-full rounded-xl bg-[#E2136E] px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-105 disabled:opacity-60"
+                  className="w-full rounded-xl px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
+                  style={{ background: "linear-gradient(135deg, #E2136E, #b90f59)" }}
                 >
                   {t.payWithBkash}
                 </button>
@@ -770,7 +825,8 @@ export default function Page() {
                 type="button"
                 onClick={() => void payWithBkash()}
                 disabled={bkashPaying || !form.package_id || !invoice || invoice.is_downgrade_blocked}
-                className="mb-3 w-full rounded-xl bg-[#E2136E] px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:brightness-105 disabled:opacity-60"
+                className="mb-3 w-full rounded-xl px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
+                style={{ background: "linear-gradient(135deg, #E2136E, #b90f59)" }}
               >
                 {bkashPaying ? t.payingWithBkash : t.payWithBkash}
               </button>
@@ -814,7 +870,7 @@ export default function Page() {
                     type="file"
                     accept="image/*"
                     onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)}
-                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--accent)] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
                   />
                   <button
                     type="submit"
@@ -833,44 +889,26 @@ export default function Page() {
 
           {/* History */}
           <section className="catv-panel mx-4 mb-6 overflow-hidden">
-            <h3 className="flex items-center gap-1.5 p-4 pb-3 text-sm font-semibold text-[var(--muted)] sm:px-5">
-              <FileText size={15} /> {t.history}
-            </h3>
+            <div className="p-4 pb-1 sm:px-5">
+              <SectionHeader icon={FileText}>{t.history}</SectionHeader>
+            </div>
             {(subscription?.recent_payments ?? []).length === 0 ? (
               <p className="px-4 pb-6 text-center text-sm text-[var(--muted)] sm:px-5">{t.noHistory}</p>
             ) : (
               <div className="divide-y divide-[var(--border)]">
                 {subscription?.recent_payments.map((p) => (
-                  <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                    <div>
-                      <div className="text-sm font-semibold text-[var(--foreground)]">{p.package?.name ?? "-"}</div>
-                      <div className="text-xs text-[var(--muted)]">
-                        {new Date(p.created_at).toLocaleDateString()}
-                        {p.trx_id ? ` · ${p.trx_id}` : ""}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-[var(--foreground)]">
-                          ৳{Number(p.amount).toLocaleString()}
-                        </div>
-                        <StatusPill status={p.status} label={t.paymentStatus[p.status] ?? p.status} />
-                      </div>
-                      <button
-                        type="button"
-                        title={t.downloadInvoice}
-                        onClick={() => void downloadInvoice(p.id)}
-                        disabled={downloadingId === p.id}
-                        className="rounded-lg border border-[var(--border)] p-2 text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-60"
-                      >
-                        {downloadingId === p.id ? (
-                          <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                          <Download size={16} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                  <HistoryRow
+                    key={p.id}
+                    icon={Receipt}
+                    title={p.package?.name ?? "-"}
+                    subtitle={`${new Date(p.created_at).toLocaleDateString()}${p.trx_id ? ` · ${p.trx_id}` : ""}`}
+                    amount={`৳${Number(p.amount).toLocaleString()}`}
+                    status={p.status}
+                    statusLabel={t.paymentStatus[p.status] ?? p.status}
+                    onDownload={() => void downloadInvoice(p.id)}
+                    downloading={downloadingId === p.id}
+                    downloadTitle={t.downloadInvoice}
+                  />
                 ))}
               </div>
             )}
