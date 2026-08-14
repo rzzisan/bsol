@@ -82,6 +82,39 @@ function notFound(label: string): NextResponse {
   );
 }
 
+/**
+ * Top-level paths that belong to the app itself, so a landing page can never
+ * shadow them. Kept in sync with the route folders under src/app —
+ * custom_domain_context.md §4.3.
+ */
+const APP_PATHS = new Set([
+  "dashboard",
+  "admin",
+  "auth",
+  "lp",
+  "store",
+  "privacy",
+  "terms",
+  "forgot-password",
+  "verify-email",
+  "verify-phone",
+]);
+
+/**
+ * True for `/offer` and `/offer/thank-you`, false for `/`, `/dashboard/...`
+ * and anything deeper. The thank-you step is included so the whole checkout
+ * stays on the seller's address — a mid-checkout hop to /lp/ would drop the
+ * _fbp/_fbc cookies that tracking depends on (tracking_capi_context.md §8).
+ */
+function isLandingSlugPath(pathname: string): boolean {
+  const segments = pathname.split("/").filter(Boolean);
+
+  if (segments.length === 0 || segments.length > 2) return false;
+  if (segments.length === 2 && segments[1] !== "thank-you") return false;
+
+  return !APP_PATHS.has(segments[0]) && !segments[0].includes(".");
+}
+
 export async function proxy(request: NextRequest) {
   const label = sellerLabel(request.headers.get("host") ?? "");
 
@@ -97,6 +130,16 @@ export async function proxy(request: NextRequest) {
   // re-deriving the label from the Host header themselves.
   const headers = new Headers(request.headers);
   headers.set("x-bsol-shop-subdomain", label);
+
+  // seller1.<apex>/offer renders the existing landing page route. A rewrite,
+  // not a redirect: the seller's own address is the canonical one, so /lp/
+  // must never appear in the URL bar or in an ad's destination.
+  const { pathname } = request.nextUrl;
+  if (isLandingSlugPath(pathname)) {
+    return NextResponse.rewrite(new URL(`/lp${pathname}`, request.url), {
+      request: { headers },
+    });
+  }
 
   return NextResponse.next({ request: { headers } });
 }

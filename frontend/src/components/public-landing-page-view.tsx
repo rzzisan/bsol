@@ -1095,7 +1095,13 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       }
 
       if (json.data?.order_id && json.data?.public_token) {
-        router.push(`/lp/${page.slug}/thank-you?order=${json.data.order_id}&token=${encodeURIComponent(json.data.public_token)}`);
+        // On a seller's own subdomain the page is served at /{slug}, so the
+        // thank-you step has to stay there too — hopping to /lp/ mid-checkout
+        // would change the URL shape and, on a real campaign, look like a
+        // different destination than the one the ad points at.
+        const onSellerSubdomain = !window.location.pathname.startsWith("/lp/");
+        const base = onSellerSubdomain ? `/${page.slug}` : `/lp/${page.slug}`;
+        router.push(`${base}/thank-you?order=${json.data.order_id}&token=${encodeURIComponent(json.data.public_token)}`);
         return;
       }
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
 import { FONT_VARIABLE_CLASSES } from "./fonts";
 
@@ -60,15 +61,11 @@ export default async function PublicLandingPageRoute({ params }: RouteProps) {
   const { slug } = await params;
   const page = await fetchLandingPage(slug);
 
+  // A real 404, not a 200 page that says "unavailable": these URLs are ad
+  // destinations on the seller's own domain, so a soft-200 would let a typo'd
+  // campaign link look healthy and would get the dead URL indexed.
   if (!page) {
-    return (
-      <main className="min-h-screen bg-slate-50 px-4 py-12 text-slate-700">
-        <div className="mx-auto max-w-5xl rounded-3xl bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-bold text-slate-900">Landing page unavailable</h1>
-          <p className="mt-3 text-sm text-red-500">Landing page not found.</p>
-        </div>
-      </main>
-    );
+    notFound();
   }
 
   return (

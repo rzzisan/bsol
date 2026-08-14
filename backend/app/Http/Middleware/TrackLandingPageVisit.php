@@ -25,7 +25,10 @@ class TrackLandingPageVisit
         // If slug is provided but not ID, look up the landing page by slug
         if (!$landingPageId && $slug) {
             try {
-                $landingPage = \App\Models\LandingPage::where('slug', $slug)->first();
+                // Host-scoped: slugs are unique per shop now, so the same
+                // slug on two subdomains is two different pages
+                // (custom_domain_context.md §11.9).
+                $landingPage = \App\Support\LandingPageResolver::query($slug, $request)->first();
                 if ($landingPage) {
                     $landingPageId = $landingPage->id;
                 }

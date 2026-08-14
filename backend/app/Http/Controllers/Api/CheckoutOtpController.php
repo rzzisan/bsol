@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\LandingPage;
+use App\Support\LandingPageResolver;
 use App\Models\Order;
 use App\Models\PhoneOtpVerification;
 use App\Services\CheckoutOtpService;
@@ -49,7 +50,7 @@ class CheckoutOtpController extends Controller
             'otp_code' => ['required', 'string', 'max:10'],
         ]);
 
-        $page = $this->resolvePage($slug);
+        $page = $this->resolvePage($slug, $request);
         $order = $this->resolveOrder($page, $orderId, $validated['token']);
         $messages = $this->messages($page);
 
@@ -75,7 +76,7 @@ class CheckoutOtpController extends Controller
             'token' => ['required', 'string', 'max:64'],
         ]);
 
-        $page = $this->resolvePage($slug);
+        $page = $this->resolvePage($slug, $request);
         $order = $this->resolveOrder($page, $orderId, $validated['token']);
         $messages = $this->messages($page);
 
@@ -107,10 +108,9 @@ class CheckoutOtpController extends Controller
         return response()->json(['success' => true, 'message' => $messages['resent']]);
     }
 
-    private function resolvePage(string $slug): LandingPage
+    private function resolvePage(string $slug, Request $request): LandingPage
     {
-        return LandingPage::query()
-            ->where('slug', $slug)
+        return LandingPageResolver::query($slug, $request)
             ->where('status', 'published')
             ->firstOrFail();
     }

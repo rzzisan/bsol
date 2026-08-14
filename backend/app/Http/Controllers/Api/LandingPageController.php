@@ -8,9 +8,11 @@ use App\Services\AbandonedCheckoutService;
 use App\Services\CheckoutOtpService;
 use App\Services\LandingPageOrderService;
 use App\Support\CheckoutFieldResolver;
+use App\Support\LandingPageResolver;
 use App\Models\LandingPage;
 use App\Models\LandingPageProduct;
 use App\Models\Order;
+use App\Models\ShopProfile;
 use App\Models\LandingTemplate;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -24,17 +26,49 @@ use Illuminate\Validation\ValidationException;
 
 class LandingPageController extends Controller
 {
+    /**
+     * Canonical public address. Landing pages live on the seller's own
+     * subdomain now (custom_domain_context.md §11.9); the platform /lp/ URL
+     * is only produced for pages that predate subdomains, whose links are
+     * still live and must keep resolving.
+     */
     private function publicUrlFor(LandingPage $page): string
     {
+        $host = ShopProfile::where('user_id', $page->user->shopOwnerId())->first()?->subdomainHost();
+
+        if ($host) {
+            return 'https://' . $host . '/' . $page->slug;
+        }
+
         $baseUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
 
-        return $baseUrl . '/lp/' . $page->slug;
+        return $baseUrl . '/lp/' . ($page->legacy_slug ?? $page->slug);
     }
 
-    public function publicShow(string $slug): JsonResponse
+    /**
+     * Landing pages are only reachable on a seller's own subdomain, so
+     * publishing without one would produce a page with no public address.
+     */
+    private function subdomainMissingResponse(): JsonResponse
     {
-        $page = LandingPage::query()
-            ->where('slug', $slug)
+        return response()->json([
+            'success' => false,
+            'message' => 'Set your shop subdomain (Settings → Shop Profile) before publishing a landing page — published pages are served on your own address.',
+            'error_code' => 'subdomain_required',
+        ], 422);
+    }
+
+    private function shopHasSubdomain(): bool
+    {
+        return ShopProfile::where('user_id', auth()->user()->shopOwnerId())
+            ->where('subdomain_status', 'active')
+            ->whereNotNull('subdomain')
+            ->exists();
+    }
+
+    public function publicShow(Request $request, string $slug): JsonResponse
+    {
+        $page = LandingPageResolver::query($slug, $request)
             ->where('status', 'published')
             ->with(['template', 'products.product.images', 'products.variant.optionValues.option'])
             ->firstOrFail();
@@ -49,8 +83,7 @@ class LandingPageController extends Controller
 
     public function publicSubmitOrder(Request $request, string $slug): JsonResponse
     {
-        $page = LandingPage::query()
-            ->where('slug', $slug)
+        $page = LandingPageResolver::query($slug, $request)
             ->where('status', 'published')
             ->with(['products.product.images', 'products.variant.optionValues.option'])
             ->firstOrFail();
@@ -135,8 +168,7 @@ class LandingPageController extends Controller
 
     public function publicShowOrder(Request $request, string $slug, int $orderId): JsonResponse
     {
-        $page = LandingPage::query()
-            ->where('slug', $slug)
+        $page = LandingPageResolver::query($slug, $request)
             ->where('status', 'published')
             ->firstOrFail();
 
@@ -194,9 +226,9 @@ class LandingPageController extends Controller
      * ever exposes a product that is actually attached to this published page,
      * so this can't be used as a generic product-data oracle.
      */
-    public function publicProductOptions(string $slug, int $productId): JsonResponse
+    public function publicProductOptions(Request $request, string $slug, int $productId): JsonResponse
     {
-        $product = $this->publicAttachedProduct($slug, $productId);
+        $product = $this->publicAttachedProduct($request, $slug, $productId);
 
         return response()->json([
             'success' => true,
@@ -207,7 +239,7 @@ class LandingPageController extends Controller
     /** POST /public/landing-pages/{slug}/products/{productId}/variants/resolve */
     public function publicResolveVariant(Request $request, string $slug, int $productId): JsonResponse
     {
-        $product = $this->publicAttachedProduct($slug, $productId);
+        $product = $this->publicAttachedProduct($request, $slug, $productId);
 
         $data = $request->validate([
             'option_value_ids' => ['required', 'array', 'min:1'],
@@ -232,10 +264,9 @@ class LandingPageController extends Controller
     }
 
     /** Product must belong to a published page and actually be attached to it. */
-    private function publicAttachedProduct(string $slug, int $productId): Product
+    private function publicAttachedProduct(Request $request, string $slug, int $productId): Product
     {
-        $page = LandingPage::query()
-            ->where('slug', $slug)
+        $page = LandingPageResolver::query($slug, $request)
             ->where('status', 'published')
             ->firstOrFail();
 
@@ -291,6 +322,10 @@ class LandingPageController extends Controller
         $shopUserIds = auth()->user()->shopUserIds();
         $data = $this->validatePayload($request, $shopUserIds);
 
+        if (($data['status'] ?? null) === 'published' && ! $this->shopHasSubdomain()) {
+            return $this->subdomainMissingResponse();
+        }
+
         $page = DB::transaction(function () use ($data, $actingUserId, $shopUserIds) {
             $slug = $this->resolveSlug($data['slug'] ?? null, $data['title']);
 
@@ -342,6 +377,12 @@ class LandingPageController extends Controller
                 'message' => 'This landing page has been locked by the admin and cannot be published.',
                 'admin_lock_reason' => $page->admin_lock_reason,
             ], 403);
+        }
+
+        // Only gate the transition into published — an already-live page
+        // whose seller predates subdomains must stay editable.
+        if (($data['status'] ?? null) === 'published' && $page->status !== 'published' && ! $this->shopHasSubdomain()) {
+            return $this->subdomainMissingResponse();
         }
 
         $page = DB::transaction(function () use ($page, $data, $shopUserIds) {
@@ -397,6 +438,10 @@ class LandingPageController extends Controller
             ], 403);
         }
 
+        if (! $this->shopHasSubdomain()) {
+            return $this->subdomainMissingResponse();
+        }
+
         $page->update([
             'status' => 'published',
             'published_at' => now(),
@@ -420,7 +465,9 @@ class LandingPageController extends Controller
                 'nullable',
                 'string',
                 'max:200',
-                Rule::unique('landing_pages', 'slug')->ignore($pageId),
+                Rule::unique('landing_pages', 'slug')
+                    ->ignore($pageId)
+                    ->where(fn ($query) => $query->whereIn('user_id', $shopUserIds)),
             ],
             'status' => ['nullable', Rule::in(['draft', 'published'])],
             'theme_settings' => ['nullable', 'array'],
@@ -478,8 +525,13 @@ class LandingPageController extends Controller
         }
     }
 
+    /**
+     * Scoped to the shop (owner + staff), not globally: two sellers may both
+     * use 'offer' because they are on different subdomains.
+     */
     private function resolveSlug(?string $requestedSlug, string $title, ?int $ignoreId = null): string
     {
+        $shopUserIds = auth()->user()->shopUserIds();
         $base = Str::slug($requestedSlug ?: $title);
         if (blank($base)) {
             $base = 'landing-page';
@@ -489,6 +541,7 @@ class LandingPageController extends Controller
         $counter = 1;
         while (
             LandingPage::query()
+                ->whereIn('user_id', $shopUserIds)
                 ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
                 ->where('slug', $slug)
                 ->exists()

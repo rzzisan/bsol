@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AbandonedCheckout;
 use App\Models\Customer;
 use App\Models\LandingPage;
+use App\Support\LandingPageResolver;
 use App\Services\AbandonedCheckoutService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,8 +19,7 @@ class AbandonedCheckoutController extends Controller
 
     public function save(Request $request, string $slug): JsonResponse
     {
-        $page = LandingPage::query()
-            ->where('slug', $slug)
+        $page = LandingPageResolver::query($slug, $request)
             ->where('status', 'published')
             ->with(['products.product', 'products.variant.optionValues.option'])
             ->firstOrFail();
@@ -49,8 +49,7 @@ class AbandonedCheckoutController extends Controller
 
     public function resumeShow(Request $request, string $slug): JsonResponse
     {
-        $page = LandingPage::query()
-            ->where('slug', $slug)
+        $page = LandingPageResolver::query($slug, $request)
             ->where('status', 'published')
             ->firstOrFail();
 
