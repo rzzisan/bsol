@@ -27,6 +27,9 @@ delete_option( 'bsol_shop_name' );
 delete_option( 'bsol_connected_at' );
 delete_option( 'bsol_activity_log' );
 delete_option( 'bsol_webhook_secret' );
+delete_option( 'bsol_repeat_block_enabled' );
+delete_option( 'bsol_repeat_block_hours' );
+delete_option( 'bsol_repeat_block_message' );
 
 global $wpdb;
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( '_transient_bsol_health_' ) . '%' ) );

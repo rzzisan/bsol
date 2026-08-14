@@ -268,3 +268,22 @@ a real WooCommerce staging site before rolling out to sellers.
    cross-session bleed).
 5. Confirm nothing on the checkout page visibly changes for the
    customer (no new UI, this module is a silent background capture).
+
+## Repeat order block (1.15.0)
+
+1. Go to **BSOL Connect → Settings**, enable "Repeat Order Block", set
+   the window to 1 hour (short, for testing), save.
+2. Place a real order on a real staging site with a specific phone
+   number and a "processing"/"pending" status.
+3. Immediately try to place a second order with the **same** phone
+   number (different browser/incognito is fine — this isn't
+   session-based) — confirm checkout is rejected with the configured
+   message, showing the correct remaining-hours count.
+4. Repeat step 3 on the **block-based checkout** (Cart & Checkout
+   blocks, not the shortcode) if the staging site uses it — confirm
+   the same rejection appears (this is the part zayroo-connect never
+   covered).
+5. Try a **different** phone number — confirm it goes through
+   normally.
+6. Disable the feature in Settings — confirm the same repeat phone
+   number now goes through.

@@ -40,6 +40,7 @@ class Bsol_Master {
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/bulk-sync/class-bsol-bulk-sync.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/invoice/class-bsol-invoice.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/abandoned-checkout/class-bsol-abandoned-checkout.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/repeat-order-block/class-bsol-repeat-order-block.php';
 
 		// Admin menu must render even when not connected (that's where the
 		// Settings/connect form lives), so this is always instantiated.
@@ -72,6 +73,7 @@ class Bsol_Master {
 		new Bsol_Bulk_Sync( $this->product_sync, $this->order_sync );
 		new Bsol_Invoice();
 		new Bsol_Abandoned_Checkout();
+		new Bsol_Repeat_Order_Block();
 	}
 
 	public function maybe_render_woocommerce_missing_notice() {

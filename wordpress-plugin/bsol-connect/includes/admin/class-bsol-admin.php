@@ -36,6 +36,8 @@ class Bsol_Admin {
 		} elseif ( isset( $_POST['bsol_clear_log'] ) && check_admin_referer( 'bsol_clear_log_action' ) ) {
 			Bsol_Activity_Log::clear();
 			add_settings_error( 'bsol_messages', 'bsol_message', __( 'Activity log cleared.', 'bsol-connect' ), 'success' );
+		} elseif ( isset( $_POST['bsol_save_repeat_block'] ) && check_admin_referer( 'bsol_repeat_block_settings_action' ) ) {
+			$this->handle_repeat_block_settings_save();
 		}
 
 		$balance_result = null;
@@ -126,6 +128,9 @@ class Bsol_Admin {
 				</div>
 			</div>
 			<p class="description"><?php esc_html_e( 'This site is syncing orders and fraud checks with BSOL.', 'bsol-connect' ); ?></p>
+
+			<?php $this->render_repeat_block_settings(); ?>
+
 			<form method="post" action="" onsubmit="return confirm('<?php echo esc_js( __( 'Disconnect this site from BSOL? New orders will stop syncing until you reconnect.', 'bsol-connect' ) ); ?>');">
 				<?php wp_nonce_field( 'bsol_disconnect_action' ); ?>
 				<button type="submit" name="bsol_disconnect" class="button button-secondary">
@@ -179,6 +184,68 @@ class Bsol_Admin {
 			$message = isset( $response['message'] ) ? $response['message'] : __( 'Connection failed. Please check your API key.', 'bsol-connect' );
 			add_settings_error( 'bsol_messages', 'bsol_message', 'Connection failed: ' . $message, 'error' );
 		}
+	}
+
+	/**
+	 * Fully WP-local — see class-bsol-repeat-order-block.php's docblock for
+	 * why these settings live here instead of on the BSOL dashboard.
+	 */
+	private function render_repeat_block_settings() {
+		$enabled = get_option( 'bsol_repeat_block_enabled', '0' );
+		$hours   = get_option( 'bsol_repeat_block_hours', '24' );
+		$message = get_option( 'bsol_repeat_block_message', Bsol_Repeat_Order_Block::DEFAULT_MESSAGE );
+		?>
+		<div class="bsol-section">
+			<h3 class="bsol-section-title"><?php esc_html_e( 'Repeat Order Block', 'bsol-connect' ); ?></h3>
+			<p class="description">
+				<?php esc_html_e( 'Stop the same phone number from placing a second order within a set number of hours. Checked instantly against this site\'s own order history — no BSOL connection required for the check itself.', 'bsol-connect' ); ?>
+			</p>
+			<form method="post" action="">
+				<?php wp_nonce_field( 'bsol_repeat_block_settings_action' ); ?>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Enable', 'bsol-connect' ); ?></th>
+						<td>
+							<label>
+								<input type="checkbox" name="bsol_repeat_block_enabled" value="1" <?php checked( $enabled, '1' ); ?> />
+								<?php esc_html_e( 'Block repeat orders from the same phone number', 'bsol-connect' ); ?>
+							</label>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="bsol_repeat_block_hours"><?php esc_html_e( 'Block window (hours)', 'bsol-connect' ); ?></label></th>
+						<td>
+							<input type="number" min="1" name="bsol_repeat_block_hours" id="bsol_repeat_block_hours"
+								value="<?php echo esc_attr( $hours ); ?>" class="small-text" />
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="bsol_repeat_block_message"><?php esc_html_e( 'Error message', 'bsol-connect' ); ?></label></th>
+						<td>
+							<input type="text" name="bsol_repeat_block_message" id="bsol_repeat_block_message"
+								value="<?php echo esc_attr( $message ); ?>" class="large-text" />
+							<p class="description"><?php esc_html_e( 'Use %d to show the number of hours left before they can order again.', 'bsol-connect' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<button type="submit" name="bsol_save_repeat_block" class="button button-primary">
+					<?php esc_html_e( 'Save', 'bsol-connect' ); ?>
+				</button>
+			</form>
+		</div>
+		<?php
+	}
+
+	private function handle_repeat_block_settings_save() {
+		update_option( 'bsol_repeat_block_enabled', isset( $_POST['bsol_repeat_block_enabled'] ) ? '1' : '0' );
+
+		$hours = isset( $_POST['bsol_repeat_block_hours'] ) ? (int) $_POST['bsol_repeat_block_hours'] : 24;
+		update_option( 'bsol_repeat_block_hours', max( 1, $hours ) );
+
+		$message = isset( $_POST['bsol_repeat_block_message'] ) ? sanitize_text_field( wp_unslash( $_POST['bsol_repeat_block_message'] ) ) : '';
+		update_option( 'bsol_repeat_block_message', $message ?: Bsol_Repeat_Order_Block::DEFAULT_MESSAGE );
+
+		add_settings_error( 'bsol_messages', 'bsol_message', __( 'Repeat order block settings saved.', 'bsol-connect' ), 'success' );
 	}
 
 	private function handle_disconnect_request() {

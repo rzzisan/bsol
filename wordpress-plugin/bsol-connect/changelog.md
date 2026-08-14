@@ -1,5 +1,18 @@
 # BSOL Connect — Changelog
 
+## 1.15.0 — 2026-08-14
+
+- **Repeat order block**: optionally stop the same phone number from
+  placing a second order within a configurable window (default 24
+  hours) — a new `Bsol_Repeat_Order_Block` module, settings in
+  **BSOL Connect → Settings** (off by default). Fully local to this
+  site — checked against this site's own WooCommerce order history,
+  no BSOL API call needed for the check itself. Covers both classic
+  (shortcode) checkout and WooCommerce's block-based Store API
+  checkout (the legacy zayroo-connect version only ever covered
+  classic checkout). Shows how many hours are actually left, not the
+  full configured window regardless of elapsed time.
+
 ## 1.14.0 — 2026-08-14
 
 - **Abandoned/incomplete checkout tracking**: the plugin now captures

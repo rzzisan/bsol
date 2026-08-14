@@ -10,7 +10,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 
 `bsol_history_and_new_context.md`-এ আলোচিত হয়েছিল যে BSOL-এর সবচেয়ে বড় গ্যাপ হলো "যাদের নিজের WooCommerce ওয়েবসাইট আছে" — তাদের জন্য কোনো কানেক্টর ছিল না। ডিজাইন সরাসরি adapt করা হয়েছে `zyro/wordpress_plugin/zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (WordPress প্লাগিন কোনো বিজনেস লজিক রাখে না, শুধু WooCommerce থেকে ডেটা তুলে BSOL API-তে পাঠায়, ফলাফল দেখায়) থেকে — সেই legacy প্লাগিনের প্রতিটা মডিউলের exact hook/nonce/AJAX-action/payload-shape আলাদাভাবে explore করে BSOL-এর নিজের backend API-র উপর বসানো হয়েছে।
 
-১৭টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
+১৮টা ফেজে তৈরি হয়েছে (সব লাইভ, `bsol.zyrotechbd.com`-এ ডিপ্লয়ড):
 
 | ফেজ | বিষয় | মূল কমিট |
 |---|---|---|
@@ -31,6 +31,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১৫ | Customer Health redesign — কুরিয়ার ডেলিভারি-হিস্ট্রি প্রোগ্রেস বার + breakdown popover (v1.13.0) | `86cc12f` |
 | ১৬ | Multi-site WooCommerce connections — একাধিক সাইট, order/product site-tagging, order-list site filter (backend + frontend, প্লাগিন অপরিবর্তিত) | `4715d92` |
 | ১৭ | Incomplete/Abandoned Order Tracking (WooCommerce) — checkout-in-progress ক্যাপচার, সাইট-ফ্ল্যাগড, বিদ্যমান abandoned-checkouts সিস্টেম reuse (v1.14.0) | `9fe4ff8` |
+| ১৮ | Repeat order block (WooCommerce) — একই ফোন নম্বর দিয়ে X ঘণ্টার মধ্যে repeat checkout ব্লক, ক্লাসিক + block-based checkout দুটোতেই, সম্পূর্ণ WP-লোকাল (v1.15.0) | `830c761` |
 
 ---
 
@@ -91,7 +92,7 @@ Backend সোর্স: `backend/app/Http/Controllers/Api/Connect/{ConnectAuthC
 ## ৪. WordPress প্লাগিন — ফাইল স্ট্রাকচার
 
 ```
-wordpress-plugin/bsol-connect/          (v1.14.0)
+wordpress-plugin/bsol-connect/          (v1.15.0)
   bsol-connect.php                      — bootstrap, প্লাগিন হেডার, constants (BSOL_API_URL ইত্যাদি), HPOS compatibility declaration
   uninstall.php                         — সব option/transient cleanup + best-effort key revoke (শুধু Delete-এ, deactivate-এ না)
   includes/
@@ -113,6 +114,7 @@ wordpress-plugin/bsol-connect/          (v1.14.0)
       bulk-sync/class-bsol-bulk-sync.php       — "Sync Data" ট্যাবের AJAX ব্যাকএন্ড; `Bsol_Master`-এর inject করা `Bsol_Product_Sync`/`Bsol_Order_Sync` ইনস্ট্যান্স reuse করে, নিজে কখনো `new` করে না (Phase ১১)
       invoice/class-bsol-invoice.php           — "Invoice" কলাম, কোনো booking precondition নেই; admin-post proxy waybill-এরই মতো (Phase ১২)
       abandoned-checkout/class-bsol-abandoned-checkout.php — **দ্বিতীয় storefront মডিউল** (checkout-otp-এর পরে) — checkout-in-progress ক্যাপচার, WC()->cart থেকে সরাসরি (DOM scraping না); nopriv AJAX relay (Phase ১৭)
+      repeat-order-block/class-bsol-repeat-order-block.php — একই ফোনে repeat checkout ব্লক, সম্পূর্ণ WP-লোকাল (কোনো BSOL API কল নেই); classic (`woocommerce_checkout_process`) + block checkout (`woocommerce_store_api_checkout_update_order_from_request` + `RouteException`) দুটোই কভার্ড, সেটিংস wp-admin-এই (Phase ১৮)
   assets/
     css/bsol-admin.css, js/bsol-admin.js       — wp-admin-only (health-bar polling, courier বাটন হ্যান্ডলার, bulk-sync progress bar — এই দুটোর জন্য আলাদা স্বাধীন jQuery(ready) ব্লক, যেহেতু `bsol_ajax`/`bsol_bulk_sync` আলাদা স্ক্রিনে লোকালাইজ হয়)
     css/bsol-checkout-otp.css, js/bsol-checkout-otp.js — storefront-only, শুধু order-received পেজে enqueue হয়
@@ -120,7 +122,7 @@ wordpress-plugin/bsol-connect/          (v1.14.0)
   changelog.md, SETUP.md, readme.txt
 ```
 
-`Bsol_Master::load_dependencies()`-এ সব require + `Bsol_Admin` সবসময় ইনস্ট্যান্শিয়েট (menu সবসময় দেখা যায়), বাকি ৭টা মডিউল (`Bsol_Order_Sync`, `Bsol_Fraud_Check`, `Bsol_Product_Sync`, `Bsol_Courier`, `Bsol_Checkout_Otp`, `Bsol_Bulk_Sync`, `Bsol_Invoice`) শুধু `is_connected() && class_exists('WooCommerce')` হলে। `Bsol_Order_Sync`/`Bsol_Product_Sync` এখন `$this->admin`-এর মতোই `Bsol_Master`-এ property হিসেবে রাখা হয় (আগে create-then-discard ছিল) — `Bsol_Bulk_Sync`-এর constructor-এ inject করার জন্য, যাতে সেই ২টা ক্লাস দ্বিতীয়বার `new` না করতে হয় (করলে তাদের constructor-এর hook রেজিস্ট্রেশন duplicate হয়ে যেত)।
+`Bsol_Master::load_dependencies()`-এ সব require + `Bsol_Admin` সবসময় ইনস্ট্যান্শিয়েট (menu সবসময় দেখা যায়), বাকি মডিউলগুলো (`Bsol_Order_Sync`, `Bsol_Fraud_Check`, `Bsol_Product_Sync`, `Bsol_Courier`, `Bsol_Checkout_Otp`, `Bsol_Bulk_Sync`, `Bsol_Invoice`, `Bsol_Abandoned_Checkout`, `Bsol_Repeat_Order_Block`) শুধু `is_connected() && class_exists('WooCommerce')` হলে। `Bsol_Order_Sync`/`Bsol_Product_Sync` এখন `$this->admin`-এর মতোই `Bsol_Master`-এ property হিসেবে রাখা হয় (আগে create-then-discard ছিল) — `Bsol_Bulk_Sync`-এর constructor-এ inject করার জন্য, যাতে সেই ২টা ক্লাস দ্বিতীয়বার `new` না করতে হয় (করলে তাদের constructor-এর hook রেজিস্ট্রেশন duplicate হয়ে যেত)।
 
 ---
 
@@ -189,6 +191,14 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 - **Conversion matching, hidden form field ছাড়া**: session key browser `sessionStorage`-এ থাকে, `woocommerce_new_order` ফায়ার হওয়ার সময় সার্ভার-সাইডে দেখা যায় না। AJAX capture হ্যান্ডলার সেশন টোকেনটা `WC()->session->set()` দিয়েও সেভ করে রাখে (checkout-type-agnostic — classic আর block-based Store API checkout দুটোতেই কাজ করে, hidden ফর্ম ফিল্ড দিয়ে classic-only প্লাম্বিং করলে যা হতো না) — `build_order_payload()` পরে `WC()->session->get()` দিয়ে ফেরত পড়ে, `orders/sync`-এর `session_token` ফিল্ডে পাঠায়। BSOL-সাইড: `ConnectOrderController::sync()`-এর create ব্র্যাঞ্চে (historical sync বাদে) `convertMatchingWooCommerce()` কল হয় — session-token ম্যাচ আগে, ফোন-নম্বর fallback (cross-device completion বা পুরনো প্লাগিন ভার্সনের জন্য যেটা session_token পাঠায় না)।
 - **কোনো wp-admin UI যোগ হয়নি** — legacy zayroo নিজের admin list/CSV-export বানিয়েছিল (তখন "cloud"-এ কিছু ছিল না), BSOL-এর ড্যাশবোর্ডে আগে থেকেই পূর্ণাঙ্গ Abandoned Checkouts list/detail/stats/export UI আছে — সেলার সেখান থেকেই WooCommerce-সোর্সড এন্ট্রি ম্যানেজ করে, ল্যান্ডিং-পেজ এন্ট্রির মতোই।
 
+### Repeat order block (`class-bsol-repeat-order-block.php`, Phase ১৮)
+
+একই ফোন নম্বর দিয়ে configurable ঘণ্টার মধ্যে দ্বিতীয় অর্ডার আটকায় — অপশনাল, ডিফল্ট বন্ধ। **সম্পূর্ণ WP-লোকাল** — `wc_get_orders(['billing_phone' => $phone, ...])` দিয়ে এই সাইটের নিজের অর্ডার হিস্ট্রি চেক করে, BSOL API কল লাগে না; সেটিংস (enable, block window, error message) তাই wp-admin option হিসেবে রাখা হয়েছে, BSOL ড্যাশবোর্ডে না।
+
+- **Classic + Block checkout দুটোই কভার্ড**: `woocommerce_checkout_process` (classic, `wc_add_notice()`) আর `woocommerce_store_api_checkout_update_order_from_request` (Block/Store API checkout — draft order-এ billing data সেট হয়ে যাওয়ার পর, payment-এর আগে ফায়ার করে; `\Automattic\WooCommerce\StoreApi\Exceptions\RouteException` থ্রো করলে WooCommerce কোর নিজেই সেটাকে normal checkout error-এ কনভার্ট করে) — দুটোই একই প্রাইভেট `evaluate()` মেথড শেয়ার করে।
+- **বাকি সময় দেখায়, পুরো window না**: `ceil($hours - $hours_since_last_order)` — legacy zayroo সবসময় পুরো configured window দেখাত, elapsed time যাই হোক না কেন।
+- **ফোন নরমালাইজ করে ম্যাচ করা হয়** (`Bsol_Helpers::clean_bd_phone_number()`), raw `$_POST`/`$order->get_billing_phone()` না — `+880`/স্পেস/ড্যাশ ভ্যারিয়েশনেও আগের প্লেইন `01XXXXXXXXX` অর্ডারের সাথে ম্যাচ করে (legacy zayroo raw ভ্যালু দিয়ে সরাসরি কোয়েরি করত)।
+
 ---
 
 ## ৬. টেস্টিং কনভেনশন (এই কানেক্টরের জন্য প্রতিষ্ঠিত)
@@ -222,7 +232,7 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 1. **Facebook পূর্ণাঙ্গ ফানেল ট্র্যাকিং** — zayroo-তে client-side Pixel বেস কোড ইনজেকশন (`wp_head`), PageView/ViewContent, AddToCart, আর কাস্টম-স্ট্যাটাস-ভিত্তিক ইভেন্ট (Confirmed/Shipping/Returned/Delivered — প্রতিটা আলাদা ইভেন্ট নামে) ছিল, Pixel + server-side CAPI একসাথে (`event_id` দিয়ে dedup)। BSOL-এর Phase ১০ শুধু **server-side Purchase** পাঠায় (`SendFacebookCapiPurchaseEventJob`) — client pixel install করে না, funnel-এর বাকি ধাপ ট্র্যাক করে না। *সতর্কতা: zayroo-র কোডে পিক্সেল আইডি hardcoded ছিল একটা নির্দিষ্ট সাইটের জন্য (zisan.me, Website ID 12) — as-is কপি করার মতো না; ধারণাটা জেনেরিকভাবে re-implement করতে হবে (সেলারের নিজস্ব `FacebookPixelSetting` থেকে)।*
 2. ~~**Incomplete/Abandoned Order Tracking (WooCommerce)**~~ — **সমাধান হয়েছে, Phase ১৭ (v1.14.0)।** নিচে §৯ দেখুন।
 3. **চেকআউট-টাইম ব্লকিং (fraud/blacklist)** — zayroo ফোন+IP দিয়ে চেকআউটের আগে SaaS-কে জিজ্ঞেস করত ("allowed" কিনা), `false` হলে সরাসরি order block করত (`woocommerce_checkout_process` হুকে `wc_add_notice()`)। BSOL-এর Customer Health কলাম শুধু তথ্যভিত্তিক (admin দেখে সিদ্ধান্ত নেয়) — কোনো ব্ল্যাকলিস্টেড/high-risk নম্বর দিয়ে আজও চেকআউট সম্পূর্ণ করা যায়, আটকায় না।
-4. **Repeat-order block** — একই ফোন নম্বর দিয়ে X ঘণ্টার মধ্যে আবার অর্ডার করলে আটকানো — সম্পূর্ণ WP-লোকাল (`wc_get_orders()` দিয়ে নিজের হিস্ট্রি চেক করে, BSOL API লাগেই না) — bsol-connect এ নেই।
+4. ~~**Repeat-order block**~~ — **সমাধান হয়েছে, Phase ১৮ (v1.15.0)।** উপরে §১০ দেখুন।
 5. **BSOL vocabulary-এর কাস্টম WooCommerce order status** — zayroo WooCommerce-এর নিজস্ব status taxonomy-তে সরাসরি ৫টা কালার-কোডেড status রেজিস্টার করত (+ bulk action দিয়ে একসাথে বদলানো)। BSOL শুধু ম্যাপ করে ভেতরে ভেতরে (`Bsol_Helpers::status_map()`), WooCommerce-এর native status/UI স্পর্শ করে না — এটা আংশিক ইচ্ছাকৃত ডিজাইন-চয়েসও (native status বদলালে অন্য প্লাগিন/রিপোর্ট ভাঙতে পারে), কিন্তু সেলারের জন্য "এক জায়গায় ইউনিফাইড ভোকাবুলারি" সুবিধাটা নেই।
 6. **wp-admin থেকে সরাসরি Manual "Send SMS"** — ছোট সুবিধা, BSOL dashboard-এই আছে (`/sms/send`) কিন্তু প্লাগিন থেকে শর্টকাট নেই।
 
@@ -235,6 +245,17 @@ Order-list-এ "Invoice" কলাম, waybill-এর মতো `admin-post.php`
 §৭.১ item ২-এর বাস্তবায়ন — সম্পূর্ণ, বিস্তারিত ডিজাইন §৫-এর "Abandoned checkout tracking" সাব-সেকশনে। সংক্ষেপে: WooCommerce checkout-এ শুরু হওয়া কিন্তু সম্পূর্ণ না-হওয়া চেকআউট এখন BSOL-এর বিদ্যমান `abandoned_checkouts`/ড্যাশবোর্ড UI-তে sync হয় (নতুন টেবিল/UI না — widen করা হয়েছে), প্রতিটা এন্ট্রি **সাইট-ভিত্তিক ফ্ল্যাগড** (`platform_api_key_id`, Phase ১৬-এর সাথে সামঞ্জস্যপূর্ণ), আসল অর্ডার কমপ্লিট হলে স্বয়ংক্রিয়ভাবে "Converted"-এ ফ্লিপ হয়ে যায়।
 
 **Bugfix (একই phase-এ, লাইভ রিপোর্টের পর)**: ড্যাশবোর্ডে Source কলাম ফাঁকা ("—") দেখাচ্ছিল সাইট-ফ্ল্যাগ সিঙ্ক হওয়া সত্ত্বেও — রুট কজ ও ফিক্স §৮ decision #১৪-এ।
+
+---
+
+## ১০. Phase ১৮ — Repeat Order Block (WooCommerce)
+
+§৭.১ item ৪-এর বাস্তবায়ন, বিস্তারিত ডিজাইন §৫-এর "Repeat order block" সাব-সেকশনে। legacy `zayroo-connect`-এর `Zayroo_Blacklist_Manager::check_for_repeat_order_at_checkout()` থেকে adapt করা, দুটো real ইম্প্রুভমেন্ট সহ:
+
+1. **Classic + Block checkout দুটোই কভার্ড, শুধু classic না** — zayroo শুধু `woocommerce_checkout_process` হুক করত, যেটা WooCommerce-এর Block-based (Store API) checkout-এ কখনো ফায়ার হয় না (WC 8.3+ থেকে নতুন সাইটে এটাই ডিফল্ট checkout — legacy ফিচারটা ওই সাইটগুলোতে চুপচাপ কিছুই করত না)। BSOL Connect `woocommerce_store_api_checkout_update_order_from_request` হুকও রেজিস্টার করে (WooCommerce কোর সোর্স পড়ে কনফার্ম করা হয়েছে — একটা already-persisted draft order-এ, billing data অলরেডি সেট থাকা অবস্থায়, payment attempt-এর আগে ফায়ার করে) — সেখান থেকে `\Automattic\WooCommerce\StoreApi\Exceptions\RouteException` থ্রো করলে WooCommerce কোর নিজেই সেটা ধরে (`Checkout.php::get_response()`-এর try/catch) স্বাভাবিক checkout error হিসেবে দেখায়। ক্লাস না পাওয়া গেলে (পুরনো namespace) fail-open — classic checkout enforcement তখনও কাজ করে।
+2. **আসল বাকি সময় দেখায়, পুরো window না** — zayroo সবসময় পুরো configured window দেখাত ("try again after 24 hours"), এমনকি ২৩ ঘণ্টা পার হয়ে গেলেও। BSOL Connect বাকি সময় হিসাব করে দেখায় (`hours - hours_since_last_order`)।
+
+**সম্পূর্ণ WP-লোকাল, BSOL API নেই** — অর্ডার হিস্ট্রি ইতিমধ্যেই এই সাইটের নিজের `wc_get_orders()`-এ আছে, রিমোট কলের দরকার নেই। এটাই ঠিক কেন সেটিংস (enable, block window ঘণ্টা, error message) wp-admin-এ প্লেইন অপশন হিসেবে রাখা হয়েছে, BSOL ড্যাশবোর্ডে না (unlike checkout-OTP toggle, যেটার actual check-ই BSOL কল করে বলে সেখানে রাখা ফ্রি) — BSOL থেকে toggle পড়তে হলে প্রতিটা checkout-এ একটা অতিরিক্ত network round-trip লাগত, যেটা এই ফিচারের পুরো পয়েন্টকেই নষ্ট করে দিত। নতুন মডিউল `Bsol_Repeat_Order_Block` (`includes/modules/repeat-order-block/`), সেটিংস UI `class-bsol-admin.php`-এর Settings ট্যাবে — কোনো ব্যাকএন্ড/মাইগ্রেশন পরিবর্তন নেই।
 
 ---
 

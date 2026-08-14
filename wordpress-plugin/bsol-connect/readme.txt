@@ -4,7 +4,7 @@ Tags: woocommerce, order management, courier, sms otp, facebook conversions api
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.14.0
+Stable tag: 1.15.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,7 @@ BSOL Connect is a thin client: it collects data from WooCommerce and sends it to
 * **Facebook Conversions API** (optional) — a server-side Purchase event for every order, for ad-attribution that survives ad blockers and iOS tracking limits.
 * **Bulk sync** — a one-time "Sync Data" tool to push products/orders that existed before you connected.
 * **Abandoned checkout tracking** — captures name/phone/email/address + cart as a customer fills the checkout form, before the order completes, so you can follow up on carts that never finish.
+* **Repeat order block** (optional, off by default) — stop the same phone number from placing a second order within a set number of hours.
 
 = Requirements =
 
@@ -69,6 +70,9 @@ Steadfast, Paperfly, Pathao, RedX, and CarryBee. For Pathao/RedX/CarryBee, BSOL 
 3. Checkout OTP verification card on the order-received page.
 
 == Changelog ==
+
+= 1.15.0 =
+Repeat order block (optional, off by default): stop the same phone number from placing a second order within a set number of hours (configurable in BSOL Connect → Settings). Fully local — no BSOL connection needed for the check. Works on both classic and block-based checkout.
 
 = 1.14.0 =
 Abandoned/incomplete checkout tracking — captures name/phone/email/address + cart as a customer fills the checkout form, before the order completes, and shows it in your BSOL dashboard's Abandoned Checkouts list.
