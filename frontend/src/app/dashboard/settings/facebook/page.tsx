@@ -48,6 +48,21 @@ const t = {
     lastSentLabel: "সর্বশেষ পাঠানো হয়েছে",
     lastErrorLabel: "সর্বশেষ সমস্যা",
     capiSaveSuccess: "সেভ করা হয়েছে।",
+
+    usageTitle: "ট্র্যাকিং ইভেন্ট ব্যবহার",
+    usageIntro: "আপনার প্যাকেজে প্রতিদিন কত ট্র্যাকিং ইভেন্ট পাঠানো যাবে তার হিসাব। দিন গোনা হয় ঢাকা সময় অনুযায়ী।",
+    usageToday: "আজকের ব্যবহার",
+    usageUnlimited: "আনলিমিটেড",
+    usageNotInPackage: "আপনার প্যাকেজে ট্র্যাকিং নেই — আপগ্রেড করুন।",
+    usageDropped: "কোটা শেষ হওয়ায় বাদ",
+    usageOverage: "লিমিটের বাইরে পাঠানো",
+    usageStateOk: "সব ইভেন্ট পাঠানো হচ্ছে।",
+    usageStateSampling: "PageView জাতীয় ইভেন্টের অর্ধেক পাঠানো হচ্ছে — কোটা ৬০% পার হয়েছে।",
+    usageStateCritical: "PageView বন্ধ, AddToCart/ViewContent-এর অর্ধেক পাঠানো হচ্ছে — কোটা ৮০% পার হয়েছে।",
+    usageStateExhausted: "আজকের কোটা শেষ। Purchase ও ডেলিভারি ইভেন্ট এখনো পাঠানো হচ্ছে — বাকিগুলো বন্ধ। আপগ্রেড করলে সব ফিরে আসবে।",
+    usageAlwaysSent: "Purchase, OrderConfirmed, OrderDelivered, OrderReturned ও Lead কখনো বাদ যায় না — কোটা শেষ হলেও পাঠানো হয়।",
+    usageHistoryTitle: "গত ৭ দিন",
+    usageNoHistory: "এখনো কোনো ইভেন্ট পাঠানো হয়নি।",
   },
   en: {
     pageTitle: "Facebook Page",
@@ -89,6 +104,21 @@ const t = {
     lastSentLabel: "Last sent",
     lastErrorLabel: "Last issue",
     capiSaveSuccess: "Saved.",
+
+    usageTitle: "Tracking Event Usage",
+    usageIntro: "How many tracking events your package allows per day. The day is counted in Dhaka time.",
+    usageToday: "Used today",
+    usageUnlimited: "Unlimited",
+    usageNotInPackage: "Your package does not include tracking — upgrade to enable it.",
+    usageDropped: "Dropped (quota spent)",
+    usageOverage: "Sent beyond the limit",
+    usageStateOk: "All events are being sent.",
+    usageStateSampling: "Half of ambient events like PageView are being sent — past 60% of quota.",
+    usageStateCritical: "PageView is off and half of AddToCart/ViewContent is being sent — past 80% of quota.",
+    usageStateExhausted: "Today's quota is spent. Purchase and delivery events are still being sent — the rest are paused. Upgrading restores everything.",
+    usageAlwaysSent: "Purchase, OrderConfirmed, OrderDelivered, OrderReturned and Lead are never dropped — they are sent even past the limit.",
+    usageHistoryTitle: "Last 7 days",
+    usageNoHistory: "No events have been sent yet.",
   },
 };
 
@@ -114,6 +144,21 @@ type PixelSettings = {
   enabled: boolean;
   last_sent_at: string | null;
   last_error: string | null;
+};
+
+type UsageDay = {
+  date: string;
+  accepted: number;
+  dropped: number;
+  overage: number;
+  sent: number;
+  failed: number;
+};
+
+type TrackingUsage = {
+  today: { date: string; limit: number | null; used: number; dropped: number; overage: number; percent: number | null };
+  state: "unlimited" | "not_in_package" | "ok" | "sampling" | "critical" | "exhausted";
+  history: UsageDay[];
 };
 
 export default function Page() {
@@ -149,6 +194,9 @@ function FacebookSettingsPage() {
   const [pixelSaving, setPixelSaving] = useState(false);
   const [pixelTesting, setPixelTesting] = useState(false);
   const [pixelMessage, setPixelMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const [usage, setUsage] = useState<TrackingUsage | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
 
   const authHeaders = useCallback(() => {
     const token = getStoredToken();
@@ -193,6 +241,24 @@ function FacebookSettingsPage() {
   useEffect(() => {
     void loadPixel();
   }, [loadPixel]);
+
+  // No setUsageLoading(true) here: the state starts true and mount is the
+  // only caller, so the sibling loaders' opening set is redundant work here.
+  const loadUsage = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/tracking/usage`, { headers: authHeaders() });
+      const json = await res.json();
+      if (json.success) setUsage(json.data);
+    } catch {
+      // silent — the meter just stays empty, retry on next visit
+    } finally {
+      setUsageLoading(false);
+    }
+  }, [authHeaders]);
+
+  useEffect(() => {
+    void loadUsage();
+  }, [loadUsage]);
 
   async function handleSavePixel() {
     setPixelSaving(true);
@@ -538,6 +604,106 @@ function FacebookSettingsPage() {
                 >
                   {pixelTesting ? tr.testingEvent : tr.testEventBtn}
                 </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">{tr.usageTitle}</h3>
+          <p className="mt-1 mb-3 text-xs text-[var(--muted)]">{tr.usageIntro}</p>
+
+          {usageLoading && <p className="text-sm text-[var(--muted)]">{tr.loading}</p>}
+
+          {!usageLoading && usage && (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-xs text-[var(--muted)]">{tr.usageToday}</span>
+                <span className="text-sm font-semibold text-[var(--foreground)]">
+                  {usage.today.used.toLocaleString()}
+                  {usage.today.limit !== null
+                    ? ` / ${usage.today.limit.toLocaleString()}`
+                    : ` — ${tr.usageUnlimited}`}
+                </span>
+              </div>
+
+              {usage.today.percent !== null && (
+                <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--background)]">
+                  <div
+                    className={`h-full rounded-full ${
+                      usage.state === "exhausted"
+                        ? "bg-red-500"
+                        : usage.state === "critical"
+                          ? "bg-orange-500"
+                          : usage.state === "sampling"
+                            ? "bg-yellow-500"
+                            : "bg-green-500"
+                    }`}
+                    style={{ width: `${usage.today.percent}%` }}
+                  />
+                </div>
+              )}
+
+              <p
+                className={`text-xs ${
+                  usage.state === "exhausted" || usage.state === "not_in_package"
+                    ? "text-red-600 dark:text-red-400"
+                    : usage.state === "critical"
+                      ? "text-orange-600 dark:text-orange-400"
+                      : "text-[var(--muted)]"
+                }`}
+              >
+                {usage.state === "not_in_package"
+                  ? tr.usageNotInPackage
+                  : usage.state === "exhausted"
+                    ? tr.usageStateExhausted
+                    : usage.state === "critical"
+                      ? tr.usageStateCritical
+                      : usage.state === "sampling"
+                        ? tr.usageStateSampling
+                        : tr.usageStateOk}
+              </p>
+
+              {(usage.today.dropped > 0 || usage.today.overage > 0) && (
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-[var(--muted)]">
+                  {usage.today.dropped > 0 && (
+                    <span>
+                      {tr.usageDropped}: <strong>{usage.today.dropped.toLocaleString()}</strong>
+                    </span>
+                  )}
+                  {usage.today.overage > 0 && (
+                    <span>
+                      {tr.usageOverage}: <strong>{usage.today.overage.toLocaleString()}</strong>
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <p className="border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">
+                {tr.usageAlwaysSent}
+              </p>
+
+              <div>
+                <h4 className="mb-2 text-xs font-semibold text-[var(--foreground)]">{tr.usageHistoryTitle}</h4>
+                {usage.history.length === 0 ? (
+                  <p className="text-xs text-[var(--muted)]">{tr.usageNoHistory}</p>
+                ) : (
+                  <div className="space-y-1">
+                    {usage.history.slice(0, 7).map((day) => (
+                      <div key={day.date} className="flex justify-between gap-3 text-xs">
+                        <span className="text-[var(--muted)]">{day.date}</span>
+                        <span className="text-[var(--foreground)]">
+                          {day.accepted.toLocaleString()}
+                          {day.dropped > 0 && (
+                            <span className="ml-2 text-[var(--muted)]">
+                              (−{day.dropped.toLocaleString()})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

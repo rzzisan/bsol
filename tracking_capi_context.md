@@ -273,6 +273,12 @@ Drop হলে: `tracking_events`-এ `status='dropped_quota'` লেখা হ�
 
 **সেলারকে জানানো:** dashboard-এ quota মিটার (আজকের ব্যবহার / লিমিট), ৮০% পার হলে ব্যানার + notification, ১০০% পার হলে "আপনার P1/P2 ইভেন্ট আজ বন্ধ, P0 চলছে — আপগ্রেড করুন" — সরাসরি upsell পয়েন্ট।
 
+> **বাস্তবায়িত (২০২৬-০৮-১৫, T1-এর সাথে):** `GET /tracking/usage` → **Settings → Facebook Page**-এ quota কার্ড (আজকের ব্যবহার/লিমিট, রঙিন বার, dropped ও overage, গত ৭ দিন)। ইভেন্ট পাঠানো শুরুর **আগেই** বানানো হয়েছে ইচ্ছাকৃতভাবে — T2-তে আসল ট্র্যাফিক যাওয়া শুরু করলে quota ভুল করলে সেটা দেখার কোনো উপায় না থাকা সবচেয়ে খারাপ অবস্থা হতো।
+> - `state` ব্যাকএন্ডে হিসাব হয় (`ok`/`sampling`/`critical`/`exhausted`/`unlimited`/`not_in_package`), যাতে ড্যাশবোর্ড আর পরের admin ভিউ threshold নিয়ে দ্বিমত করতে না পারে।
+> - মিটার **১০০%-এ থামে**; overage আলাদা সংখ্যা হিসেবে দেখায় (§11.2)।
+> - রুট এখন `owner_only`, কারণ একমাত্র সার্ফেসটাই owner-only। §6.2-এর Pattern A + `tracking` module key **T7-এ**, event log UI-র সাথে — তার আগে staff grant দিলে খোলার মতো কিছু থাকত না।
+> - **admin-এর per-seller usage ভিউ এখনো নেই** — T7।
+
 **Admin-এর জন্য:** per-seller override (প্যাকেজ লিমিটের উপরে একটা `tracking_events_daily_override` কলাম users-এ) — বড় সেলারের সাথে আলাদা চুক্তি হলে প্যাকেজ না বদলে ছাড় দেওয়া যায়।
 
 ### 5.3 অপব্যবহার প্রতিরোধ

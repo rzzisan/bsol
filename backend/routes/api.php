@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\LandingTemplateController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupportController;
+use App\Http\Controllers\Api\TrackingUsageController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\AdminSupportController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
@@ -513,6 +514,13 @@ Route::middleware('active_subscription')->group(function () {
             Route::put('/', [FacebookPixelSettingController::class, 'update']);
             Route::post('/test-event', [FacebookPixelSettingController::class, 'testEvent']);
         });
+
+        // Tracking quota meter. owner_only for now because the only surface
+        // rendering it is the owner-only pixel settings page above; §6.2 of
+        // tracking_capi_context.md moves usage reads to
+        // staff_permission:tracking in T7, alongside the event log UI that
+        // gives a staff grant something to actually open.
+        Route::get('/tracking/usage', [TrackingUsageController::class, 'show']);
     });
 
     Route::middleware('staff_permission:facebook')->group(function () {
