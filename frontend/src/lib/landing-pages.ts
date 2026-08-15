@@ -419,23 +419,17 @@ export function mergeLandingContent(
 }
 
 /**
- * Path to a landing page on the host the browser is currently on.
+ * Path to a landing page, relative to the host it is served on.
  *
- * A page is served at /{slug} on its seller's own subdomain and at
- * /lp/{slug} on the platform domain (custom_domain_context.md §14). Anything
- * rendered *inside* the public checkout flow — back links, the thank-you
- * step, the terms/privacy "home" link — has to follow the current host, or a
- * customer mid-checkout gets bounced to a URL that no longer exists.
+ * Landing pages exist only on their seller's own subdomain, where they sit
+ * at the root (custom_domain_context.md §14) — /lp/ was the pre-subdomain
+ * address and no longer resolves. Used by links rendered *inside* the public
+ * checkout flow (back links, the thank-you step, the terms/privacy "home"
+ * link), which are always already on the right host.
  *
  * Dashboard/admin screens must NOT use this: they may be showing another
  * shop's page, so they read `public_url` from the API instead.
  */
 export function landingPathForSlug(slug: string): string {
-  if (typeof window === "undefined") return `/lp/${slug}`;
-
-  const apex = (process.env.NEXT_PUBLIC_SUBDOMAIN_APEX ?? "zyrotechbd.com").toLowerCase();
-  const host = window.location.hostname.toLowerCase();
-  const onSellerSubdomain = host.endsWith(`.${apex}`) && host !== `bsol.${apex}`;
-
-  return onSellerSubdomain ? `/${slug}` : `/lp/${slug}`;
+  return `/${slug}`;
 }

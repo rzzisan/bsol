@@ -15,19 +15,19 @@ use Illuminate\Http\Request;
  * Slugs are unique per shop, not globally, so the same slug can belong to
  * different sellers — the host is what disambiguates them:
  *
- *   seller1.<apex>/offer        -> seller1's page with slug 'offer'
- *   bsol.<apex>/lp/offer        -> the page that owned 'offer' before slugs
- *                                  were scoped (legacy_slug)
+ *   seller1.<apex>/offer  -> seller1's page with slug 'offer'
+ *   seller2.<apex>/offer  -> seller2's, a different page entirely
+ *   bsol.<apex>/...       -> no landing pages live here
  *
- * Every public landing endpoint goes through here so the two paths can never
- * drift apart. The frontend needs no change: its public calls are already
- * same-origin relative URLs, so the browser's host reaches the API intact.
+ * Every public landing endpoint goes through here so no two of them can
+ * disagree about what a slug means. The frontend needs no special handling:
+ * its public calls are same-origin relative URLs, so the browser's host
+ * reaches the API intact.
  */
 class LandingPageResolver
 {
     /**
-     * Base query for the page identified by $slug on this request's host,
-     * or null when the host names no shop and the slug matches no legacy URL.
+     * Base query for the page identified by $slug on this request's host.
      *
      * Callers add their own status/eager-load constraints, exactly as they
      * did when this was an inline where('slug', ...).
@@ -37,17 +37,11 @@ class LandingPageResolver
     public static function query(string $slug, Request $request): Builder
     {
         $label = self::subdomainLabel($request->getHost());
+        $shopUserIds = $label === null ? null : self::shopUserIdsForLabel($label);
 
-        // Platform host: only the frozen pre-subdomain URLs resolve here.
-        if ($label === null) {
-            return LandingPage::query()->where('legacy_slug', $slug);
-        }
-
-        $shopUserIds = self::shopUserIdsForLabel($label);
-
-        // A subdomain nobody owns must not fall through to the legacy
-        // lookup, or unknown.<apex>/offer would happily serve another
-        // seller's page.
+        // Landing pages exist only on their seller's own host. The platform
+        // domain has none at all, and a subdomain nobody owns must not
+        // resolve one either.
         if ($shopUserIds === null) {
             return LandingPage::query()->whereRaw('1 = 0');
         }

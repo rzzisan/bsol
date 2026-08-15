@@ -231,9 +231,11 @@ export default function AbandonedCheckoutDetailPage() {
 
   const handleCopyLink = async () => {
     if (!checkout?.landing_page) return;
-    // public_url comes from the API because this page may belong to a
-    // shop on its own subdomain — /lp/{slug} would 404 there.
-    const base = checkout.landing_page.public_url ?? `${window.location.origin}/lp/${checkout.landing_page.slug}`;
+    // The address comes from the API: landing pages live on their
+    // seller's own subdomain, which this dashboard may not be on.
+    // Null means the shop has no address yet, so there is no link.
+    const base = checkout.landing_page.public_url;
+    if (!base) return;
     const link = `${base}?resume=${encodeURIComponent(checkout.session_token)}`;
     await navigator.clipboard.writeText(link);
     setCopied(true);

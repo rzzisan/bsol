@@ -41,13 +41,7 @@ class LandingPageSubdomainTest extends TestCase
 
     private function page(User $owner, string $slug, array $attrs = []): LandingPage
     {
-        // legacy_slug is deliberately not fillable — the migration backfills
-        // it once and application code never writes it — so a test that
-        // needs one has to set it explicitly.
-        $legacy = $attrs['legacy_slug'] ?? null;
-        unset($attrs['legacy_slug']);
-
-        $page = LandingPage::create(array_merge([
+        return LandingPage::create(array_merge([
             'user_id' => $owner->id,
             'title' => ucfirst($slug),
             'slug' => $slug,
@@ -55,12 +49,6 @@ class LandingPageSubdomainTest extends TestCase
             'published_at' => now(),
             'content' => [],
         ], $attrs));
-
-        if ($legacy !== null) {
-            $page->forceFill(['legacy_slug' => $legacy])->save();
-        }
-
-        return $page;
     }
 
     /**
@@ -96,37 +84,20 @@ class LandingPageSubdomainTest extends TestCase
             ->assertJsonPath('data.public_url', "https://zareen.{$this->apex()}/watch");
     }
 
-    /**
-     * Pages that predate subdomains keep their platform URL working — those
-     * links are live in real campaigns.
-     */
-    public function test_legacy_lp_url_still_resolves_on_the_platform_host(): void
+    /** The platform domain hosts no landing pages at all any more. */
+    public function test_no_page_is_reachable_on_the_platform_host(): void
     {
         $owner = $this->seller('zareen');
-        $this->page($owner, 'headphone', ['legacy_slug' => 'headphone']);
+        $this->page($owner, 'headphone');
 
         $this->getJson("https://bsol.{$this->apex()}/api/public/landing-pages/headphone")
-            ->assertOk()
-            ->assertJsonPath('data.slug', 'headphone');
-    }
-
-    public function test_a_page_without_a_legacy_slug_is_not_reachable_on_the_platform_host(): void
-    {
-        $owner = $this->seller('zareen');
-        $this->page($owner, 'newoffer');
-
-        $this->getJson("https://bsol.{$this->apex()}/api/public/landing-pages/newoffer")
             ->assertStatus(404);
     }
 
-    /**
-     * An unclaimed subdomain must not fall back to the legacy lookup, or it
-     * would serve another seller's page.
-     */
-    public function test_unknown_subdomain_does_not_fall_through_to_legacy_pages(): void
+    public function test_an_unclaimed_subdomain_resolves_nothing(): void
     {
         $owner = $this->seller('zareen');
-        $this->page($owner, 'headphone', ['legacy_slug' => 'headphone']);
+        $this->page($owner, 'headphone');
 
         $this->getJson("https://nobody.{$this->apex()}/api/public/landing-pages/headphone")
             ->assertStatus(404);
@@ -190,7 +161,12 @@ class LandingPageSubdomainTest extends TestCase
             ->assertJsonPath('error_code', 'subdomain_required');
     }
 
-    public function test_canonical_url_falls_back_to_the_legacy_platform_url_without_a_subdomain(): void
+    /**
+     * No subdomain means no public address — inventing one would hand the
+     * seller a link that 404s. Only reachable for drafts, since publishing
+     * is gated on having a subdomain.
+     */
+    public function test_canonical_url_is_null_without_a_subdomain(): void
     {
         $owner = User::factory()->create();
         ShopProfile::create([
@@ -198,9 +174,9 @@ class LandingPageSubdomainTest extends TestCase
             'shop_name' => 'No Subdomain', 'phone' => '01700000000', 'address' => 'Dhaka',
         ]);
 
-        $page = $this->page($owner, 'oldpage', ['legacy_slug' => 'oldpage']);
+        $page = $this->page($owner, 'draftpage', ['status' => 'draft', 'published_at' => null]);
 
-        $this->assertStringEndsWith('/lp/oldpage', $page->canonicalUrl());
+        $this->assertNull($page->canonicalUrl());
     }
 
     /**

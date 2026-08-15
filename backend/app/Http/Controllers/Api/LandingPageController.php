@@ -8,6 +8,7 @@ use App\Services\AbandonedCheckoutService;
 use App\Services\CheckoutOtpService;
 use App\Services\LandingPageOrderService;
 use App\Support\CheckoutFieldResolver;
+use App\Support\FrontendUrl;
 use App\Support\LandingPageResolver;
 use App\Models\LandingPage;
 use App\Models\LandingPageProduct;
@@ -27,12 +28,10 @@ use Illuminate\Validation\ValidationException;
 class LandingPageController extends Controller
 {
     /**
-     * Canonical public address. Landing pages live on the seller's own
-     * subdomain now (custom_domain_context.md §11.9); the platform /lp/ URL
-     * is only produced for pages that predate subdomains, whose links are
-     * still live and must keep resolving.
+     * Canonical public address, or null while the shop has no subdomain
+     * (custom_domain_context.md §14).
      */
-    private function publicUrlFor(LandingPage $page): string
+    private function publicUrlFor(LandingPage $page): ?string
     {
         return $page->canonicalUrl();
     }
@@ -141,7 +140,10 @@ class LandingPageController extends Controller
             $order->id,
             $request->ip(),
             $request->userAgent(),
-            $this->publicUrlFor($page),
+            // Non-null in practice — publishing requires a subdomain — but the
+            // job's signature is strict, so don't let a draft edge case fatal
+            // a real checkout.
+            $this->publicUrlFor($page) ?? FrontendUrl::platform(),
         );
 
         return response()->json([

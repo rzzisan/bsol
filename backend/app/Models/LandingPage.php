@@ -58,8 +58,9 @@ class LandingPage extends Model
      * hand out a /lp/ URL for a page that only exists on a subdomain.
      *
      * Requires user_id to be loaded — partial selects must include it.
+     * Null when the shop has no subdomain.
      */
-    public function canonicalUrl(): string
+    public function canonicalUrl(): ?string
     {
         $ownerId = self::resolveOwnerId((int) $this->user_id);
 
@@ -70,16 +71,11 @@ class LandingPage extends Model
 
         $host = self::$hostByOwner[$ownerId];
 
-        if ($host) {
-            return 'https://' . $host . '/' . $this->slug;
-        }
-
-        // Pre-subdomain pages keep their platform URL; a page created after
-        // subdomains became mandatory has no legacy_slug and therefore no
-        // platform address at all, so fall back to the slug for display.
-        $base = rtrim((string) config('app.frontend_url', config('app.url')), '/');
-
-        return $base . '/lp/' . ($this->legacy_slug ?? $this->slug);
+        // Null, not a platform URL: a shop without a subdomain has no public
+        // address for its pages at all, and inventing one would hand out a
+        // link that 404s. Publishing is gated on having a subdomain, so this
+        // is only ever reached for drafts.
+        return $host ? 'https://' . $host . '/' . $this->slug : null;
     }
 
     /**
@@ -87,7 +83,7 @@ class LandingPage extends Model
      * payload with ->append('public_url'). Deliberately not in $appends:
      * several queries select only id/title/slug, and this needs user_id.
      */
-    public function getPublicUrlAttribute(): string
+    public function getPublicUrlAttribute(): ?string
     {
         return $this->canonicalUrl();
     }

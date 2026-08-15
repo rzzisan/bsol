@@ -599,7 +599,7 @@ export default function AdminLandingPagesPage() {
                       <div className="flex flex-col items-center justify-center gap-2">
                         {row.status === "published" && (
                           <a
-                            href={row.public_url ?? `/lp/${row.slug}`}
+                            href={row.public_url ?? "#"}
                             target="_blank"
                             rel="noreferrer"
                             className="rounded px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100"

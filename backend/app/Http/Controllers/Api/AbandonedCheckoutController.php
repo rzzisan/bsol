@@ -90,7 +90,7 @@ class AbandonedCheckoutController extends Controller
 
         $query = AbandonedCheckout::query()
             ->whereIn('user_id', $shopUserIds)
-            ->with('landingPage:id,title,slug,user_id,legacy_slug')
+            ->with('landingPage:id,title,slug,user_id')
             ->with('platformApiKey:id,domain')
             ->with('order:id,order_number,status');
 
@@ -141,7 +141,7 @@ class AbandonedCheckoutController extends Controller
     {
         $checkout = AbandonedCheckout::query()
             ->whereIn('user_id', auth()->user()->shopUserIds())
-            ->with(['landingPage:id,title,slug,user_id,legacy_slug', 'platformApiKey:id,domain', 'order:id,order_number,status'])
+            ->with(['landingPage:id,title,slug,user_id', 'platformApiKey:id,domain', 'order:id,order_number,status'])
             ->findOrFail($id);
 
         $checkout->landingPage?->append('public_url');

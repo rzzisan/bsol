@@ -1095,9 +1095,8 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       }
 
       if (json.data?.order_id && json.data?.public_token) {
-        // The thank-you step stays on whichever host the customer is on —
-        // hopping to /lp/ mid-checkout would land them on a URL that does not
-        // exist for pages created after subdomains became mandatory.
+        // The thank-you step stays on the seller's own address, where the
+        // rest of the checkout already is.
         router.push(`${landingPathForSlug(page.slug)}/thank-you?order=${json.data.order_id}&token=${encodeURIComponent(json.data.public_token)}`);
         return;
       }

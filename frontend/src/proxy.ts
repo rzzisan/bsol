@@ -123,6 +123,15 @@ function isLandingSlugPath(pathname: string): boolean {
 }
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // /lp/ is the internal render target the rewrite below points at, not a
+  // public address — landing pages live only on their seller's own host.
+  // Blocking it here is safe because a rewrite does not re-enter the proxy.
+  if (pathname === "/lp" || pathname.startsWith("/lp/")) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   const label = sellerLabel(request.headers.get("host") ?? "");
 
   if (!label) {
@@ -149,10 +158,9 @@ export async function proxy(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.set("x-bsol-shop-subdomain", label);
 
-  // seller1.<apex>/offer renders the existing landing page route. A rewrite,
-  // not a redirect: the seller's own address is the canonical one, so /lp/
-  // must never appear in the URL bar or in an ad's destination.
-  const { pathname } = request.nextUrl;
+  // seller1.<apex>/offer renders the landing page route. A rewrite, not a
+  // redirect: the seller's own address is the canonical one, so /lp/ must
+  // never appear in the URL bar or in an ad's destination.
   if (isLandingSlugPath(pathname)) {
     return NextResponse.rewrite(new URL(`/lp${pathname}`, request.url), {
       request: { headers },
