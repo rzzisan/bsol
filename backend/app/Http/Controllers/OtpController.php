@@ -9,6 +9,7 @@ use App\Models\SubscriptionPackage;
 use App\Models\User;
 use App\Services\NotificationDispatchService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -195,19 +196,31 @@ class OtpController extends Controller
             ? SubscriptionPackage::find($registrationDefaults->default_subscription_package_id)
             : null;
 
-        $user = User::create([
-            'name'               => $pendingData['name'],
-            'mobile'             => $rawMobile,
-            'email'              => $pendingData['email'],
-            'password'           => $pendingData['password'],
-            'role'               => 'user',
-            'user_status'        => $registrationDefaults->default_user_status,
-            'subscription_package_id' => $registrationDefaults->default_subscription_package_id,
-            'subscription_status' => $defaultPackage ? 'trial' : 'active',
-            'subscription_started_at' => $defaultPackage ? now() : null,
-            'subscription_ends_at' => $defaultPackage ? now()->addDays($defaultPackage->duration_days) : null,
-            'mobile_verified_at' => now(),
-        ]);
+        try {
+            $user = User::create([
+                'name'               => $pendingData['name'],
+                'mobile'             => $rawMobile,
+                'email'              => $pendingData['email'],
+                'password'           => $pendingData['password'],
+                'role'               => 'user',
+                'user_status'        => $registrationDefaults->default_user_status,
+                'subscription_package_id' => $registrationDefaults->default_subscription_package_id,
+                'subscription_status' => $defaultPackage ? 'trial' : 'active',
+                'subscription_started_at' => $defaultPackage ? now() : null,
+                'subscription_ends_at' => $defaultPackage ? now()->addDays($defaultPackage->duration_days) : null,
+                'mobile_verified_at' => now(),
+            ]);
+        } catch (UniqueConstraintViolationException $e) {
+            // The checks above can still lose a race with a second submit of
+            // the same OTP. Whatever slips past them, the seller should see a
+            // sentence rather than "Server Error" — this step is the last one
+            // in signup and a 500 here reads as the product being broken.
+            report($e);
+
+            return response()->json([
+                'message' => 'This mobile number or email is already registered. Please log in instead.',
+            ], 422);
+        }
 
         $record->update(['verified_at' => now()]);
 
