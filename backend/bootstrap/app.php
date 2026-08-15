@@ -31,6 +31,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // Docker/Traefik proxy on the Dokploy branch), where it's needed to
         // resolve the real client IP. Trusting '*' let any caller spoof
         // X-Forwarded-For directly and defeat every IP-keyed rate limit.
+        // Reject requests carrying a Host we don't serve. Laravel builds
+        // absolute URLs (e.g. WordpressApiKeyController's download_url) from
+        // the Host header, so an unrecognised one would be reflected back
+        // into a response. The wildcard covers every seller subdomain; the
+        // platform apex and its subdomains cover the rest.
+        $middleware->trustHosts(at: fn () => [
+            config('app.subdomain_apex', 'zyrotechbd.com'),
+            '^(.+\\.)?' . preg_quote(config('app.subdomain_apex', 'zyrotechbd.com'), '/') . '$',
+            'localhost',
+            '127.0.0.1',
+        ]);
+
         $middleware->trustProxies(at: [
             '127.0.0.1',
             '10.0.0.0/8',

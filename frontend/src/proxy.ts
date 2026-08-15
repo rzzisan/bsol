@@ -17,6 +17,12 @@ const APEX = (process.env.NEXT_PUBLIC_SUBDOMAIN_APEX ?? "zyrotechbd.com").toLowe
 const PLATFORM_HOST = `bsol.${APEX}`;
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
+/**
+ * Set by this proxy and trusted downstream, so it must never be accepted
+ * from a client — see the strip in proxy() below.
+ */
+const SHOP_HEADER = "x-bsol-shop-subdomain";
+
 const POSITIVE_TTL_MS = 5 * 60 * 1000;
 const NEGATIVE_TTL_MS = 60 * 1000;
 
@@ -135,6 +141,17 @@ export async function proxy(request: NextRequest) {
   const label = sellerLabel(request.headers.get("host") ?? "");
 
   if (!label) {
+    // Strip any inbound copy of the trusted header before the app sees it.
+    // Downstream code treats its presence as proof the proxy resolved a
+    // seller subdomain; on the platform host nothing overwrites it, so a
+    // client could otherwise simply send one.
+    if (request.headers.has(SHOP_HEADER)) {
+      const headers = new Headers(request.headers);
+      headers.delete(SHOP_HEADER);
+
+      return NextResponse.next({ request: { headers } });
+    }
+
     return NextResponse.next();
   }
 
@@ -156,7 +173,7 @@ export async function proxy(request: NextRequest) {
   // Forwarded so server components can render shop-specific output without
   // re-deriving the label from the Host header themselves.
   const headers = new Headers(request.headers);
-  headers.set("x-bsol-shop-subdomain", label);
+  headers.set(SHOP_HEADER, label);
 
   // seller1.<apex>/offer renders the landing page route. A rewrite, not a
   // redirect: the seller's own address is the canonical one, so /lp/ must
