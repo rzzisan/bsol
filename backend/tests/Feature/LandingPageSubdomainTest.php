@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AbandonedCheckout;
 use App\Models\LandingPage;
 use App\Models\ShopProfile;
 use App\Models\User;
@@ -187,6 +188,53 @@ class LandingPageSubdomainTest extends TestCase
         $this->postJson("/api/landing/pages/{$page->id}/publish")
             ->assertStatus(422)
             ->assertJsonPath('error_code', 'subdomain_required');
+    }
+
+    public function test_canonical_url_falls_back_to_the_legacy_platform_url_without_a_subdomain(): void
+    {
+        $owner = User::factory()->create();
+        ShopProfile::create([
+            'user_id' => $owner->id,
+            'shop_name' => 'No Subdomain', 'phone' => '01700000000', 'address' => 'Dhaka',
+        ]);
+
+        $page = $this->page($owner, 'oldpage', ['legacy_slug' => 'oldpage']);
+
+        $this->assertStringEndsWith('/lp/oldpage', $page->canonicalUrl());
+    }
+
+    /**
+     * The resume link a seller copies out of the abandoned-checkout list has
+     * to be the page's real address — /lp/{slug} 404s for any page created
+     * after subdomains became mandatory.
+     */
+    public function test_abandoned_checkout_rows_carry_the_pages_canonical_url(): void
+    {
+        $owner = $this->seller('zareen');
+        $page = $this->page($owner, 'watch');
+
+        AbandonedCheckout::create([
+            'user_id' => $owner->id,
+            'landing_page_id' => $page->id,
+            'session_token' => 'tok-123',
+            'customer_phone' => '01711223344',
+            'items' => [],
+            'status' => 'active',
+            'last_activity_at' => now(),
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $expected = "https://zareen.{$this->apex()}/watch";
+
+        $this->getJson('/api/landing/abandoned-checkouts')
+            ->assertOk()
+            ->assertJsonPath('data.0.landing_page.public_url', $expected);
+
+        $id = AbandonedCheckout::first()->id;
+        $this->getJson("/api/landing/abandoned-checkouts/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.landing_page.public_url', $expected);
     }
 
     /**

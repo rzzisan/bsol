@@ -34,15 +34,7 @@ class LandingPageController extends Controller
      */
     private function publicUrlFor(LandingPage $page): string
     {
-        $host = ShopProfile::where('user_id', $page->user->shopOwnerId())->first()?->subdomainHost();
-
-        if ($host) {
-            return 'https://' . $host . '/' . $page->slug;
-        }
-
-        $baseUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
-
-        return $baseUrl . '/lp/' . ($page->legacy_slug ?? $page->slug);
+        return $page->canonicalUrl();
     }
 
     /**

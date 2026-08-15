@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DOMPurify from "isomorphic-dompurify";
 import type { JSONContent } from "@tiptap/core";
-import { mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
+import { landingPathForSlug, mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
 import { resolveBlockIcon } from "@/lib/block-icons";
 import { renderTiptapJSON } from "@/lib/rich-text-render";
@@ -1095,13 +1095,10 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       }
 
       if (json.data?.order_id && json.data?.public_token) {
-        // On a seller's own subdomain the page is served at /{slug}, so the
-        // thank-you step has to stay there too — hopping to /lp/ mid-checkout
-        // would change the URL shape and, on a real campaign, look like a
-        // different destination than the one the ad points at.
-        const onSellerSubdomain = !window.location.pathname.startsWith("/lp/");
-        const base = onSellerSubdomain ? `/${page.slug}` : `/lp/${page.slug}`;
-        router.push(`${base}/thank-you?order=${json.data.order_id}&token=${encodeURIComponent(json.data.public_token)}`);
+        // The thank-you step stays on whichever host the customer is on —
+        // hopping to /lp/ mid-checkout would land them on a URL that does not
+        // exist for pages created after subdomains became mandatory.
+        router.push(`${landingPathForSlug(page.slug)}/thank-you?order=${json.data.order_id}&token=${encodeURIComponent(json.data.public_token)}`);
         return;
       }
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { JSONContent } from "@tiptap/react";
 import { renderTiptapJSON } from "@/lib/rich-text-render";
+import { landingPathForSlug } from "@/lib/landing-pages";
 import { getStoredLocale, LOCALE_STORAGE_KEY, type Locale } from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -30,7 +31,7 @@ export default function PublicTermsPage() {
 
   useEffect(() => {
     const lp = new URLSearchParams(window.location.search).get("lp");
-    if (lp) setHomeHref(`/lp/${lp}`);
+    if (lp) setHomeHref(landingPathForSlug(lp));
   }, []);
 
   useEffect(() => {

@@ -66,6 +66,7 @@ class LandingPageAdminController extends Controller
                 'id' => $page->id,
                 'title' => $page->title,
                 'slug' => $page->slug,
+                'public_url' => $page->canonicalUrl(),
                 'status' => $page->status,
                 'theme_settings' => $page->theme_settings,
                 'content' => $page->content,

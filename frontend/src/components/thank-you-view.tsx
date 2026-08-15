@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { landingPathForSlug } from "@/lib/landing-pages";
 import { mergeLandingContent, getDefaultThankYou, getDefaultSettings } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
 import type { PublicLandingPage } from "@/components/public-landing-page-view";
@@ -271,7 +272,7 @@ export default function ThankYouView({
             <div className="lp-card rounded-3xl p-6 text-center sm:p-8">
               <p className="text-sm text-slate-600">{t.orderInfoMissing}</p>
               <a
-                href={`/lp/${page.slug}`}
+                href={landingPathForSlug(page.slug)}
                 className="mt-4 inline-flex rounded-2xl px-5 py-2.5 text-sm font-semibold"
                 style={{ backgroundColor: theme.accent, color: theme.buttonText }}
               >
@@ -366,7 +367,7 @@ export default function ThankYouView({
 
           <div className="text-center text-sm text-slate-500">
             {contactPhone ? <p>{t.callForHelp}: <a href={`tel:${contactPhone}`} className="font-semibold" style={{ color: theme.primary }}>{contactPhone}</a></p> : null}
-            <a href={`/lp/${page.slug}`} className="mt-2 inline-block font-medium hover:underline" style={{ color: theme.primary }}>
+            <a href={landingPathForSlug(page.slug)} className="mt-2 inline-block font-medium hover:underline" style={{ color: theme.primary }}>
               {t.orderAgain}
             </a>
           </div>

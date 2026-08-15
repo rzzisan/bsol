@@ -93,7 +93,7 @@ type AbandonedCheckoutRow = {
   // snake_case — Eloquent's Model::$snakeAttributes converts relation keys
   // (landingPage()/platformApiKey() method names) to snake_case on
   // serialization, same as regular DB columns.
-  landing_page: { id: number; title: string; slug: string } | null;
+  landing_page: { id: number; title: string; slug: string; public_url?: string } | null;
   platform_api_key: { id: number; domain: string } | null;
   customer_value: { total_orders: number; total_spent: number; risk_level: string } | null;
 };
@@ -190,7 +190,10 @@ export default function AbandonedCheckoutsPage() {
 
   const handleCopyLink = async (row: AbandonedCheckoutRow) => {
     if (!row.landing_page) return;
-    const link = `${window.location.origin}/lp/${row.landing_page.slug}?resume=${encodeURIComponent(row.session_token)}`;
+    // public_url comes from the API because this page may belong to a
+    // shop on its own subdomain — /lp/{slug} would 404 there.
+    const base = row.landing_page.public_url ?? `${window.location.origin}/lp/${row.landing_page.slug}`;
+    const link = `${base}?resume=${encodeURIComponent(row.session_token)}`;
     await navigator.clipboard.writeText(link);
     setCopiedId(row.id);
     setTimeout(() => setCopiedId(null), 2000);

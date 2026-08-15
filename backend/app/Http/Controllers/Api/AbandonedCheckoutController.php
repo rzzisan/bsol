@@ -90,7 +90,7 @@ class AbandonedCheckoutController extends Controller
 
         $query = AbandonedCheckout::query()
             ->whereIn('user_id', $shopUserIds)
-            ->with('landingPage:id,title,slug')
+            ->with('landingPage:id,title,slug,user_id,legacy_slug')
             ->with('platformApiKey:id,domain')
             ->with('order:id,order_number,status');
 
@@ -119,6 +119,10 @@ class AbandonedCheckoutController extends Controller
 
         $rows = $query->orderByDesc('last_activity_at')->paginate($perPage);
 
+        // The resume link the seller copies has to point at the page's real
+        // address — on a subdomain that is not /lp/{slug} (custom_domain_context.md §14).
+        collect($rows->items())->each(fn ($row) => $row->landingPage?->append('public_url'));
+
         $data = $this->attachCustomerValue(collect($rows->items()), auth()->user()->shopOwnerId());
 
         return response()->json([
@@ -137,8 +141,10 @@ class AbandonedCheckoutController extends Controller
     {
         $checkout = AbandonedCheckout::query()
             ->whereIn('user_id', auth()->user()->shopUserIds())
-            ->with(['landingPage:id,title,slug', 'platformApiKey:id,domain', 'order:id,order_number,status'])
+            ->with(['landingPage:id,title,slug,user_id,legacy_slug', 'platformApiKey:id,domain', 'order:id,order_number,status'])
             ->findOrFail($id);
+
+        $checkout->landingPage?->append('public_url');
 
         $data = $this->attachCustomerValue(collect([$checkout]), auth()->user()->shopOwnerId())->first();
 
