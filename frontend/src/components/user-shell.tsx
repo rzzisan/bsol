@@ -603,6 +603,20 @@ export default function UserShell({
   // before touching anything else — mirrors the backend's
   // ForcePasswordChange middleware, which 403s every route but /me,
   // /user, /logout until this flag clears.
+  // ─── Mandatory shop setup ────────────────────────────────────────────────
+  // A brand-new seller has no shop profile and no address, so nothing they
+  // could do in the dashboard would actually work — landing pages can't be
+  // published without a subdomain. Send them through setup first. Only on
+  // the platform origin: a seller already on their own subdomain has, by
+  // definition, finished.
+  if (user?.onboarding?.required && !impersonating) {
+    if (typeof window !== "undefined" && window.location.pathname !== "/onboarding") {
+      window.location.replace("/onboarding");
+    }
+
+    return null;
+  }
+
   if (user?.must_change_password) {
     return (
       <ForcePasswordChangeScreen

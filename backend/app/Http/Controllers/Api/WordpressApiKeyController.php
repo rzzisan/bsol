@@ -168,7 +168,10 @@ class WordpressApiKeyController extends Controller
             'success' => true,
             'data' => [
                 'version' => $this->resolvePluginVersion($sourceDir),
-                'download_url' => url('/api/wordpress/plugin-download'),
+                // Pinned to the platform, not derived from the request Host: the
+                // plugin's own BSOL_API_URL is the platform domain, and a
+                // seller's subdomain can change or be released.
+                'download_url' => rtrim((string) config('app.url'), '/') . '/api/wordpress/plugin-download',
             ],
         ]);
     }

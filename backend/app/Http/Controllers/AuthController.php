@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\EmailOtpVerification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Models\ShopProfile;
 use App\Models\User;
 use App\Services\SubdomainHandoffService;
 use App\Support\FrontendUrl;
@@ -137,6 +138,7 @@ class AuthController extends Controller
         $context = [
             'is_staff' => $user->isStaff(),
             'must_change_password' => (bool) $user->must_change_password,
+            'onboarding' => $this->onboardingState($user),
         ];
 
         if ($user->isStaff()) {
@@ -145,6 +147,63 @@ class AuthController extends Controller
         }
 
         return $context;
+    }
+
+    /**
+     * What a new seller still has to do before their shop has an address.
+     *
+     * Both steps are mandatory: a landing page cannot be published without a
+     * subdomain, and a subdomain cannot be claimed without a saved profile —
+     * so a seller who skips them has an account that cannot actually sell.
+     * Admins and staff are exempt: neither owns a ShopProfile (staff use
+     * their owner's).
+     *
+     * @return array{required: bool, needs_shop_profile: bool, needs_subdomain: bool, subdomain_host: string|null}
+     */
+    private function onboardingState(User $user): array
+    {
+        if ($user->isAdmin() || $user->isStaff()) {
+            return ['required' => false, 'needs_shop_profile' => false, 'needs_subdomain' => false, 'subdomain_host' => null];
+        }
+
+        $profile = ShopProfile::where('user_id', $user->shopOwnerId())->first();
+        $needsProfile = $profile === null;
+        $needsSubdomain = $profile?->subdomainHost() === null;
+
+        return [
+            'required' => $needsProfile || $needsSubdomain,
+            'needs_shop_profile' => $needsProfile,
+            'needs_subdomain' => $needsSubdomain,
+            'subdomain_host' => $profile?->subdomainHost(),
+        ];
+    }
+
+    /**
+     * Hand an already-signed-in session over to the caller's own subdomain.
+     *
+     * Login handles this at sign-in time, but a seller who claims their
+     * subdomain mid-session is still holding a token minted on the platform
+     * origin — and localStorage does not cross origins, so they would
+     * otherwise have to sign in again to reach their new address.
+     */
+    public function startHandoff(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $targetHost = $this->handoff->redirectHostFor($user, $request->getHost());
+
+        if ($targetHost === null) {
+            return response()->json([
+                'message' => 'This account has no separate address to move to.',
+                'error_code' => 'no_target_host',
+            ], 422);
+        }
+
+        return response()->json([
+            'redirect_to' => $this->handoff->redirectUrl(
+                $targetHost,
+                $this->handoff->issue($user, $targetHost, $request->ip()),
+            ),
+        ]);
     }
 
     public function updateProfile(Request $request): JsonResponse

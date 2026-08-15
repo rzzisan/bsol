@@ -83,6 +83,12 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/auth/handoff/exchange', [AuthController::class, 'exchangeHandoff'])
     ->middleware('throttle:20,1');
 
+// Move an already-signed-in session to the seller's own address — used right
+// after they claim a subdomain during onboarding, when their token still
+// belongs to the platform origin.
+Route::post('/auth/handoff/start', [AuthController::class, 'startHandoff'])
+    ->middleware(['auth:sanctum', 'throttle:20,1']);
+
 // Phone OTP for registration
 Route::post('/otp/register', [OtpController::class, 'sendRegistrationOtp']);
 Route::post('/otp/verify-registration', [OtpController::class, 'verifyRegistrationOtp']);

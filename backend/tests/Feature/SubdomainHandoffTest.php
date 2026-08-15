@@ -224,6 +224,83 @@ class SubdomainHandoffTest extends TestCase
         $this->login($homeless)->assertOk()->assertJsonStructure(['token']);
     }
 
+    // ── onboarding ───────────────────────────────────────────────────────
+
+    /** A brand-new seller has neither a profile nor an address yet. */
+    public function test_login_reports_onboarding_for_a_new_seller(): void
+    {
+        $user = User::factory()->create(['password' => Hash::make(self::PASSWORD)]);
+
+        $this->login($user)
+            ->assertOk()
+            ->assertJsonPath('onboarding.required', true)
+            ->assertJsonPath('onboarding.needs_shop_profile', true)
+            ->assertJsonPath('onboarding.needs_subdomain', true);
+    }
+
+    public function test_a_saved_profile_leaves_only_the_address_outstanding(): void
+    {
+        $user = $this->seller(null);
+
+        $this->login($user)
+            ->assertOk()
+            ->assertJsonPath('onboarding.required', true)
+            ->assertJsonPath('onboarding.needs_shop_profile', false)
+            ->assertJsonPath('onboarding.needs_subdomain', true);
+    }
+
+    public function test_onboarding_is_complete_once_a_subdomain_exists(): void
+    {
+        $user = $this->seller('zareen');
+        $host = 'zareen.' . config('app.subdomain_apex');
+        $code = $this->codeFromRedirect($this->login($user)->json('redirect_to'));
+
+        $this->exchange($host, $code)
+            ->assertOk()
+            ->assertJsonPath('onboarding.required', false)
+            ->assertJsonPath('onboarding.subdomain_host', $host);
+    }
+
+    /** Admins and staff own no ShopProfile, so setup does not apply to them. */
+    public function test_admins_are_not_asked_to_onboard(): void
+    {
+        $admin = User::factory()->create(['password' => Hash::make(self::PASSWORD), 'role' => 'admin']);
+
+        $this->login($admin)->assertOk()->assertJsonPath('onboarding.required', false);
+    }
+
+    /**
+     * Claiming a subdomain mid-session leaves the token on the platform
+     * origin, so onboarding needs its own handoff rather than a re-login.
+     */
+    public function test_an_authenticated_seller_can_hand_off_to_their_own_address(): void
+    {
+        $user = $this->seller('zareen');
+        \Laravel\Sanctum\Sanctum::actingAs($user);
+
+        $this->postJson("https://bsol.{$this->apexOrDefault()}/api/auth/handoff/start")
+            ->assertOk()
+            ->assertJsonPath('redirect_to', fn ($url) => str_starts_with(
+                $url,
+                'https://zareen.' . config('app.subdomain_apex') . '/auth/handoff?code=',
+            ));
+    }
+
+    public function test_handoff_start_refuses_when_there_is_nowhere_to_go(): void
+    {
+        $user = $this->seller(null);
+        \Laravel\Sanctum\Sanctum::actingAs($user);
+
+        $this->postJson("https://bsol.{$this->apexOrDefault()}/api/auth/handoff/start")
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'no_target_host');
+    }
+
+    private function apexOrDefault(): string
+    {
+        return config('app.subdomain_apex');
+    }
+
     public function test_staff_are_redirected_to_their_owners_subdomain(): void
     {
         $owner = $this->seller('zareen');

@@ -18,6 +18,7 @@ export interface AuthUser {
   // before persisting — see that function below.
   is_staff?: boolean;
   must_change_password?: boolean;
+  onboarding?: OnboardingState;
   owner_name?: string | null;
   permissions?: Record<string, boolean>;
 }
@@ -48,12 +49,20 @@ export function hasModuleAccess(user: AuthUser | null, moduleKey: StaffModuleKey
   return user.permissions?.[moduleKey] === true;
 }
 
+export type OnboardingState = {
+  required: boolean;
+  needs_shop_profile: boolean;
+  needs_subdomain: boolean;
+  subdomain_host: string | null;
+};
+
 /** Flattens a /login or /me API response (`{ user, is_staff, must_change_password,
  *  owner_name, permissions }`) into a single AuthUser object for storage. */
 export function mergeAuthPayload(payload: {
   user: AuthUser;
   is_staff?: boolean;
   must_change_password?: boolean;
+  onboarding?: OnboardingState;
   owner_name?: string | null;
   permissions?: Record<string, boolean>;
 }): AuthUser {
@@ -61,6 +70,7 @@ export function mergeAuthPayload(payload: {
     ...payload.user,
     is_staff: payload.is_staff ?? false,
     must_change_password: payload.must_change_password ?? false,
+    onboarding: payload.onboarding,
     owner_name: payload.owner_name ?? null,
     permissions: payload.permissions ?? {},
   };
