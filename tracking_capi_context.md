@@ -6,9 +6,17 @@
 2. **আসল কাস্টমার ট্র্যাকিং** — browser (Pixel) + server (Conversions API) দুই দিক থেকে একই ইভেন্ট, `event_id` দিয়ে dedup, উচ্চ Event Match Quality।
 3. **SaaS ফিচার হিসেবে বিক্রয়যোগ্য** — সেলার নিজের WordPress/WooCommerce সাইট বা BSOL landing page-এ এক ক্লিকে ট্র্যাকিং চালু করবে, প্যাকেজ অনুযায়ী দৈনিক ইভেন্ট লিমিট।
 
-**অবস্থা:** পরিকল্পনা পর্যায় (২০২৬-০৮-১৪)। কোনো কোড এখনো লেখা হয়নি। নিচের §2 হলো verified ground truth (কোড ও সার্ভার কনফিগ পড়ে যাচাই করা), §3 থেকে পরে ডিজাইন/প্ল্যান। **§8 (Origin/Domain মডেল) সবচেয়ে গুরুত্বপূর্ণ সেকশন** — সেলারের নিজের WordPress, শেয়ার্ড SaaS ডোমেইন, ও পরিকল্পিত কাস্টম ডোমেইন — তিন কেসে ট্র্যাকিং কীভাবে ভিন্ন হয়।
+**অবস্থা:** পরিকল্পনা পর্যায়, T1 শুরু হচ্ছে (২০২৬-০৮-১৫)। নিচের §2 হলো verified ground truth (কোড ও সার্ভার কনফিগ পড়ে যাচাই করা), §3 থেকে পরে ডিজাইন/প্ল্যান।
 
-**সম্পর্কিত ডকুমেন্ট:** `CONTEXT.md` (server/ops, §৩১ staff-role বাধ্যতামূলক চেকলিস্ট), `SAAS_MODULE_CONTEXT.md` (মডিউল অডিট), `facebook_integration_context.md` (§8 item 4 — বর্তমান CAPI implementation), `wordpress_connect_context.md` (§7.1 item 1 — deferred full-funnel item, এই ডকেই resolve হবে), `landing_page_context.md`, `subscription_billing_context.md` (প্যাকেজ/লিমিট)।
+> **🚨 বড় সংশোধন (২০২৬-০৮-১৫) — এই ডকের §8 লেখা হয়েছিল সাবডোমেইন ফিচার আসার আগে।**
+> এর মাঝে **প্রতিটি সেলার নিজের সাবডোমেইন পেয়েছে** (`{seller}.zyrotechbd.com`) এবং ল্যান্ডিং পেজ **শুধু সেখানেই** চলে — `/lp/{slug}` সম্পূর্ণ মুছে ফেলা হয়েছে (`custom_domain_context.md §14`)। ফলে:
+> - **§8.2-এর কেস B (শেয়ার্ড প্ল্যাটফর্ম ডোমেইন) আর অস্তিত্বে নেই** — ওই সেকশনের পুরো "Basic tier / namespaced `bsol_fbp_*` কুকি" ডিজাইন **বাতিল**, ঐতিহাসিক রেফারেন্স হিসেবে রাখা হলো।
+> - আজকের বাস্তবতা = **§8.3-এর কেস C2**, এবং §8.0-এর host resolver **ইতিমধ্যেই তৈরি** (§8.0 দেখো — নতুন করে লেখা যাবে না)।
+> - §11-এর ৬, ৯, ১০, ১১ নম্বর সিদ্ধান্ত **বন্ধ**। খোলা আছে শুধু **§11.7** (Meta domain verification), যেটা কোনো ফেজ আটকায় না।
+>
+> §8 পড়ার সময় প্রতিটি সাব-সেকশনের উপরের নোট আগে দেখো।
+
+**সম্পর্কিত ডকুমেন্ট:** `custom_domain_context.md` (**আগে পড়ো** — per-seller সাবডোমেইন, এই ডকের §8-এর ভিত্তি বদলে দিয়েছে), `CONTEXT.md` (server/ops, §৩১ staff-role ও §৩২ সাবডোমেইন বাধ্যতামূলক চেকলিস্ট), `SAAS_MODULE_CONTEXT.md` (মডিউল অডিট), `facebook_integration_context.md` (§8 item 4 — বর্তমান CAPI implementation), `wordpress_connect_context.md` (§7.1 item 1 — deferred full-funnel item, এই ডকেই resolve হবে), `landing_page_context.md`, `subscription_billing_context.md` (প্যাকেজ/লিমিট), `domain_security_audit.md`।
 
 ---
 
@@ -44,6 +52,8 @@ BSOL-এর কাছে যা আছে অথচ কোনো সাধার
 | Queue infra | `hybrid-queue-worker.service` (systemd, active), `QUEUE_CONNECTION=redis`, `CACHE_STORE=redis` | চালু ও verified |
 | Landing page visit analytics | `landing_page_visits`, `landing_page_statistics` টেবিল, `TrackLandingPageVisit` middleware | server-side page hit রেকর্ড হয়, কিন্তু Meta-তে যায় না |
 | Multi-site WooCommerce | `platform_api_keys` (multi-row per user), `orders.platform_api_key_id` | Phase 16-এ হয়েছে — ট্র্যাকিং ইভেন্টও per-site tag করতে হবে |
+| **Per-seller সাবডোমেইন** | `shop_profiles.subdomain`, `LandingPageResolver`, `SubdomainPolicy`, `FrontendUrl`, `src/proxy.ts` | **D1–D5, লাইভ ২০২৬-০৮-১৫** — §8-এর ভিত্তি বদলে দিয়েছে, §8.0 দেখো |
+| **ল্যান্ডিং পেজের ঠিকানা** | `{seller}.zyrotechbd.com/{slug}`, `LandingPage::canonicalUrl()` (**nullable**) | `/lp/` মুছে ফেলা; slug per-shop unique; publish-এ সাবডোমেইন বাধ্যতামূলক |
 
 ### 2.2 যা নেই (gap)
 
@@ -147,15 +157,16 @@ pixel_id           string
 access_token       text, encrypted
 test_event_code    string nullable
 enabled            boolean default false
-scope_type         string(20) nullable  — null = shop-wide | 'landing_page' | 'platform_api_key' | 'landing_domain'
-scope_id           bigint nullable      — কোন landing page / কোন WP site / কোন কাস্টম ডোমেইন (§8.7)
+scope_type         string(20) nullable  — null = shop-wide | 'landing_page' | 'platform_api_key'
+                                          ('landing_domain' T8b-তে যোগ হবে, §4.4)
+scope_id           bigint nullable      — কোন landing page / কোন WP site
 consent_mode       string(20) default 'off'   — 'off' | 'required' (GDPR-ইশ সাইটের জন্য)
 last_sent_at, last_error
 timestamps
 index (user_id, enabled), index (scope_type, scope_id)
 ```
 
-**Migration নোট:** `facebook_pixel_settings`-এর বিদ্যমান row গুলো এখানে backfill হবে (`provider='meta'`, `label='Default'`, `scope_type=null`), তারপর পুরনো টেবিল কমপক্ষে এক ফেজ ধরে রাখা হবে (drop নয়) — `SendFacebookCapiPurchaseEventJob` এখনো ওটা পড়ে, রোলব্যাক নিরাপত্তার জন্য।
+**Migration নোট:** `facebook_pixel_settings`-এর বিদ্যমান row গুলো এখানে backfill হবে (`provider='meta'`, `label='Default'`, `scope_type=null`)। **backfill T1-এ, টেবিল তৈরির সাথে একই migration-এ** (আগের পরিকল্পনায় এটা T3-তে ছিল) — নাহলে মাঝখানে একটা ফেজ ধরে দুটো টেবিলই আংশিক সত্য বহন করত, আর সেই সময়ে লেখা প্রতিটা কোডকে "কোনটা পড়ব" ঠিক করতে হতো। পুরনো টেবিল **drop করা হবে না** — `SendFacebookCapiPurchaseEventJob` T2-তে wrapper হওয়ার আগ পর্যন্ত ওটাই পড়ে, আর রোলব্যাকের নিরাপত্তা হিসেবে অন্তত এক ফেজ থাকবে।
 
 ### 4.2 `tracking_events` (নতুন — ingest log + idempotency + audit)
 
@@ -201,7 +212,10 @@ unique (user_id, date)
 
 Redis হলো hot counter, এই টেবিল হলো সত্য/বিলিং/UI-র উৎস — Redis উড়ে গেলেও ইতিহাস থাকে।
 
-### 4.4 `landing_domains` (নতুন — কাস্টম ডোমেইন রেজিস্ট্রি, §8-এর ভিত্তি)
+### 4.4 `landing_domains` (**T8b-তে স্থগিত** — কাস্টম ডোমেইন রেজিস্ট্রি)
+
+> **আপডেট (২০২৬-০৮-১৫):** প্ল্যাটফর্ম সাবডোমেইনের জন্য এই টেবিল **আর দরকার নেই** — `shop_profiles.subdomain` (+ `subdomain_status`, `subdomain_tombstones`, `reserved_subdomains`) ইতিমধ্যেই সেই রেজিস্ট্রির কাজ করছে, এবং সেটাই একমাত্র সত্য। এখানে দ্বিতীয় একটা host রেজিস্ট্রি বানালে দুই জায়গায় সত্য থাকবে — ঠিক যেটা §8.0 নিষেধ করে। **এই টেবিল শুধু T8b-তে (সেলারের নিজের ডোমেইন, `lp.sellershop.com`) তৈরি হবে**, তখন `type` কলামেরও দরকার থাকবে না (`seller_owned` ছাড়া কিছু থাকবে না)। নিচের স্কিমা সেদিনের জন্য রাখা।
+
 
 ```
 id
@@ -290,8 +304,9 @@ Route::post('/tracking/events', [ConnectTrackingController::class, 'ingest'])->m
 Route::get('/tracking/config',  [ConnectTrackingController::class, 'config'])->middleware('throttle:60,1');
 //   config = কোন pixel id, কোন ইভেন্ট চালু, consent mode, quota অবস্থা — প্লাগইন ক্যাশ করবে (১ ঘণ্টা)
 
-// public (landing page browser থেকে), API-key ছাড়া — slug + সাইনড টোকেনে স্কোপড
-Route::post('/public/landing-pages/{slug}/track', [PublicTrackingController::class, 'ingest'])->middleware('throttle:300,1');
+// public (landing page browser থেকে), API-key ছাড়া — সেলার resolve হয় Host থেকে (§8.0)
+// slug-ভিত্তিক রুট নয়: slug এখন per-shop unique, তাই slug একা কোনো শপ নির্দেশ করে না
+Route::post('/public/track', [PublicTrackingController::class, 'ingest'])->middleware('throttle:300,1');
 
 // dashboard (owner_only — Pattern B, credential)
 Route::prefix('tracking')->middleware('owner_only')->group(function () {
@@ -347,16 +362,24 @@ Route::middleware('staff_permission:tracking')->group(function () {
 
 ট্র্যাকিং-এর গুণমান পুরোপুরি নির্ভর করে **ব্রাউজার কোন ডোমেইনে দাঁড়িয়ে আছে** তার উপর — কারণ `_fbp`/`_fbc` কুকি ডোমেইন-স্কোপড, এবং Meta-র domain verification/AEM ডোমেইন-ভিত্তিক। তাই তিনটা আলাদা কেস, এবং তিনটার জন্য আলাদা আচরণ।
 
-### 8.0 একীভূত মেকানিজম — `TrackingHostResolver`
+### 8.0 একীভূত মেকানিজম — host resolution
 
 তিন কেসেই একই নিয়ম: **ইভেন্ট কোন সেলারের, সেটা সবসময় রিকোয়েস্টের `Host`/`Origin` থেকে সার্ভার নিজে বের করবে — ক্লায়েন্টের পাঠানো `destination_id`/`user_id` কখনো বিশ্বাস করা হবে না।**
 
 ```
-Host header → TrackingHostResolver → (user_id, scope) → প্রযোজ্য tracking_destinations
-                 ├── platform_api_keys.domain          → WooCommerce সাইট (Phase 16, বিদ্যমান)
-                 ├── landing_domains.hostname          → কাস্টম ল্যান্ডিং ডোমেইন (§4.4, নতুন)
-                 └── প্ল্যাটফর্ম ডিফল্ট host + slug     → বর্তমান /lp/{slug}
+Host header → host resolution → (user_id, scope) → প্রযোজ্য tracking_destinations
+                 ├── platform_api_keys.domain     → WooCommerce সাইট (Phase 16, বিদ্যমান)
+                 ├── shop_profiles.subdomain      → সেলারের সাবডোমেইন (D2, বিদ্যমান)
+                 └── landing_domains.hostname     → সেলারের নিজের ডোমেইন (T8b, পরে)
 ```
+
+> **আপডেট (২০২৬-০৮-১৫): এটা আর নতুন করে লিখতে হবে না — সাবডোমেইনের কাজেই তৈরি হয়ে গেছে।** নতুন `TrackingHostResolver` ক্লাস **বানানো যাবে না**; নিচেরগুলোই বাড়াতে হবে:
+> - **`App\Support\LandingPageResolver`** — Host → শপ → ওই শপের slug। প্রতিটি পাবলিক ল্যান্ডিং endpoint ইতিমধ্যেই এখান দিয়ে যায়। ট্র্যাকিং ingest-ও এখান দিয়েই যাবে।
+> - **`App\Support\SubdomainPolicy`** — label বৈধতা ও reserved/tombstone চেক।
+> - **`GET /api/public/shop-by-subdomain/{label}`** (`ShopProfileController::publicResolveSubdomain`) — Next.js proxy যেটা ডাকে।
+> - **proxy-র `x-bsol-shop-subdomain` হেডার** — ⚠️ এটা **কখনো অনুমোদনের ভিত্তি হতে পারবে না**। proxy ইনবাউন্ড কপি মুছে দেয় (`domain_security_audit.md` M-1), কিন্তু ব্যাকএন্ড-এর নিজের সিদ্ধান্ত সবসময় `$request->getHost()` থেকেই হবে।
+>
+> মূল ডকের সতর্কতা বহাল: **দুটো আলাদা সত্যের উৎস রাখা যাবে না।**
 
 **কেন এটা নিরাপত্তার প্রশ্ন, শুধু কারিগরি পরিপাটি নয়:** ক্লায়েন্ট-সরবরাহকৃত id বিশ্বাস করলে সেলার A সেলার B-র quota শেষ করে দিতে পারবে, বা B-র Pixel-এ ভুয়া ইভেন্ট ঢোকাতে পারবে। Host-ভিত্তিক resolution এই দুটোই বন্ধ করে (WooCommerce-এ API key ইতিমধ্যেই domain-bound — `AuthenticatePlatformApiKey::matchesDomain()`, একই নীতি)।
 
@@ -371,7 +394,13 @@ Host header → TrackingHostResolver → (user_id, scope) → প্রযোজ
 
 **আচরণ: Full tracking** (browser Pixel + server CAPI, dual, `event_id` dedup) — §7-এর ডিজাইন যেমন আছে তেমনই।
 
-### 8.2 কেস B — BSOL-এর শেয়ার্ড প্ল্যাটফর্ম ডোমেইনে SaaS landing page (আজকের অবস্থা)
+### 8.2 কেস B — শেয়ার্ড প্ল্যাটফর্ম ডোমেইনে SaaS landing page — ⛔ **আর প্রযোজ্য নয়**
+
+> **বাতিল (২০২৬-০৮-১৫)।** এই কেসটা আর অস্তিত্বে নেই: `/lp/{slug}` রুট মুছে ফেলা হয়েছে, প্রতিটা ল্যান্ডিং পেজ এখন সেলারের নিজের সাবডোমেইনে (`custom_domain_context.md §14`), এবং প্ল্যাটফর্ম host-এ ল্যান্ডিং পেজ resolve করাই বন্ধ (`LandingPageResolver` প্ল্যাটফর্ম host-এ কিছুই ফেরত দেয় না)।
+>
+> **যা এর ফলে বাতিল:** এই সেকশনের **"Basic tracking" প্রস্তাব**, `bsol_fbp_{destinationId}` / `bsol_fbc_{destinationId}` namespaced কুকির পুরো মেকানিজম, এবং §11.6-এর "ডকের সবচেয়ে বড় product সিদ্ধান্ত"। কুকি আইসোলেশন এখন **কাঠামোগতভাবে** পাওয়া যাচ্ছে (exact-host কুকি, আলাদা origin) — অ্যাপ্লিকেশন-স্তরে namespace বানানোর দরকারই নেই।
+>
+> নিচের সমস্যার তালিকা **ঐতিহাসিক রেফারেন্স** হিসেবে রাখা হলো, কারণ ১/২/৪ কেন সমাধান হলো সেটা বোঝার জন্য এগুলো জানা দরকার — এবং **সমস্যা ৪ (রেপুটেশন) আংশিকভাবে রয়ে গেছে**, §8.6.4 দেখো।
 
 আজ সব সেলারের পেজ `https://bsol.zyrotechbd.com/lp/{slug}`-এ (nginx-এ একটাই server block, `server_name bsol.zyrotechbd.com` — verified)। এখানে **পাঁচটা বাস্তব সমস্যা**, যার দুটো correctness bug:
 
@@ -401,32 +430,52 @@ Host header → TrackingHostResolver → (user_id, scope) → প্রযোজ
 **C1 — সেলারের নিজের ডোমেইন** (`lp.sellershop.com` CNAME → আমাদের সার্ভার)
 কেস A-র সমান — সম্পূর্ণ first-party, সেলার নিজে Meta-তে ডোমেইন verify করতে পারে, AEM কাজ করে। **আচরণ: Full tracking।** এটাই প্রস্তাবিত ডিফল্ট সুপারিশ, এবং custom domain ফিচারের সবচেয়ে শক্ত বিক্রয়-যুক্তি।
 
-**C2 — আমাদের ডোমেইনে per-seller সাবডোমেইন** (`zareen.bsolpages.com`)
-- কুকি **অবশ্যই exact host-এ** বসবে, `domain=.bsolpages.com` কখনো নয় — নাহলে সাবডোমেইনগুলো আবার কুকি শেয়ার করবে এবং কেস B-র সমস্যা ১/২ ফিরে আসবে।
-- **অবশ্যই অ্যাপ ডোমেইন থেকে আলাদা apex** (`bsolpages.com`, `bsol.zyrotechbd.com` নয়) — যাতে কোনো সেলারের পেজের কারণে ডোমেইন ফ্ল্যাগ হলে ড্যাশবোর্ড/API অক্ষত থাকে। কেস B-র সমস্যা ৪-এর কাঠামোগত সমাধান।
-- domain verification কে করবে তা **যাচাই করতে হবে** (§11 আইটেম ৭): apex আমরা verify করলে সেলার আলাদাভাবে সাবডোমেইন verify করতে পারবে কিনা, Meta Business Manager-এ বাস্তবে পরীক্ষা করে নিশ্চিত হতে হবে — ডকুমেন্টেশন থেকে অনুমান করে ডিজাইন করা যাবে না।
-- verification যদি সেলার-স্তরে সম্ভব হয় → **Full tracking**; না হলে → **Basic tracking** (কেস B-র মতো), কিন্তু কুকি আইসোলেশন ও রেপুটেশন আলাদা থাকায় B-র চেয়ে ভালো।
+**C2 — আমাদের ডোমেইনে per-seller সাবডোমেইন** — ✅ **লাইভ (২০২৬-০৮-১৫), এবং এটাই এখন BSOL ল্যান্ডিং পেজের একমাত্র রূপ**
 
-### 8.4 তিন কেসের সারসংক্ষেপ
+বাস্তবায়িত হয়েছে `{seller}.zyrotechbd.com` হিসেবে (`custom_domain_context.md`)। ডিজাইনের সাথে দুটো পার্থক্য নিচে।
 
-| | কেস A (নিজের WP) | কেস B (শেয়ার্ড প্ল্যাটফর্ম ডোমেইন) | কেস C1 (নিজের কাস্টম ডোমেইন) | কেস C2 (আমাদের সাবডোমেইন) |
+- ✅ কুকি **exact host-এ** — `domain=` অ্যাট্রিবিউট ছাড়া। এটা এখন একটা **হার্ড কনস্ট্রেইন্ট**, শুধু ট্র্যাকিং-এর সুপারিশ নয় (`custom_domain_context.md §2`)। ফলে কেস B-র সমস্যা ১ ও ২ কাঠামোগতভাবেই শেষ।
+- ⚠️ **আলাদা apex হয়নি** — একই `zyrotechbd.com`-এ, যেখানে ড্যাশবোর্ড ও API-ও আছে। অর্থাৎ কেস B-র সমস্যা ৪ (শেয়ার্ড রেপুটেশন) **রয়ে গেছে**। §8.6.4 দেখো।
+- ❓ **domain verification এখনো যাচাই হয়নি** (§11.7) — apex আমাদের, তাই সেলার নিজের Business Manager থেকে `{seller}.zyrotechbd.com` আলাদাভাবে verify করতে পারবে কি না, Meta Business Manager-এ **বাস্তবে পরীক্ষা করে** নিশ্চিত হতে হবে; ডকুমেন্টেশন থেকে অনুমান করা যাবে না।
+- **আচরণ: browser Pixel + server CAPI, অর্থাৎ Full tracking** — §11.7-এর উত্তর নির্বিশেষে। কারণ কুকি আইসোলেশন ইতিমধ্যেই পূর্ণ, তাই pixel চালাতে কোনো correctness বাধা নেই। §11.7-এর উত্তর শুধু **AEM/iOS ইভেন্ট প্রায়োরিটি** কনফিগার করা যাবে কি না তা ঠিক করে — সেটা মানের একটা স্তর, pixel চালানো বা না-চালানোর প্রশ্ন নয়। (বাংলাদেশি ট্রাফিকের অধিকাংশ Android, তাই ক্ষতিও তুলনামূলক কম।)
+
+**⚠️ C2-র নিজস্ব নতুন শর্ত — Pixel কখনো ড্যাশবোর্ডে লোড হবে না**
+
+সাবডোমেইনে সেলারের **ল্যান্ডিং পেজ আর ড্যাশবোর্ড একই origin-এ** (`{seller}.zyrotechbd.com/{slug}` ও `{seller}.zyrotechbd.com/dashboard/...`)। তাই Pixel base code **শুধু পাবলিক ল্যান্ডিং রুটে** ইনজেক্ট হবে, `/dashboard/*`-এ **কখনো নয়**:
+
+- সেলারের নিজের ড্যাশবোর্ড ব্রাউজিং PageView/ViewContent ইভেন্ট হয়ে যাবে → **নিজের কোটা নিজেই খাবে** এবং audience/optimization নষ্ট করবে (সেলার নিজেই "সবচেয়ে engaged ভিজিটর" হয়ে যাবে)।
+- ড্যাশবোর্ডের URL-এ order id, customer ফোন ইত্যাদি থাকে — `event_source_url` হিসেবে Meta-তে পাঠানো মানে ক্রেতার ডেটা অপ্রয়োজনে বাইরে যাওয়া।
+
+*টোকেন-চুরির দিক থেকে এটা নতুন ঝুঁকি নয়* — সেলার আগে থেকেই নিজের ল্যান্ডিং পেজে `html_sections`/`custom_css` দিয়ে ওই origin-এ যা খুশি JS চালাতে পারে, আর ঝুঁকিটা তার **নিজের** অ্যাকাউন্টেই সীমাবদ্ধ (`domain_security_audit.md`-এ গৃহীত)। উপরের দুটো কারণ correctness ও প্রাইভেসির, নিরাপত্তার নয়।
+
+**⚠️ সাবডোমেইন বদলানোর প্রভাব** — §8.6.3 দেখো, ডিজাইনের ধারণা ভুল ছিল।
+
+### 8.4 কেসগুলোর সারসংক্ষেপ (২০২৬-০৮-১৫-এ হালনাগাদ)
+
+আজ **দুটো** কেস বাস্তবে আছে — A ও C2। B বিলুপ্ত, C1 পরে (T8b)।
+
+| | কেস A (সেলারের নিজের WP) | ~~কেস B (শেয়ার্ড ডোমেইন)~~ | কেস C1 (সেলারের নিজের ডোমেইন) | **কেস C2 (আমাদের সাবডোমেইন)** |
 |---|---|---|---|---|
-| Browser Pixel | হ্যাঁ | **না** (server-only) | হ্যাঁ | verification-নির্ভর |
-| Server CAPI | হ্যাঁ | হ্যাঁ | হ্যাঁ | হ্যাঁ |
-| `fbp`/`fbc` আইসোলেশন | পূর্ণ | BSOL-namespaced | পূর্ণ | পূর্ণ (exact-host কুকি) |
-| সেলার domain verify / AEM | পারে | **পারে না** | পারে | যাচাই বাকি |
-| রেপুটেশন ঝুঁকি | সেলারের নিজের | **শেয়ার্ড, অ্যাপ ডোমেইনসহ** | সেলারের নিজের | শেয়ার্ড, কিন্তু অ্যাপ থেকে আলাদা |
-| ট্র্যাকিং টিয়ার | Full | Basic | Full | Full/Basic |
+| অবস্থা | **লাইভ** (প্লাগইন T4-এ) | ⛔ বিলুপ্ত | T8b, পরে | **লাইভ** |
+| Browser Pixel | হ্যাঁ | ~~না~~ | হ্যাঁ | **হ্যাঁ** (ল্যান্ডিং রুটে, `/dashboard/*`-এ কখনো নয়) |
+| Server CAPI | হ্যাঁ | ~~হ্যাঁ~~ | হ্যাঁ | হ্যাঁ |
+| `fbp`/`fbc` আইসোলেশন | পূর্ণ | ~~BSOL-namespaced~~ | পূর্ণ | **পূর্ণ** (exact-host কুকি, হার্ড কনস্ট্রেইন্ট) |
+| সেলার domain verify / AEM | পারে | ~~পারে না~~ | পারে | **যাচাই বাকি** (§11.7) |
+| রেপুটেশন ঝুঁকি | সেলারের নিজের | ~~শেয়ার্ড~~ | সেলারের নিজের | **শেয়ার্ড, অ্যাপ ডোমেইনসহ** (§8.6.4) |
+| ট্র্যাকিং টিয়ার | Full | ~~Basic~~ | Full | **Full** (AEM ছাড়া, যদি §11.7 না হয়) |
 
-**প্রোডাক্ট ফ্রেমিং:** "Basic tracking" (শেয়ার্ড ডোমেইন) সবার জন্য ফ্রি-তে চালু; "Full tracking" কাস্টম ডোমেইনের সাথে — অর্থাৎ custom domain ফিচারটা শুধু ব্র্যান্ডিং upsell নয়, **পরিমাপযোগ্য ad-performance upsell**। এটা `feature_roadmap_context.md` আইটেম ৬-এর ব্যবসায়িক যুক্তিকে যথেষ্ট শক্তিশালী করে।
+**প্রোডাক্ট ফ্রেমিং (সংশোধিত):** পুরনো ফ্রেমিং ছিল "Basic ফ্রি, Full কাস্টম ডোমেইনের সাথে" — সেটা আর খাটে না, কারণ **সবাই ইতিমধ্যেই Full-এর কাছাকাছি**। এটা খারাপ খবর নয়: ট্র্যাকিং-এর মান এখন সবার জন্য ভালো, আর বিক্রির যুক্তি সরে গেছে **ইভেন্ট কোটায়** (§5-এর প্যাকেজ লিমিট) — যেটা ব্যবহারের সাথে রৈখিকভাবে বাড়ে, তাই upsell হিসেবে বেশি স্বাভাবিক। T8b (সেলারের নিজের ডোমেইন) তখন ব্র্যান্ডিং + AEM-এর নিশ্চয়তার জন্য, ট্র্যাকিং চালু করার জন্য নয়।
 
 ### 8.5 SaaS landing page-এর কারিগরি বাস্তবায়ন
 
 Landing page BSOL-এর নিজের Next.js-এ (`frontend/src/app/lp/[slug]/page.tsx` → `PublicLandingPageView` client component)। `page.tsx` ইতিমধ্যেই `headers()` থেকে `x-forwarded-host` পড়ে (`getBaseUrl()`) — অর্থাৎ host-সচেতন রাউটিং-এর ভিত্তি আজই আছে।
 
-- `page.tsx` (server component) → host + slug থেকে প্রযোজ্য destination resolve → tracking config (pixel id, tier, consent mode) পেজে পাঠায়। **public payload-এ শুধু pixel id, access token কখনো নয়**; শুধু Full tier হলে base code inject।
-- নতুন client hook `useBsolTracking()` — PageView / ViewContent (প্রোডাক্ট ব্লক দেখা) / InitiateCheckout (checkout ফর্মে প্রথম ইনপুট) / Lead (ফোন valid হলে) / Purchase (thank-you)। Full tier-এ `fbq` + server POST একই `event_id` দিয়ে; Basic tier-এ শুধু server POST।
-- Ingest রুট host-ভিত্তিক হবে: `POST /api/public/track` (`Origin` থেকে resolve), বর্তমান slug-ভিত্তিক রুট (`/public/landing-pages/{slug}/track`) কাস্টম ডোমেইনে কাজ করবে না বলে দ্বিতীয় স্তরের fallback হিসেবে থাকবে।
+> **আপডেট (২০২৬-০৮-১৫):** `app/lp/[slug]/` এখন **শুধু ভেতরের render target** — পাবলিক ঠিকানা `{seller}.{apex}/{slug}`, আর `src/proxy.ts` সেটাকে `/lp/{slug}`-এ rewrite করে (rewrite proxy-কে পুনরায় ডাকে না, তাই যেকোনো host-এ সরাসরি `/lp/...` চাওয়া 404)। ফাইলপথ অপরিবর্তিত, কিন্তু **`event_source_url` সবসময় পাবলিক ঠিকানা হতে হবে** (`{seller}.{apex}/{slug}`), ভেতরের rewrite path নয় — নাহলে Meta-তে এমন URL যাবে যা ব্রাউজারে কখনো খোলে না, আর domain verification/AEM ম্যাচিং ভাঙবে। `LandingPage::canonicalUrl()` ইতিমধ্যেই সঠিক পাবলিক ঠিকানা দেয় — এটাই ব্যবহার করতে হবে, নিজে বানানো নয়। **সতর্কতা:** `canonicalUrl()` **nullable** (সাবডোমেইনহীন শপের draft পেজে `null`)। `null` হলে ইভেন্ট `event_source_url` ছাড়া যাবে, বানানো URL দিয়ে নয়।
+
+- `page.tsx` (server component) → host + slug থেকে প্রযোজ্য destination resolve → tracking config (pixel id, consent mode) পেজে পাঠায়। **public payload-এ শুধু pixel id, access token কখনো নয়**।
+- **base code শুধু এই রুটে** — `/dashboard/*`-এ কখনো নয় (§8.3 C2-র শর্ত; একই origin বলে এটা সহজেই ভুল হতে পারে)।
+- নতুন client hook `useBsolTracking()` — PageView / ViewContent (প্রোডাক্ট ব্লক দেখা) / InitiateCheckout (checkout ফর্মে প্রথম ইনপুট) / Lead (ফোন valid হলে) / Purchase (thank-you)। `fbq` + server POST একই `event_id` দিয়ে। thank-you একই সাবডোমেইনে (`/{slug}/thank-you`), তাই checkout-এর মাঝপথে কুকি হারানোর সমস্যা নেই।
+- Ingest রুট **host-ভিত্তিক**: `POST /api/public/track`, Host থেকে `LandingPageResolver` দিয়ে resolve (§8.0)। slug-ভিত্তিক রুট বানানো হবে না — host-ই এখন একমাত্র সত্য, আর slug আর globally unique নয় (per-shop), তাই slug একা কোনো শপ নির্দেশ করে না। সাবডোমেইনে API same-origin, তাই CORS-এর প্রশ্নও নেই।
 - `landing_pages.content.settings`-এ per-page toggle (`tracking_enabled`, `tracking_destination_id`) — `frontend/src/lib/landing-pages.ts` ও backend validation দুই জায়গায় যোগ।
 - বিদ্যমান `landing_page_visits` টেবিল অপরিবর্তিত (BSOL-এর নিজস্ব analytics) — tracking pipeline-এর সাথে মেশানো হবে না, দুটোর উদ্দেশ্য আলাদা।
 
@@ -471,15 +520,26 @@ Wildcard সার্টিফিকেট **শুধুমাত্র DNS-01 
 
 **এটা একটা কঠিন শর্ত হিসেবে ধরে রাখতে হবে:** কেউ ভবিষ্যতে `SESSION_DOMAIN=.zyrotechbd.com` করলে সাথে সাথেই ক্রস-সাবডোমেইন সেশন এক্সপোজার তৈরি হবে — এবং সেলাররা landing page builder-এ custom HTML/CSS বসাতে পারে (`custom_css`, `html_sections`, DOMPurify দিয়ে sanitize হয়), তাই এটা তাত্ত্বিক ঝুঁকি নয়। ট্র্যাকিং কুকিও (`bsol_fbp_*`/`bsol_fbc_*`) অবশ্যই exact-host-এ বসবে, `domain=` অ্যাট্রিবিউট ছাড়া।
 
-#### 8.6.3 সাবডোমেইন নাম ব্যবস্থাপনা
+#### 8.6.3 সাবডোমেইন নাম ব্যবস্থাপনা — ✅ **বাস্তবায়িত, দুটো ধারণা ভুল ছিল**
 
-- **Reserved blocklist:** `www`, `api`, `admin`, `app`, `mail`, `webmail`, `ftp`, `cpanel`, `ns1`, `ns2`, `bsol`, `staging`, `dev`, `autodiscover`, `_dmarc` ইত্যাদি — এবং ভবিষ্যতে যোগ হতে পারে এমন নাম।
-- **Immutable:** বিজ্ঞাপন চালু হওয়ার পর সাবডোমেইন বদলানো যাবে না (§8.7 — কুকি ও `event_source_url` দুটোই হারায়)। UI-তে স্পষ্ট সতর্কতা, এবং বদলানোর অনুরোধ support-এর মাধ্যমে।
-- **`landing_pages.slug` আজ globally unique** (verified: `$table->string('slug', 200)->unique()`)। সাবডোমেইন এলে দুই সেলারের একই slug (`/offer`) থাকা স্বাভাবিক দাবি হবে → `unique(user_id, slug)`-এ সরাতে হবে। কিন্তু পুরনো `/lp/{slug}` রুট global lookup-এর উপর দাঁড়িয়ে, যা চিরস্থায়ীভাবে কাজ করতে হবে। **সিদ্ধান্ত দরকার** (§11.9)।
+- ✅ **Reserved blocklist** — বাস্তবায়িত, কিন্তু hardcoded তালিকা হিসেবে নয়: `reserved_subdomains` টেবিল + **Admin → Settings → Reserved Subdomains** UI, `is_system` সুরক্ষা সহ। ১২৮টা row migration-এই বসে।
+- ❌ **"Immutable" ধারণাটা ভুল ছিল** — বাস্তবে সাবডোমেইন **বদলানো যায়**, পুরনো label চিরকাল `subdomain_tombstones`-এ যায় এবং শপের বর্তমান ঠিকানায় **301** হয়। ট্র্যাকিং-এর জন্য তিনটা পরিণতি:
+  1. **`_fbp`/`_fbc` রিসেট** — নতুন host মানে নতুন কুকি ডোমেইন; প্রতিটা ফিরতি ভিজিটর Meta-র কাছে নতুন ব্যক্তি।
+  2. **`event_source_url` বদলে যায়** — Meta-র কাছে এটা ভিন্ন ডোমেইন, domain verification/AEM আবার করতে হবে।
+  3. ⚠️ **retired label-এ ingest POST নীরবে ব্যর্থ হবে** — বেশিরভাগ HTTP ক্লায়েন্ট ও `fetch` 301-এ POST-কে GET-এ নামায় (`custom_domain_context.md §18`-এ WordPress Connect API-র জন্য ঠিক এই কারণেই প্ল্যাটফর্ম ডোমেইন pin করা হয়েছে)। পুরনো host-এ ক্যাশড ল্যান্ডিং পেজ খোলা থাকা ব্রাউজার থেকে ইভেন্ট আর পৌঁছাবে না, অথচ কোনো ত্রুটিও দেখা যাবে না।
+
+  **ফলাফল:** সাবডোমেইন বদলানোর UI-তে সতর্কতা ট্র্যাকিং-সচেতন হতে হবে (§8.7), আর T6-এ ingest ব্যর্থতা মাপার ব্যবস্থা রাখতে হবে — নীরব শূন্যতা এখানে সবচেয়ে খারাপ ফল।
+- ✅ **`landing_pages.slug` এখন per-shop unique** (`unique(user_id, slug)`) — §11.9 বন্ধ। `/lp/{slug}` global lookup সম্পূর্ণ মুছে ফেলা হয়েছে (`legacy_slug` সহ), তাই যে জটিলতার আশঙ্কা ছিল তার কিছুই লাগেনি।
 
 #### 8.6.4 কৌশলগত প্রশ্ন — একই apex, নাকি আলাদা?
 
 `*.zyrotechbd.com` ব্যবহার করলে খরচ শূন্য এবং কাজ কম। কিন্তু §8.2-এর সমস্যা ৪ থেকে যায়: কোনো সেলারের পেজ Meta বা Google Safe Browsing-এ ফ্ল্যাগ হলে parent domain-এর reputation প্রভাবিত হতে পারে — আর সেই একই apex-এ ড্যাশবোর্ড ও API। একটা **আলাদা apex** (বছরে ~$১০) এই ঝুঁকি সম্পূর্ণ আলাদা করে; কারিগরিভাবে দুটোই হুবহু একইভাবে কাজ করে (একই wildcard DNS + wildcard cert + regex block)। *সুপারিশ:* আলাদা apex, কারণ পার্থক্যটা নগণ্য খরচের কিন্তু ঝুঁকিটা প্ল্যাটফর্ম-ব্যাপী।
+
+> **যা আসলে হয়েছে (২০২৬-০৮-১৫): একই apex** — `{seller}.zyrotechbd.com`, ড্যাশবোর্ড ও API-র সাথে। উপরের সুপারিশ মানা হয়নি, তাই **শেয়ার্ড রেপুটেশন ঝুঁকি বহাল**: কোনো সেলারের ল্যান্ডিং পেজ Meta-তে ফ্ল্যাগ হলে তা `zyrotechbd.com`-এর গায়ে লাগতে পারে, আর সেখানেই `bsol.` (ড্যাশবোর্ড + API) ও প্রতিষ্ঠানের মূল সাইট।
+>
+> **এখন আর সস্তায় বদলানো যাবে না** — সেলাররা ইতিমধ্যে সাবডোমেইন নিয়ে ফেলেছে, এবং §8.6.3 অনুযায়ী host বদলানো মানে প্রত্যেকের `_fbp`/`_fbc` ও domain verification হারানো। যদি কখনো সরাতেই হয়, সেটা করতে হবে **বিজ্ঞাপন শুরুর আগে, এবং একবারেই সব সেলারের জন্য** — ট্র্যাকিং লাইভ হয়ে যাওয়ার পরে নয়।
+>
+> **প্রশমন (আলাদা apex ছাড়াই যা করা যায়):** (ক) ল্যান্ডিং পেজ কনটেন্ট মডারেশন — নীতি-লঙ্ঘনকারী পেজ আগেই ধরা, (খ) `landing_pages` publish-এ abuse রিপোর্টের পথ, (গ) Meta-তে ডোমেইন-স্তরের সতর্কতা এলে দ্রুত সাড়া দেওয়ার জন্য admin-এ দৃশ্যমানতা। এগুলো ট্র্যাকিং ফেজের অংশ নয়, কিন্তু ঝুঁকিটা লিখে রাখা দরকার।
 
 ### 8.6.6 Cloudflare মাইগ্রেশন রানবুক (সিদ্ধান্ত: nameserver Cloudflare-এ সরানো হবে)
 
@@ -522,9 +582,9 @@ Wildcard সার্টিফিকেট **শুধুমাত্র DNS-01 
 
 ### 8.7 মাইগ্রেশন ও সতর্কতা (সেলারকে অবশ্যই জানাতে হবে)
 
-- **পুরনো `/lp/{slug}` URL চিরস্থায়ীভাবে কাজ করবে** — চালু বিজ্ঞাপন ওই লিংকে পয়েন্ট করা থাকে, ভাঙা যাবে না। কাস্টম ডোমেইন যোগ করা additive, প্রতিস্থাপন নয়।
-- **ক্যাম্পেইন চলা অবস্থায় ডোমেইন বদলানো যাবে না** — `_fbp`/`_fbc` কুকি ডোমেইন পার হয় না, তাই ভিজিটর নতুন পরিচয় পাবে; `event_source_url` বদলে যাওয়ায় Meta-র কাছে এটা ভিন্ন ডোমেইন। সুপারিশ: **বিজ্ঞাপন চালুর আগেই ডোমেইন চূড়ান্ত করো**।
-- `tracking_destinations.scope_type`-এ `landing_domain` মান যোগ হবে (§4.1-এর enum সম্প্রসারণ), যাতে একটা destination নির্দিষ্ট ডোমেইনে বাঁধা যায়।
+- ~~**পুরনো `/lp/{slug}` URL চিরস্থায়ীভাবে কাজ করবে**~~ — **আর প্রযোজ্য নয়।** `/lp/` ও `legacy_slug` মুছে ফেলা হয়েছে (২০২৬-০৮-১৫), কারণ যাচাই করে দেখা গেছে ওই ঠিকানার ট্র্যাফিক টেস্ট ডেটা ছিল এবং প্রকাশিত পেজওয়ালা দুটো শপেরই নিজস্ব সাবডোমেইন আছে। ট্র্যাকিং-এর জন্য এটা **ভালো খবর**: কোনো legacy URL ধরে রাখার বোঝা নেই, প্রতিটা পেজের **একটাই** canonical `event_source_url`।
+- **ক্যাম্পেইন চলা অবস্থায় ডোমেইন/সাবডোমেইন বদলানো যাবে না** — `_fbp`/`_fbc` কুকি ডোমেইন পার হয় না, তাই ভিজিটর নতুন পরিচয় পাবে; `event_source_url` বদলে যাওয়ায় Meta-র কাছে এটা ভিন্ন ডোমেইন; আর retired label-এর 301 ingest POST ভেঙে দেয় (§8.6.3)। সুপারিশ: **বিজ্ঞাপন চালুর আগেই ঠিকানা চূড়ান্ত করো**। এই সতর্কতা **সাবডোমেইন বদলানোর UI-তেও দেখাতে হবে** — আজ সেখানে সাধারণ সতর্কতা আছে, ট্র্যাকিং-নির্দিষ্ট নয় (T6-এ যোগ হবে)।
+- `tracking_destinations.scope_type`-এ `landing_domain` মান **T8b-তে** যোগ হবে (§4.1, §4.4)। প্ল্যাটফর্ম সাবডোমেইনে দরকার নেই — সেখানে host থেকে সরাসরি `user_id` পাওয়া যায়, তাই shop-wide destination-ই যথেষ্ট।
 
 ---
 
@@ -546,18 +606,26 @@ Wildcard সার্টিফিকেট **শুধুমাত্র DNS-01 
 
 ## 10. ফেজ পরিকল্পনা
 
+**ক্রম পরিবর্তন (২০২৬-০৮-১৫):** T5 এগিয়ে আনা হয়েছে (আগে T4-এর পরে ছিল), আর T3-এর backfill T1-এ ঢুকেছে। কারণ **§1-এর মূল লিভার (`OrderDelivered` → Meta) সম্পূর্ণ server-side** — এর জন্য ব্রাউজার কোড, প্লাগইন বা §11.7-এর উত্তর কিছুই লাগে না। তাই তিন ফেজেই (T1→T2→T5) বিক্রয়যোগ্য differentiator দাঁড়িয়ে যায়, বাকি সব তার উপর মান যোগ করে।
+
 | ফেজ | পরিধি | নির্ভরতা |
 |---|---|---|
-| **T1** | ডেটা মডেল (৩ টেবিল + package কলাম) + `TrackingQuotaService` + `TrackingIngestService` + admin package UI-তে লিমিট ফিল্ড | — |
-| **T2** | `MetaCapiDriver` (batched) + `DispatchTrackingEventsJob` + retry/log + `SendFacebookCapiPurchaseEventJob`-কে নতুন পাইপলাইনে wrapper করা (behavior অপরিবর্তিত) | T1 |
-| **T3** | Multi-destination: `facebook_pixel_settings` → `tracking_destinations` migration + backfill, dashboard CRUD UI, scope selector | T1 |
-| **T4** | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS, first-party REST endpoint, batch relay, funnel ইভেন্ট (plugin v1.17.0) | T2, T3 |
-| **T5** | Order-flow ইভেন্ট — `OrderStatusService::transition()`-এ hook, Delivered/Returned/Confirmed, `orders` থেকে deterministic event_id | T2 |
-| **T6** | Landing page ট্র্যাকিং (Next.js) + per-page toggle + `TrackingHostResolver` + **Basic tier** (শেয়ার্ড ডোমেইন, server-only, namespaced fbp/fbc — §8.2) | T2, T3 |
+| **T1** | ডেটা মডেল (৩ টেবিল + package কলাম) + `TrackingQuotaService` + `TrackingIngestService` + admin package UI-তে লিমিট ফিল্ড। **`facebook_pixel_settings` → `tracking_destinations` backfill এখানেই** (§4.1) | — |
+| **T2** | `MetaCapiDriver` (batched) + `DispatchTrackingEventsJob` + retry/log + `SendFacebookCapiPurchaseEventJob`-কে নতুন পাইপলাইনে wrapper করা (behavior অপরিবর্তিত, দুটো লাইভ call-site অস্পৃশ্য) | T1 |
+| **T5** | **Order-flow ইভেন্ট** — `OrderStatusService::transition()`-এ hook, Delivered/Returned/Confirmed, deterministic `order_{id}_{event}`। ← **এখানেই প্রোডাক্টের মূল মূল্য** | T2 |
+| **T6** | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0) | T2 |
+| **T4** | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS, first-party REST endpoint, batch relay, funnel ইভেন্ট (plugin v1.17.0) | T2 |
+| **T3** | Multi-destination **UI** — dashboard CRUD, scope selector, একাধিক pixel (backfill T1-এ হয়ে গেছে) | T1 |
 | **T7** | Dashboard: event log, quota মিটার, match-quality সারাংশ; fraud signal অর্ডার-ডিটেইলে প্রদর্শন | T2–T6 |
-| **T8** | কাস্টম ডোমেইন (§8.3, §8.6) — `landing_domains` টেবিল, DNS/HTTP verification, catch-all nginx + wildcard/Certbot অটোমেশন, host→page রাউটিং, ওই ডোমেইনে **Full tier** চালু | T6 + `feature_roadmap_context.md` আইটেম ৬ |
+| **T8b** | সেলারের নিজের ডোমেইন (§8.3 C1, §8.6.5) — `landing_domains` টেবিল, DNS verification, per-domain Certbot, catch-all nginx | T6 |
+
+**~~T8a~~** — সম্পন্ন, `custom_domain_context.md` দেখো।
 
 ### 10.1 কাস্টম ডোমেইন কি আগে বানাতে হবে? — না
+
+> **যা হয়েছে (২০২৬-০৮-১৫):** প্রশ্নটা নিজে থেকেই মিটে গেছে — T8a (per-seller সাবডোমেইন) **ট্র্যাকিং শুরুর আগেই সম্পূর্ণ হয়ে গেছে**, ট্র্যাকিং-এর জন্য নয়, নিজের কারণে। ফলে নিচের যুক্তিগুলো আর সিদ্ধান্তের জন্য দরকার নেই, কিন্তু §10.1-এর **শেষ অনুচ্ছেদের ডিজাইন-শর্তটা** (host-ভিত্তিক resolution) এখনো সমান গুরুত্বপূর্ণ — এবং সেটা এখন **বিনামূল্যে পূরণ হয়ে আছে**, কারণ সাবডোমেইনের কাজেই resolver তৈরি হয়ে গেছে (§8.0)। শুধু ভুল করে দ্বিতীয় একটা resolver না লিখলেই হলো।
+>
+> নিচের §10.1-এর একমাত্র অংশ যা এখনো বাস্তব সিদ্ধান্ত: **T8b (সেলারের নিজের ডোমেইন) ট্র্যাকিং আটকাবে না** — সেটা এখনো সত্য, এবং এখন আরও জোরালো, কারণ সাবডোমেইনেই Full tracking পাওয়া যাচ্ছে।
 
 **সিদ্ধান্ত: ট্র্যাকিং কাজ কাস্টম ডোমেইনের জন্য আটকে রাখা হবে না।** যুক্তি:
 
@@ -572,7 +640,7 @@ Wildcard সার্টিফিকেট **শুধুমাত্র DNS-01 
 
 **যে ডিজাইন-শর্তটা এখনই মানতে হবে** (নাহলে T8 একটা rewrite হয়ে যাবে): T6-এ `TrackingHostResolver` **প্রথম দিন থেকেই host-ভিত্তিক** লিখতে হবে (§8.0), slug-ভিত্তিক শর্টকাট নয় — তাহলে পরে কাস্টম ডোমেইন যোগ করা নিছক একটা `landing_domains` row যোগ করার ব্যাপার, কোড পরিবর্তন নয়।
 
-**প্রতি ফেজের বাধ্যতামূলক চেকলিস্ট** (প্রতিষ্ঠিত কনভেনশন): isolated Postgres schema-তে টেস্ট (create → `DB_SCHEMA=xxx php artisan test` → drop), ২টা পরিচিত pre-existing failure baseline (`AuthApiTest`, `CourierFraudCheckApiTest`) মিলিয়ে দেখা, `php artisan migrate --force` প্রোডাকশনে (এই checkout-ই প্রোডাকশন), frontend বদলালে `deploy-safe.sh`, প্লাগইন বদলালে `php -l` + hook/nonce/AJAX-action cross-check + `SETUP.md`-এ QA সেকশন, staff-role তিন-কেস verification (§6.2)।
+**প্রতি ফেজের বাধ্যতামূলক চেকলিস্ট** (প্রতিষ্ঠিত কনভেনশন): isolated Postgres schema-তে টেস্ট (create → `DB_SCHEMA=xxx php artisan test` → drop), ২টা পরিচিত pre-existing failure baseline (`AuthApiTest`, `CourierFraudCheckApiTest`) মিলিয়ে দেখা, `php artisan migrate --force` প্রোডাকশনে (এই checkout-ই প্রোডাকশন), frontend বদলালে `deploy-safe.sh`, প্লাগইন বদলালে `php -l` + hook/nonce/AJAX-action cross-check + `SETUP.md`-এ QA সেকশন, staff-role তিন-কেস verification (§6.2), এবং **`CONTEXT.md §৩২`-এর সাবডোমেইন চেকলিস্ট** — Host থেকে কোনো সিদ্ধান্ত নিচ্ছি কি না, `LandingPageResolver`/`FrontendUrl` ব্যবহার করছি কি না, নতুন top-level রুট হলে proxy-র `APP_PATHS`-এ যোগ হয়েছে কি না।
 
 ---
 
@@ -583,12 +651,14 @@ Wildcard সার্টিফিকেট **শুধুমাত্র DNS-01 
 3. **`OrderDelivered`-এর `value` কী হবে** — অর্ডারের মোট, নাকি ডেলিভারি চার্জ বাদে? Meta ROAS হিসাব এর উপর নির্ভর করে। *প্রাথমিক ঝোঁক:* পণ্যের মূল্য (shipping বাদে), কারণ ROAS-এ shipping revenue নয়।
 4. **Landing page pixel id public payload-এ** — pixel id গোপন নয় (browser-এ যেভাবেই হোক দেখা যায়), কিন্তু কোন সেলারের কোন pixel সেটা enumerate করা যাবে কিনা তা ঠিক করতে হবে (host/slug-স্কোপড রেসপন্স, তালিকা নয়)।
 5. **Consent ডিফল্ট** — বাংলাদেশে কুকি-কনসেন্ট আইনি বাধ্যবাধকতা নয়; ডিফল্ট `off` রাখা হবে, তবে টগল থাকবে। আন্তর্জাতিক ট্রাফিকওয়ালা সেলারের জন্য চালু করার সুপারিশ ডকুমেন্টে থাকবে।
-6. **শেয়ার্ড ডোমেইনে browser Pixel চালানো হবে কি না** (§8.2) — সুপারিশ "না, শুধু CAPI" (Basic tier)। বিকল্প: চালানো, শেয়ার্ড `_fbp` মেনে নিয়ে শুধু `_fbc` namespaced। **এটাই এই ডকের সবচেয়ে বড় product সিদ্ধান্ত** — Full/Basic টিয়ারিং ও custom-domain upsell পুরোটাই এর উপর দাঁড়িয়ে।
-7. **Meta domain verification সাবডোমেইনে কীভাবে কাজ করে** (§8.3 C2) — apex (`bsolpages.com`) আমরা verify করলে সেলার নিজের Business Manager থেকে `zareen.bsolpages.com` আলাদাভাবে verify করতে পারবে কি না। **Business Manager-এ বাস্তবে পরীক্ষা করে নিশ্চিত হতে হবে**, ডকুমেন্টেশন থেকে অনুমান করে ডিজাইন করা যাবে না — উত্তরটা C2-র tier (Full না Basic) নির্ধারণ করে।
-8. **কাস্টম ডোমেইনে DNS পদ্ধতি** — CNAME (সহজ, apex-এ কাজ করে না) বনাম A রেকর্ড (apex-এ চলে, সার্ভার IP বদলালে সব সেলারকে বদলাতে হয়)। *প্রাথমিক ঝোঁক:* সাবডোমেইনে CNAME বাধ্যতামূলক করা (`lp.sellershop.com`), apex সাপোর্ট না দেওয়া।
-9. **`landing_pages.slug` global unique থাকবে না per-seller হবে?** (§8.6.3) — সাবডোমেইন এলে দুই সেলারের একই slug থাকা স্বাভাবিক দাবি, কিন্তু পুরনো `/lp/{slug}` রুট global lookup-এর উপর দাঁড়িয়ে এবং চিরস্থায়ীভাবে কাজ করতে হবে। *প্রাথমিক ঝোঁক:* বিদ্যমান slug গুলো grandfathered রেখে `unique(user_id, slug)`-এ সরানো, আর `/lp/{slug}`-কে একটা আলাদা global alias টেবিল/কলাম দিয়ে resolve করা — যাতে নতুন সেলাররা slug সংঘাতে না পড়ে অথচ চালু বিজ্ঞাপন না ভাঙে।
-10. **DNS Cloudflare-এ সরানো হবে কি না** (§8.6.1) — wildcard cert স্বয়ংক্রিয় নবায়নের একমাত্র বাস্তব পথ। না সরালে per-subdomain HTTP-01, যার সীমা সপ্তাহে ~৫০ সেলার।
-11. **সাবডোমেইনের জন্য একই apex (`zyrotechbd.com`) নাকি আলাদা apex** (§8.6.4) — *সুপারিশ:* আলাদা, reputation আলাদা রাখতে।
+6. ~~**শেয়ার্ড ডোমেইনে browser Pixel চালানো হবে কি না**~~ — **প্রশ্নটাই বিলুপ্ত (২০২৬-০৮-১৫)।** শেয়ার্ড ডোমেইনে আর কোনো ল্যান্ডিং পেজ নেই (§8.2)। সেলার সাবডোমেইনে কুকি আইসোলেশন কাঠামোগত, তাই **Pixel চালানো হবে** — শুধু পাবলিক ল্যান্ডিং রুটে, `/dashboard/*`-এ কখনো নয় (§8.3 C2)।
+7. ❗ **Meta domain verification সাবডোমেইনে কীভাবে কাজ করে** (§8.3 C2) — **এখনো খোলা, এবং এটাই একমাত্র অবশিষ্ট অজানা।** apex (`zyrotechbd.com`) আমরা verify করলে সেলার নিজের Business Manager থেকে `{seller}.zyrotechbd.com` আলাদাভাবে verify করতে পারবে কি না। **Business Manager-এ বাস্তবে পরীক্ষা করে নিশ্চিত হতে হবে**, ডকুমেন্টেশন থেকে অনুমান করা যাবে না।
+   - **কোনো ফেজ আটকায় না** — উত্তর যা-ই হোক browser Pixel + CAPI দুটোই চলবে। এটা শুধু ঠিক করে **AEM/iOS ইভেন্ট প্রায়োরিটি** সেলার কনফিগার করতে পারবে কি না।
+   - না পারলে বিকল্প: apex-এ **আমরা** verify করে ইভেন্ট প্রায়োরিটি প্ল্যাটফর্ম-স্তরে ঠিক করা (সব সেলারের জন্য একই ম্যাপিং, `Purchase` সর্বোচ্চ) — কম নমনীয়, কিন্তু শূন্যের চেয়ে ভালো। T6-এর আগে সিদ্ধান্ত দরকার।
+8. **কাস্টম ডোমেইনে DNS পদ্ধতি** (T8b) — CNAME (সহজ, apex-এ কাজ করে না) বনাম A রেকর্ড (apex-এ চলে, সার্ভার IP বদলালে সব সেলারকে বদলাতে হয়)। *প্রাথমিক ঝোঁক:* সাবডোমেইনে CNAME বাধ্যতামূলক করা (`lp.sellershop.com`), apex সাপোর্ট না দেওয়া।
+9. ~~**`landing_pages.slug` global unique থাকবে না per-seller হবে?**~~ — **শেষ।** `unique(user_id, slug)` বাস্তবায়িত; `/lp/{slug}` ও `legacy_slug` মুছে ফেলা, তাই alias টেবিলের জটিলতা লাগেনি (§8.6.3)।
+10. ~~**DNS Cloudflare-এ সরানো হবে কি না**~~ — **শেষ।** সরানো হয়েছে; wildcard DNS + DNS-01 auto-renew চালু।
+11. ~~**একই apex নাকি আলাদা apex**~~ — **নিষ্পত্তি হয়েছে: একই apex**, সুপারিশের বিপরীতে। রেপুটেশন ঝুঁকি বহাল ও গৃহীত; §8.6.4-এ ঝুঁকি ও প্রশমন লেখা আছে।
 
 ---
 
