@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
 import { FONT_VARIABLE_CLASSES } from "./fonts";
 
@@ -60,6 +60,17 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
 export default async function PublicLandingPageRoute({ params }: RouteProps) {
   const { slug } = await params;
   const page = await fetchLandingPage(slug);
+
+  // On the platform domain, a page whose shop has its own subdomain is served
+  // at two addresses at once — duplicate content, and the platform one sits on
+  // a domain the seller cannot verify with Meta. Send visitors to the
+  // canonical address instead. The proxy sets this header when it rewrote
+  // /{slug} on a seller subdomain, which is how we tell the two apart.
+  const onSellerSubdomain = (await headers()).get("x-bsol-shop-subdomain") !== null;
+
+  if (page && !onSellerSubdomain && page.public_url && !page.public_url.includes("/lp/")) {
+    permanentRedirect(page.public_url);
+  }
 
   // A real 404, not a 200 page that says "unavailable": these URLs are ad
   // destinations on the seller's own domain, so a soft-200 would let a typo'd

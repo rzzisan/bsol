@@ -216,11 +216,26 @@ class ShopProfileController extends Controller
      */
     public function publicResolveSubdomain(string $label): JsonResponse
     {
-        $profile = ShopProfile::where('subdomain', SubdomainPolicy::normalize($label))
+        $label = SubdomainPolicy::normalize($label);
+
+        $profile = ShopProfile::where('subdomain', $label)
             ->where('subdomain_status', 'active')
             ->first();
 
         if (! $profile) {
+            // A label the shop used to own: send visitors to wherever that
+            // shop lives now instead of a dead end. Ad links, bookmarks and
+            // shared URLs keep working across a rename.
+            $movedTo = self::movedToHost($label);
+
+            if ($movedTo) {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'subdomain_moved',
+                    'moved_to' => $movedTo,
+                ], 404);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Unknown subdomain.',
@@ -236,6 +251,22 @@ class ShopProfileController extends Controller
                 'logo_url' => $profile->logo_url,
             ],
         ]);
+    }
+
+    /**
+     * Where a retired label should redirect to: the current address of the
+     * shop that used to own it, or null if that shop has no address now.
+     */
+    private static function movedToHost(string $label): ?string
+    {
+        $tombstone = SubdomainTombstone::where('label', $label)->first();
+
+        if (! $tombstone || ! $tombstone->user_id) {
+            return null;
+        }
+
+        return ShopProfile::where('user_id', $tombstone->user_id)
+            ->first()?->subdomainHost();
     }
 
     private static function rejectionMessage(string $reason): string

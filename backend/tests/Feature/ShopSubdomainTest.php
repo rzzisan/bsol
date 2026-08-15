@@ -203,6 +203,33 @@ class ShopSubdomainTest extends TestCase
         $this->assertArrayNotHasKey('user_id', $response->json('data'));
     }
 
+    /**
+     * A renamed shop's old address must point at the new one, not dead-end:
+     * ad links, bookmarks and anything already shared keep working.
+     */
+    public function test_resolver_reports_where_a_retired_label_moved_to(): void
+    {
+        $this->ownerWithProfile(['subdomain' => 'oldshop', 'subdomain_status' => 'active']);
+
+        $this->putJson('/api/shop-profile/subdomain', ['label' => 'newshop'])->assertOk();
+
+        $this->getJson('/api/public/shop-by-subdomain/oldshop')
+            ->assertStatus(404)
+            ->assertJsonPath('error_code', 'subdomain_moved')
+            ->assertJsonPath('moved_to', 'newshop.' . config('app.subdomain_apex'));
+    }
+
+    public function test_a_released_label_with_no_new_address_is_simply_unknown(): void
+    {
+        $this->ownerWithProfile(['subdomain' => 'goneshop', 'subdomain_status' => 'active']);
+
+        $this->deleteJson('/api/shop-profile/subdomain')->assertOk();
+
+        $this->getJson('/api/public/shop-by-subdomain/goneshop')
+            ->assertStatus(404)
+            ->assertJsonPath('error_code', 'subdomain_not_found');
+    }
+
     public function test_public_resolver_404s_for_unknown_or_inactive_subdomains(): void
     {
         $user = User::factory()->create();

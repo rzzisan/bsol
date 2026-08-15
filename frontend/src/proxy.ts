@@ -24,7 +24,9 @@ const NEGATIVE_TTL_MS = 60 * 1000;
 // costs one resolver call every few minutes rather than one per request.
 // Proxy runs before the data cache, so fetch's own caching options are
 // documented as having no effect here — this has to be done by hand.
-const cache = new Map<string, { exists: boolean; until: number }>();
+type Resolution = { exists: boolean; movedTo: string | null };
+
+const cache = new Map<string, Resolution & { until: number }>();
 
 /** The single label under the apex, or null if this host isn't a seller subdomain. */
 function sellerLabel(host: string): string | null {
@@ -41,10 +43,10 @@ function sellerLabel(host: string): string | null {
   return label.includes(".") ? null : label;
 }
 
-async function shopExists(label: string): Promise<boolean> {
+async function resolveShop(label: string): Promise<Resolution> {
   const hit = cache.get(label);
   if (hit && hit.until > Date.now()) {
-    return hit.exists;
+    return hit;
   }
 
   try {
@@ -52,18 +54,23 @@ async function shopExists(label: string): Promise<boolean> {
       headers: { Accept: "application/json" },
     });
 
-    const exists = res.ok;
+    const body = await res.json().catch(() => ({}));
+    const resolution: Resolution = {
+      exists: res.ok,
+      movedTo: typeof body?.moved_to === "string" ? body.moved_to : null,
+    };
+
     cache.set(label, {
-      exists,
-      until: Date.now() + (exists ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS),
+      ...resolution,
+      until: Date.now() + (resolution.exists ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS),
     });
 
-    return exists;
+    return resolution;
   } catch {
     // Fail open, matching how every other storefront-facing remote check in
     // this codebase behaves: a backend blip must not take every seller's
     // dashboard offline. Not cached, so it retries on the next request.
-    return true;
+    return { exists: true, movedTo: null };
   }
 }
 
@@ -122,7 +129,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!(await shopExists(label))) {
+  const shop = await resolveShop(label);
+
+  if (!shop.exists) {
+    // A renamed shop keeps its old address working: ad links, bookmarks and
+    // anything already shared would otherwise dead-end
+    // (custom_domain_context.md §11.2).
+    if (shop.movedTo) {
+      const target = new URL(request.nextUrl.pathname + request.nextUrl.search, `https://${shop.movedTo}`);
+
+      return NextResponse.redirect(target, 301);
+    }
+
     return notFound(label);
   }
 
