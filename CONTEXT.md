@@ -1287,3 +1287,28 @@ React Context শুধু **descendant** কম্পোনেন্টে ক�
 **Verification-এ নতুন যোগ**: নতুন module/controller লেখার পর rollback-wrapped tinker/live-HTTP টেস্টে staff-account দিয়ে (ক) granted module → 200, (খ) non-granted module → 403 `staff_permission_denied`, (গ) owner-only route staff দিয়ে → 403 `owner_only` — এই তিনটা কেস অবশ্যই যাচাই করতে হবে, শুধু owner দিয়ে টেস্ট করলে যথেষ্ট না।
 
 `SAAS_MODULE_CONTEXT.md §5/§6/§7`-এর checklist এই rule অনুযায়ী আপডেট করা হয়েছে (২০২৬-০৮-১০)।
+
+
+---
+
+## ৩২. 🚨 বাধ্যতামূলক: প্রতিটি সেলারের নিজস্ব সাবডোমেইন — নতুন যেকোনো ফিচারে মেনে চলতে হবে (2026-08-15)
+
+SaaS-এর URL কাঠামো বদলে গেছে। **প্রতিটি সেলার এখন `{label}.zyrotechbd.com`-এ নিজের ঠিকানা পায়, এবং সেখানেই তার ড্যাশবোর্ড ও ল্যান্ডিং পেজ চলে।** সম্পূর্ণ ডিজাইন, নিরাপত্তা যুক্তি ও ফেজ লগ: **`custom_domain_context.md`**; নিরাপত্তা অডিট: `domain_security_audit.md`।
+
+**অবকাঠামোতে যা বদলেছে** (§৮ nginx ও §১০ SSL এখন অসম্পূর্ণ, এই সেকশনটাই হালনাগাদ):
+- DNS এখন **Cloudflare**-এ (`gina`/`pablo.ns.cloudflare.com`), `*.zyrotechbd.com` wildcard A → `103.157.253.197`।
+- Wildcard TLS: `/etc/letsencrypt/live/wildcard-zyrotechbd/`, `certbot-dns-cloudflare` (DNS-01) দিয়ে স্বয়ংক্রিয় নবায়ন। `bsol.zyrotechbd.com`-এর নিজস্ব cert আলাদাই আছে।
+- nginx-এ দ্বিতীয় server block: `server_name "~^(?<seller>...)\.zyrotechbd\.com$"` (**regex-এ ব্রেস থাকায় কোট করা বাধ্যতামূলক**)। exact-match block সবসময় regex-এর আগে জেতে।
+- Next.js 16-এ Middleware-এর নাম **Proxy** — `frontend/src/proxy.ts`, `middleware.ts` নয়।
+
+**নতুন ফিচার লেখার সময় যে প্রশ্নগুলোর উত্তর দিয়ে শুরু করতে হবে:**
+
+1. **এই কোড কি request-এর Host থেকে কিছু সিদ্ধান্ত নেয়?** পাবলিক ল্যান্ডিং লুকআপ সবসময় `LandingPageResolver` দিয়ে যাবে (slug এখন shop-প্রতি unique, globally নয়)। ব্রাউজারমুখী URL সবসময় `App\Support\FrontendUrl` দিয়ে — **ব্যবহারকারী থেকে resolve হয়, Host থেকে নয়**, কারণ এগুলো ইমেইল ও পেমেন্ট কলব্যাকে যায়।
+2. **নতুন কোনো top-level frontend রুট যোগ করলে** `proxy.ts`-এর `APP_PATHS`-এ যোগ করতে হবে, নাহলে সেলারের ল্যান্ডিং পেজ slug সেটাকে ঢেকে দেবে।
+3. **`zyrotechbd.com`-এ নতুন DNS রেকর্ড যোগ করলে** সেই label সাথে সাথে Admin → Settings → Reserved Subdomains-এ যোগ করতে হবে, নাহলে সেলার সেটা দাবি করে চালু সার্ভিস হাইজ্যাক করতে পারবে।
+4. **সাবডোমেইন = Pattern B** (owner-only, `shop_profiles`-এ)। staff দাবি/ছাড়তে পারে না, কিন্তু owner-এর ঠিকানা ব্যবহার করে।
+
+**অলঙ্ঘনীয় নিরাপত্তা শর্ত** (`domain_security_audit.md §৫`-এ সাতটি, সবচেয়ে গুরুত্বপূর্ণ তিনটি এখানে):
+- **`SESSION_DOMAIN` কখনো `.zyrotechbd.com` করা যাবে না**, আর auth টোকেন কখনো `localStorage` থেকে কুকিতে সরানো যাবে না — কুকি ডোমেইন-স্কোপড, `localStorage` origin-স্কোপড; এই পার্থক্যটাই ক্রস-সেলার টোকেন চুরি অসম্ভব করে রাখে।
+- **কোনো অ্যাকাউন্ট নিজের নয় এমন সাবডোমেইনে লগইন করতে পারবে না**, এবং সেলার সাবডোমেইনে কখনো লগইন ফর্ম রেন্ডার করা যাবে না। admin সাপোর্টের একমাত্র পথ প্ল্যাটফর্ম origin থেকে impersonation (Admin → Active Customers → "দেখুন")।
+- **`x-bsol-shop-subdomain` কখনো ক্লায়েন্ট থেকে গ্রহণ করা যাবে না** — proxy সেট করে, proxy-ই ইনবাউন্ড কপি মুছে দেয়।
