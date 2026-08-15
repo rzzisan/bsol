@@ -156,6 +156,8 @@ class AdminController extends Controller
             'price' => ['required', 'numeric', 'min:0'],
             'duration_days' => ['required', 'integer', 'min:1'],
             'max_orders' => ['nullable', 'integer', 'min:0'],
+            // null = unlimited, 0 = tracking not included on this package.
+            'max_tracking_events_per_day' => ['nullable', 'integer', 'min:0'],
             'features' => ['nullable', 'array'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
@@ -180,6 +182,7 @@ class AdminController extends Controller
             'price' => ['sometimes', 'required', 'numeric', 'min:0'],
             'duration_days' => ['sometimes', 'required', 'integer', 'min:1'],
             'max_orders' => ['nullable', 'integer', 'min:0'],
+            'max_tracking_events_per_day' => ['nullable', 'integer', 'min:0'],
             'features' => ['nullable', 'array'],
             'is_active' => ['sometimes', 'boolean'],
         ]);

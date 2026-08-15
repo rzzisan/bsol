@@ -6,7 +6,10 @@
 2. **আসল কাস্টমার ট্র্যাকিং** — browser (Pixel) + server (Conversions API) দুই দিক থেকে একই ইভেন্ট, `event_id` দিয়ে dedup, উচ্চ Event Match Quality।
 3. **SaaS ফিচার হিসেবে বিক্রয়যোগ্য** — সেলার নিজের WordPress/WooCommerce সাইট বা BSOL landing page-এ এক ক্লিকে ট্র্যাকিং চালু করবে, প্যাকেজ অনুযায়ী দৈনিক ইভেন্ট লিমিট।
 
-**অবস্থা:** পরিকল্পনা পর্যায়, T1 শুরু হচ্ছে (২০২৬-০৮-১৫)। নিচের §2 হলো verified ground truth (কোড ও সার্ভার কনফিগ পড়ে যাচাই করা), §3 থেকে পরে ডিজাইন/প্ল্যান।
+**অবস্থা:** **T1 সম্পন্ন ও লাইভ (২০২৬-০৮-১৫)** — ডেটা মডেল, quota ও ingest পাইপলাইন দাঁড়িয়ে গেছে, কিন্তু এখনো কোনো call-site ইভেন্ট জমা দেয় না (সেটা T5/T6/T4)। পরের ফেজ **T2** (`MetaCapiDriver`)।
+
+> ⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)** — migration ইচ্ছাকৃতভাবে কোনো মান বসায়নি, কারণ চালু প্যাকেজে নীরবে লিমিট বসানো মানে সেলারের ইভেন্ট হারানো। **Admin → Packages** থেকে বাস্তব মান বসাতে হবে; seeder-এর প্রস্তাব: Free Trial 2,000 · Starter 5,000 · Growth 15,000 · Business আনলিমিটেড।
+ নিচের §2 হলো verified ground truth (কোড ও সার্ভার কনফিগ পড়ে যাচাই করা), §3 থেকে পরে ডিজাইন/প্ল্যান।
 
 > **🚨 বড় সংশোধন (২০২৬-০৮-১৫) — এই ডকের §8 লেখা হয়েছিল সাবডোমেইন ফিচার আসার আগে।**
 > এর মাঝে **প্রতিটি সেলার নিজের সাবডোমেইন পেয়েছে** (`{seller}.zyrotechbd.com`) এবং ল্যান্ডিং পেজ **শুধু সেখানেই** চলে — `/lp/{slug}` সম্পূর্ণ মুছে ফেলা হয়েছে (`custom_domain_context.md §14`)। ফলে:
@@ -287,7 +290,7 @@ Drop হলে: `tracking_events`-এ `status='dropped_quota'` লেখা হ�
 
 | ক্লাস | দায়িত্ব |
 |---|---|
-| `App\Services\Tracking\TrackingIngestService` | validate → dedup → quota check/sample → `tracking_events` insert → queue dispatch। একমাত্র প্রবেশপথ (landing page, WooCommerce, internal order-flow সবাই এটাই ডাকবে) |
+| `App\Services\Tracking\TrackingIngestService` | validate → **destination আছে কি না** → dedup → quota check/sample → `tracking_events` insert → queue dispatch। একমাত্র প্রবেশপথ (landing page, WooCommerce, internal order-flow সবাই এটাই ডাকবে)। **ক্রমটাই মূল**: destination না থাকলে কিছুই খরচ হয় না, duplicate কোটা খায় না, drop হওয়া ইভেন্ট row হয় না |
 | `App\Services\Tracking\TrackingQuotaService` | `check(ownerId, priority): bool`, `record(ownerId, n)`, `usageToday(ownerId): array`। Redis + `tracking_usage_daily` |
 | `App\Services\Tracking\Destinations\MetaCapiDriver` | ইভেন্ট → Meta payload map, **batched** POST (১০০০ পর্যন্ত, আমরা ৫০-এ রাখব), response parse, per-event success/failure |
 | `App\Services\Tracking\TrackingUserDataBuilder` | normalize + sha256 হ্যাশিং, fbp/fbc, external_id — একটাই জায়গায়, যাতে হ্যাশ নিয়ম কখনো দুই রকম না হয় |
@@ -610,7 +613,7 @@ Wildcard সার্টিফিকেট **শুধুমাত্র DNS-01 
 
 | ফেজ | পরিধি | নির্ভরতা |
 |---|---|---|
-| **T1** | ডেটা মডেল (৩ টেবিল + package কলাম) + `TrackingQuotaService` + `TrackingIngestService` + admin package UI-তে লিমিট ফিল্ড। **`facebook_pixel_settings` → `tracking_destinations` backfill এখানেই** (§4.1) | — |
+| **T1** ✅ | ডেটা মডেল (৩ টেবিল + package কলাম) + `TrackingQuotaService` + `TrackingIngestService` + `TrackingUserDataBuilder` + `app:purge-tracking-events` + admin package UI-তে লিমিট ফিল্ড। **`facebook_pixel_settings` → `tracking_destinations` backfill এখানেই** (§4.1)। **সম্পন্ন ২০২৬-০৮-১৫** | — |
 | **T2** | `MetaCapiDriver` (batched) + `DispatchTrackingEventsJob` + retry/log + `SendFacebookCapiPurchaseEventJob`-কে নতুন পাইপলাইনে wrapper করা (behavior অপরিবর্তিত, দুটো লাইভ call-site অস্পৃশ্য) | T1 |
 | **T5** | **Order-flow ইভেন্ট** — `OrderStatusService::transition()`-এ hook, Delivered/Returned/Confirmed, deterministic `order_{id}_{event}`। ← **এখানেই প্রোডাক্টের মূল মূল্য** | T2 |
 | **T6** | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0) | T2 |

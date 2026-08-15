@@ -22,6 +22,7 @@ class SubscriptionPackageSeeder extends Seeder
                 'price' => 0,
                 'duration_days' => 14,
                 'max_orders' => 50,
+                'max_tracking_events_per_day' => 2000,
                 'features' => ['orders', 'customers', 'products', 'courier', 'sms_automation', 'fraud_check', 'landing_pages', 'accounting'],
             ],
             [
@@ -30,6 +31,7 @@ class SubscriptionPackageSeeder extends Seeder
                 'price' => 799,
                 'duration_days' => 30,
                 'max_orders' => 150,
+                'max_tracking_events_per_day' => 5000,
                 'features' => ['orders', 'customers', 'products', 'courier'],
             ],
             [
@@ -38,6 +40,7 @@ class SubscriptionPackageSeeder extends Seeder
                 'price' => 1999,
                 'duration_days' => 30,
                 'max_orders' => 500,
+                'max_tracking_events_per_day' => 15000,
                 'features' => ['orders', 'customers', 'products', 'courier', 'sms_automation', 'fraud_check', 'landing_pages', 'accounting'],
             ],
             [
@@ -46,6 +49,7 @@ class SubscriptionPackageSeeder extends Seeder
                 'price' => 3999,
                 'duration_days' => 30,
                 'max_orders' => null,
+                'max_tracking_events_per_day' => null,
                 'features' => ['orders', 'customers', 'products', 'courier', 'sms_automation', 'fraud_check', 'landing_pages', 'accounting', 'analytics', 'multi_staff', 'priority_support'],
             ],
         ];

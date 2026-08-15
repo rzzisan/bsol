@@ -28,6 +28,7 @@ interface SubscriptionPackage {
   price: string;
   duration_days: number;
   max_orders: number | null;
+  max_tracking_events_per_day: number | null;
   is_active: boolean;
   created_at: string;
 }
@@ -35,6 +36,7 @@ interface SubscriptionPackage {
 interface PackageForm {
   name: string;
   max_orders: string;
+  max_tracking_events_per_day: string;
   price: string;
   validity_value: string;
   validity_unit: ValidityUnit;
@@ -52,6 +54,7 @@ interface RegistrationDefaults {
 const EMPTY_FORM: PackageForm = {
   name: "",
   max_orders: "",
+  max_tracking_events_per_day: "",
   price: "",
   validity_value: "1",
   validity_unit: "month",
@@ -97,6 +100,8 @@ const text = {
       name: "প্যাকেজ নাম",
       maxOrders: "সর্বোচ্চ অর্ডার লিমিট",
       maxOrdersHint: "ফাঁকা রাখলে আনলিমিটেড ধরা হবে",
+      maxTrackingEvents: "দৈনিক ট্র্যাকিং ইভেন্ট লিমিট",
+      maxTrackingEventsHint: "ফাঁকা = আনলিমিটেড, 0 = এই প্যাকেজে ট্র্যাকিং নেই",
       price: "মূল্য (BDT)",
       validity: "ভ্যালিডিটি",
       defaultStatus: "ডিফল্ট ইউজার স্ট্যাটাস",
@@ -114,6 +119,7 @@ const text = {
     table: {
       name: "নাম",
       maxOrders: "ম্যাক্স অর্ডার",
+      maxTrackingEvents: "ট্র্যাকিং/দিন",
       price: "মূল্য",
       validity: "ভ্যালিডিটি",
       status: "স্ট্যাটাস",
@@ -149,6 +155,7 @@ const text = {
       validityInvalid: "ভ্যালিডিটি ১ বা তার বেশি হতে হবে।",
       priceInvalid: "মূল্য ০ বা তার বেশি হতে হবে।",
       maxOrderInvalid: "অর্ডার লিমিট ০ বা তার বেশি হতে হবে।",
+      maxTrackingEventsInvalid: "ট্র্যাকিং ইভেন্ট লিমিট ০ বা তার বেশি হতে হবে।",
     },
     created: "প্যাকেজ সফলভাবে তৈরি হয়েছে।",
     defaultsSaved: "ডিফল্ট রেজিস্ট্রেশন সেটিংস সংরক্ষণ হয়েছে।",
@@ -195,6 +202,8 @@ const text = {
       name: "Package Name",
       maxOrders: "Maximum Order Limit",
       maxOrdersHint: "Leave empty to treat as unlimited",
+      maxTrackingEvents: "Daily Tracking Event Limit",
+      maxTrackingEventsHint: "Empty = unlimited, 0 = tracking not included",
       price: "Price (BDT)",
       validity: "Validity",
       defaultStatus: "Default User Status",
@@ -212,6 +221,7 @@ const text = {
     table: {
       name: "Name",
       maxOrders: "Max Orders",
+      maxTrackingEvents: "Tracking/Day",
       price: "Price",
       validity: "Validity",
       status: "Status",
@@ -247,6 +257,7 @@ const text = {
       validityInvalid: "Validity must be 1 or greater.",
       priceInvalid: "Price must be 0 or greater.",
       maxOrderInvalid: "Max order limit must be 0 or greater.",
+      maxTrackingEventsInvalid: "Tracking event limit must be 0 or greater.",
     },
     created: "Package created successfully.",
     defaultsSaved: "Default registration settings saved.",
@@ -445,6 +456,9 @@ export default function AdminPackagesPage() {
     const validityValue = Number(form.validity_value);
     const priceValue = Number(form.price);
     const maxOrdersValue = form.max_orders.trim() ? Number(form.max_orders) : null;
+    const maxTrackingValue = form.max_tracking_events_per_day.trim()
+      ? Number(form.max_tracking_events_per_day)
+      : null;
 
     if (!Number.isFinite(validityValue) || validityValue < 1) {
       setMessage({ type: "err", text: t.validation.validityInvalid });
@@ -461,6 +475,14 @@ export default function AdminPackagesPage() {
       (!Number.isFinite(maxOrdersValue) || maxOrdersValue < 0)
     ) {
       setMessage({ type: "err", text: t.validation.maxOrderInvalid });
+      return;
+    }
+
+    if (
+      maxTrackingValue !== null &&
+      (!Number.isFinite(maxTrackingValue) || maxTrackingValue < 0)
+    ) {
+      setMessage({ type: "err", text: t.validation.maxTrackingEventsInvalid });
       return;
     }
 
@@ -481,6 +503,7 @@ export default function AdminPackagesPage() {
           name: form.name.trim(),
           price: priceValue,
           max_orders: maxOrdersValue,
+          max_tracking_events_per_day: maxTrackingValue,
           duration_days: validityToDays(validityValue, form.validity_unit),
           is_active: true,
         }),
@@ -558,6 +581,8 @@ export default function AdminPackagesPage() {
     setEditForm({
       name: pkg.name,
       max_orders: pkg.max_orders !== null ? String(pkg.max_orders) : "",
+      max_tracking_events_per_day:
+        pkg.max_tracking_events_per_day !== null ? String(pkg.max_tracking_events_per_day) : "",
       price: String(pkg.price),
       validity_value: isMonth ? String(days / 30) : String(days),
       validity_unit: isMonth ? "month" : "day",
@@ -589,6 +614,14 @@ export default function AdminPackagesPage() {
       setMessage({ type: "err", text: t.validation.maxOrderInvalid });
       return;
     }
+    const maxTracking =
+      editForm.max_tracking_events_per_day === ""
+        ? null
+        : Number(editForm.max_tracking_events_per_day);
+    if (maxTracking !== null && (!Number.isInteger(maxTracking) || maxTracking < 0)) {
+      setMessage({ type: "err", text: t.validation.maxTrackingEventsInvalid });
+      return;
+    }
     const token = getStoredToken();
     if (!token) return;
     setEditSubmitting(true);
@@ -605,6 +638,7 @@ export default function AdminPackagesPage() {
           price,
           duration_days: validityToDays(validity, editForm.validity_unit),
           max_orders: maxOrders,
+          max_tracking_events_per_day: maxTracking,
           is_active: editForm.is_active,
         }),
       });
@@ -787,6 +821,19 @@ export default function AdminPackagesPage() {
           </div>
 
           <div>
+            <label className={labelCls}>{t.form.maxTrackingEvents}</label>
+            <input
+              type="number"
+              min={0}
+              className={inputCls}
+              value={form.max_tracking_events_per_day}
+              onChange={(e) => setField("max_tracking_events_per_day", e.target.value)}
+              placeholder={locale === "bn" ? "যেমন: 5000" : "e.g. 5000"}
+            />
+            <p className="mt-1 text-xs text-[var(--muted)]">{t.form.maxTrackingEventsHint}</p>
+          </div>
+
+          <div>
             <label className={labelCls}>{t.form.price}</label>
             <input
               type="number"
@@ -860,6 +907,7 @@ export default function AdminPackagesPage() {
               <tr>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.name}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxOrders}</th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxTrackingEvents}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.price}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.validity}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.status}</th>
@@ -870,7 +918,7 @@ export default function AdminPackagesPage() {
             <tbody>
               {loadingPackages && (
                 <tr>
-                  <td colSpan={7} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
@@ -878,7 +926,7 @@ export default function AdminPackagesPage() {
 
               {!loadingPackages && packages.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
@@ -890,6 +938,9 @@ export default function AdminPackagesPage() {
                     <td className="border border-[#e5ebf5] px-3 py-2 font-medium text-[var(--foreground)]">{pkg.name}</td>
                     <td className="border border-[#e5ebf5] px-3 py-2 text-right">
                       {pkg.max_orders ?? t.unlimited}
+                    </td>
+                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                      {pkg.max_tracking_events_per_day ?? t.unlimited}
                     </td>
                     <td className="border border-[#e5ebf5] px-3 py-2 text-right">
                       BDT {Number(pkg.price).toFixed(2)}
@@ -973,6 +1024,19 @@ export default function AdminPackagesPage() {
                   placeholder={t.form.maxOrdersHint}
                   value={editForm.max_orders}
                   onChange={(e) => setEditForm((p) => ({ ...p, max_orders: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>{t.form.maxTrackingEvents}</label>
+                <input
+                  type="number"
+                  min={0}
+                  className={inputCls}
+                  placeholder={t.form.maxTrackingEventsHint}
+                  value={editForm.max_tracking_events_per_day}
+                  onChange={(e) =>
+                    setEditForm((p) => ({ ...p, max_tracking_events_per_day: e.target.value }))
+                  }
                 />
               </div>
               <div>
