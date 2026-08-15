@@ -47,7 +47,9 @@ use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\AdminSupportController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
+use App\Http\Controllers\Api\Admin\ImpersonationController;
 use App\Http\Controllers\Api\Admin\PlatformFacebookSettingsController;
+use App\Http\Controllers\Api\Admin\ReservedSubdomainController;
 use App\Http\Controllers\Api\Admin\PlatformSettingsController;
 use App\Http\Controllers\Api\Admin\LandingTemplateController as AdminLandingTemplateController;
 use App\Http\Controllers\Api\Admin\LandingPageAdminController;
@@ -542,6 +544,17 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);
 
         Route::get('/users', [AdminController::class, 'listUsers']);
+        // Support tool — see ImpersonationController for why this keeps the
+        // admin on the platform origin instead of the seller's subdomain.
+        Route::post('/users/{user}/impersonate', [ImpersonationController::class, 'start'])
+            ->where('user', '[0-9]+')
+            ->middleware('throttle:10,1');
+
+        // Subdomain labels sellers cannot claim (custom_domain_context.md §5.3).
+        Route::get('/reserved-subdomains', [ReservedSubdomainController::class, 'index']);
+        Route::post('/reserved-subdomains', [ReservedSubdomainController::class, 'store']);
+        Route::delete('/reserved-subdomains/{id}', [ReservedSubdomainController::class, 'destroy'])
+            ->where('id', '[0-9]+');
         Route::post('/users', [AdminController::class, 'createUser']);
         Route::put('/users/{user}', [AdminController::class, 'updateUser']);
         Route::delete('/users/{user}', [AdminController::class, 'deleteUser']);

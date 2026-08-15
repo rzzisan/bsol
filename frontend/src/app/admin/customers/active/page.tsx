@@ -139,6 +139,10 @@ const text = {
     settings: "সেটিংস",
     settingsShort: "⚙️",
     delete: "মুছুন",
+    viewAs: "দেখুন",
+    viewAsHint: "সাপোর্টের জন্য এই সেলারের ড্যাশবোর্ড খুলুন",
+    viewAsConfirm: "{name}-এর ড্যাশবোর্ড খুলবেন? আপনার অ্যাডমিন সেশন রাখা থাকবে, ব্যানার থেকে ফিরে আসতে পারবেন।",
+    viewAsFailed: "সাপোর্ট সেশন শুরু করা যায়নি।",
     noGateway: "নেই",
     noPackage: "প্যাকেজ নেই",
     statuses: {
@@ -219,6 +223,10 @@ const text = {
     settings: "Settings",
     settingsShort: "⚙️",
     delete: "Delete",
+    viewAs: "View as",
+    viewAsHint: "Open this seller's dashboard for support",
+    viewAsConfirm: "Open the dashboard as {name}? Your admin session is kept and can be restored from the banner.",
+    viewAsFailed: "Could not start the support session.",
     noGateway: "None",
     noPackage: "No package",
     statuses: {
@@ -256,6 +264,7 @@ export default function ActiveCustomersPage() {
     null,
   );
   const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
+  const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
   const [form, setForm] = useState<UserForm>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -371,6 +380,39 @@ export default function ActiveCustomersPage() {
     setFormError(null);
     setSelectedUser(null);
     setModalMode("add");
+  }
+
+  /**
+   * Support access (custom_domain_context.md §11.5): view the dashboard as a
+   * seller *on this origin*. Deliberately not a login on the seller's own
+   * subdomain — their landing-page HTML runs there, and an admin token in
+   * that origin's localStorage would be reachable from it.
+   */
+  async function impersonate(row: AdminUserRow) {
+    if (!window.confirm(t.viewAsConfirm.replace("{name}", row.name))) return;
+    setImpersonatingId(row.id);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/users/${row.id}/impersonate`, {
+        method: "POST",
+        headers: { Accept: "application/json", Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.data?.token) {
+        window.alert(data?.message ?? t.viewAsFailed);
+        return;
+      }
+
+      // Keep the admin's own token so "exit" can restore it without a re-login.
+      localStorage.setItem("admin_token_backup", localStorage.getItem("auth_token") ?? "");
+      localStorage.setItem("impersonating_name", data.data.user.name);
+      localStorage.setItem("auth_token", data.data.token);
+      localStorage.removeItem("auth_user");
+      window.location.href = "/dashboard";
+    } catch {
+      window.alert(t.viewAsFailed);
+    } finally {
+      setImpersonatingId(null);
+    }
   }
 
   function openEdit(user: AdminUserRow) {
@@ -1056,6 +1098,15 @@ export default function ActiveCustomersPage() {
                           className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--surface-soft)]"
                         >
                           {t.settingsShort}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void impersonate(row)}
+                          disabled={impersonatingId === row.id}
+                          title={t.viewAsHint}
+                          className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--surface-soft)] disabled:opacity-60"
+                        >
+                          {impersonatingId === row.id ? "..." : t.viewAs}
                         </button>
                         <button
                           type="button"

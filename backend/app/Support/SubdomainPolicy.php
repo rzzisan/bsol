@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\ReservedSubdomain;
 use App\Models\ShopProfile;
 use App\Models\SubdomainTombstone;
 
@@ -9,63 +10,17 @@ use App\Models\SubdomainTombstone;
  * Single source of truth for which subdomain labels a seller may claim
  * (custom_domain_context.md §5.3/§5.4).
  *
- * The reserved list lives in code, not in the database, on purpose: an admin
- * must not be able to free up 'mail' or 'cpanel' through a UI and silently
- * break email or the hosting control panel. Changing it requires a commit.
+ * The reserved list lives in reserved_subdomains, managed from the admin
+ * panel, so adding a DNS record to the zone no longer needs a deploy to stay
+ * safe. Rows flagged is_system cannot be deleted through that UI — see the
+ * model — which keeps the original guarantee that nobody can free up 'mail'
+ * or 'cpanel' and hand a seller someone else's live service.
  */
 class SubdomainPolicy
 {
     public const MIN_LENGTH = 3;
 
     public const MAX_LENGTH = 63;
-
-    /**
-     * Labels that already exist as explicit DNS records in the zone
-     * (extracted from the live Cloudflare zone, 2026-08-14). A seller who
-     * claimed one of these would hijack a running service — the wildcard
-     * never overrides an explicit record, so the DNS would keep pointing at
-     * the real host while BSOL believed the label belonged to the seller.
-     *
-     * Keep in sync when a new DNS record is added to zyrotechbd.com.
-     */
-    private const EXISTING_DNS_LABELS = [
-        'ai', 'app', 'autoconfig', 'autodiscover', 'bsol', 'caldav', 'caldavs',
-        'carddav', 'carddavs', 'catv', 'catv-dev', 'cpanel', 'cpcalendars',
-        'cpcontacts', 'default', 'dishbill', 'dmarc', 'dokploy', 'domainkey',
-        'ftp', 'iptv', 'isp', 'mail', 'portal', 'saas', 'sub', 'webdisk',
-        'webmail', 'whm', 'www',
-    ];
-
-    /**
-     * Names we may plausibly need later, plus the usual infrastructure and
-     * role-account names. Cheaper to reserve now than to claw back from a
-     * seller who is already advertising the URL.
-     */
-    private const RESERVED_LABELS = [
-        // infrastructure
-        'api', 'admin', 'ns', 'ns1', 'ns2', 'ns3', 'dns', 'mx', 'smtp', 'imap',
-        'pop', 'pop3', 'email', 'relay', 'gateway', 'proxy', 'vpn', 'ssh',
-        // environments
-        'staging', 'stage', 'dev', 'test', 'testing', 'demo', 'sandbox',
-        'beta', 'alpha', 'preview', 'local', 'localhost',
-        // assets / delivery
-        'cdn', 'static', 'assets', 'media', 'img', 'images', 'files',
-        'download', 'downloads', 'upload', 'uploads',
-        // ops
-        'status', 'health', 'monitor', 'monitoring', 'metrics', 'logs',
-        'backup', 'backups', 'grafana', 'kibana',
-        // product surfaces we may want
-        'support', 'help', 'helpdesk', 'docs', 'doc', 'blog', 'news',
-        'shop', 'store', 'pay', 'payment', 'payments', 'checkout',
-        'billing', 'invoice', 'account', 'accounts', 'auth', 'sso', 'id',
-        'login', 'signup', 'register', 'dashboard', 'panel', 'console',
-        'partner', 'partners', 'affiliate', 'reseller', 'agency',
-        // mail policy / role accounts
-        'dkim', 'spf', 'postmaster', 'hostmaster', 'abuse', 'security',
-        'noreply', 'no-reply', 'root', 'info', 'contact', 'sales',
-        // brand
-        'bsol', 'zyro', 'zyrotech', 'zyrotechbd', 'official', 'www2',
-    ];
 
     /**
      * Lowercase and strip anything that is obviously not part of the label,
@@ -132,17 +87,13 @@ class SubdomainPolicy
     }
 
     /**
-     * Reserved covers three things a seller must never be able to claim:
-     * a name already in DNS, a name we have set aside, and a name some other
-     * seller used to own (see SubdomainTombstone).
+     * Reserved covers two things a seller must never be able to claim: a
+     * label an admin has set aside (reserved_subdomains), and one some other
+     * seller used to own (SubdomainTombstone).
      */
     public static function isReserved(string $label): bool
     {
-        if (in_array($label, self::EXISTING_DNS_LABELS, true)) {
-            return true;
-        }
-
-        if (in_array($label, self::RESERVED_LABELS, true)) {
+        if (ReservedSubdomain::where('label', $label)->exists()) {
             return true;
         }
 

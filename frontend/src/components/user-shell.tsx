@@ -391,6 +391,28 @@ export default function UserShell({
   pageSubtitle,
   children,
 }: UserShellProps) {
+  // Support session banner (custom_domain_context.md §11.5). Rendered from
+  // localStorage rather than the API because impersonation deliberately
+  // leaves no server-side "acting as" state — the token simply is the
+  // seller's — so this flag is the only marker that the tab is borrowed.
+  const [impersonating] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : localStorage.getItem("impersonating_name"),
+  );
+
+  function exitImpersonation() {
+    const adminToken = localStorage.getItem("admin_token_backup");
+    localStorage.removeItem("impersonating_name");
+    localStorage.removeItem("admin_token_backup");
+    localStorage.removeItem("auth_user");
+    if (adminToken) {
+      localStorage.setItem("auth_token", adminToken);
+      window.location.href = "/admin/customers/active";
+    } else {
+      localStorage.removeItem("auth_token");
+      window.location.href = "/";
+    }
+  }
+
   const router = useRouter();
   const [locale, setLocale] = useState<Locale>("bn");
   const [theme, setTheme] = useState<ThemeMode>("dark");
@@ -615,6 +637,22 @@ export default function UserShell({
       onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
     >
+      {impersonating && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-500 px-4 py-2 text-sm font-semibold text-amber-950">
+          <span>
+            {locale === "bn"
+              ? `সাপোর্ট মোড — আপনি ${impersonating} হিসেবে দেখছেন`
+              : `Support mode — viewing as ${impersonating}`}
+          </span>
+          <button
+            type="button"
+            onClick={exitImpersonation}
+            className="rounded-lg bg-amber-950 px-3 py-1 text-xs font-semibold text-amber-50 hover:opacity-90"
+          >
+            {locale === "bn" ? "অ্যাডমিনে ফিরুন" : "Back to admin"}
+          </button>
+        </div>
+      )}
       {!user?.email_verified_at && (
         <div className="p-4 sm:p-5">
           <EmailVerificationBanner

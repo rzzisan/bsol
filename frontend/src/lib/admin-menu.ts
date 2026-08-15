@@ -19,6 +19,7 @@ export type AdminMenuLabels = {
   notificationUseCases?: string;
   notificationLogs?: string;
   productMediaSettings?: string;
+  reservedSubdomains?: string;
   landingTemplates?: string;
   landingPages?: string;
   platformBranding?: string;
@@ -42,6 +43,11 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
       key: "settings-platform-branding",
       label: labels.platformBranding ?? "Platform Branding",
       href: "/admin/settings/platform-branding",
+    },
+    {
+      key: "settings-reserved-subdomains",
+      label: labels.reservedSubdomains ?? "Reserved Subdomains",
+      href: "/admin/settings/reserved-subdomains",
     },
     {
       key: "settings-facebook",
