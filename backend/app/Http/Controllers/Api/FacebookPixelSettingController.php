@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FacebookPixelSetting;
 use App\Services\Facebook\FacebookCapiClient;
 use Illuminate\Http\JsonResponse;
+use App\Support\FrontendUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -80,7 +81,7 @@ class FacebookPixelSettingController extends Controller
             'event_time' => now()->timestamp,
             'event_id' => 'test_' . Str::random(8),
             'action_source' => 'website',
-            'event_source_url' => rtrim((string) config('app.frontend_url'), '/'),
+            'event_source_url' => FrontendUrl::forUser(auth()->user()),
             'user_data' => ['ph' => [hash('sha256', '8801700000000')]],
             'custom_data' => ['currency' => 'BDT', 'value' => 100],
         ], $settings->test_event_code ?: null);

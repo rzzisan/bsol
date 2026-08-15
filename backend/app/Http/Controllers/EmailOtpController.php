@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\EmailOtpVerification;
 use App\Models\User;
+use App\Support\FrontendUrl;
 use App\Services\NotificationDispatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -391,9 +392,12 @@ class EmailOtpController extends Controller
         /** @var NotificationDispatchService $dispatcher */
         $dispatcher = app(NotificationDispatchService::class);
 
-        // Build verification link URL manually since we need frontend URL
-        $frontendUrl = config('app.frontend_url', env('FRONTEND_URL', 'https://bsol.zyrotechbd.com'));
-        $verificationLink = $frontendUrl . '/verify-email?token=' . urlencode($verificationToken);
+        // Point the link at the seller's own address when they have one, so a
+        // white-labelled shop doesn't send its owner to the platform domain.
+        // Resolved from the user, not the request Host — this URL goes into
+        // an email, where a spoofed Host would be a phishing vector.
+        $verificationLink = FrontendUrl::forUserPath($user, 'verify-email')
+            . '?token=' . urlencode($verificationToken);
 
         $result = $dispatcher->dispatch($adminUser, 'email_verification', null, $email, [
             'otp' => $otp,

@@ -9,6 +9,7 @@ use App\Services\Payment\BkashPaymentGatewayClient;
 use App\Services\SmsCreditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use App\Support\FrontendUrl;
 use Illuminate\Http\Request;
 
 /**
@@ -67,12 +68,14 @@ class SmsCreditBkashPaymentController extends Controller
 
     public function callback(Request $request): RedirectResponse
     {
-        $frontendUrl = rtrim((string) config('app.frontend_url'), '/') . '/dashboard/sms/credit';
-
         $paymentId = (string) $request->query('paymentID', '');
         $status = (string) $request->query('status', '');
 
         $purchase = $paymentId ? SmsCreditPurchase::where('bkash_payment_id', $paymentId)->first() : null;
+
+        // See BkashPaymentController::callback() — owner-resolved, not
+        // Host-derived, because bKash controls this redirect.
+        $frontendUrl = FrontendUrl::forUserPath($purchase?->user, 'dashboard/sms/credit');
 
         if (! $purchase) {
             return redirect("{$frontendUrl}?bkash_status=error");

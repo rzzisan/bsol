@@ -319,7 +319,9 @@ server {
 ## 15. জানা সীমাবদ্ধতা
 
 - **`www.{seller}.{apex}` কাজ করে না** — Let's Encrypt wildcard এক লেভেল কভার করে (`*.{apex}`), দুই লেভেল (`*.*.{apex}`) ইস্যু করা যায় না। কেউ `www.` লিখলে ব্রাউজার সার্টিফিকেট সতর্কতা দেখাবে। সমাধান নেই (per-host cert ছাড়া); সেলারকে `www.` ছাড়া ঠিকানা দিতে হবে, এবং কোথাও `www.` সহ লিংক দেখানো যাবে না।
-- **`FRONTEND_URL` এখনো `bsol.{apex}`** — password reset ও email verification লিংক সবসময় প্ল্যাটফর্ম ডোমেইনে যায়, সেলারের সাবডোমেইনে নয়। কাজ করে, কিন্তু white-label অভিজ্ঞতা ভাঙে। host-aware করতে হলে আলাদা কাজ।
+- ~~**`FRONTEND_URL` এখনো `bsol.{apex}`**~~ — **সমাধান হয়েছে।** `App\Support\FrontendUrl` এখন সেলারের নিজের ঠিকানা ফেরত দেয়: email verification লিংক, তিনটা gateway/OAuth কলব্যাক (bKash subscription, bKash SMS credit, Facebook connect), আর CAPI test event-এর `event_source_url`।
+  **গুরুত্বপূর্ণ ডিজাইন সিদ্ধান্ত:** ঠিকানা বের করা হয় **ব্যবহারকারী থেকে, রিকোয়েস্টের `Host` হেডার থেকে নয়**। এই URL গুলো ইমেইলে ও পেমেন্ট-গেটওয়ে কলব্যাকে যায়; Host হেডার আক্রমণকারী-নিয়ন্ত্রিত, তাই সেটা বিশ্বাস করলে প্রতিটাই open redirect / phishing ভেক্টর হয়ে যেত। Facebook কলব্যাকে signed state-এর `user_id` থেকে, bKash কলব্যাকে payment রেকর্ডের মালিক থেকে resolve হয় — state/payment না পাওয়া গেলে প্ল্যাটফর্ম URL-ই একমাত্র নিরাপদ গন্তব্য।
+  `LandingPage::canonicalUrl()`-এর fallback ইচ্ছাকৃতভাবে প্ল্যাটফর্ম URL-ই রাখে — সাবডোমেইনহীন শপের পেজের ঠিকানা ওটাই।
 - **ড্যাশবোর্ডের API কল এখনো absolute** (`bsol.{apex}/api`) — CORS `*` + Bearer টোকেনে কাজ করে; শুধু নেটওয়ার্ক ট্যাবে প্ল্যাটফর্ম ডোমেইন দেখা যায়। পাবলিক ল্যান্ডিং ফ্লো ও handoff relative, তাই কার্যকারিতায় প্রভাব নেই (§11.4)।
 
 ## 12. ফেজ পরিকল্পনা

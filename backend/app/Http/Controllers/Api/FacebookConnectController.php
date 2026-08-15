@@ -8,6 +8,8 @@ use App\Models\PlatformFacebookSetting;
 use App\Services\Facebook\FacebookGraphClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use App\Models\User;
+use App\Support\FrontendUrl;
 use Illuminate\Http\Request;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Cache;
@@ -64,7 +66,11 @@ class FacebookConnectController extends Controller
 
     public function callback(Request $request): RedirectResponse
     {
-        $frontendUrl = rtrim((string) config('app.frontend_url'), '/') . '/dashboard/settings/facebook';
+        // Meta redirects the browser here, so the Host header is not ours to
+        // trust; the seller's address is resolved from the signed state's
+        // user_id below. Until that decodes, the platform URL is the only
+        // safe destination.
+        $frontendUrl = FrontendUrl::platform() . '/dashboard/settings/facebook';
 
         if ($request->filled('error')) {
             return redirect("{$frontendUrl}?fb_error=" . urlencode((string) $request->query('error_description', 'denied')));
@@ -74,6 +80,8 @@ class FacebookConnectController extends Controller
         if (! $state) {
             return redirect("{$frontendUrl}?fb_error=" . urlencode('Session expired, please try connecting again.'));
         }
+
+        $frontendUrl = FrontendUrl::forUserPath(User::find($state['user_id']), 'dashboard/settings/facebook');
 
         $code = (string) $request->query('code', '');
         $userToken = $this->graphClient->exchangeCodeForUserToken($code, $this->callbackUrl());
