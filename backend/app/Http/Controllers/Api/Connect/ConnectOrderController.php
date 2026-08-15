@@ -206,8 +206,8 @@ class ConnectOrderController extends Controller
                     // Purchase event only — fires once, on creation, same as
                     // the landing-page checkout flow (LandingPageController).
                     // A safe no-op for any seller who hasn't configured
-                    // Facebook CAPI (the job's own FacebookPixelSetting gate
-                    // handles that).
+                    // Facebook CAPI (T2 — TrackingIngestService's own
+                    // tracking_destinations lookup handles that).
                     SendFacebookCapiPurchaseEventJob::dispatch(
                         $responseData['data']['id'],
                         $data['client_ip'] ?? null,

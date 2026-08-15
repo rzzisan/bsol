@@ -2,6 +2,7 @@
 
 namespace App\Services\Tracking;
 
+use App\Jobs\DispatchTrackingEventsJob;
 use App\Models\TrackingDestination;
 use App\Models\TrackingEvent;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -106,8 +107,7 @@ class TrackingIngestService
             return $this->result(self::DUPLICATE, reason: 'This event was already ingested.');
         }
 
-        // T2 dispatches DispatchTrackingEventsJob here, fanning $row out to
-        // every destination resolved above.
+        DispatchTrackingEventsJob::dispatch($row->id);
 
         return $this->result(self::ACCEPTED, event: $row, priority: $decision['priority']);
     }

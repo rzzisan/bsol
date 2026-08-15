@@ -6,7 +6,7 @@
 2. **আসল কাস্টমার ট্র্যাকিং** — browser (Pixel) + server (Conversions API) দুই দিক থেকে একই ইভেন্ট, `event_id` দিয়ে dedup, উচ্চ Event Match Quality।
 3. **SaaS ফিচার হিসেবে বিক্রয়যোগ্য** — সেলার নিজের WordPress/WooCommerce সাইট বা BSOL landing page-এ এক ক্লিকে ট্র্যাকিং চালু করবে, প্যাকেজ অনুযায়ী দৈনিক ইভেন্ট লিমিট।
 
-**অবস্থা (২০২৬-০৮-১৫):** **T1 সম্পন্ন ও লাইভ** — ডেটা মডেল, quota ও ingest পাইপলাইন দাঁড়িয়ে গেছে। **এখনো কোনো call-site ইভেন্ট জমা দেয় না** (সেটা T2/T5/T6/T4)। পরের ফেজ **T2** (`MetaCapiDriver`)।
+**অবস্থা (২০২৬-০৮-১৫):** **T1, T2 সম্পন্ন ও লাইভ** — ডেটা মডেল, quota, ingest পাইপলাইন, আর এখন Meta-তে আসল send। `SendFacebookCapiPurchaseEventJob`-এর দুই লাইভ call site (ল্যান্ডিং পেজ checkout, WooCommerce order sync) নতুন পাইপলাইনে চলছে — Purchase ইভেন্ট আসলেই Meta-তে যাচ্ছে, pixel কনফিগার করা প্রতিটা সেলারের জন্য। **এখনো Purchase ছাড়া আর কোনো ইভেন্ট কোথাও পাঠানো হয় না** (funnel/order-flow ইভেন্ট — সেটা T5/T6/T4)। পরের ফেজ **T5** (order-flow ইভেন্ট)।
 
 > ⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)।** Migration ইচ্ছাকৃতভাবে কোনো মান বসায়নি — চালু প্যাকেজে নীরবে লিমিট বসানো মানে সেলারের ইভেন্ট হারানো। **Admin → Packages** থেকে বাস্তব মান বসাতে হবে; seeder-এর প্রস্তাব: Free Trial 2,000 · Starter 5,000 · Growth 15,000 · Business আনলিমিটেড।
 
@@ -53,7 +53,8 @@ BSOL-এর কাছে যা আছে অথচ কোনো সাধার
 
 ### 2.2 যা নেই (gap)
 
-> **T1-এ যা তৈরি হয়েছে (২০২৬-০৮-১৫):** নিচের ৪, ৫, ৬ নম্বরের **ভিত্তি** দাঁড়িয়ে গেছে — `tracking_destinations` (multi-pixel), `tracking_events` (log + idempotency), `tracking_usage_daily` + `TrackingQuotaService` (quota), `TrackingIngestService`, `TrackingUserDataBuilder`। কিন্তু **কোনো call-site এখনো ইভেন্ট জমা দেয় না** এবং **কিছুই Meta-তে যায় না** (T2)। তাই তালিকাটা কার্যকরভাবে এখনো সত্য।
+> **T1-এ যা তৈরি হয়েছে:** নিচের ৪, ৫, ৬ নম্বরের **ভিত্তি** — `tracking_destinations` (multi-pixel), `tracking_events` (log + idempotency), `tracking_usage_daily` + `TrackingQuotaService` (quota), `TrackingIngestService`, `TrackingUserDataBuilder`।
+> **T2-এ যা তৈরি হয়েছে (২০২৬-০৮-১৫):** `MetaCapiDriver` (আসল Meta HTTP call), `DispatchTrackingEventsJob` (fan-out + retry + log), আর `SendFacebookCapiPurchaseEventJob` নতুন পাইপলাইনের thin wrapper হয়ে গেছে — তার দুই লাইভ call site অপরিবর্তিত, শুধু ভেতরের রাস্তা বদলেছে। **Purchase এখন সত্যিই Meta-তে যাচ্ছে।** নিচের তালিকা তাই আংশিক পুরনো — যা এখনো সত্য সেটাই শুধু থাকল (funnel/order-flow ইভেন্ট, batching-এর প্রকৃত ব্যবহার)।
 
 1. **কোনো client-side Pixel নেই কোথাও।** `grep -rn "fbq\|connect.facebook.net\|gtag\|dataLayer" frontend/src/` → শূন্য ম্যাচ। BSOL landing page-এ Meta Pixel base code বসে না, তাই আজ `fbp`/`fbc` কুকি কখনোই তৈরি হয় না — অর্থাৎ বর্তমান CAPI ইভেন্টগুলোর Event Match Quality কাঠামোগতভাবেই দুর্বল।
 2. **Funnel-এর মাত্র শেষ ধাপ ট্র্যাক হয়।** PageView / ViewContent / AddToCart / InitiateCheckout / Lead — কিছুই নেই।
@@ -61,7 +62,7 @@ BSOL-এর কাছে যা আছে অথচ কোনো সাধার
 4. **এক সেলার এক Pixel** — `facebook_pixel_settings.unique('user_id')`; একাধিক ব্র্যান্ড/সাইটের সেলার আটকে যায়। *(T1-এ `tracking_destinations` টেবিল তৈরি ও backfill হয়েছে; CRUD UI T3-এ।)*
 5. **কোনো event log নেই।** কোন ইভেন্ট গেল, Meta কী উত্তর দিল, কেন ব্যর্থ হলো — কেউ দেখতে পায় না, শুধু `last_error` string। *(T1-এ `tracking_events` টেবিল তৈরি; UI T7-এ।)*
 6. **কোনো quota/rate control নেই।** একটা busy WooCommerce সাইট দিনে লাখো PageView পাঠালে BSOL-এর queue ও Meta rate limit দুটোই ভাঙবে, খরচ প্ল্যাটফর্মের ঘাড়ে পড়বে। ← **user-এর মূল requirement**। *(T1-এ সম্পূর্ণ — quota tiering, Redis কাউন্টার, দৈনিক টেবিল, সেলারের মিটার লাইভ।)*
-7. **Batching নেই।** Meta একটা রিকোয়েস্টে ১০০০ ইভেন্ট নেয়; আমরা প্রতি ইভেন্টে একটা HTTP call করি।
+7. **Batching এখনো ব্যবহৃত হয় না।** `MetaCapiDriver::send()` একাধিক ইভেন্ট এক HTTP call-এ পাঠাতে পারে (T2-তে বানানো), কিন্তু `DispatchTrackingEventsJob` প্রতিটা accepted ইভেন্টের জন্য আলাদাভাবে ডাকা হয় (real-time), তাই আজ প্রতি call-এ একটাই ইভেন্ট যায়। প্লাগইনের ব্যাচ রিলে (T4) বা ভবিষ্যতের retry sweep চাইলে driver-টা আজই batch নিতে পারে — কোনো বদল ছাড়া।
 
 ### 2.3 প্রাসঙ্গিক legacy prior art (`oldproject/`, `zyro/`) — পড়া হয়েছে, কপি করা হবে না
 
@@ -293,12 +294,12 @@ Drop হলে: `tracking_events`-এ `status='dropped_quota'` লেখা হ�
 |---|---|
 | ✅ `App\Services\Tracking\TrackingIngestService` | validate → **destination আছে কি না** → dedup → quota check/sample → `tracking_events` insert → queue dispatch। একমাত্র প্রবেশপথ (landing page, WooCommerce, internal order-flow সবাই এটাই ডাকবে)। **ক্রমটাই মূল**: destination না থাকলে কিছুই খরচ হয় না, duplicate কোটা খায় না, drop হওয়া ইভেন্ট row হয় না |
 | ✅ `App\Services\Tracking\TrackingQuotaService` | `check(ownerId, priority): bool`, `record(ownerId, n)`, `usageToday(ownerId): array`। Redis + `tracking_usage_daily` |
-| ⬜ `App\Services\Tracking\Destinations\MetaCapiDriver` (T2) | ইভেন্ট → Meta payload map, **batched** POST (১০০০ পর্যন্ত, আমরা ৫০-এ রাখব), response parse, per-event success/failure |
+| ✅ `App\Services\Tracking\Destinations\MetaCapiDriver` | ইভেন্ট → Meta payload map, batched POST নিতে পারে (আজ ব্যবহার ১-এ, §2.2 আইটেম ৭), response parse — Meta per-event status ফেরত দেয় না, তাই batch-এর সবগুলোকে একই ফলাফল ধরা হয় |
 | ✅ `App\Services\Tracking\TrackingUserDataBuilder` | normalize + sha256 হ্যাশিং, fbp/fbc, external_id — একটাই জায়গায়, যাতে হ্যাশ নিয়ম কখনো দুই রকম না হয় |
-| ⬜ `App\Jobs\DispatchTrackingEventsJob` (T2) | queued, batch করে destination driver ডাকে, `tracking_events` status আপডেট, retry |
+| ✅ `App\Jobs\DispatchTrackingEventsJob` | একটা accepted ইভেন্ট → প্রযোজ্য প্রতিটা destination-এ পাঠায় (§11.1 fan-out সিদ্ধান্ত), অন্তত একটা সফল হলেই `status='sent'`, সবগুলো ব্যর্থ হলে exception ছুঁড়ে retry (`tries=3`, backoff `[10,30,60]`), শেষমেশ ব্যর্থ হলে `failed()`-এ `status='failed'` |
 | ✅ `App\Console\Commands\PurgeOldTrackingEvents` | ৯০ দিনের বেশি পুরনো row মুছে। Job নয়, artisan command — `routes/console.php`-এ প্রতিদিন ০৩:৩০-এ শিডিউলড। Postgres-এ `DELETE ... LIMIT` নেই, তাই id select করে chunk-এ মোছে |
 
-**বিদ্যমান `FacebookCapiClient` ও `SendFacebookCapiPurchaseEventJob`:** মুছে ফেলা হবে না। `SendFacebookCapiPurchaseEventJob` নতুন পাইপলাইনে ইভেন্ট জমা দেওয়ার একটা পাতলা wrapper-এ পরিণত হবে (behavior একই, dispatch call-site দুটো অপরিবর্তিত) — এটাই সবচেয়ে কম-ঝুঁকির পথ, কারণ ওই দুই call-site এখন প্রোডাকশনে চলছে।
+**`FacebookCapiClient` ও `SendFacebookCapiPurchaseEventJob` ✅ T2-তে সম্পন্ন।** `FacebookCapiClient` মোছা হয়নি কিন্তু আর ডাকা হয় না (legacy, রোলব্যাক-নিরাপত্তা হিসেবে রাখা)। `SendFacebookCapiPurchaseEventJob` এখন `TrackingIngestService::ingest()`-এর পাতলা wrapper — constructor ও দুই লাইভ dispatch call-site (`LandingPageController.php`, `ConnectOrderController.php`) অপরিবর্তিত, `FacebookPixelSetting` lookup আর সরাসরি Meta HTTP call ভেতর থেকে সরে গেছে। বাড়তি সুবিধা যেটা আগে ছিল না: এখন একই অর্ডারের জন্য দুবার dispatch হলে `tracking_events`-এর unique constraint দ্বিতীয়টা নিঃশব্দে বাতিল করে — আগে প্রতিবার সরাসরি Meta-তে যেত, ডুপ্লিকেট-প্রতিরোধ ছিল না।
 
 ### 6.2 নতুন রুট
 
@@ -522,8 +523,8 @@ Landing page BSOL-এর Next.js-এ: পাবলিক ঠিকানা `{se
 | ফেজ | পরিধি | নির্ভরতা |
 |---|---|---|
 | **T1** ✅ | ডেটা মডেল (৩ টেবিল + package কলাম) + `TrackingQuotaService` + `TrackingIngestService` + `TrackingUserDataBuilder` + `app:purge-tracking-events` + admin package UI-তে লিমিট ফিল্ড। **`facebook_pixel_settings` → `tracking_destinations` backfill এখানেই** (§4.1)। **সম্পন্ন ২০২৬-০৮-১৫** | — |
-| **T2** ← **পরবর্তী** | `MetaCapiDriver` (batched) + `DispatchTrackingEventsJob` + retry/log + `SendFacebookCapiPurchaseEventJob`-কে নতুন পাইপলাইনে wrapper করা (behavior অপরিবর্তিত, দুটো লাইভ call-site অস্পৃশ্য) | T1 |
-| **T5** | **Order-flow ইভেন্ট** — `OrderStatusService::transition()`-এ hook, Delivered/Returned/Confirmed, deterministic `order_{id}_{event}`। ← **এখানেই প্রোডাক্টের মূল মূল্য** | T2 |
+| **T2** ✅ | `MetaCapiDriver` + `DispatchTrackingEventsJob` (fan-out/retry/log) + `SendFacebookCapiPurchaseEventJob`-কে নতুন পাইপলাইনে wrapper করা (behavior অপরিবর্তিত, দুটো লাইভ call-site অস্পৃশ্য)। **সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T1 |
+| **T5** ← **পরবর্তী** | **Order-flow ইভেন্ট** — `OrderStatusService::transition()`-এ hook, Delivered/Returned/Confirmed, deterministic `order_{id}_{event}`। ← **এখানেই প্রোডাক্টের মূল মূল্য** | T2 |
 | **T6** | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0) | T2 |
 | **T4** | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS, first-party REST endpoint, batch relay, funnel ইভেন্ট (plugin v1.17.0) | T2 |
 | **T3** | Multi-destination **UI** — dashboard CRUD, scope selector, একাধিক pixel (backfill T1-এ হয়ে গেছে) | T1 |

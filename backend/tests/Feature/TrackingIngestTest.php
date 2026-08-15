@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Tracking\TrackingIngestService;
 use App\Services\Tracking\TrackingUserDataBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -28,6 +29,13 @@ class TrackingIngestTest extends TestCase
     {
         parent::setUp();
         $this->ingest = app(TrackingIngestService::class);
+
+        // ingest() dispatches DispatchTrackingEventsJob (T2) on every accepted
+        // event. QUEUE_CONNECTION=sync in tests would run it inline — a real
+        // Meta HTTP call this file has no business making, and one that would
+        // flip status past 'queued' before these tests can assert on it.
+        // DispatchTrackingEventsJob itself is covered in TrackingDispatchTest.
+        Queue::fake();
     }
 
     private function seller(?int $limit = null): User

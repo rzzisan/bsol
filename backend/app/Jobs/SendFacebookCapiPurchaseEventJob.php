@@ -2,9 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Models\FacebookPixelSetting;
 use App\Models\Order;
-use App\Services\Facebook\FacebookCapiClient;
+use App\Services\Tracking\TrackingIngestService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -12,12 +11,22 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Sends a server-side Purchase event to the seller's own Facebook Pixel
- * (Conversions API) after a landing-page checkout completes — §6 item 4 in
- * facebook_integration_context.md. Queued (not sync, unlike the webhook
- * receiver) because this makes a real outbound HTTP call to Meta and
- * checkout shouldn't wait on it; the queue worker is confirmed running
- * (§4 of the same doc).
+ * Submits a Purchase event for a landing-page or WooCommerce checkout into
+ * the tracking pipeline (tracking_capi_context.md §6.1). Historically this
+ * job talked to Meta directly; as of T2 it is a thin wrapper over
+ * TrackingIngestService — the constructor and both live dispatch call
+ * sites (LandingPageController.php, ConnectOrderController.php) are
+ * unchanged on purpose, since this is the lowest-risk way to move
+ * production traffic onto the new pipeline.
+ *
+ * What changed under the hood: FacebookPixelSetting lookup and the direct
+ * Meta HTTP call are gone from here — TrackingIngestService resolves the
+ * seller's tracking_destinations itself (no destination configured is a
+ * silent no-op, same as before), and the actual send now happens in
+ * DispatchTrackingEventsJob, with retry/backoff and an event log neither of
+ * which this job had. A repeat call for the same order is now also safe —
+ * tracking_events' unique(user_id, event_name, event_id) dedupes it,
+ * something the old direct-to-Meta path had no protection against.
  */
 class SendFacebookCapiPurchaseEventJob implements ShouldQueue
 {
@@ -37,36 +46,29 @@ class SendFacebookCapiPurchaseEventJob implements ShouldQueue
         return [10, 30, 60];
     }
 
-    public function handle(FacebookCapiClient $capi): void
+    public function handle(TrackingIngestService $ingest): void
     {
         $order = Order::with('items')->find($this->orderId);
         if (! $order) {
             return;
         }
 
-        $settings = FacebookPixelSetting::where('user_id', $order->user_id)
-            ->where('enabled', true)
-            ->first();
-
-        if (! $settings || ! $settings->pixel_id || ! $settings->access_token) {
-            return;
-        }
-
-        $userData = array_filter([
-            'ph' => [hash('sha256', $this->normalizePhone($order->customer_phone))],
-            'client_ip_address' => $this->clientIp,
-            'client_user_agent' => $this->userAgent,
-        ]);
-
-        $eventData = [
+        $event = [
             'event_name' => 'Purchase',
-            'event_time' => $order->created_at->timestamp,
             // Stable per-order id — lets a client-side Pixel Purchase event
             // (if the seller ever adds one) dedupe against this CAPI event.
             'event_id' => 'order_' . $order->id,
+            'event_time' => $order->created_at,
             'action_source' => 'website',
             'event_source_url' => $this->eventSourceUrl,
-            'user_data' => $userData,
+            'user_data' => array_filter([
+                // Raw phone in, TrackingUserDataBuilder normalizes + hashes
+                // it the same way this job used to do inline — see its
+                // docblock for why that has to stay in exact lockstep.
+                'ph' => $order->customer_phone,
+                'client_ip_address' => $this->clientIp,
+                'client_user_agent' => $this->userAgent,
+            ]),
             'custom_data' => [
                 'currency' => 'BDT',
                 'value' => (float) $order->total,
@@ -76,21 +78,8 @@ class SendFacebookCapiPurchaseEventJob implements ShouldQueue
             ],
         ];
 
-        $ok = $capi->sendEvent($settings->pixel_id, $settings->access_token, $eventData, $settings->test_event_code ?: null);
-
-        $settings->update([
-            'last_sent_at' => now(),
-            'last_error' => $ok ? null : 'Facebook rejected the last Purchase event — check the Pixel ID / Access Token in Events Manager.',
-        ]);
-    }
-
-    private function normalizePhone(string $phone): string
-    {
-        $digits = preg_replace('/\D/', '', $phone) ?? '';
-        if (str_starts_with($digits, '880')) {
-            return $digits;
-        }
-
-        return '880' . ltrim($digits, '0');
+        // Order.user_id is always the shop owner id (never staff) — the
+        // same id tracking_destinations and the daily quota are keyed by.
+        $ingest->ingest($order->user_id, $event, ['order_id' => $order->id]);
     }
 }

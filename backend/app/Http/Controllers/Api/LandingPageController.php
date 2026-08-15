@@ -133,9 +133,9 @@ class LandingPageController extends Controller
         // still don't fire this (no ad-attributable checkout event to
         // report); WooCommerce-synced orders do, via the equivalent
         // dispatch in ConnectOrderController::sync() — see Phase 10 in
-        // wordpress_connect_context.md. No-ops for sellers who haven't set
-        // up CAPI (job checks facebook_pixel_settings.enabled and returns
-        // early).
+        // wordpress_connect_context.md. No-ops for sellers with no enabled
+        // tracking_destinations row (T2 — TrackingIngestService checks this,
+        // not the retired facebook_pixel_settings table).
         SendFacebookCapiPurchaseEventJob::dispatch(
             $order->id,
             $request->ip(),
