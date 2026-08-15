@@ -283,6 +283,8 @@ const text = {
     otpFormDescription: "OTP ফর্মের বর্ণনা",
     otpFormButtonText: "কনফার্ম বাটনের টেক্সট",
     otpFormResendText: "পুনরায় পাঠান লিংকের টেক্সট",
+    trackingEnabled: "মেটা (Facebook) ট্র্যাকিং",
+    trackingEnabledHint: "চালু থাকলে এই পেজে Facebook Pixel/Conversions API ইভেন্ট পাঠানো হবে (আপনার ট্র্যাকিং কনফিগার করা থাকলে)। বন্ধ করলে এই নির্দিষ্ট পেজের জন্য ট্র্যাকিং সম্পূর্ণ বন্ধ হয়ে যাবে।",
     save: "সংরক্ষণ করুন",
     saving: "সংরক্ষণ হচ্ছে...",
     blocksTitle: "পেজ ব্লক (ড্র্যাগ করে সাজান)",
@@ -399,6 +401,8 @@ const text = {
     otpFormDescription: "OTP form description",
     otpFormButtonText: "Confirm button text",
     otpFormResendText: "Resend link text",
+    trackingEnabled: "Meta (Facebook) tracking",
+    trackingEnabledHint: "When on, this page sends Facebook Pixel/Conversions API events (once you've configured tracking). Turning it off disables tracking for this specific page only.",
     save: "Save",
     saving: "Saving...",
     blocksTitle: "Page blocks (drag to reorder)",
@@ -505,6 +509,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const [otpFormDescription, setOtpFormDescription] = useState<string>(getDefaultSettings("bn").otp_form_description);
   const [otpFormButtonText, setOtpFormButtonText] = useState<string>(getDefaultSettings("bn").otp_form_button_text);
   const [otpFormResendText, setOtpFormResendText] = useState<string>(getDefaultSettings("bn").otp_form_resend_text);
+  const [trackingEnabled, setTrackingEnabled] = useState<boolean>(true);
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   const isAdminTemplateMode = mode === "admin-template";
@@ -612,6 +617,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setOtpFormDescription(merged.settings?.otp_form_description ?? loadedDefaults.otp_form_description);
       setOtpFormButtonText(merged.settings?.otp_form_button_text ?? loadedDefaults.otp_form_button_text);
       setOtpFormResendText(merged.settings?.otp_form_resend_text ?? loadedDefaults.otp_form_resend_text);
+      setTrackingEnabled(merged.settings?.tracking_enabled ?? true);
       if (sourceTheme) {
         setTheme({
           primary_color: sourceTheme.primary_color ?? DEFAULT_THEME.primary_color,
@@ -774,6 +780,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setOtpFormDescription(merged.settings?.otp_form_description ?? loadedDefaults.otp_form_description);
           setOtpFormButtonText(merged.settings?.otp_form_button_text ?? loadedDefaults.otp_form_button_text);
           setOtpFormResendText(merged.settings?.otp_form_resend_text ?? loadedDefaults.otp_form_resend_text);
+      setTrackingEnabled(merged.settings?.tracking_enabled ?? true);
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
             accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
@@ -1101,6 +1108,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
         otp_form_description: otpFormDescription || null,
         otp_form_button_text: otpFormButtonText || null,
         otp_form_resend_text: otpFormResendText || null,
+        tracking_enabled: trackingEnabled,
       },
       layout_order: layoutEntries,
     };
@@ -1122,7 +1130,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -1910,6 +1918,14 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
                   <TextField label={t.otpFormResendText} value={otpFormResendText} onChange={setOtpFormResendText} />
                 </div>
               ) : null}
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+                <input type="checkbox" checked={trackingEnabled} onChange={(e) => setTrackingEnabled(e.target.checked)} className="accent-[var(--accent)]" />
+                {t.trackingEnabled}
+              </label>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t.trackingEnabledHint}</p>
             </div>
           </div>
 

@@ -6,7 +6,7 @@
 2. **আসল কাস্টমার ট্র্যাকিং** — browser (Pixel) + server (Conversions API) দুই দিক থেকে একই ইভেন্ট, `event_id` দিয়ে dedup, উচ্চ Event Match Quality।
 3. **SaaS ফিচার হিসেবে বিক্রয়যোগ্য** — সেলার নিজের WordPress/WooCommerce সাইট বা BSOL landing page-এ এক ক্লিকে ট্র্যাকিং চালু করবে, প্যাকেজ অনুযায়ী দৈনিক ইভেন্ট লিমিট।
 
-**অবস্থা (২০২৬-০৮-১৫):** **T1, T2, T5 সম্পন্ন ও লাইভ** — ডেটা মডেল, quota, ingest পাইপলাইন, Meta-তে আসল send, আর এখন **§1-এর মূল লিভার**: `OrderStatusService::transition()`-এ hook করে Confirmed/Shipped/Delivered/Returned/Canceled সত্যিই Meta-তে যাচ্ছে, pixel কনফিগার করা প্রতিটা সেলারের জন্য। **এখনো কোনো funnel/browser ইভেন্ট নেই** (PageView/ViewContent/AddToCart/InitiateCheckout — সেটা T6/T4)। পরের ফেজ **T6** (landing page ট্র্যাকিং)।
+**অবস্থা (২০২৬-০৮-১৫):** **T1, T2, T5, T6 সম্পন্ন ও লাইভ** — ডেটা মডেল, quota, ingest পাইপলাইন, Meta-তে আসল send, order-flow ইভেন্ট, আর এখন **সেলার সাবডোমেইনে ল্যান্ডিং পেজে Full browser + server tracking**: Meta Pixel base code, PageView/ViewContent/InitiateCheckout/Lead/Purchase, প্রতি পেজে toggle। **শুধু WooCommerce (কেস A, সংখ্যাগরিষ্ঠ সেলার) বাকি** — সেটা T4।
 
 > ⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)।** Migration ইচ্ছাকৃতভাবে কোনো মান বসায়নি — চালু প্যাকেজে নীরবে লিমিট বসানো মানে সেলারের ইভেন্ট হারানো। **Admin → Packages** থেকে বাস্তব মান বসাতে হবে; seeder-এর প্রস্তাব: Free Trial 2,000 · Starter 5,000 · Growth 15,000 · Business আনলিমিটেড।
 
@@ -58,10 +58,11 @@ BSOL-এর কাছে যা আছে অথচ কোনো সাধার
 
 > **T1-এ যা তৈরি হয়েছে:** নিচের ৪, ৫, ৬ নম্বরের **ভিত্তি** — `tracking_destinations` (multi-pixel), `tracking_events` (log + idempotency), `tracking_usage_daily` + `TrackingQuotaService` (quota), `TrackingIngestService`, `TrackingUserDataBuilder`।
 > **T2-এ যা তৈরি হয়েছে:** `MetaCapiDriver` (আসল Meta HTTP call), `DispatchTrackingEventsJob` (fan-out + retry + log), আর `SendFacebookCapiPurchaseEventJob` নতুন পাইপলাইনের thin wrapper হয়ে গেছে — তার দুই লাইভ call site অপরিবর্তিত, শুধু ভেতরের রাস্তা বদলেছে। **Purchase এখন সত্যিই Meta-তে যাচ্ছে।**
-> **T5-এ যা তৈরি হয়েছে (২০২৬-০৮-১৫):** `OrderStatusService::transition()`-এ hook — Confirmed/Shipped/Delivered/Returned/Canceled পাঁচটাই এখন Meta-তে যাচ্ছে, deterministic `order_{id}_{event}` id দিয়ে, P0 অগ্রাধিকারে কখনো drop হয় না। **§1-এর মূল লিভার এখন বাস্তব।** নিচের তালিকা তাই আরও ছোট — শুধু browser-side/funnel অংশটাই বাকি।
+> **T5-এ যা তৈরি হয়েছে:** `OrderStatusService::transition()`-এ hook — Confirmed/Shipped/Delivered/Returned/Canceled পাঁচটাই এখন Meta-তে যাচ্ছে, deterministic `order_{id}_{event}` id দিয়ে, P0 অগ্রাধিকারে কখনো drop হয় না। **§1-এর মূল লিভার এখন বাস্তব।**
+> **T6-এ যা তৈরি হয়েছে (২০২৬-০৮-১৫):** সেলার সাবডোমেইনের ল্যান্ডিং পেজে Meta Pixel base code (`frontend/src/lib/tracking.ts::useBsolTracking()`), PageView/ViewContent (মাউন্টে) + InitiateCheckout/Lead (checkout ফর্মে) + Purchase (থ্যাংক ইউ পেজে) — browser + server একই `event_id`। `POST /api/public/track` (`PublicTrackingController`), host থেকে সেলার resolve, `LandingPageController::publicShow()` প্রতিটা পেজের জন্য একটামাত্র resolved `{enabled, pixel_id}` ফেরত দেয় (access token কখনো নয়)। ড্যাশবোর্ড এডিটরে per-page টগল। **নিচের তালিকা তাই এখন শুধু WooCommerce (T4) নিয়ে।**
 
-1. **কোনো client-side Pixel নেই কোথাও।** `grep -rn "fbq\|connect.facebook.net\|gtag\|dataLayer" frontend/src/` → শূন্য ম্যাচ। BSOL landing page-এ Meta Pixel base code বসে না, তাই আজ `fbp`/`fbc` কুকি কখনোই তৈরি হয় না — অর্থাৎ বর্তমান CAPI ইভেন্টগুলোর Event Match Quality কাঠামোগতভাবেই দুর্বল।
-2. **Funnel-এর মাত্র শেষ ধাপ ট্র্যাক হয়।** PageView / ViewContent / AddToCart / InitiateCheckout / Lead — কিছুই নেই (T6/T4)।
+1. ~~**কোনো client-side Pixel নেই কোথাও।**~~ ✅ **T6-এ সম্পন্ন, ল্যান্ডিং পেজে** — WooCommerce সাইটে এখনো নেই (T4)।
+2. ~~**Funnel-এর মাত্র শেষ ধাপ ট্র্যাক হয়।**~~ ✅ **T6-এ সম্পন্ন, ল্যান্ডিং পেজে** (AddToCart প্রযোজ্য নয় — ল্যান্ডিং পেজে আলাদা কার্ট ধাপ নেই)। WooCommerce-এ এখনো শুধু Purchase (T4)।
 3. ~~**Order-flow ইভেন্ট নেই।**~~ ✅ **T5-এ সম্পন্ন** — Delivered/Returned/Confirmed/Shipped/Canceled সবই Meta-তে যাচ্ছে।
 4. **এক সেলার এক Pixel** — `facebook_pixel_settings.unique('user_id')`; একাধিক ব্র্যান্ড/সাইটের সেলার আটকে যায়। *(T1-এ `tracking_destinations` টেবিল তৈরি ও backfill হয়েছে; CRUD UI T3-এ।)*
 5. **কোনো event log নেই।** কোন ইভেন্ট গেল, Meta কী উত্তর দিল, কেন ব্যর্থ হলো — কেউ দেখতে পায় না, শুধু `last_error` string। *(T1-এ `tracking_events` টেবিল তৈরি; UI T7-এ।)*
@@ -303,6 +304,9 @@ Drop হলে: `tracking_events`-এ `status='dropped_quota'` লেখা হ�
 | ✅ `App\Jobs\DispatchTrackingEventsJob` | একটা accepted ইভেন্ট → প্রযোজ্য প্রতিটা destination-এ পাঠায় (§11.1 fan-out সিদ্ধান্ত), অন্তত একটা সফল হলেই `status='sent'`, সবগুলো ব্যর্থ হলে exception ছুঁড়ে retry (`tries=3`, backoff `[10,30,60]`), শেষমেশ ব্যর্থ হলে `failed()`-এ `status='failed'` |
 | ✅ `App\Console\Commands\PurgeOldTrackingEvents` | ৯০ দিনের বেশি পুরনো row মুছে। Job নয়, artisan command — `routes/console.php`-এ প্রতিদিন ০৩:৩০-এ শিডিউলড। Postgres-এ `DELETE ... LIMIT` নেই, তাই id select করে chunk-এ মোছে |
 | ✅ `App\Services\OrderStatusService::submitTrackingEvent()` (T5) | `transition()`-এর শেষে hook — status→event ম্যাপ (`confirmed`→`OrderConfirmed` ইত্যাদি, §7), value = `total − shipping_charge`, `returned`/`cancelled`-এ ঋণাত্মক (§1)। নিজের try/catch-এ মোড়ানো — ট্র্যাকিং ব্যর্থ হলেও অর্ডার স্ট্যাটাস বদল আটকাবে না |
+| ✅ `App\Http\Controllers\Api\PublicTrackingController` (T6) | `POST /public/track` — Host থেকে সেলার resolve (`LandingPageResolver`), `slug` (ঐচ্ছিক) থেকে পেজ scope, client IP/UA request থেকেই নেয় (body-র মান কখনো নয়), `fbclid`→`fbc` synthesis। অজানা host নিঃশব্দে `{success:true}` — host-enumeration oracle এড়াতে |
+| ✅ `App\Support\LandingPageResolver::shopOwnerIdForLabel()` (T6) | নতুন resolver নয় — বিদ্যমান ক্লাসেই যোগ, `shopUserIdsForLabel()`-এর ভিত্তি হিসেবে refactor (§8.0) |
+| ✅ `frontend/src/lib/tracking.ts::useBsolTracking()` (T6) | Pixel base code (default PageView suppressed), PageView/ViewContent (মাউন্টে), InitiateCheckout/Lead/Purchase (caller-triggered), সব ইভেন্টে browser+server একই `event_id` |
 
 **`FacebookCapiClient` ও `SendFacebookCapiPurchaseEventJob` ✅ T2-তে সম্পন্ন।** `FacebookCapiClient` মোছা হয়নি কিন্তু আর ডাকা হয় না (legacy, রোলব্যাক-নিরাপত্তা হিসেবে রাখা)। `SendFacebookCapiPurchaseEventJob` এখন `TrackingIngestService::ingest()`-এর পাতলা wrapper — constructor ও দুই লাইভ dispatch call-site (`LandingPageController.php`, `ConnectOrderController.php`) অপরিবর্তিত, `FacebookPixelSetting` lookup আর সরাসরি Meta HTTP call ভেতর থেকে সরে গেছে। বাড়তি সুবিধা যেটা আগে ছিল না: এখন একই অর্ডারের জন্য দুবার dispatch হলে `tracking_events`-এর unique constraint দ্বিতীয়টা নিঃশব্দে বাতিল করে — আগে প্রতিবার সরাসরি Meta-তে যেত, ডুপ্লিকেট-প্রতিরোধ ছিল না।
 
@@ -316,7 +320,7 @@ Route::get('/tracking/config',  [ConnectTrackingController::class, 'config'])->m
 
 // public (landing page browser থেকে), API-key ছাড়া — সেলার resolve হয় Host থেকে (§8.0)
 // slug-ভিত্তিক রুট নয়: slug এখন per-shop unique, তাই slug একা কোনো শপ নির্দেশ করে না
-Route::post('/public/track', [PublicTrackingController::class, 'ingest'])->middleware('throttle:300,1');
+Route::post('/public/track', [PublicTrackingController::class, 'ingest'])->middleware('throttle:300,1'); // ✅ T6-এ লাইভ
 
 // dashboard (owner_only — Pattern B, credential)
 Route::prefix('tracking')->middleware('owner_only')->group(function () {
@@ -493,17 +497,18 @@ Host → (user_id, scope) → প্রযোজ্য tracking_destinations
 
 **করণীয়:** সাবডোমেইন বদলানোর UI-তে ট্র্যাকিং-সচেতন সতর্কতা (T6), আর ingest ব্যর্থতা মাপার ব্যবস্থা — **নীরব শূন্যতা এখানে সবচেয়ে খারাপ ফল**। সুপারিশ: বিজ্ঞাপন চালুর আগেই ঠিকানা চূড়ান্ত করা।
 
-### 8.8 ল্যান্ডিং পেজে কারিগরি বাস্তবায়ন (T6)
+### 8.8 ল্যান্ডিং পেজে কারিগরি বাস্তবায়ন ✅ **T6-এ সম্পন্ন (২০২৬-০৮-১৫)**
 
 Landing page BSOL-এর Next.js-এ: পাবলিক ঠিকানা `{seller}.{apex}/{slug}`, আর `src/proxy.ts` সেটাকে ভেতরে `/lp/{slug}`-এ rewrite করে (rewrite proxy-কে পুনরায় ডাকে না, তাই যেকোনো host-এ সরাসরি `/lp/...` চাওয়া 404)।
 
-- **`event_source_url` সবসময় পাবলিক ঠিকানা হতে হবে**, ভেতরের rewrite path নয় — নাহলে Meta-তে এমন URL যাবে যা ব্রাউজারে কখনো খোলে না। **`LandingPage::canonicalUrl()` ব্যবহার করতে হবে**, নিজে URL বানানো যাবে না। ⚠️ এটা **nullable** (সাবডোমেইনহীন শপের draft পেজে `null`) — `null` হলে ইভেন্ট `event_source_url` **ছাড়াই** যাবে, বানানো URL দিয়ে নয়।
-- `page.tsx` (server component) → host থেকে destination resolve → tracking config পেজে পাঠায়। **public payload-এ শুধু dataset/pixel id, access token কখনো নয়**।
-- **base code শুধু পাবলিক ল্যান্ডিং রুটে**, `/dashboard/*`-এ কখনো নয় (§8.3)।
-- নতুন client hook `useBsolTracking()` — PageView / ViewContent / InitiateCheckout (checkout ফর্মে প্রথম ইনপুট) / Lead (ফোন valid হলে) / Purchase (thank-you)। `fbq` + server POST একই `event_id` দিয়ে। thank-you একই সাবডোমেইনে (`/{slug}/thank-you`), তাই মাঝপথে কুকি হারানোর সমস্যা নেই।
-- Ingest রুট **host-ভিত্তিক**: `POST /api/public/track`, Host থেকে `LandingPageResolver` দিয়ে resolve। **slug-ভিত্তিক রুট বানানো হবে না** — slug আর globally unique নয় (per-shop), তাই slug একা কোনো শপ নির্দেশ করে না। সাবডোমেইনে API same-origin, তাই CORS-এর প্রশ্নও নেই।
-- `landing_pages.content.settings`-এ per-page toggle (`tracking_enabled`, `tracking_destination_id`) — `frontend/src/lib/landing-pages.ts` ও backend validation দুই জায়গায়।
-- বিদ্যমান `landing_page_visits` টেবিল **অপরিবর্তিত** (BSOL-এর নিজস্ব analytics) — tracking pipeline-এর সাথে মেশানো হবে না, উদ্দেশ্য আলাদা।
+- **`event_source_url`** — মূল পরিকল্পনায় ছিল সার্ভার-সাইড `LandingPage::canonicalUrl()` (nullable) দিয়ে বানানো। বাস্তবায়নে সহজ ও শক্তিশালী: প্রতিটা ইভেন্টে ব্রাউজার নিজেই `window.location.href` পাঠায় (`frontend/src/lib/tracking.ts`) — ব্রাউজার যেখানে দাঁড়িয়ে সেটাই আসল পাবলিক ঠিকানা, তাই `canonicalUrl()`-এর nullability-র সমস্যাটাই আর ওঠে না। (সার্ভার-সাইড Purchase-এর জন্য `canonicalUrl()` এখনো ব্যবহৃত হয় — T2/`LandingPageController::publicSubmitOrder()`, অপরিবর্তিত।)
+- `LandingPageController::publicShow()` প্রতিটা রেসপন্সে একটা resolved `tracking: {enabled, pixel_id}` object যোগ করে (`trackingConfigFor()`) — **access token কখনো নয়**, আর কখনো একাধিক destination-এর তালিকা নয় (§11.3 আইটেম ৪ নিষ্পত্তি — নিচে §11.1)। Owner resolution `User::find($page->user_id)?->shopOwnerId()` দিয়ে, কারণ `LandingPage.user_id` staff-ও হতে পারে (Pattern A)।
+- **base code শুধু পাবলিক ল্যান্ডিং রুটে**, `/dashboard/*`-এ কখনো নয় (§8.3) — এডিটরের live-preview-ও `disabled: previewMode` দিয়ে বাদ, কারণ preview iframe ড্যাশবোর্ডেরই ভেতরে রেন্ডার হয়।
+- `useBsolTracking()` (`frontend/src/lib/tracking.ts`) — PageView / ViewContent (মাউন্টে) / InitiateCheckout (checkout ফর্মের প্রথম ইনপুট) / Lead (ফোন valid হলে) / Purchase (thank-you)। AddToCart প্রযোজ্য নয় — ল্যান্ডিং পেজে আলাদা কার্ট ধাপ নেই, পুরো পেজটাই "content"। `fbq` + server POST একই `event_id` দিয়ে; PageView প্রতি মাউন্টে নতুন (in-memory), ViewContent/InitiateCheckout/Lead ১ ঘণ্টার কুকি-bucket-এ (§3.2), Purchase deterministic `order_{id}` (server-side Purchase-এর সাথে dedup pair)।
+- Ingest রুট **host-ভিত্তিক**: `POST /api/public/track` (`PublicTrackingController`), Host থেকে `LandingPageResolver::shopOwnerIdForLabel()` দিয়ে resolve (নতুন resolver নয়, বিদ্যমান ক্লাসে যোগ)। **slug-ভিত্তিক রুট বানানো হয়নি** — body-তে ঐচ্ছিক `slug` শুধু কোন পেজ তা নির্দেশ করে, সেলার কে সেটা নয়। সাবডোমেইনে API same-origin, তাই CORS-এর প্রশ্নও নেই। অজানা host নিঃশব্দে গ্রহণ করে কিছু না লিখেই — 404/422 দিলে সেটাই host-enumeration oracle হয়ে যেত।
+- client IP/UA — Phase 10-এর WooCommerce সতর্কতা (§3.3) এখানে প্রযোজ্য নয়: ব্রাউজার সরাসরি BSOL-এর নিজের API-তে POST করছে, তাই `$request->ip()`/`userAgent()` ব্রাউজারেরই — body-তে client যা পাঠায় তা উপেক্ষা করে সার্ভার নিজে বসায়।
+- `landing_pages.content.settings.tracking_enabled` — per-page toggle, ডিফল্ট `true` (ভাষা-নির্ভর নয়, তাই `getDefaultSettings()`-এর বাইরে)। ড্যাশবোর্ড এডিটরে ("Meta (Facebook) ট্র্যাকিং") OTP টগলের ঠিক নিচে।
+- বিদ্যমান `landing_page_visits` টেবিল **অপরিবর্তিত** (BSOL-এর নিজস্ব analytics) — tracking pipeline-এর সাথে মেশানো হয়নি, উদ্দেশ্য আলাদা।
 
 ## 9. Fraud feedback loop — "ফেক কাস্টমার কমানো"-র দ্বিতীয় স্তর
 
@@ -530,8 +535,8 @@ Landing page BSOL-এর Next.js-এ: পাবলিক ঠিকানা `{se
 | **T1** ✅ | ডেটা মডেল (৩ টেবিল + package কলাম) + `TrackingQuotaService` + `TrackingIngestService` + `TrackingUserDataBuilder` + `app:purge-tracking-events` + admin package UI-তে লিমিট ফিল্ড। **`facebook_pixel_settings` → `tracking_destinations` backfill এখানেই** (§4.1)। **সম্পন্ন ২০২৬-০৮-১৫** | — |
 | **T2** ✅ | `MetaCapiDriver` + `DispatchTrackingEventsJob` (fan-out/retry/log) + `SendFacebookCapiPurchaseEventJob`-কে নতুন পাইপলাইনে wrapper করা (behavior অপরিবর্তিত, দুটো লাইভ call-site অস্পৃশ্য)। **সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T1 |
 | **T5** ✅ | **Order-flow ইভেন্ট** — `OrderStatusService::transition()`-এ hook, Confirmed/Shipped/Delivered/Returned/Canceled, deterministic `order_{id}_{event}`, ব্যর্থতা status transition আটকায় না। ← **এখানেই প্রোডাক্টের মূল মূল্য, এখন লাইভ। সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T2 |
-| **T6** ← **পরবর্তী** | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0) | T2 |
-| **T4** | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS, first-party REST endpoint, batch relay, funnel ইভেন্ট (plugin v1.17.0) | T2 |
+| **T6** ✅ | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0)। **সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T2 |
+| **T4** ← **পরবর্তী** | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS, first-party REST endpoint, batch relay, funnel ইভেন্ট (plugin v1.17.0) | T2 |
 | **T3** | Multi-destination **UI** — dashboard CRUD, scope selector, একাধিক pixel (backfill T1-এ হয়ে গেছে) | T1 |
 | **T7** | Dashboard: event log, quota মিটার, match-quality সারাংশ; fraud signal অর্ডার-ডিটেইলে প্রদর্শন | T2–T6 |
 | **T8b** | সেলারের নিজের ডোমেইন (§8.4) — `landing_domains` টেবিল, DNS verification, per-domain Certbot, catch-all nginx। **বিক্রয়-যুক্তি ব্র্যান্ডিং + রেপুটেশন আলাদা রাখা** — AEM আর যুক্তি নয়, কারণ AEM এখন সবার জন্যই স্বয়ংক্রিয় (§11.2) | T6 |
@@ -569,6 +574,7 @@ T8a (per-seller সাবডোমেইন) ট্র্যাকিং শু�
 | ২ | **P0 overage কি quota-তে গোনা হবে?** | **না, আলাদা `overage_count` কলামে**। একসাথে গুনলে মিটার ১০০% পেরিয়ে যেত অথচ কিছুই ব্লক হয়নি — বাগ মনে হতো | T1-এ বাস্তবায়িত |
 | ৫ | **Consent ডিফল্ট** | **`off`**, তবে per-destination টগল আছে (`consent_mode`)। বাংলাদেশে কুকি-কনসেন্ট আইনি বাধ্যবাধকতা নয়; আন্তর্জাতিক ট্র্যাফিকওয়ালা সেলারকে চালু করার সুপারিশ থাকবে | T1-এ স্কিমায় |
 | ৬ | **শেয়ার্ড ডোমেইনে browser Pixel চালানো হবে?** | **প্রশ্নটাই বিলুপ্ত** — শেয়ার্ড ডোমেইনে আর ল্যান্ডিং পেজ নেই (§8.2)। সেলার সাবডোমেইনে Pixel **চালানো হবে**, শুধু পাবলিক ল্যান্ডিং রুটে | ২০২৬-০৮-১৫ |
+| ৪ | **ল্যান্ডিং পেজের public payload-এ dataset id enumerate করা যাবে কি না** | **যাবে না** — `publicShow()` প্রতিটা রেসপন্সে একটামাত্র resolved `{enabled, pixel_id}` দেয়, host/slug-স্কোপড; কোনো এন্ডপয়েন্ট সেলারের destination-এর তালিকা ফেরত দেয় না | T6-এ বাস্তবায়িত |
 | ৭ | **Meta domain verification সাবডোমেইনে?** | **সেলার পারবে না** — Meta শুধু root ডোমেইন নেয়। নিচের ১১.২ দেখো | Business Manager-এ যাচাই |
 | ৯ | **`landing_pages.slug` global নাকি per-seller unique?** | **per-seller** (`unique(user_id, slug)`)। `/lp/` ও `legacy_slug` মুছে ফেলায় alias টেবিলের জটিলতা লাগেনি | বাস্তবায়িত |
 | ১০ | **DNS Cloudflare-এ সরানো হবে?** | **হয়েছে** — wildcard DNS + DNS-01 auto-renew চালু | বাস্তবায়িত |
@@ -598,7 +604,6 @@ Meta-র "Add a domain" ডায়ালগ:
 
 | # | প্রশ্ন | কখন লাগবে | প্রাথমিক ঝোঁক |
 |---|---|---|---|
-| ৪ | **ল্যান্ডিং পেজের public payload-এ dataset id** — id গোপন নয় (browser-এ যেভাবেই হোক দেখা যায়), কিন্তু কোন সেলারের কোনটা তা enumerate করা যাবে কি না | **T6** | host/slug-স্কোপড রেসপন্স, কখনো তালিকা নয় |
 | ৮ | **T8b-তে DNS পদ্ধতি** — CNAME (সহজ, apex-এ চলে না) বনাম A রেকর্ড (apex-এ চলে, সার্ভার IP বদলালে সব সেলারকে বদলাতে হয়) | **T8b** | সাবডোমেইনে CNAME বাধ্যতামূলক (`lp.sellershop.com`), apex সাপোর্ট নয় |
 
 ---

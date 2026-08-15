@@ -17,6 +17,8 @@ use App\Models\ShopProfile;
 use App\Models\LandingTemplate;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\TrackingDestination;
+use App\Models\User;
 use App\Support\ProductVariantFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,8 +70,37 @@ class LandingPageController extends Controller
             'success' => true,
             'data' => array_merge($page->toArray(), [
                 'public_url' => $this->publicUrlFor($page),
+                'tracking' => $this->trackingConfigFor($page),
             ]),
         ]);
+    }
+
+    /**
+     * Resolved to a single destination for this exact page, never a list —
+     * enumerating a seller's other pixels would leak which sellers use
+     * tracking to anyone probing slugs (tracking_capi_context.md §11.3 #4).
+     * The access token never leaves the server; only what a browser Pixel
+     * needs (which is not a secret — every page's HTML already contains it).
+     *
+     * @return array{enabled: bool, pixel_id: ?string}
+     */
+    private function trackingConfigFor(LandingPage $page): array
+    {
+        // content.settings.tracking_enabled is a per-page opt-out; the page's
+        // creator can be a staff account (LandingPage.user_id is Pattern A,
+        // §11.1), so the owner for the Pattern B destination lookup has to
+        // be resolved separately rather than assumed to be user_id itself.
+        $trackingEnabled = (bool) ($page->content['settings']['tracking_enabled'] ?? true);
+        $ownerId = $trackingEnabled ? User::find($page->user_id)?->shopOwnerId() : null;
+
+        $destination = $ownerId
+            ? TrackingDestination::sendableFor($ownerId, 'landing_page', $page->id)->first()
+            : null;
+
+        return [
+            'enabled' => $destination !== null,
+            'pixel_id' => $destination?->pixel_id,
+        ];
     }
 
     public function publicSubmitOrder(Request $request, string $slug): JsonResponse

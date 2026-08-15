@@ -252,6 +252,10 @@ export type LandingPageSettings = {
   otp_form_description?: string | null;
   otp_form_button_text?: string | null;
   otp_form_resend_text?: string | null;
+  // publicShow() reads this to decide the *page's* opt-out; the actual
+  // pixel id it resolves to lives on tracking_destinations, never here
+  // (tracking_capi_context.md §8.8).
+  tracking_enabled?: boolean | null;
 };
 
 type DefaultSettingsShape = {
@@ -409,6 +413,9 @@ export function mergeLandingContent(
       otp_form_description: pageContent.settings?.otp_form_description ?? templateContent.settings?.otp_form_description ?? defaultSettings.otp_form_description,
       otp_form_button_text: pageContent.settings?.otp_form_button_text ?? templateContent.settings?.otp_form_button_text ?? defaultSettings.otp_form_button_text,
       otp_form_resend_text: pageContent.settings?.otp_form_resend_text ?? templateContent.settings?.otp_form_resend_text ?? defaultSettings.otp_form_resend_text,
+      // Not part of DefaultSettingsShape — it isn't language-dependent like
+      // the fields above, just an on/off toggle defaulting to on.
+      tracking_enabled: pageContent.settings?.tracking_enabled ?? templateContent.settings?.tracking_enabled ?? true,
     },
     layout_order: Array.isArray(pageContent.layout_order)
       ? pageContent.layout_order

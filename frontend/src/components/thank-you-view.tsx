@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { landingPathForSlug } from "@/lib/landing-pages";
 import { mergeLandingContent, getDefaultThankYou, getDefaultSettings } from "@/lib/landing-pages";
 import { resolveFontCssVar } from "@/lib/theme-presets";
+import { useBsolTracking } from "@/lib/tracking";
 import type { PublicLandingPage } from "@/components/public-landing-page-view";
 
 export type ThankYouOrder = {
@@ -211,6 +212,22 @@ export default function ThankYouView({
   token?: string;
 }) {
   const [otpVerified, setOtpVerified] = useState(Boolean(order?.otp_verified));
+
+  // Purchase's authoritative send is server-side (SendFacebookCapiPurchaseEventJob,
+  // fired at order creation, before the customer ever reaches this page) —
+  // this is the browser-side copy for Event Match Quality, same order_{id}
+  // event id, so Meta dedupes the pair (tracking_capi_context.md §3.2).
+  const { trackPurchase } = useBsolTracking(page);
+  const purchaseFiredRef = useRef(false);
+  useEffect(() => {
+    if (!order || !orderId || purchaseFiredRef.current) return;
+    purchaseFiredRef.current = true;
+    trackPurchase(Number(orderId), {
+      currency: "BDT",
+      value: Number(order.total ?? 0),
+      num_items: (order.items ?? []).reduce((sum, item) => sum + (item.quantity ?? 0), 0),
+    });
+  }, [order, orderId, trackPurchase]);
 
   const theme = {
     primary: page?.theme_settings?.primary_color ?? "#0f766e",

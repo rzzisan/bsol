@@ -56,6 +56,7 @@ use App\Http\Controllers\Api\Admin\LandingTemplateController as AdminLandingTemp
 use App\Http\Controllers\Api\Admin\LandingPageAdminController;
 use App\Http\Controllers\Api\Admin\CourierCacheController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
+use App\Http\Controllers\Api\PublicTrackingController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
@@ -123,6 +124,13 @@ Route::get('/public/shop-by-subdomain/{label}', [ShopProfileController::class, '
 
 Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publicShow'])
     ->middleware(['track_landing_page_visit', 'throttle:60,1']);
+
+// Landing-page browser tracking ingest — host-resolved, not slug-based
+// (slug is per-shop, not global, so it can't identify a seller on its own —
+// tracking_capi_context.md §8.0/§8.8). No API key: the seller's own
+// subdomain is same-origin to the browser already.
+Route::post('/public/track', [PublicTrackingController::class, 'ingest'])
+    ->middleware('throttle:300,1');
 Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder'])
     ->middleware(['track_landing_page_visit', 'throttle:15,1']);
 // Thank-you page order lookup — token-guarded, deliberately not tracked as a landing visit.

@@ -10,6 +10,7 @@ import { resolveBlockIcon } from "@/lib/block-icons";
 import { renderTiptapJSON } from "@/lib/rich-text-render";
 import type { LayoutEntry } from "@/lib/landing-layout";
 import { getOrCreateCheckoutSessionToken, setCheckoutSessionToken } from "@/lib/checkout-session";
+import { useBsolTracking } from "@/lib/tracking";
 import type { ProductOption } from "@/types/variant";
 
 // Seller-authored content (rich-text blocks, raw HTML sections) is rendered
@@ -204,6 +205,7 @@ export type PublicLandingPage = {
   title: string;
   slug: string;
   public_url?: string;
+  tracking?: { enabled: boolean; pixel_id: string | null } | null;
   template?: LandingTemplate | null;
   theme_settings?: {
     primary_color?: string | null;
@@ -851,6 +853,14 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const [submitting, setSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "bkash" | "card">("cod");
 
+  // previewMode covers both the editor's live-preview iframe and any other
+  // non-visitor render — neither should count as a real page view or spend
+  // the seller's quota (§8.3's "Pixel never on /dashboard/*" reasoning
+  // extends to the preview, which renders inside the dashboard).
+  const { trackInitiateCheckout, trackLead } = useBsolTracking(page, { disabled: previewMode });
+  const initiateCheckoutFiredRef = useRef(false);
+  const leadFiredRef = useRef(false);
+
   const theme = useMemo(() => ({
     primary: page?.theme_settings?.primary_color ?? "#0f766e",
     accent: page?.theme_settings?.accent_color ?? "#f97316",
@@ -992,6 +1002,25 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customer, customFieldValues, checkout, sessionToken]);
+
+  // InitiateCheckout on the first keystroke in any checkout field, Lead
+  // specifically once the phone number becomes valid — two different
+  // purchase-intent signals (tracking_capi_context.md §8.8), each fired at
+  // most once per visit via the refs above.
+  useEffect(() => {
+    if (previewMode) return;
+
+    if (!initiateCheckoutFiredRef.current && Object.values(customer).some((value) => value.trim() !== "")) {
+      initiateCheckoutFiredRef.current = true;
+      trackInitiateCheckout();
+    }
+
+    if (!leadFiredRef.current && BD_PHONE_REGEX.test(customer.customer_phone.trim())) {
+      leadFiredRef.current = true;
+      trackLead();
+    }
+  }, [customer, previewMode, trackInitiateCheckout, trackLead]);
+
   const shipping = content.shipping ?? {};
   const language = content.settings?.language ?? "bn";
   const t = PUBLIC_UI_TEXT[language] ?? PUBLIC_UI_TEXT.bn;

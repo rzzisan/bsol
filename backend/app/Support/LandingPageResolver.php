@@ -57,6 +57,20 @@ class LandingPageResolver
     }
 
     /**
+     * The shop owner's user id for a subdomain label, or null if no active
+     * shop owns it. shop_profiles.user_id is always the owner (it's a
+     * singleton owner-level resource), never a staff account.
+     */
+    public static function shopOwnerIdForLabel(string $label): ?int
+    {
+        $userId = ShopProfile::where('subdomain', $label)
+            ->where('subdomain_status', 'active')
+            ->value('user_id');
+
+        return $userId === null ? null : (int) $userId;
+    }
+
+    /**
      * The shop's user ids (owner + staff) for a subdomain label, or null if
      * no active shop owns it.
      *
@@ -64,15 +78,12 @@ class LandingPageResolver
      */
     public static function shopUserIdsForLabel(string $label): ?array
     {
-        $profile = ShopProfile::where('subdomain', $label)
-            ->where('subdomain_status', 'active')
-            ->first();
-
-        if (! $profile) {
+        $ownerId = self::shopOwnerIdForLabel($label);
+        if ($ownerId === null) {
             return null;
         }
 
-        $owner = User::find($profile->user_id);
+        $owner = User::find($ownerId);
 
         return $owner ? $owner->shopUserIds() : null;
     }
