@@ -6,7 +6,7 @@
 2. **আসল কাস্টমার ট্র্যাকিং** — browser (Pixel) + server (Conversions API) দুই দিক থেকে একই ইভেন্ট, `event_id` দিয়ে dedup, উচ্চ Event Match Quality।
 3. **SaaS ফিচার হিসেবে বিক্রয়যোগ্য** — সেলার নিজের WordPress/WooCommerce সাইট বা BSOL landing page-এ এক ক্লিকে ট্র্যাকিং চালু করবে, প্যাকেজ অনুযায়ী দৈনিক ইভেন্ট লিমিট।
 
-**অবস্থা (২০২৬-০৮-১৫):** **T1, T2 সম্পন্ন ও লাইভ** — ডেটা মডেল, quota, ingest পাইপলাইন, আর এখন Meta-তে আসল send। `SendFacebookCapiPurchaseEventJob`-এর দুই লাইভ call site (ল্যান্ডিং পেজ checkout, WooCommerce order sync) নতুন পাইপলাইনে চলছে — Purchase ইভেন্ট আসলেই Meta-তে যাচ্ছে, pixel কনফিগার করা প্রতিটা সেলারের জন্য। **এখনো Purchase ছাড়া আর কোনো ইভেন্ট কোথাও পাঠানো হয় না** (funnel/order-flow ইভেন্ট — সেটা T5/T6/T4)। পরের ফেজ **T5** (order-flow ইভেন্ট)।
+**অবস্থা (২০২৬-০৮-১৫):** **T1, T2, T5 সম্পন্ন ও লাইভ** — ডেটা মডেল, quota, ingest পাইপলাইন, Meta-তে আসল send, আর এখন **§1-এর মূল লিভার**: `OrderStatusService::transition()`-এ hook করে Confirmed/Shipped/Delivered/Returned/Canceled সত্যিই Meta-তে যাচ্ছে, pixel কনফিগার করা প্রতিটা সেলারের জন্য। **এখনো কোনো funnel/browser ইভেন্ট নেই** (PageView/ViewContent/AddToCart/InitiateCheckout — সেটা T6/T4)। পরের ফেজ **T6** (landing page ট্র্যাকিং)।
 
 > ⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)।** Migration ইচ্ছাকৃতভাবে কোনো মান বসায়নি — চালু প্যাকেজে নীরবে লিমিট বসানো মানে সেলারের ইভেন্ট হারানো। **Admin → Packages** থেকে বাস্তব মান বসাতে হবে; seeder-এর প্রস্তাব: Free Trial 2,000 · Starter 5,000 · Growth 15,000 · Business আনলিমিটেড।
 
@@ -24,12 +24,15 @@ BSOL-এর কাছে যা আছে অথচ কোনো সাধার
 
 | Meta-কে যা পাঠাই | কখন | কী শেখায় |
 |---|---|---|
-| `Purchase` | অর্ডার তৈরি হওয়ার সময় (বর্তমান behavior) | কে ফর্ম ভরে |
-| `OrderConfirmed` | ফোনে/OTP-তে কনফার্ম হলে | কে সত্যিই কিনতে চায় |
-| `OrderDelivered` (value = আসল টাকা) | courier delivered হলে | **কে আসলে টাকা দেয়** ← optimization target |
-| `OrderReturned` (value negative/exclusion audience) | রিটার্ন হলে | কাকে বাদ দিতে হবে |
+| `Purchase` ✅ | অর্ডার তৈরি হওয়ার সময় (T2) | কে ফর্ম ভরে |
+| `OrderConfirmed` ✅ | `status → confirmed` (T5) | কে সত্যিই কিনতে চায় |
+| `OrderDelivered` ✅ (value = total − shipping) | `status → delivered` (T5) | **কে আসলে টাকা দেয়** ← optimization target |
+| `OrderReturned` ✅ (value ঋণাত্মক) | `status → returned` (T5) | কাকে বাদ দিতে হবে |
+| `OrderShipped`, `OrderCanceled` ✅ | `status → shipped` / `cancelled` (T5) | funnel-এর বাকি ধাপ, `Canceled`-এও ঋণাত্মক value |
 
 এটাই "ফেক কাস্টমার কমানো"-র প্রকৃত মেকানিজম — ব্লক করে নয়, **ad targeting-কে ঠিক লোকের দিকে ঘোরানোর মাধ্যমে**। সাথে §9-এর fraud feedback loop (session behavior → risk score) দ্বিতীয় স্তর।
+
+**✅ T5-এ সম্পন্ন (২০২৬-০৮-১৫):** পাঁচটাই লাইভ, `OrderStatusService::transition()`-এ hook করে — এটাই এই ডকের মূল প্রতিশ্রুতি ছিল, এখন বাস্তব। বিস্তারিত §6.1, §7, §11.1।
 
 ---
 
@@ -54,11 +57,12 @@ BSOL-এর কাছে যা আছে অথচ কোনো সাধার
 ### 2.2 যা নেই (gap)
 
 > **T1-এ যা তৈরি হয়েছে:** নিচের ৪, ৫, ৬ নম্বরের **ভিত্তি** — `tracking_destinations` (multi-pixel), `tracking_events` (log + idempotency), `tracking_usage_daily` + `TrackingQuotaService` (quota), `TrackingIngestService`, `TrackingUserDataBuilder`।
-> **T2-এ যা তৈরি হয়েছে (২০২৬-০৮-১৫):** `MetaCapiDriver` (আসল Meta HTTP call), `DispatchTrackingEventsJob` (fan-out + retry + log), আর `SendFacebookCapiPurchaseEventJob` নতুন পাইপলাইনের thin wrapper হয়ে গেছে — তার দুই লাইভ call site অপরিবর্তিত, শুধু ভেতরের রাস্তা বদলেছে। **Purchase এখন সত্যিই Meta-তে যাচ্ছে।** নিচের তালিকা তাই আংশিক পুরনো — যা এখনো সত্য সেটাই শুধু থাকল (funnel/order-flow ইভেন্ট, batching-এর প্রকৃত ব্যবহার)।
+> **T2-এ যা তৈরি হয়েছে:** `MetaCapiDriver` (আসল Meta HTTP call), `DispatchTrackingEventsJob` (fan-out + retry + log), আর `SendFacebookCapiPurchaseEventJob` নতুন পাইপলাইনের thin wrapper হয়ে গেছে — তার দুই লাইভ call site অপরিবর্তিত, শুধু ভেতরের রাস্তা বদলেছে। **Purchase এখন সত্যিই Meta-তে যাচ্ছে।**
+> **T5-এ যা তৈরি হয়েছে (২০২৬-০৮-১৫):** `OrderStatusService::transition()`-এ hook — Confirmed/Shipped/Delivered/Returned/Canceled পাঁচটাই এখন Meta-তে যাচ্ছে, deterministic `order_{id}_{event}` id দিয়ে, P0 অগ্রাধিকারে কখনো drop হয় না। **§1-এর মূল লিভার এখন বাস্তব।** নিচের তালিকা তাই আরও ছোট — শুধু browser-side/funnel অংশটাই বাকি।
 
 1. **কোনো client-side Pixel নেই কোথাও।** `grep -rn "fbq\|connect.facebook.net\|gtag\|dataLayer" frontend/src/` → শূন্য ম্যাচ। BSOL landing page-এ Meta Pixel base code বসে না, তাই আজ `fbp`/`fbc` কুকি কখনোই তৈরি হয় না — অর্থাৎ বর্তমান CAPI ইভেন্টগুলোর Event Match Quality কাঠামোগতভাবেই দুর্বল।
-2. **Funnel-এর মাত্র শেষ ধাপ ট্র্যাক হয়।** PageView / ViewContent / AddToCart / InitiateCheckout / Lead — কিছুই নেই।
-3. **Order-flow ইভেন্ট নেই।** Delivered/Returned/Confirmed Meta-তে যায় না — §1-এর মূল লিভারটাই অব্যবহৃত।
+2. **Funnel-এর মাত্র শেষ ধাপ ট্র্যাক হয়।** PageView / ViewContent / AddToCart / InitiateCheckout / Lead — কিছুই নেই (T6/T4)।
+3. ~~**Order-flow ইভেন্ট নেই।**~~ ✅ **T5-এ সম্পন্ন** — Delivered/Returned/Confirmed/Shipped/Canceled সবই Meta-তে যাচ্ছে।
 4. **এক সেলার এক Pixel** — `facebook_pixel_settings.unique('user_id')`; একাধিক ব্র্যান্ড/সাইটের সেলার আটকে যায়। *(T1-এ `tracking_destinations` টেবিল তৈরি ও backfill হয়েছে; CRUD UI T3-এ।)*
 5. **কোনো event log নেই।** কোন ইভেন্ট গেল, Meta কী উত্তর দিল, কেন ব্যর্থ হলো — কেউ দেখতে পায় না, শুধু `last_error` string। *(T1-এ `tracking_events` টেবিল তৈরি; UI T7-এ।)*
 6. **কোনো quota/rate control নেই।** একটা busy WooCommerce সাইট দিনে লাখো PageView পাঠালে BSOL-এর queue ও Meta rate limit দুটোই ভাঙবে, খরচ প্ল্যাটফর্মের ঘাড়ে পড়বে। ← **user-এর মূল requirement**। *(T1-এ সম্পূর্ণ — quota tiering, Redis কাউন্টার, দৈনিক টেবিল, সেলারের মিটার লাইভ।)*
@@ -298,6 +302,7 @@ Drop হলে: `tracking_events`-এ `status='dropped_quota'` লেখা হ�
 | ✅ `App\Services\Tracking\TrackingUserDataBuilder` | normalize + sha256 হ্যাশিং, fbp/fbc, external_id — একটাই জায়গায়, যাতে হ্যাশ নিয়ম কখনো দুই রকম না হয় |
 | ✅ `App\Jobs\DispatchTrackingEventsJob` | একটা accepted ইভেন্ট → প্রযোজ্য প্রতিটা destination-এ পাঠায় (§11.1 fan-out সিদ্ধান্ত), অন্তত একটা সফল হলেই `status='sent'`, সবগুলো ব্যর্থ হলে exception ছুঁড়ে retry (`tries=3`, backoff `[10,30,60]`), শেষমেশ ব্যর্থ হলে `failed()`-এ `status='failed'` |
 | ✅ `App\Console\Commands\PurgeOldTrackingEvents` | ৯০ দিনের বেশি পুরনো row মুছে। Job নয়, artisan command — `routes/console.php`-এ প্রতিদিন ০৩:৩০-এ শিডিউলড। Postgres-এ `DELETE ... LIMIT` নেই, তাই id select করে chunk-এ মোছে |
+| ✅ `App\Services\OrderStatusService::submitTrackingEvent()` (T5) | `transition()`-এর শেষে hook — status→event ম্যাপ (`confirmed`→`OrderConfirmed` ইত্যাদি, §7), value = `total − shipping_charge`, `returned`/`cancelled`-এ ঋণাত্মক (§1)। নিজের try/catch-এ মোড়ানো — ট্র্যাকিং ব্যর্থ হলেও অর্ডার স্ট্যাটাস বদল আটকাবে না |
 
 **`FacebookCapiClient` ও `SendFacebookCapiPurchaseEventJob` ✅ T2-তে সম্পন্ন।** `FacebookCapiClient` মোছা হয়নি কিন্তু আর ডাকা হয় না (legacy, রোলব্যাক-নিরাপত্তা হিসেবে রাখা)। `SendFacebookCapiPurchaseEventJob` এখন `TrackingIngestService::ingest()`-এর পাতলা wrapper — constructor ও দুই লাইভ dispatch call-site (`LandingPageController.php`, `ConnectOrderController.php`) অপরিবর্তিত, `FacebookPixelSetting` lookup আর সরাসরি Meta HTTP call ভেতর থেকে সরে গেছে। বাড়তি সুবিধা যেটা আগে ছিল না: এখন একই অর্ডারের জন্য দুবার dispatch হলে `tracking_events`-এর unique constraint দ্বিতীয়টা নিঃশব্দে বাতিল করে — আগে প্রতিবার সরাসরি Meta-তে যেত, ডুপ্লিকেট-প্রতিরোধ ছিল না।
 
@@ -361,9 +366,9 @@ Route::middleware('staff_permission:tracking')->group(function () {
 | InitiateCheckout | `is_checkout()` | `wp` hook, checkout পেজে একবার |
 | Lead | ফোন/ইমেইল ফিল্ড valid হলে (abandoned-checkout মডিউলের ট্রিগারের সাথে মিলিয়ে) | — |
 | Purchase | thank-you পেজ (eventID = `order_{bsolOrderId}`) | `woocommerce_thankyou` (আসল উৎস; browser fallback) |
-| OrderConfirmed / OrderShipped / OrderDelivered / OrderReturned / OrderCanceled | — | `woocommerce_order_status_changed` + BSOL courier status webhook |
+| OrderConfirmed / OrderShipped / OrderDelivered / OrderReturned / OrderCanceled ✅ **T5** | — | `OrderStatusService::transition()` (BSOL সার্ভার, নিচে দেখো) |
 
-**গুরুত্বপূর্ণ:** BSOL অর্ডারের আসল ডেলিভারি স্ট্যাটাস জানে (courier tracking), WordPress জানে না। তাই `OrderDelivered` ইভেন্টের **authoritative উৎস BSOL সার্ভার**, প্লাগইন নয় — `OrderStatusService::transition()`-এ hook করে server-side ইভেন্ট জমা হবে। প্লাগইনের status-change hook শুধু WooCommerce-এ ম্যানুয়ালি স্ট্যাটাস বদলানোর কেসটা ধরে।
+**✅ T5-এ বাস্তবায়িত ঠিক এই যুক্তিতেই:** BSOL অর্ডারের আসল ডেলিভারি স্ট্যাটাস জানে (courier tracking), WordPress জানে না। তাই `OrderDelivered` ইভেন্টের **authoritative উৎস BSOL সার্ভার**, প্লাগইন নয় — `OrderStatusService::transition()`-এ hook করা হয়েছে, প্লাগইনের কোনো status-change hook ছাড়াই। T4-এর প্লাগইন মডিউল তাই এই পাঁচটার জন্য কিছু করবে না — শুধু funnel ইভেন্ট (PageView/ViewContent/AddToCart/InitiateCheckout/Lead) আর Purchase-এর browser fallback পাঠাবে।
 
 ---
 
@@ -524,8 +529,8 @@ Landing page BSOL-এর Next.js-এ: পাবলিক ঠিকানা `{se
 |---|---|---|
 | **T1** ✅ | ডেটা মডেল (৩ টেবিল + package কলাম) + `TrackingQuotaService` + `TrackingIngestService` + `TrackingUserDataBuilder` + `app:purge-tracking-events` + admin package UI-তে লিমিট ফিল্ড। **`facebook_pixel_settings` → `tracking_destinations` backfill এখানেই** (§4.1)। **সম্পন্ন ২০২৬-০৮-১৫** | — |
 | **T2** ✅ | `MetaCapiDriver` + `DispatchTrackingEventsJob` (fan-out/retry/log) + `SendFacebookCapiPurchaseEventJob`-কে নতুন পাইপলাইনে wrapper করা (behavior অপরিবর্তিত, দুটো লাইভ call-site অস্পৃশ্য)। **সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T1 |
-| **T5** ← **পরবর্তী** | **Order-flow ইভেন্ট** — `OrderStatusService::transition()`-এ hook, Delivered/Returned/Confirmed, deterministic `order_{id}_{event}`। ← **এখানেই প্রোডাক্টের মূল মূল্য** | T2 |
-| **T6** | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0) | T2 |
+| **T5** ✅ | **Order-flow ইভেন্ট** — `OrderStatusService::transition()`-এ hook, Confirmed/Shipped/Delivered/Returned/Canceled, deterministic `order_{id}_{event}`, ব্যর্থতা status transition আটকায় না। ← **এখানেই প্রোডাক্টের মূল মূল্য, এখন লাইভ। সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T2 |
+| **T6** ← **পরবর্তী** | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0) | T2 |
 | **T4** | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS, first-party REST endpoint, batch relay, funnel ইভেন্ট (plugin v1.17.0) | T2 |
 | **T3** | Multi-destination **UI** — dashboard CRUD, scope selector, একাধিক pixel (backfill T1-এ হয়ে গেছে) | T1 |
 | **T7** | Dashboard: event log, quota মিটার, match-quality সারাংশ; fraud signal অর্ডার-ডিটেইলে প্রদর্শন | T2–T6 |
@@ -568,6 +573,8 @@ T8a (per-seller সাবডোমেইন) ট্র্যাকিং শু�
 | ৯ | **`landing_pages.slug` global নাকি per-seller unique?** | **per-seller** (`unique(user_id, slug)`)। `/lp/` ও `legacy_slug` মুছে ফেলায় alias টেবিলের জটিলতা লাগেনি | বাস্তবায়িত |
 | ১০ | **DNS Cloudflare-এ সরানো হবে?** | **হয়েছে** — wildcard DNS + DNS-01 auto-renew চালু | বাস্তবায়িত |
 | ১১ | **একই apex নাকি আলাদা?** | **একই apex** (সুপারিশের বিপরীতে)। রেপুটেশন ঝুঁকি বহাল ও গৃহীত — §8.6 | বাস্তবায়িত |
+| ৩ | **`OrderDelivered`-এর `value` কী হবে** — অর্ডারের মোট, নাকি ডেলিভারি চার্জ বাদে? | **পণ্যের মূল্য, shipping বাদে** — `total − shipping_charge`। ROAS হিসাবে shipping revenue হিসেবে গোনা হয় না | T5-এ বাস্তবায়িত |
+| ১২ | **`OrderReturned`/`OrderCanceled`-এর `value`** — §1-এ শুধু "negative/exclusion audience" লেখা ছিল, সংখ্যা নির্দিষ্ট ছিল না | **ঋণাত্মক** — Delivered-এর একই সূত্রের বিপরীত চিহ্ন (`-(total − shipping_charge)`), ০ হলে ঋণাত্মক করা হয় না। এটা একটা modeling সিদ্ধান্ত, ডেটা জমার পর দরকার হলে বদলানো যাবে — কোনো migration লাগে না, শুধু payload ফিল্ড | T5-এ বাস্তবায়িত |
 
 ### 11.2 Meta domain verification — বিস্তারিত (২০২৬-০৮-১৫, Business Manager-এ সরাসরি যাচাই)
 
@@ -591,7 +598,6 @@ Meta-র "Add a domain" ডায়ালগ:
 
 | # | প্রশ্ন | কখন লাগবে | প্রাথমিক ঝোঁক |
 |---|---|---|---|
-| ৩ | **`OrderDelivered`-এর `value` কী হবে** — অর্ডারের মোট, নাকি ডেলিভারি চার্জ বাদে? Meta-র ROAS হিসাব এর উপর দাঁড়ায় | **T5** | পণ্যের মূল্য, shipping বাদে — ROAS-এ shipping revenue নয় |
 | ৪ | **ল্যান্ডিং পেজের public payload-এ dataset id** — id গোপন নয় (browser-এ যেভাবেই হোক দেখা যায়), কিন্তু কোন সেলারের কোনটা তা enumerate করা যাবে কি না | **T6** | host/slug-স্কোপড রেসপন্স, কখনো তালিকা নয় |
 | ৮ | **T8b-তে DNS পদ্ধতি** — CNAME (সহজ, apex-এ চলে না) বনাম A রেকর্ড (apex-এ চলে, সার্ভার IP বদলালে সব সেলারকে বদলাতে হয়) | **T8b** | সাবডোমেইনে CNAME বাধ্যতামূলক (`lp.sellershop.com`), apex সাপোর্ট নয় |
 

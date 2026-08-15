@@ -7,15 +7,31 @@ use App\Models\OrderItem;
 use App\Models\OrderStatusLog;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\Tracking\TrackingIngestService;
 use App\Support\PhoneIntelCache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class OrderStatusService
 {
+    /**
+     * Order status → Meta order-flow event (tracking_capi_context.md §1, §7).
+     * 'pending' and 'processing' have no event — nothing ad-relevant has
+     * happened yet at either.
+     */
+    private const ORDER_FLOW_EVENTS = [
+        'confirmed' => 'OrderConfirmed',
+        'shipped' => 'OrderShipped',
+        'delivered' => 'OrderDelivered',
+        'returned' => 'OrderReturned',
+        'cancelled' => 'OrderCanceled',
+    ];
+
     public function __construct(
         private readonly SmsAutomationService $smsAutomationService,
         private readonly AccountingService $accountingService,
+        private readonly TrackingIngestService $trackingIngest,
     ) {}
 
     /**
@@ -63,6 +79,102 @@ class OrderStatusService
         if (in_array($newStatus, ['cancelled', 'returned'], true)) {
             $this->accountingService->onOrderCancelledOrReturned($order);
         }
+
+        $this->submitTrackingEvent($order, $newStatus);
+    }
+
+    /**
+     * BSOL is the *authoritative* source for order-flow events — WordPress
+     * only sees "processing" until a courier eventually reports delivery,
+     * BSOL knows the real outcome the moment this transition happens
+     * (tracking_capi_context.md §7, "গুরুত্বপূর্ণ" note). This is §1's whole
+     * differentiator: an ad platform normally only ever hears "form
+     * submitted", never "courier actually delivered it and got paid".
+     *
+     * Deliberately not wrapped around the DB::transaction above — ingest()
+     * only touches tracking_events/tracking_usage_daily (never orders), so
+     * there's nothing here for that transaction to protect. It IS wrapped
+     * in its own try/catch: a bug in the tracking pipeline must never take
+     * down an order status update, which is core business logic and the
+     * one thing this method exists to do.
+     */
+    private function submitTrackingEvent(Order $order, string $newStatus): void
+    {
+        $eventName = self::ORDER_FLOW_EVENTS[$newStatus] ?? null;
+        if ($eventName === null) {
+            return;
+        }
+
+        try {
+            // Product value only, shipping excluded — Meta's ROAS math
+            // shouldn't count shipping as ad-driven revenue (§11.3 #3).
+            $value = max(0.0, (float) $order->total - (float) $order->shipping_charge);
+
+            // Returned reverses a delivery that was already reported as a
+            // positive conversion — a negative value is the signal Meta
+            // documents for "this customer should be excluded from a
+            // lookalike/remarketing audience built on Purchase/Delivered"
+            // (§1). Cancelled never had a delivered value to reverse, but
+            // it's the same "don't optimize toward this person" signal.
+            if ($value > 0 && in_array($newStatus, ['returned', 'cancelled'], true)) {
+                $value = -$value;
+            }
+
+            $event = [
+                'event_name' => $eventName,
+                // order_{id}_{event}, deliberately distinct from the
+                // Purchase event's own order_{id} id — Delivered on the
+                // same order is a separate conversion, not a dedupe target
+                // for the checkout event (§3.2).
+                'event_id' => 'order_' . $order->id . '_' . $eventName,
+                'event_time' => now(),
+                // No browser request behind a status change — this is BSOL
+                // itself (or a WooCommerce status sync) deciding the order
+                // moved, never a customer action (§7).
+                'action_source' => 'system_generated',
+                'user_data' => array_filter(['ph' => $order->customer_phone]),
+                'custom_data' => [
+                    'currency' => 'BDT',
+                    'value' => $value,
+                    'content_ids' => $order->items->pluck('product_id')->filter()->values()->all(),
+                    'content_type' => 'product',
+                ],
+            ];
+
+            $this->trackingIngest->ingest($order->user_id, $event, $this->trackingContextFor($order));
+        } catch (\Throwable $e) {
+            Log::warning('Order-flow tracking event submission failed', [
+                'order_id' => $order->id,
+                'event_name' => $eventName,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Same scope resolution the WooCommerce/landing-page ingest paths use
+     * (§4.1) — a destination pinned to this order's site/page still
+     * receives its own order-flow events, not just its Purchase event.
+     * Order has no landing_page_id column; a landing-page order carries the
+     * page id in source_ref (LandingPageController's own convention).
+     *
+     * @return array<string, mixed>
+     */
+    private function trackingContextFor(Order $order): array
+    {
+        $context = ['order_id' => $order->id];
+
+        if ($order->platform_api_key_id) {
+            $context['platform_api_key_id'] = $order->platform_api_key_id;
+            $context['scope_type'] = 'platform_api_key';
+            $context['scope_id'] = $order->platform_api_key_id;
+        } elseif ($order->source === 'landing_page' && $order->source_ref) {
+            $context['landing_page_id'] = (int) $order->source_ref;
+            $context['scope_type'] = 'landing_page';
+            $context['scope_id'] = (int) $order->source_ref;
+        }
+
+        return $context;
     }
 
     private function adjustInventoryForStatusTransition(Order $order, string $oldStatus, string $newStatus): void
