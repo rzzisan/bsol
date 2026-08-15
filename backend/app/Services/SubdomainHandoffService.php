@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ShopProfile;
 use App\Models\User;
+use App\Support\LandingPageResolver;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -48,6 +49,30 @@ class SubdomainHandoffService
         }
 
         return $host;
+    }
+
+    /**
+     * True when $currentHost is some *other* shop's subdomain.
+     *
+     * Signing in there would mint this user's token in an origin that also
+     * serves that shop's own landing-page HTML — the exact exposure §9 rule 3
+     * exists to prevent, and the reason admin support goes through
+     * impersonation on the platform origin instead. Admins have no subdomain
+     * of their own, so for them every seller subdomain is foreign.
+     */
+    public function isForeignSubdomain(User $user, string $currentHost): bool
+    {
+        if (LandingPageResolver::subdomainLabel($currentHost) === null) {
+            return false; // platform host (or something we don't serve)
+        }
+
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $ownHost = ShopProfile::where('user_id', $user->shopOwnerId())->first()?->subdomainHost();
+
+        return $ownHost === null || strcasecmp($ownHost, $currentHost) !== 0;
     }
 
     /**

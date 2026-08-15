@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Services\SubdomainHandoffService;
+use App\Support\FrontendUrl;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -43,6 +44,19 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'email' => ['This staff account has been suspended.'],
             ]);
+        }
+
+        // Never mint a token in another shop's origin: that origin also
+        // serves their own landing-page HTML, so a token sitting in its
+        // localStorage is reachable from whatever they publish there. Admins
+        // hit this too — support access goes through impersonation on the
+        // platform origin instead (custom_domain_context.md §11.5).
+        if ($this->handoff->isForeignSubdomain($user, $request->getHost())) {
+            return response()->json([
+                'message' => 'Sign in at ' . FrontendUrl::platform() . ' — this address belongs to another shop.',
+                'error_code' => 'foreign_subdomain',
+                'login_url' => FrontendUrl::platform(),
+            ], 403);
         }
 
         // A seller with a branded subdomain finishes logging in there, not

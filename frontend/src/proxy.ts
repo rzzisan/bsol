@@ -175,6 +175,15 @@ export async function proxy(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.set(SHOP_HEADER, label);
 
+  // The platform home carries the sign-in form, and this origin also serves
+  // the shop's own landing-page HTML — so a password typed here would be
+  // typed into markup the shop controls. Send it to the platform instead.
+  // The API refuses a foreign-subdomain sign-in as well; this just stops the
+  // credential ever being entered (domain_security_audit.md M-3).
+  if (pathname === "/") {
+    return NextResponse.redirect(new URL("/", `https://${PLATFORM_HOST}`), 302);
+  }
+
   // seller1.<apex>/offer renders the landing page route. A rewrite, not a
   // redirect: the seller's own address is the canonical one, so /lp/ must
   // never appear in the URL bar or in an ad's destination.

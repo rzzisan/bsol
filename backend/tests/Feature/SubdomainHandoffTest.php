@@ -184,6 +184,46 @@ class SubdomainHandoffTest extends TestCase
             ->assertJsonPath('error_code', 'staff_suspended');
     }
 
+    /**
+     * The exposure §9 rule 3 exists to prevent: a token minted in an origin
+     * that also serves another shop's own landing-page HTML.
+     */
+    public function test_admins_cannot_sign_in_on_a_sellers_subdomain(): void
+    {
+        $admin = $this->seller('zareen', ['role' => 'admin']);
+
+        $this->login($admin, 'zareen.' . config('app.subdomain_apex'))
+            ->assertStatus(403)
+            ->assertJsonPath('error_code', 'foreign_subdomain')
+            ->assertJsonMissingPath('token');
+
+        // The platform host still works for them.
+        $this->login($admin)->assertOk()->assertJsonStructure(['token']);
+    }
+
+    public function test_a_seller_cannot_sign_in_on_another_shops_subdomain(): void
+    {
+        $this->seller('shopa');
+        $other = $this->seller('shopb', ['email' => 'b@example.com']);
+
+        $this->login($other, 'shopa.' . config('app.subdomain_apex'))
+            ->assertStatus(403)
+            ->assertJsonPath('error_code', 'foreign_subdomain');
+    }
+
+    /** A seller with no address of their own has no business on someone else's. */
+    public function test_a_seller_without_a_subdomain_cannot_sign_in_on_someone_elses(): void
+    {
+        $this->seller('shopa');
+        $homeless = $this->seller(null, ['email' => 'nohost@example.com']);
+
+        $this->login($homeless, 'shopa.' . config('app.subdomain_apex'))
+            ->assertStatus(403)
+            ->assertJsonPath('error_code', 'foreign_subdomain');
+
+        $this->login($homeless)->assertOk()->assertJsonStructure(['token']);
+    }
+
     public function test_staff_are_redirected_to_their_owners_subdomain(): void
     {
         $owner = $this->seller('zareen');
