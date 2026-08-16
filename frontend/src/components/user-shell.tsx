@@ -80,6 +80,9 @@ const menuText = {
     abandonedCheckouts: "অসম্পূর্ণ অর্ডার",
     facebookLeads: "ফেসবুক লিডস",
 
+    marketing: "মার্কেটিং",
+    facebookCapi: "Facebook CAPI",
+
     settings: "সেটিংস",
     shopProfile: "শপ প্রোফাইল",
     stickerTemplates: "স্টিকার টেমপ্লেট",
@@ -153,6 +156,9 @@ const menuText = {
     landingPages: "Landing Pages",
     abandonedCheckouts: "Abandoned Checkouts",
     facebookLeads: "Facebook Leads",
+
+    marketing: "Marketing",
+    facebookCapi: "Facebook CAPI",
 
     settings: "Settings",
     shopProfile: "Shop Profile",
@@ -281,6 +287,14 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
       ],
     },
     {
+      key: "marketing",
+      label: (t as any).marketing ?? "মার্কেটিং",
+      icon: "📣",
+      children: [
+        { key: "facebook-capi", label: (t as any).facebookCapi ?? "Facebook CAPI", href: "/dashboard/marketing/facebook-capi" },
+      ],
+    },
+    {
       key: "settings",
       label: t.settings,
       icon: "⚙️",
@@ -302,8 +316,10 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
 
 // Owner-only resources — never shown to staff regardless of any permission
 // grant (billing/settings, Pattern B — matches the backend's owner_only
-// route middleware, not staff_permission).
-const OWNER_ONLY_MENU_KEYS = new Set(["settings", "sms-credit"]);
+// route middleware, not staff_permission). "marketing" (Facebook CAPI —
+// tracking_destinations, a credential) belongs here for the same reason
+// "settings" does.
+const OWNER_ONLY_MENU_KEYS = new Set(["settings", "sms-credit", "marketing"]);
 
 // Maps a leaf menu item's key (a top-level item with no children, OR a
 // child inside a parent group) to the backend module permission that gates

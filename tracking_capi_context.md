@@ -347,12 +347,18 @@ Route::middleware('staff_permission:tracking')->group(function () {
 
 **ব্যবহারকারীর বাস্তবতা যেটা এই ফেজের মূল প্রশ্ন ছিল:** একজন সেলারের একাধিক Pixel ID থাকতে পারে, আর একেক ল্যান্ডিং পেজে আলাদা Pixel ব্যবহার করতে পারে। এই দুটোই T1-এর স্কিমা থেকেই সমর্থিত ছিল (`tracking_destinations.scope_type`/`scope_id`) — T3 শুধু সেটার জন্য UI বানিয়েছে, নতুন কোনো ডেটা মডেল লাগেনি।
 
-- **Settings → Facebook Page**-এর একক-পিক্সেল ফর্ম প্রতিস্থাপিত হয়েছে একটা লিস্ট UI দিয়ে (Facebook Page connections-এর একই কার্ড-লিস্ট প্যাটার্ন) — প্রতিটা destination আলাদা কার্ড, নিজস্ব label/Dataset ID/token/enable/scope, এডিট/টেস্ট/ডিলিট বাটন, আর "নতুন ডেস্টিনেশন যোগ করুন"।
+- **Settings → Facebook Page**-এর একক-পিক্সেল ফর্ম প্রতিস্থাপিত হয়েছিল একটা লিস্ট UI দিয়ে (Facebook Page connections-এর একই কার্ড-লিস্ট প্যাটার্ন) — প্রতিটা destination আলাদা কার্ড, নিজস্ব label/Dataset ID/token/enable/scope, এডিট/টেস্ট/ডিলিট বাটন, আর "নতুন ডেস্টিনেশন যোগ করুন"। **⚠️ পাতা বদলেছে, নিচে দেখো।**
 - **Scope selector তিনটা অপশন:** পুরো দোকান (ডিফল্ট, `scope_type=null`) / একটা নির্দিষ্ট ল্যান্ডিং পেজ (dropdown, বিদ্যমান `GET /landing/pages` রিইউজ) / একটা নির্দিষ্ট WooCommerce সাইট (dropdown, বিদ্যমান `GET /wordpress/api-keys` রিইউজ) — দুটোই নতুন এন্ডপয়েন্ট বানাতে হয়নি।
 - **Ownership যাচাই সার্ভার-সাইডে বাধ্যতামূলক:** `scope_id` client থেকে এলেও `TrackingDestinationController::assertOwnsScope()` সবসময় নিশ্চিত করে সেটা এই owner-এরই পেজ/সাইট — নাহলে এক সেলার আরেক সেলারের পেজে pixel পিন করে তার ইভেন্ট চুরি করতে পারত।
-- **`FacebookPixelSettingController` (§7.2) অপরিবর্তিত থেকেছে** — একই টেবিলের একই shop-wide row (`scope_type IS NULL`), শুধু দুটো UI (পুরনো single-form পেজ আর এখনকার লিস্ট) এখন একই ডেটা দেখায়/এডিট করে, কোনো migration বা sync দরকার হয়নি।
+- **`FacebookPixelSettingController` (§7.2) অপরিবর্তিত থেকেছে** — একই টেবিলের একই shop-wide row (`scope_type IS NULL`), শুধু ভিন্ন UI-গুলো এখন একই ডেটা দেখায়/এডিট করে, কোনো migration বা sync দরকার হয়নি।
 - **"Dataset ID (আগের নাম: Pixel ID)" লেবেল** — §11.2-এর সিদ্ধান্ত অনুযায়ী, এই ফর্মেই প্রথম প্রয়োগ হলো।
 - Test event প্রতিটা destination-এর নিজস্ব credential দিয়ে (কোনো ইনগেস্ট পাইপলাইন/কোটা খরচ হয় না — ad-hoc connectivity check)।
+
+**⚠️ আপডেট (২০২৬-০৮-১৬, একই দিনে): নিজস্ব মেইন মেনুতে সরানো হয়েছে।** ব্যবহারকারীর সিদ্ধান্ত — CAPI/Pixel কনফিগারেশন Settings → Facebook Page-এ না রেখে আলাদা **মার্কেটিং → Facebook CAPI** মেনুতে সরানো। বাস্তবায়ন:
+- নতুন পেজ `frontend/src/app/dashboard/marketing/facebook-capi/page.tsx` — destination CRUD (এই সেকশনে বর্ণিত) **এবং** quota/usage মিটার (§5.2) দুটোই এখানে সরে গেছে, কারণ usage মিটার pixel-নির্ভর তথ্য, লিড-ক্যাপচার পেজে রাখার যুক্তি ছিল না।
+- `dashboard/settings/facebook/page.tsx` এখন **শুধু** Facebook Page OAuth connect/disconnect (লিড ক্যাপচার) — CAPI/usage সেকশন সম্পূর্ণ সরানো, কোনো ডুপ্লিকেট কোড রাখা হয়নি।
+- `user-shell.tsx`-এ নতুন টপ-লেভেল গ্রুপ `marketing` (📣), সন্তান `facebook-capi` — `OWNER_ONLY_MENU_KEYS`-এ যোগ (destination CRUD credential, Pattern B, `settings`-এর মতোই staff-এর কাছে সম্পূর্ণ অদৃশ্য)।
+- ব্যাকএন্ড/রুট/মডেল **অপরিবর্তিত** — `/api/tracking/destinations` ও `/api/tracking/usage` একই আছে, শুধু কোন dashboard পেজ থেকে কল হচ্ছে সেটা বদলেছে।
 
 **Staff-role চেকলিস্ট (CONTEXT.md §৩১ — বাধ্যতামূলক, T7-এ):**
 - `tracking_destinations` = **Pattern B** (owner-only credential, `shopOwnerId()`), `owner_only` middleware।
