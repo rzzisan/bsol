@@ -6,7 +6,7 @@
 2. **আসল কাস্টমার ট্র্যাকিং** — browser (Pixel) + server (Conversions API) দুই দিক থেকে একই ইভেন্ট, `event_id` দিয়ে dedup, উচ্চ Event Match Quality।
 3. **SaaS ফিচার হিসেবে বিক্রয়যোগ্য** — সেলার নিজের WordPress/WooCommerce সাইট বা BSOL landing page-এ এক ক্লিকে ট্র্যাকিং চালু করবে, প্যাকেজ অনুযায়ী দৈনিক ইভেন্ট লিমিট।
 
-**অবস্থা (২০২৬-০৮-১৬):** **T1, T2, T5, T6, T4 সম্পন্ন ও লাইভ** — পুরো পরিকল্পিত ট্র্যাকিং পাইপলাইন এখন দুই কেসেই (নিজের WordPress সাইট আর BSOL সাবডোমেইন) কাজ করছে: Meta Pixel base code, browser+server funnel ইভেন্ট, order-flow ইভেন্ট BSOL সার্ভার থেকে, quota/dedup/log। **T4-এ একটা critical gap-ও ধরা পড়েছে ও ঠিক হয়েছে** — dashboard-এর একমাত্র Pixel-সেটিংস UI T1-এর পর থেকে পুরনো টেবিলে লিখছিল, নতুন destination টেবিলে নয় (§7.2)। বাকি — T3 (multi-destination CRUD UI), T7 (event log/admin usage view)।
+**অবস্থা (২০২৬-০৮-১৬):** **T1, T2, T5, T6, T4, T3 সম্পন্ন ও লাইভ** — পুরো পরিকল্পিত ট্র্যাকিং পাইপলাইন এখন দুই কেসেই (নিজের WordPress সাইট আর BSOL সাবডোমেইন) কাজ করছে: Meta Pixel base code, browser+server funnel ইভেন্ট, order-flow ইভেন্ট BSOL সার্ভার থেকে, quota/dedup/log, **আর এখন dashboard থেকেই একাধিক pixel ম্যানেজ করা যায়** — একটা সেলারের একাধিক Pixel ID থাকতে পারে, প্রতিটাকে চাইলে একটা নির্দিষ্ট ল্যান্ডিং পেজ বা WooCommerce সাইটে পিন করা যায় (§6.3)। T4-এ একটা critical gap-ও ধরা পড়েছিল ও ঠিক হয়েছে — dashboard-এর একমাত্র Pixel-সেটিংস UI T1-এর পর থেকে পুরনো টেবিলে লিখছিল (§7.2)। বাকি — শুধু T7 (event log/admin usage view)।
 
 > ⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)।** Migration ইচ্ছাকৃতভাবে কোনো মান বসায়নি — চালু প্যাকেজে নীরবে লিমিট বসানো মানে সেলারের ইভেন্ট হারানো। **Admin → Packages** থেকে বাস্তব মান বসাতে হবে; seeder-এর প্রস্তাব: Free Trial 2,000 · Starter 5,000 · Growth 15,000 · Business আনলিমিটেড।
 
@@ -65,7 +65,7 @@ BSOL-এর কাছে যা আছে অথচ কোনো সাধার
 1. ~~**কোনো client-side Pixel নেই কোথাও।**~~ ✅ **T6-এ সম্পন্ন, ল্যান্ডিং পেজে** — WooCommerce সাইটে এখনো নেই (T4)।
 2. ~~**Funnel-এর মাত্র শেষ ধাপ ট্র্যাক হয়।**~~ ✅ **T6-এ সম্পন্ন, ল্যান্ডিং পেজে** (AddToCart প্রযোজ্য নয় — ল্যান্ডিং পেজে আলাদা কার্ট ধাপ নেই)। WooCommerce-এ এখনো শুধু Purchase (T4)।
 3. ~~**Order-flow ইভেন্ট নেই।**~~ ✅ **T5-এ সম্পন্ন** — Delivered/Returned/Confirmed/Shipped/Canceled সবই Meta-তে যাচ্ছে।
-4. **এক সেলার এক Pixel** — `facebook_pixel_settings.unique('user_id')`; একাধিক ব্র্যান্ড/সাইটের সেলার আটকে যায়। *(T1-এ `tracking_destinations` টেবিল তৈরি ও backfill হয়েছে; CRUD UI T3-এ।)*
+4. ~~**এক সেলার এক Pixel।**~~ ✅ **T3-এ সম্পন্ন** — একাধিক destination, dashboard CRUD, per-page/per-site scope।
 5. **কোনো event log নেই।** কোন ইভেন্ট গেল, Meta কী উত্তর দিল, কেন ব্যর্থ হলো — কেউ দেখতে পায় না, শুধু `last_error` string। *(T1-এ `tracking_events` টেবিল তৈরি; UI T7-এ।)*
 6. **কোনো quota/rate control নেই।** একটা busy WooCommerce সাইট দিনে লাখো PageView পাঠালে BSOL-এর queue ও Meta rate limit দুটোই ভাঙবে, খরচ প্ল্যাটফর্মের ঘাড়ে পড়বে। ← **user-এর মূল requirement**। *(T1-এ সম্পূর্ণ — quota tiering, Redis কাউন্টার, দৈনিক টেবিল, সেলারের মিটার লাইভ।)*
 7. **Batching এখনো ব্যবহৃত হয় না।** `MetaCapiDriver::send()` একাধিক ইভেন্ট এক HTTP call-এ পাঠাতে পারে (T2-তে বানানো), কিন্তু `DispatchTrackingEventsJob` প্রতিটা accepted ইভেন্টের জন্য আলাদাভাবে ডাকা হয় (real-time), তাই আজ প্রতি call-এ একটাই ইভেন্ট যায়। প্লাগইনের ব্যাচ রিলে (T4) বা ভবিষ্যতের retry sweep চাইলে driver-টা আজই batch নিতে পারে — কোনো বদল ছাড়া।
@@ -310,6 +310,7 @@ Drop হলে: `tracking_events`-এ `status='dropped_quota'` লেখা হ�
 | ✅ `frontend/src/lib/tracking.ts::useBsolTracking()` (T6) | Pixel base code (default PageView suppressed), PageView/ViewContent (মাউন্টে), InitiateCheckout/Lead/Purchase (caller-triggered), সব ইভেন্টে browser+server একই `event_id` |
 | ✅ `App\Http\Controllers\Api\Connect\ConnectTrackingController` (T4) | `ingest()` — batched (≤৫০), `TrackingIngestService::ingestBatch()`-এ ডেলিগেট, প্রতি ইভেন্টের status আলাদা রিপোর্ট করে। `config()` — resolved `{enabled, pixel_id}`, WooCommerce প্লাগইনের জন্য (landing page-র জন্য `LandingPageController::publicShow()`-এর সমান্তরাল) |
 | ✅ `wordpress-plugin/bsol-connect/includes/modules/tracking/class-bsol-tracking.php` (T4) | `wp_head` Pixel inject, `wp_enqueue_scripts` context, `wp_ajax_bsol_track_event` (+nopriv) ব্যাচ রিলে। **REST route নয়, admin-ajax.php** — §7-এর বিচ্যুতি নোট দেখো |
+| ✅ `App\Http\Controllers\Api\TrackingDestinationController` (T3) | Dashboard CRUD — `index`/`store`/`update`/`destroy`/`testEvent`, `owner_only` (Pattern B)। `scope_id` সবসময় owner-এর নিজের landing page/site কিনা যাচাই হয় (§6.3) — অন্যথায় এক সেলার আরেক সেলারের পেজে pixel পিন করতে পারত |
 
 **`FacebookCapiClient` ও `SendFacebookCapiPurchaseEventJob` ✅ T2-তে সম্পন্ন।** `FacebookCapiClient` মোছা হয়নি কিন্তু আর ডাকা হয় না (legacy, রোলব্যাক-নিরাপত্তা হিসেবে রাখা)। `SendFacebookCapiPurchaseEventJob` এখন `TrackingIngestService::ingest()`-এর পাতলা wrapper — constructor ও দুই লাইভ dispatch call-site (`LandingPageController.php`, `ConnectOrderController.php`) অপরিবর্তিত, `FacebookPixelSetting` lookup আর সরাসরি Meta HTTP call ভেতর থেকে সরে গেছে। বাড়তি সুবিধা যেটা আগে ছিল না: এখন একই অর্ডারের জন্য দুবার dispatch হলে `tracking_events`-এর unique constraint দ্বিতীয়টা নিঃশব্দে বাতিল করে — আগে প্রতিবার সরাসরি Meta-তে যেত, ডুপ্লিকেট-প্রতিরোধ ছিল না।
 
@@ -325,11 +326,11 @@ Route::get('/tracking/config',  [ConnectTrackingController::class, 'config'])->m
 // slug-ভিত্তিক রুট নয়: slug এখন per-shop unique, তাই slug একা কোনো শপ নির্দেশ করে না
 Route::post('/public/track', [PublicTrackingController::class, 'ingest'])->middleware('throttle:300,1'); // ✅ T6-এ লাইভ
 
-// dashboard (owner_only — Pattern B, credential)
-Route::prefix('tracking')->middleware('owner_only')->group(function () {
-    Route::get('/destinations', ...); Route::post('/destinations', ...);
-    Route::put('/destinations/{id}', ...); Route::delete('/destinations/{id}', ...);
-    Route::post('/destinations/{id}/test-event', ...);
+// dashboard (owner_only — Pattern B, credential) — ✅ T3-এ লাইভ
+Route::prefix('tracking/destinations')->middleware('owner_only')->group(function () {
+    Route::get('/', ...); Route::post('/', ...);
+    Route::put('/{id}', ...); Route::delete('/{id}', ...);
+    Route::post('/{id}/test-event', ...);
 });
 // dashboard read-only (Pattern A — staff দেখতে পারে), T7-এ
 Route::middleware('staff_permission:tracking')->group(function () {
@@ -340,7 +341,18 @@ Route::middleware('staff_permission:tracking')->group(function () {
 
 **✅ যা ইতিমধ্যে লাইভ (T1):** `GET /tracking/usage` — quota মিটার, **এখন `owner_only`**, Settings → Facebook Page-এর কার্ডে দেখায় (আজকের ব্যবহার/লিমিট, রঙিন বার, dropped ও overage, গত ৭ দিন)। `state` (`ok`/`sampling`/`critical`/`exhausted`/`unlimited`/`not_in_package`) ব্যাকএন্ডে হিসাব হয়, যাতে ড্যাশবোর্ড আর পরের admin ভিউ threshold নিয়ে দ্বিমত করতে না পারে।
 
-**কেন `owner_only`, §6.2-এর Pattern A নয়:** এখন এটা রেন্ডার করে একমাত্র owner-only Pixel settings পেজ; staff-কে permission দিলে খোলার মতো কিছুই থাকত না। **T7-এ event log UI-র সাথে** `tracking` module key যোগ হবে এবং রুটটা `staff_permission:tracking`-এ সরবে — নিচের চার-জায়গার চেকলিস্ট তখনই প্রযোজ্য।
+**কেন `owner_only`, §6.2-এর Pattern A নয়:** এই পেজে যা আছে (destination CRUD + access token, quota মিটার) — দুটোই credential/owner-level তথ্য; staff-কে permission দিলে খোলার মতো কিছুই থাকত না। **T7-এ event log UI-র সাথে** `tracking` module key যোগ হবে এবং শুধু usage/events-পড়া রুট দুটো `staff_permission:tracking`-এ সরবে (destination CRUD চিরকাল `owner_only`ই থাকবে) — নিচের চার-জায়গার চেকলিস্ট তখনই প্রযোজ্য।
+
+### 6.3 ✅ T3-এ সম্পন্ন — Multi-destination dashboard UI (২০২৬-০৮-১৬)
+
+**ব্যবহারকারীর বাস্তবতা যেটা এই ফেজের মূল প্রশ্ন ছিল:** একজন সেলারের একাধিক Pixel ID থাকতে পারে, আর একেক ল্যান্ডিং পেজে আলাদা Pixel ব্যবহার করতে পারে। এই দুটোই T1-এর স্কিমা থেকেই সমর্থিত ছিল (`tracking_destinations.scope_type`/`scope_id`) — T3 শুধু সেটার জন্য UI বানিয়েছে, নতুন কোনো ডেটা মডেল লাগেনি।
+
+- **Settings → Facebook Page**-এর একক-পিক্সেল ফর্ম প্রতিস্থাপিত হয়েছে একটা লিস্ট UI দিয়ে (Facebook Page connections-এর একই কার্ড-লিস্ট প্যাটার্ন) — প্রতিটা destination আলাদা কার্ড, নিজস্ব label/Dataset ID/token/enable/scope, এডিট/টেস্ট/ডিলিট বাটন, আর "নতুন ডেস্টিনেশন যোগ করুন"।
+- **Scope selector তিনটা অপশন:** পুরো দোকান (ডিফল্ট, `scope_type=null`) / একটা নির্দিষ্ট ল্যান্ডিং পেজ (dropdown, বিদ্যমান `GET /landing/pages` রিইউজ) / একটা নির্দিষ্ট WooCommerce সাইট (dropdown, বিদ্যমান `GET /wordpress/api-keys` রিইউজ) — দুটোই নতুন এন্ডপয়েন্ট বানাতে হয়নি।
+- **Ownership যাচাই সার্ভার-সাইডে বাধ্যতামূলক:** `scope_id` client থেকে এলেও `TrackingDestinationController::assertOwnsScope()` সবসময় নিশ্চিত করে সেটা এই owner-এরই পেজ/সাইট — নাহলে এক সেলার আরেক সেলারের পেজে pixel পিন করে তার ইভেন্ট চুরি করতে পারত।
+- **`FacebookPixelSettingController` (§7.2) অপরিবর্তিত থেকেছে** — একই টেবিলের একই shop-wide row (`scope_type IS NULL`), শুধু দুটো UI (পুরনো single-form পেজ আর এখনকার লিস্ট) এখন একই ডেটা দেখায়/এডিট করে, কোনো migration বা sync দরকার হয়নি।
+- **"Dataset ID (আগের নাম: Pixel ID)" লেবেল** — §11.2-এর সিদ্ধান্ত অনুযায়ী, এই ফর্মেই প্রথম প্রয়োগ হলো।
+- Test event প্রতিটা destination-এর নিজস্ব credential দিয়ে (কোনো ইনগেস্ট পাইপলাইন/কোটা খরচ হয় না — ad-hoc connectivity check)।
 
 **Staff-role চেকলিস্ট (CONTEXT.md §৩১ — বাধ্যতামূলক, T7-এ):**
 - `tracking_destinations` = **Pattern B** (owner-only credential, `shopOwnerId()`), `owner_only` middleware।
@@ -566,8 +578,8 @@ Landing page BSOL-এর Next.js-এ: পাবলিক ঠিকানা `{se
 | **T5** ✅ | **Order-flow ইভেন্ট** — `OrderStatusService::transition()`-এ hook, Confirmed/Shipped/Delivered/Returned/Canceled, deterministic `order_{id}_{event}`, ব্যর্থতা status transition আটকায় না। ← **এখানেই প্রোডাক্টের মূল মূল্য, এখন লাইভ। সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T2 |
 | **T6** ✅ | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0)। **সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T2 |
 | **T4** ✅ | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS (jQuery), `admin-ajax.php` batch relay, funnel ইভেন্ট। **সম্পন্ন ২০২৬-০৮-১৬** (plugin v1.17.0), migration নেই। সাথে `FacebookPixelSettingController`-এর critical fix (§7.2) | T2 |
-| **T3** ← **পরবর্তী** | Multi-destination **UI** — dashboard CRUD, scope selector, একাধিক pixel (backfill T1-এ হয়ে গেছে)। §7.2-এর ফিক্স এটাকে আরও জরুরি করে তুলেছে — এখনো একমাত্র destination তৈরির পথ Settings → Facebook Page-এর single shop-wide ফর্ম | T1 |
-| **T7** | Dashboard: event log, quota মিটার, match-quality সারাংশ; fraud signal অর্ডার-ডিটেইলে প্রদর্শন | T2–T6 |
+| **T3** ✅ | Multi-destination **UI** — dashboard CRUD, scope selector (শপ-ওয়াইড/ল্যান্ডিং পেজ/WooCommerce সাইট), একাধিক pixel। **সম্পন্ন ২০২৬-০৮-১৬**, migration নেই | T1 |
+| **T7** ← **পরবর্তী** | Dashboard: event log, quota মিটার, match-quality সারাংশ; fraud signal অর্ডার-ডিটেইলে প্রদর্শন | T2–T6 |
 | **T8b** | সেলারের নিজের ডোমেইন (§8.4) — `landing_domains` টেবিল, DNS verification, per-domain Certbot, catch-all nginx। **বিক্রয়-যুক্তি ব্র্যান্ডিং + রেপুটেশন আলাদা রাখা** — AEM আর যুক্তি নয়, কারণ AEM এখন সবার জন্যই স্বয়ংক্রিয় (§11.2) | T6 |
 
 **T8a** — ✅ সম্পন্ন (per-seller সাবডোমেইন), `custom_domain_context.md` দেখো।

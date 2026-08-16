@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\LandingTemplateController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupportController;
+use App\Http\Controllers\Api\TrackingDestinationController;
 use App\Http\Controllers\Api\TrackingUsageController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\AdminSupportController;
@@ -534,6 +535,17 @@ Route::middleware('active_subscription')->group(function () {
         // staff_permission:tracking in T7, alongside the event log UI that
         // gives a staff grant something to actually open.
         Route::get('/tracking/usage', [TrackingUsageController::class, 'show']);
+
+        // Multi-destination CRUD (T3) — a seller can have several pixels
+        // (different ad accounts) and pin one to a specific landing page
+        // or connected WooCommerce site instead of the shop-wide default.
+        Route::prefix('tracking/destinations')->group(function () {
+            Route::get('/', [TrackingDestinationController::class, 'index']);
+            Route::post('/', [TrackingDestinationController::class, 'store']);
+            Route::put('/{id}', [TrackingDestinationController::class, 'update'])->where('id', '[0-9]+');
+            Route::delete('/{id}', [TrackingDestinationController::class, 'destroy'])->where('id', '[0-9]+');
+            Route::post('/{id}/test-event', [TrackingDestinationController::class, 'testEvent'])->where('id', '[0-9]+');
+        });
     });
 
     Route::middleware('staff_permission:facebook')->group(function () {

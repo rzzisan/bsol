@@ -33,9 +33,9 @@ const t = {
     disconnectSuccess: "Facebook Page ডিসকানেক্ট করা হয়েছে।",
     connectSuccess: "Facebook Page সফলভাবে কানেক্ট হয়েছে।",
 
-    capiTitle: "Conversions API (বিজ্ঞাপন ট্র্যাকিং)",
-    capiIntro: "ল্যান্ডিং পেজ চেকআউট সম্পন্ন হলে সার্ভার থেকে সরাসরি আপনার নিজের Facebook Pixel-এ Purchase ইভেন্ট পাঠানো হবে — বিজ্ঞাপন ক্যাম্পেইন নিজে থেকে অপটিমাইজ হতে সাহায্য করে। Pixel ID এবং Access Token আপনার Meta Events Manager থেকে সংগ্রহ করুন।",
-    pixelIdLabel: "Pixel ID",
+    capiTitle: "ট্র্যাকিং ডেস্টিনেশন (Meta Pixel)",
+    capiIntro: "চেকআউট সম্পন্ন হলে সার্ভার থেকে সরাসরি Meta-তে Purchase/order ইভেন্ট পাঠানো হয় — বিজ্ঞাপন ক্যাম্পেইন নিজে থেকে অপটিমাইজ হতে সাহায্য করে। একাধিক Pixel থাকলে প্রতিটাকে আলাদা নাম দিয়ে যোগ করুন, চাইলে একটা নির্দিষ্ট ল্যান্ডিং পেজ বা WooCommerce সাইটে পিন করে দিন — না করলে সেটা পুরো দোকানের ডিফল্ট হিসেবে কাজ করবে। Dataset ID এবং Access Token আপনার Meta Events Manager থেকে সংগ্রহ করুন।",
+    datasetIdLabel: "Dataset ID (আগের নাম: Pixel ID)",
     accessTokenLabel: "CAPI Access Token",
     accessTokenSetHint: "সেট করা আছে — পরিবর্তন করতে নতুন টোকেন লিখুন",
     accessTokenPlaceholder: "নতুন টোকেন লিখুন (খালি রাখলে অপরিবর্তিত থাকবে)",
@@ -43,11 +43,27 @@ const t = {
     enabledLabel: "সক্রিয় করুন",
     saveBtn: "সেভ করুন",
     saving: "সেভ হচ্ছে...",
+    cancelBtn: "বাতিল",
+    editBtn: "এডিট করুন",
+    deleteBtn: "মুছে ফেলুন",
+    deleting: "মোছা হচ্ছে...",
+    deleteConfirm: "এই ডেস্টিনেশনটা মুছে ফেলতে চান? এটা যে পেজ/সাইটে পিন করা ছিল সেখানে ইভেন্ট পাঠানো বন্ধ হয়ে যাবে।",
     testEventBtn: "টেস্ট ইভেন্ট পাঠান",
     testingEvent: "পাঠানো হচ্ছে...",
     lastSentLabel: "সর্বশেষ পাঠানো হয়েছে",
     lastErrorLabel: "সর্বশেষ সমস্যা",
     capiSaveSuccess: "সেভ করা হয়েছে।",
+    labelLabel: "নাম (নিজের জন্য, যেমন: Main Pixel)",
+    labelPlaceholder: "Default",
+    scopeLabel: "কোথায় প্রযোজ্য",
+    scopeShopWide: "পুরো দোকান (ডিফল্ট)",
+    scopeLandingPage: "একটা নির্দিষ্ট ল্যান্ডিং পেজ",
+    scopeSite: "একটা নির্দিষ্ট WooCommerce সাইট",
+    selectLandingPage: "ল্যান্ডিং পেজ বেছে নিন",
+    selectSite: "সাইট বেছে নিন",
+    addDestinationBtn: "+ নতুন ডেস্টিনেশন যোগ করুন",
+    noDestinations: "এখনো কোনো ট্র্যাকিং ডেস্টিনেশন যোগ করা হয়নি।",
+    shopWideBadge: "পুরো দোকান",
 
     usageTitle: "ট্র্যাকিং ইভেন্ট ব্যবহার",
     usageIntro: "আপনার প্যাকেজে প্রতিদিন কত ট্র্যাকিং ইভেন্ট পাঠানো যাবে তার হিসাব। দিন গোনা হয় ঢাকা সময় অনুযায়ী।",
@@ -89,9 +105,9 @@ const t = {
     disconnectSuccess: "Facebook Page disconnected.",
     connectSuccess: "Facebook Page connected successfully.",
 
-    capiTitle: "Conversions API (Ad Tracking)",
-    capiIntro: "When a landing-page checkout completes, a server-side Purchase event is sent directly to your own Facebook Pixel — helps your ad campaigns optimize automatically. Get the Pixel ID and Access Token from your Meta Events Manager.",
-    pixelIdLabel: "Pixel ID",
+    capiTitle: "Tracking Destinations (Meta Pixel)",
+    capiIntro: "When a checkout completes, a server-side Purchase/order event is sent directly to Meta — helps your ad campaigns optimize automatically. If you run more than one Pixel, add each with its own name, optionally pinned to one landing page or WooCommerce site — leave it unpinned and it becomes the shop-wide default. Get the Dataset ID and Access Token from your Meta Events Manager.",
+    datasetIdLabel: "Dataset ID (formerly Pixel ID)",
     accessTokenLabel: "CAPI Access Token",
     accessTokenSetHint: "Already set — enter a new token to change it",
     accessTokenPlaceholder: "Enter new token (leave blank to keep unchanged)",
@@ -99,11 +115,27 @@ const t = {
     enabledLabel: "Enable",
     saveBtn: "Save",
     saving: "Saving...",
+    cancelBtn: "Cancel",
+    editBtn: "Edit",
+    deleteBtn: "Delete",
+    deleting: "Deleting...",
+    deleteConfirm: "Delete this destination? Events will stop reaching whatever page/site it was pinned to.",
     testEventBtn: "Send Test Event",
     testingEvent: "Sending...",
     lastSentLabel: "Last sent",
     lastErrorLabel: "Last issue",
     capiSaveSuccess: "Saved.",
+    labelLabel: "Name (for your own reference, e.g. Main Pixel)",
+    labelPlaceholder: "Default",
+    scopeLabel: "Applies to",
+    scopeShopWide: "Whole shop (default)",
+    scopeLandingPage: "One specific landing page",
+    scopeSite: "One specific WooCommerce site",
+    selectLandingPage: "Choose a landing page",
+    selectSite: "Choose a site",
+    addDestinationBtn: "+ Add destination",
+    noDestinations: "No tracking destinations added yet.",
+    shopWideBadge: "Whole shop",
 
     usageTitle: "Tracking Event Usage",
     usageIntro: "How many tracking events your package allows per day. The day is counted in Dhaka time.",
@@ -137,13 +169,33 @@ type Status = {
 
 type PendingPage = { id: string; name: string };
 
-type PixelSettings = {
+type Scope = "landing_page" | "platform_api_key";
+
+type Destination = {
+  id: number;
+  label: string;
   pixel_id: string | null;
   access_token_set: boolean;
   test_event_code: string | null;
   enabled: boolean;
+  scope_type: Scope | null;
+  scope_id: number | null;
+  scope_label: string | null;
   last_sent_at: string | null;
   last_error: string | null;
+};
+
+type LandingPageOption = { id: number; title: string };
+type SiteOption = { id: number; domain: string };
+
+type DestinationDraft = {
+  label: string;
+  pixelId: string;
+  accessToken: string;
+  testEventCode: string;
+  enabled: boolean;
+  scopeType: Scope | "";
+  scopeId: string;
 };
 
 type UsageDay = {
@@ -185,14 +237,14 @@ function FacebookSettingsPage() {
   const [selecting, setSelecting] = useState(false);
   const [disconnectingId, setDisconnectingId] = useState<number | null>(null);
 
-  const [pixel, setPixel] = useState<PixelSettings | null>(null);
-  const [pixelLoading, setPixelLoading] = useState(true);
-  const [pixelIdInput, setPixelIdInput] = useState("");
-  const [accessTokenInput, setAccessTokenInput] = useState("");
-  const [testEventCodeInput, setTestEventCodeInput] = useState("");
-  const [pixelEnabled, setPixelEnabled] = useState(false);
-  const [pixelSaving, setPixelSaving] = useState(false);
-  const [pixelTesting, setPixelTesting] = useState(false);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [destinationsLoading, setDestinationsLoading] = useState(true);
+  const [landingPages, setLandingPages] = useState<LandingPageOption[]>([]);
+  const [sites, setSites] = useState<SiteOption[]>([]);
+  const [editingId, setEditingId] = useState<number | "new" | null>(null);
+  const [savingId, setSavingId] = useState<number | "new" | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [testingId, setTestingId] = useState<number | null>(null);
   const [pixelMessage, setPixelMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [usage, setUsage] = useState<TrackingUsage | null>(null);
@@ -220,27 +272,51 @@ function FacebookSettingsPage() {
     void loadStatus();
   }, [loadStatus]);
 
-  const loadPixel = useCallback(async () => {
-    setPixelLoading(true);
+  const loadDestinations = useCallback(async () => {
+    setDestinationsLoading(true);
     try {
-      const res = await fetch(`${API}/facebook/pixel`, { headers: authHeaders() });
+      const res = await fetch(`${API}/tracking/destinations`, { headers: authHeaders() });
       const json = await res.json();
-      if (json.success) {
-        setPixel(json.data);
-        setPixelIdInput(json.data.pixel_id ?? "");
-        setTestEventCodeInput(json.data.test_event_code ?? "");
-        setPixelEnabled(json.data.enabled);
-      }
+      if (json.success) setDestinations(json.data);
     } catch {
-      // silent — panel just stays empty, retry on next visit
+      // silent — list just stays empty, retry on next visit
     } finally {
-      setPixelLoading(false);
+      setDestinationsLoading(false);
     }
   }, [authHeaders]);
 
   useEffect(() => {
-    void loadPixel();
-  }, [loadPixel]);
+    void loadDestinations();
+  }, [loadDestinations]);
+
+  // Options for the scope picker — fetched once, reusing the same
+  // endpoints the landing-pages and WordPress-settings dashboards already
+  // call, not a new tracking-specific list.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API}/landing/pages?per_page=100`, { headers: authHeaders() });
+        const json = await res.json();
+        if (json.success) {
+          setLandingPages(json.data.map((p: { id: number; title: string }) => ({ id: p.id, title: p.title })));
+        }
+      } catch {
+        // silent — the picker just shows no landing-page options
+      }
+    })();
+    (async () => {
+      try {
+        const res = await fetch(`${API}/wordpress/api-keys`, { headers: authHeaders() });
+        const json = await res.json();
+        if (json.success) {
+          setSites(json.data.map((k: { id: number; domain: string }) => ({ id: k.id, domain: k.domain })));
+        }
+      } catch {
+        // silent — the picker just shows no site options
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // No setUsageLoading(true) here: the state starts true and mount is the
   // only caller, so the sibling loaders' opening set is redundant work here.
@@ -260,47 +336,70 @@ function FacebookSettingsPage() {
     void loadUsage();
   }, [loadUsage]);
 
-  async function handleSavePixel() {
-    setPixelSaving(true);
+  async function handleSaveDestination(id: number | "new", draft: DestinationDraft) {
+    setSavingId(id);
     setPixelMessage(null);
     try {
-      const res = await fetch(`${API}/facebook/pixel`, {
-        method: "PUT",
+      const res = await fetch(id === "new" ? `${API}/tracking/destinations` : `${API}/tracking/destinations/${id}`, {
+        method: id === "new" ? "POST" : "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
-          pixel_id: pixelIdInput,
-          access_token: accessTokenInput || undefined,
-          test_event_code: testEventCodeInput,
-          enabled: pixelEnabled,
+          label: draft.label || "Default",
+          pixel_id: draft.pixelId,
+          access_token: draft.accessToken || undefined,
+          test_event_code: draft.testEventCode,
+          enabled: draft.enabled,
+          ...(draft.scopeType
+            ? { scope_type: draft.scopeType, scope_id: draft.scopeId ? Number(draft.scopeId) : undefined }
+            : {}),
         }),
       });
       const json = await res.json();
       if (json.success) {
-        setPixel(json.data);
-        setAccessTokenInput("");
+        setEditingId(null);
         setPixelMessage({ type: "success", text: tr.capiSaveSuccess });
+        void loadDestinations();
       } else {
         setPixelMessage({ type: "error", text: json.message ?? tr.genericError });
       }
     } catch {
       setPixelMessage({ type: "error", text: tr.genericError });
     } finally {
-      setPixelSaving(false);
+      setSavingId(null);
     }
   }
 
-  async function handleTestEvent() {
-    setPixelTesting(true);
+  async function handleDeleteDestination(id: number) {
+    if (!window.confirm(tr.deleteConfirm)) return;
+    setDeletingId(id);
     setPixelMessage(null);
     try {
-      const res = await fetch(`${API}/facebook/pixel/test-event`, { method: "POST", headers: authHeaders() });
+      const res = await fetch(`${API}/tracking/destinations/${id}`, { method: "DELETE", headers: authHeaders() });
       const json = await res.json();
-      setPixelMessage({ type: json.success ? "success" : "error", text: json.message ?? tr.genericError });
-      void loadPixel();
+      if (json.success) {
+        void loadDestinations();
+      } else {
+        setPixelMessage({ type: "error", text: json.message ?? tr.genericError });
+      }
     } catch {
       setPixelMessage({ type: "error", text: tr.genericError });
     } finally {
-      setPixelTesting(false);
+      setDeletingId(null);
+    }
+  }
+
+  async function handleTestDestination(id: number) {
+    setTestingId(id);
+    setPixelMessage(null);
+    try {
+      const res = await fetch(`${API}/tracking/destinations/${id}/test-event`, { method: "POST", headers: authHeaders() });
+      const json = await res.json();
+      setPixelMessage({ type: json.success ? "success" : "error", text: json.message ?? tr.genericError });
+      void loadDestinations();
+    } catch {
+      setPixelMessage({ type: "error", text: tr.genericError });
+    } finally {
+      setTestingId(null);
     }
   }
 
@@ -536,75 +635,95 @@ function FacebookSettingsPage() {
             </div>
           )}
 
-          {pixelLoading ? (
+          {destinationsLoading ? (
             <p className="text-sm text-[var(--muted)]">{tr.loading}</p>
           ) : (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs text-[var(--muted)]">{tr.pixelIdLabel}</label>
-                  <input
-                    value={pixelIdInput}
-                    onChange={(e) => setPixelIdInput(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-[var(--muted)]">{tr.accessTokenLabel}</label>
-                  <input
-                    type="password"
-                    value={accessTokenInput}
-                    onChange={(e) => setAccessTokenInput(e.target.value)}
-                    placeholder={pixel?.access_token_set ? tr.accessTokenSetHint : tr.accessTokenPlaceholder}
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-[var(--muted)]">{tr.testEventCodeLabel}</label>
-                  <input
-                    value={testEventCodeInput}
-                    onChange={(e) => setTestEventCodeInput(e.target.value)}
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)]"
-                  />
-                </div>
-                <label className="flex items-center gap-2 self-end pb-2 text-sm text-[var(--foreground)]">
-                  <input
-                    type="checkbox"
-                    checked={pixelEnabled}
-                    onChange={(e) => setPixelEnabled(e.target.checked)}
-                    className="h-4 w-4 accent-[var(--accent)]"
-                  />
-                  {tr.enabledLabel}
-                </label>
-              </div>
-
-              {pixel && (pixel.last_sent_at || pixel.last_error) && (
-                <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-                  {pixel.last_sent_at && (
-                    <p className="text-[var(--muted)]">
-                      {tr.lastSentLabel}: {new Date(pixel.last_sent_at).toLocaleString()}
-                    </p>
-                  )}
-                  {pixel.last_error && <p className="text-red-600">{tr.lastErrorLabel}: {pixel.last_error}</p>}
-                </div>
+              {destinations.length === 0 && editingId !== "new" && (
+                <p className="text-sm text-[var(--muted)]">{tr.noDestinations}</p>
               )}
 
-              <div className="flex flex-wrap gap-2">
+              {destinations.map((destination) =>
+                editingId === destination.id ? (
+                  <DestinationEditor
+                    key={destination.id}
+                    tr={tr}
+                    initial={destination}
+                    landingPages={landingPages}
+                    sites={sites}
+                    saving={savingId === destination.id}
+                    onCancel={() => setEditingId(null)}
+                    onSave={(draft) => void handleSaveDestination(destination.id, draft)}
+                  />
+                ) : (
+                  <div key={destination.id} className="rounded-lg border border-[var(--border)] p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${destination.enabled ? "bg-green-500" : "bg-[var(--muted)]"}`} />
+                        <span className="text-sm font-semibold text-[var(--foreground)]">{destination.label}</span>
+                        <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--muted)]">
+                          {destination.scope_label ?? tr.shopWideBadge}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setEditingId(destination.id)}
+                          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+                        >
+                          {tr.editBtn}
+                        </button>
+                        <button
+                          onClick={() => void handleTestDestination(destination.id)}
+                          disabled={testingId === destination.id || !destination.pixel_id || !destination.access_token_set}
+                          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-60"
+                        >
+                          {testingId === destination.id ? tr.testingEvent : tr.testEventBtn}
+                        </button>
+                        <button
+                          onClick={() => void handleDeleteDestination(destination.id)}
+                          disabled={deletingId === destination.id}
+                          className="rounded-lg border border-red-600/30 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-600/10 disabled:opacity-60 dark:text-red-400"
+                        >
+                          {deletingId === destination.id ? tr.deleting : tr.deleteBtn}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                      <p className="text-[var(--muted)]">
+                        {tr.datasetIdLabel}: <span className="text-[var(--foreground)]">{destination.pixel_id ?? "—"}</span>
+                      </p>
+                      {destination.last_sent_at && (
+                        <p className="text-[var(--muted)]">
+                          {tr.lastSentLabel}: {new Date(destination.last_sent_at).toLocaleString()}
+                        </p>
+                      )}
+                      {destination.last_error && (
+                        <p className="text-red-600 sm:col-span-2">{tr.lastErrorLabel}: {destination.last_error}</p>
+                      )}
+                    </div>
+                  </div>
+                ),
+              )}
+
+              {editingId === "new" ? (
+                <DestinationEditor
+                  tr={tr}
+                  initial={null}
+                  landingPages={landingPages}
+                  sites={sites}
+                  saving={savingId === "new"}
+                  onCancel={() => setEditingId(null)}
+                  onSave={(draft) => void handleSaveDestination("new", draft)}
+                />
+              ) : (
                 <button
-                  onClick={() => void handleSavePixel()}
-                  disabled={pixelSaving}
-                  className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  onClick={() => setEditingId("new")}
+                  className="rounded-lg border border-dashed border-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent)]"
                 >
-                  {pixelSaving ? tr.saving : tr.saveBtn}
+                  {tr.addDestinationBtn}
                 </button>
-                <button
-                  onClick={() => void handleTestEvent()}
-                  disabled={pixelTesting || !pixel?.pixel_id || !pixel?.access_token_set}
-                  className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)] disabled:opacity-60"
-                >
-                  {pixelTesting ? tr.testingEvent : tr.testEventBtn}
-                </button>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -710,5 +829,126 @@ function FacebookSettingsPage() {
         </div>
       </div>
     </UserShell>
+  );
+}
+
+function DestinationEditor({
+  tr,
+  initial,
+  landingPages,
+  sites,
+  saving,
+  onCancel,
+  onSave,
+}: {
+  tr: typeof t.bn;
+  initial: Destination | null;
+  landingPages: LandingPageOption[];
+  sites: SiteOption[];
+  saving: boolean;
+  onCancel: () => void;
+  onSave: (draft: DestinationDraft) => void;
+}) {
+  const [label, setLabel] = useState(initial?.label ?? "");
+  const [pixelId, setPixelId] = useState(initial?.pixel_id ?? "");
+  const [accessToken, setAccessToken] = useState("");
+  const [testEventCode, setTestEventCode] = useState(initial?.test_event_code ?? "");
+  const [enabled, setEnabled] = useState(initial?.enabled ?? true);
+  const [scopeType, setScopeType] = useState<Scope | "">(initial?.scope_type ?? "");
+  const [scopeId, setScopeId] = useState(initial?.scope_id ? String(initial.scope_id) : "");
+
+  const inputClass =
+    "w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]";
+
+  return (
+    <div className="rounded-lg border border-[var(--accent)]/40 bg-[var(--background)] p-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs text-[var(--muted)]">{tr.labelLabel}</label>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={tr.labelPlaceholder} className={inputClass} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[var(--muted)]">{tr.datasetIdLabel}</label>
+          <input value={pixelId} onChange={(e) => setPixelId(e.target.value)} className={inputClass} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[var(--muted)]">{tr.accessTokenLabel}</label>
+          <input
+            type="password"
+            value={accessToken}
+            onChange={(e) => setAccessToken(e.target.value)}
+            placeholder={initial?.access_token_set ? tr.accessTokenSetHint : tr.accessTokenPlaceholder}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[var(--muted)]">{tr.testEventCodeLabel}</label>
+          <input value={testEventCode} onChange={(e) => setTestEventCode(e.target.value)} className={inputClass} />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs text-[var(--muted)]">{tr.scopeLabel}</label>
+          <select
+            value={scopeType}
+            onChange={(e) => {
+              setScopeType(e.target.value as Scope | "");
+              setScopeId("");
+            }}
+            className={inputClass}
+          >
+            <option value="">{tr.scopeShopWide}</option>
+            <option value="landing_page">{tr.scopeLandingPage}</option>
+            <option value="platform_api_key">{tr.scopeSite}</option>
+          </select>
+        </div>
+
+        {scopeType === "landing_page" && (
+          <div className="sm:col-span-2">
+            <select value={scopeId} onChange={(e) => setScopeId(e.target.value)} className={inputClass}>
+              <option value="">{tr.selectLandingPage}</option>
+              {landingPages.map((page) => (
+                <option key={page.id} value={page.id}>
+                  {page.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {scopeType === "platform_api_key" && (
+          <div className="sm:col-span-2">
+            <select value={scopeId} onChange={(e) => setScopeId(e.target.value)} className={inputClass}>
+              <option value="">{tr.selectSite}</option>
+              {sites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.domain}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <label className="flex items-center gap-2 self-end pb-2 text-sm text-[var(--foreground)]">
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
+          {tr.enabledLabel}
+        </label>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          onClick={() => onSave({ label, pixelId, accessToken, testEventCode, enabled, scopeType, scopeId })}
+          disabled={saving || (Boolean(scopeType) && !scopeId)}
+          className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+        >
+          {saving ? tr.saving : tr.saveBtn}
+        </button>
+        <button
+          onClick={onCancel}
+          className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+        >
+          {tr.cancelBtn}
+        </button>
+      </div>
+    </div>
   );
 }
