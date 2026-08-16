@@ -70,6 +70,7 @@ const menuText = {
     intelligence: "কাস্টমার ইন্টেলিজেন্স",
     adsRoi: "Ads ROI",
     courierReport: "কুরিয়ার রিপোর্ট",
+    trackingLog: "ট্র্যাকিং লগ",
 
     accounting: "হিসাব",
     dailyReport: "দৈনিক রিপোর্ট",
@@ -147,6 +148,7 @@ const menuText = {
     intelligence: "Customer Intelligence",
     adsRoi: "Ads ROI",
     courierReport: "Courier Report",
+    trackingLog: "Tracking Log",
 
     accounting: "Accounting",
     dailyReport: "Daily Report",
@@ -274,6 +276,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
         { key: "intelligence", label: t.intelligence, href: "/dashboard/analytics/intelligence" },
         { key: "ads-roi", label: t.adsRoi, href: "/dashboard/analytics/ads-roi" },
         { key: "courier-report", label: t.courierReport, href: "/dashboard/analytics/courier" },
+        { key: "tracking-log", label: t.trackingLog, href: "/dashboard/analytics/tracking" },
       ],
     },
     {
@@ -358,6 +361,7 @@ const MODULE_KEY_BY_MENU_ITEM: Record<string, StaffModuleKey> = {
   intelligence: "analytics",
   "ads-roi": "analytics",
   "courier-report": "analytics",
+  "tracking-log": "tracking",
 
   "daily-report": "accounting",
   expenses: "accounting",

@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\TrackingDestinationController;
+use App\Http\Controllers\Api\TrackingEventController;
 use App\Http\Controllers\Api\TrackingUsageController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\AdminSupportController;
@@ -57,6 +58,7 @@ use App\Http\Controllers\Api\Admin\PlatformSettingsController;
 use App\Http\Controllers\Api\Admin\LandingTemplateController as AdminLandingTemplateController;
 use App\Http\Controllers\Api\Admin\LandingPageAdminController;
 use App\Http\Controllers\Api\Admin\CourierCacheController;
+use App\Http\Controllers\Api\Admin\AdminTrackingController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\PublicTrackingController;
 use App\Http\Controllers\Api\OrderController;
@@ -529,13 +531,6 @@ Route::middleware('active_subscription')->group(function () {
             Route::post('/test-event', [FacebookPixelSettingController::class, 'testEvent']);
         });
 
-        // Tracking quota meter. owner_only for now because the only surface
-        // rendering it is the owner-only pixel settings page above; §6.2 of
-        // tracking_capi_context.md moves usage reads to
-        // staff_permission:tracking in T7, alongside the event log UI that
-        // gives a staff grant something to actually open.
-        Route::get('/tracking/usage', [TrackingUsageController::class, 'show']);
-
         // Multi-destination CRUD (T3) — a seller can have several pixels
         // (different ad accounts) and pin one to a specific landing page
         // or connected WooCommerce site instead of the shop-wide default.
@@ -546,6 +541,14 @@ Route::middleware('active_subscription')->group(function () {
             Route::delete('/{id}', [TrackingDestinationController::class, 'destroy'])->where('id', '[0-9]+');
             Route::post('/{id}/test-event', [TrackingDestinationController::class, 'testEvent'])->where('id', '[0-9]+');
         });
+    });
+
+    // Tracking usage + event log — Pattern A (team-shared, read-only).
+    // Destination CRUD above stays owner_only forever (credentials); this is
+    // just "what happened" (tracking_capi_context.md §6.2, T7).
+    Route::middleware('staff_permission:tracking')->group(function () {
+        Route::get('/tracking/usage', [TrackingUsageController::class, 'show']);
+        Route::get('/tracking/events', [TrackingEventController::class, 'index']);
     });
 
     Route::middleware('staff_permission:facebook')->group(function () {
@@ -686,6 +689,9 @@ Route::middleware('active_subscription')->group(function () {
 
         // Courier delivery-history cache (courier_fraud_stats) — read-only view
         Route::get('/courier-cache', [CourierCacheController::class, 'index']);
+
+        // Per-seller tracking usage — tracking_capi_context.md §5.2/T7.
+        Route::get('/tracking/usage', [AdminTrackingController::class, 'usage']);
 
         // Notification Dispatch Routes
         Route::post('/notification-dispatch', [NotificationDispatchController::class, 'dispatch']);

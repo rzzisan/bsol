@@ -132,22 +132,41 @@ class TrackingUsageApiTest extends TestCase
     }
 
     /**
-     * The route is owner_only, so a staff account is refused even with every
-     * module granted — there is no staff-facing tracking surface yet, and
-     * §6.2 moves this to staff_permission:tracking in T7 with that UI.
+     * §6.2/T7: reads moved to Pattern A (staff_permission:tracking) — a
+     * staff account without that specific grant is still refused, even with
+     * every other module enabled (default-deny).
      */
-    public function test_staff_are_refused_even_with_permissions_granted(): void
+    public function test_staff_without_the_tracking_module_are_refused(): void
     {
         $owner = $this->owner(100);
-        $staff = User::factory()->create(['owner_id' => $owner->id, 'role' => 'user']);
+        $staff = User::factory()->create(['owner_id' => $owner->id, 'role' => 'user', 'staff_status' => 'active']);
 
         foreach (StaffPermission::MODULE_KEYS as $key) {
+            if ($key === 'tracking') {
+                continue;
+            }
             StaffPermission::create(['user_id' => $staff->id, 'module_key' => $key, 'enabled' => true]);
         }
 
         Sanctum::actingAs($staff);
 
         $this->getJson('/api/tracking/usage')->assertForbidden();
+    }
+
+    /** A staff account granted the tracking module can read the shop's usage. */
+    public function test_staff_with_the_tracking_module_can_read_usage(): void
+    {
+        $owner = $this->owner(100);
+        $staff = User::factory()->create(['owner_id' => $owner->id, 'role' => 'user', 'staff_status' => 'active']);
+        StaffPermission::create(['user_id' => $staff->id, 'module_key' => 'tracking', 'enabled' => true]);
+
+        app(TrackingQuotaService::class)->admit($owner->id, 'Purchase');
+
+        Sanctum::actingAs($staff);
+
+        $this->getJson('/api/tracking/usage')
+            ->assertOk()
+            ->assertJsonPath('data.today.used', 1);
     }
 
     public function test_it_requires_authentication(): void

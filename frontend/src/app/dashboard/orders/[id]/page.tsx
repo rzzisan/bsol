@@ -58,6 +58,11 @@ type StatusLog = {
   changed_by_user: { name: string } | null;
 };
 
+type TrackingEventEntry = {
+  event_name: string; event_time: string; status: string;
+  has_fbp: boolean; has_fbc: boolean;
+};
+
 type Order = {
   id: number; order_number: string; status: OrderStatus;
   customer_name: string | null; customer_phone: string;
@@ -71,7 +76,7 @@ type Order = {
   courier_status: string | null; courier_charge: string | null;
   created_at: string; updated_at: string;
   otp_verified_at: string | null;
-  items: OrderItem[]; status_logs: StatusLog[];
+  items: OrderItem[]; status_logs: StatusLog[]; tracking_events: TrackingEventEntry[];
 };
 
 // ── Translations ─────────────────────────────────────────────────────────────
@@ -140,6 +145,8 @@ const t = {
     variant: "ভেরিয়েন্ট",
     unknown: "অজানা",
     by: "দ্বারা",
+    trackingSignals: "ট্র্যাকিং সিগন্যাল",
+    noTrackingEvents: "এই অর্ডারের জন্য কোনো ট্র্যাকিং ইভেন্ট রেকর্ড হয়নি — চেকআউটের আগে কোনো ব্রাউজার সিগন্যাল ছিল না, সন্দেহজনক হতে পারে।",
   },
   en: {
     pageTitle: "Order Detail",
@@ -204,6 +211,8 @@ const t = {
     variant: "Variant",
     unknown: "Unknown",
     by: "by",
+    trackingSignals: "Tracking Signals",
+    noTrackingEvents: "No tracking events recorded for this order — no browser signal before checkout, which can be a fraud indicator.",
   },
 };
 
@@ -666,6 +675,28 @@ export default function OrderDetailPage() {
                 </li>
               ))}
             </ol>
+          )}
+        </div>
+
+        {/* Tracking Signals — tracking_capi_context.md §9 (fraud feedback loop, data only this round) */}
+        <div className="catv-panel p-4 md:col-span-2">
+          <h3 className="mb-3 text-sm font-semibold">{txt.trackingSignals}</h3>
+          {order.tracking_events.length === 0 ? (
+            <p className="text-xs text-[var(--muted)]">{txt.noTrackingEvents}</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {order.tracking_events.map((ev, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-2.5 py-1 text-xs"
+                >
+                  <span className="font-medium">{ev.event_name}</span>
+                  <span className="text-[var(--muted)]">{fmtDate(ev.event_time)}</span>
+                  {ev.has_fbp && <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] text-blue-400">fbp</span>}
+                  {ev.has_fbc && <span className="rounded bg-purple-500/15 px-1.5 py-0.5 text-[10px] text-purple-400">fbc</span>}
+                </span>
+              ))}
+            </div>
           )}
         </div>
       </div>

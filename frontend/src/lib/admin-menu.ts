@@ -26,6 +26,7 @@ export type AdminMenuLabels = {
   facebookSettings?: string;
   courierCache?: string;
   support?: string;
+  tracking?: string;
 };
 
 export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
@@ -116,6 +117,12 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
       label: labels.courierCache ?? "Courier Cache",
       icon: "🚚",
       href: "/admin/courier-cache",
+    },
+    {
+      key: "tracking",
+      label: labels.tracking ?? "Tracking Usage",
+      icon: "🎯",
+      href: "/admin/tracking",
     },
     {
       key: "support",

@@ -10,6 +10,7 @@ use App\Models\OrderStatusLog;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductVariant;
+use App\Models\TrackingEvent;
 use App\Services\AccountingService;
 use App\Services\OrderInvoicePdfService;
 use App\Services\OrderStatusService;
@@ -361,10 +362,23 @@ class OrderController extends Controller
     public function show(int $id): JsonResponse
     {
         $order = Order::whereIn('user_id', auth()->user()->shopUserIds())
-            ->with(['items.product:id,thumbnail', 'items.variant:id,sku,image_url', 'statusLogs.changedByUser:id,name'])
+            ->with(['items.product:id,thumbnail', 'items.variant:id,sku,image_url', 'statusLogs.changedByUser:id,name', 'trackingEvents'])
             ->findOrFail($id);
 
-        return response()->json(['success' => true, 'data' => $order]);
+        $payload = $order->toArray();
+        // Trimmed, not the raw model — user_data_hashed is sha256 digests
+        // plus fbp/fbc, but there's no reason to ship the whole blob to the
+        // browser when only "did this event have Meta's strongest match
+        // signals" matters here (tracking_capi_context.md §9, T7).
+        $payload['tracking_events'] = $order->trackingEvents->map(fn (TrackingEvent $e) => [
+            'event_name' => $e->event_name,
+            'event_time' => $e->event_time,
+            'status' => $e->status,
+            'has_fbp' => isset($e->user_data_hashed['fbp']),
+            'has_fbc' => isset($e->user_data_hashed['fbc']),
+        ])->all();
+
+        return response()->json(['success' => true, 'data' => $payload]);
     }
 
     public function invoicePdf(int $id, OrderInvoicePdfService $service): Response

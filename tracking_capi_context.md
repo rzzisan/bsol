@@ -6,7 +6,7 @@
 2. **আসল কাস্টমার ট্র্যাকিং** — browser (Pixel) + server (Conversions API) দুই দিক থেকে একই ইভেন্ট, `event_id` দিয়ে dedup, উচ্চ Event Match Quality।
 3. **SaaS ফিচার হিসেবে বিক্রয়যোগ্য** — সেলার নিজের WordPress/WooCommerce সাইট বা BSOL landing page-এ এক ক্লিকে ট্র্যাকিং চালু করবে, প্যাকেজ অনুযায়ী দৈনিক ইভেন্ট লিমিট।
 
-**অবস্থা (২০২৬-০৮-১৬):** **T1, T2, T5, T6, T4, T3 সম্পন্ন ও লাইভ** — পুরো পরিকল্পিত ট্র্যাকিং পাইপলাইন এখন দুই কেসেই (নিজের WordPress সাইট আর BSOL সাবডোমেইন) কাজ করছে: Meta Pixel base code, browser+server funnel ইভেন্ট, order-flow ইভেন্ট BSOL সার্ভার থেকে, quota/dedup/log, **আর এখন dashboard থেকেই একাধিক pixel ম্যানেজ করা যায়** — একটা সেলারের একাধিক Pixel ID থাকতে পারে, প্রতিটাকে চাইলে একটা নির্দিষ্ট ল্যান্ডিং পেজ বা WooCommerce সাইটে পিন করা যায় (§6.3)। T4-এ একটা critical gap-ও ধরা পড়েছিল ও ঠিক হয়েছে — dashboard-এর একমাত্র Pixel-সেটিংস UI T1-এর পর থেকে পুরনো টেবিলে লিখছিল (§7.2)। বাকি — শুধু T7 (event log/admin usage view)।
+**অবস্থা (২০২৬-০৮-১৬):** **T1, T2, T5, T6, T4, T3, T7 সম্পন্ন ও লাইভ** — পরিকল্পিত পুরো ট্র্যাকিং প্ল্যাটফর্ম এখন সম্পূর্ণ। পাইপলাইন দুই কেসেই (নিজের WordPress সাইট আর BSOL সাবডোমেইন) কাজ করছে: Meta Pixel base code, browser+server funnel ইভেন্ট, order-flow ইভেন্ট BSOL সার্ভার থেকে, quota/dedup/log, dashboard থেকেই একাধিক pixel ম্যানেজ করা যায় (§6.3), **আর এখন সেলার/স্টাফ নিজেই event log ও match-quality দেখতে পারে, অ্যাডমিন এক স্ক্রিনে সব সেলারের ব্যবহার দেখতে পারে, আর অর্ডার-ডিটেইলে ট্র্যাকিং সিগন্যাল দেখা যায় (§6.4, T7)**। T4-এ একটা critical gap-ও ধরা পড়েছিল ও ঠিক হয়েছে — dashboard-এর একমাত্র Pixel-সেটিংস UI T1-এর পর থেকে পুরনো টেবিলে লিখছিল (§7.2)। রোডম্যাপে কোনো ট্র্যাকিং ফেজ বাকি নেই — বাকি যা আছে (fraud score-এ ওজন বসানো, TikTok/GA4 destination) নতুন কাজ হিসেবে আলাদা অনুরোধ লাগবে।
 
 > ⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)।** Migration ইচ্ছাকৃতভাবে কোনো মান বসায়নি — চালু প্যাকেজে নীরবে লিমিট বসানো মানে সেলারের ইভেন্ট হারানো। **Admin → Packages** থেকে বাস্তব মান বসাতে হবে; seeder-এর প্রস্তাব: Free Trial 2,000 · Starter 5,000 · Growth 15,000 · Business আনলিমিটেড।
 
@@ -66,7 +66,7 @@ BSOL-এর কাছে যা আছে অথচ কোনো সাধার
 2. ~~**Funnel-এর মাত্র শেষ ধাপ ট্র্যাক হয়।**~~ ✅ **T6-এ সম্পন্ন, ল্যান্ডিং পেজে** (AddToCart প্রযোজ্য নয় — ল্যান্ডিং পেজে আলাদা কার্ট ধাপ নেই)। WooCommerce-এ এখনো শুধু Purchase (T4)।
 3. ~~**Order-flow ইভেন্ট নেই।**~~ ✅ **T5-এ সম্পন্ন** — Delivered/Returned/Confirmed/Shipped/Canceled সবই Meta-তে যাচ্ছে।
 4. ~~**এক সেলার এক Pixel।**~~ ✅ **T3-এ সম্পন্ন** — একাধিক destination, dashboard CRUD, per-page/per-site scope।
-5. **কোনো event log নেই।** কোন ইভেন্ট গেল, Meta কী উত্তর দিল, কেন ব্যর্থ হলো — কেউ দেখতে পায় না, শুধু `last_error` string। *(T1-এ `tracking_events` টেবিল তৈরি; UI T7-এ।)*
+5. ~~**কোনো event log নেই।**~~ ✅ **T7-এ সম্পন্ন** — dashboard-এ ফিল্টার/পেজিনেটেড event log, match-quality সারসংক্ষেপ, অ্যাডমিনের per-seller usage ভিউ, অর্ডার-ডিটেইলে ট্র্যাকিং সিগন্যাল (§6.4)।
 6. **কোনো quota/rate control নেই।** একটা busy WooCommerce সাইট দিনে লাখো PageView পাঠালে BSOL-এর queue ও Meta rate limit দুটোই ভাঙবে, খরচ প্ল্যাটফর্মের ঘাড়ে পড়বে। ← **user-এর মূল requirement**। *(T1-এ সম্পূর্ণ — quota tiering, Redis কাউন্টার, দৈনিক টেবিল, সেলারের মিটার লাইভ।)*
 7. **Batching এখনো ব্যবহৃত হয় না।** `MetaCapiDriver::send()` একাধিক ইভেন্ট এক HTTP call-এ পাঠাতে পারে (T2-তে বানানো), কিন্তু `DispatchTrackingEventsJob` প্রতিটা accepted ইভেন্টের জন্য আলাদাভাবে ডাকা হয় (real-time), তাই আজ প্রতি call-এ একটাই ইভেন্ট যায়। প্লাগইনের ব্যাচ রিলে (T4) বা ভবিষ্যতের retry sweep চাইলে driver-টা আজই batch নিতে পারে — কোনো বদল ছাড়া।
 
@@ -278,8 +278,8 @@ Drop হলে: `tracking_events`-এ `status='dropped_quota'` লেখা হ�
 > **বাস্তবায়িত (২০২৬-০৮-১৫, T1-এর সাথে):** `GET /tracking/usage` → **Settings → Facebook Page**-এ quota কার্ড (আজকের ব্যবহার/লিমিট, রঙিন বার, dropped ও overage, গত ৭ দিন)। ইভেন্ট পাঠানো শুরুর **আগেই** বানানো হয়েছে ইচ্ছাকৃতভাবে — T2-তে আসল ট্র্যাফিক যাওয়া শুরু করলে quota ভুল করলে সেটা দেখার কোনো উপায় না থাকা সবচেয়ে খারাপ অবস্থা হতো।
 > - `state` ব্যাকএন্ডে হিসাব হয় (`ok`/`sampling`/`critical`/`exhausted`/`unlimited`/`not_in_package`), যাতে ড্যাশবোর্ড আর পরের admin ভিউ threshold নিয়ে দ্বিমত করতে না পারে।
 > - মিটার **১০০%-এ থামে**; overage আলাদা সংখ্যা হিসেবে দেখায় (§11.2)।
-> - রুট এখন `owner_only`, কারণ একমাত্র সার্ফেসটাই owner-only। §6.2-এর Pattern A + `tracking` module key **T7-এ**, event log UI-র সাথে — তার আগে staff grant দিলে খোলার মতো কিছু থাকত না।
-> - **admin-এর per-seller usage ভিউ এখনো নেই** — T7।
+> - ✅ **T7-এ (২০২৬-০৮-১৬):** রুট `owner_only` থেকে `staff_permission:tracking`-এ সরানো হয়েছে (§6.2 Pattern A), নতুন `tracking` module key যোগ — `Marketing → Facebook CAPI`-এর মিটারটা owner-only থেকেই যায় (destination CRUD সেই পেজেই আছে), কিন্তু একই ডেটা `Analytics → Tracking Log`-এ (§6.4) staff-এর জন্যও এখন দেখা যায়।
+> - ✅ **admin-এর per-seller usage ভিউ — T7-এ সম্পন্ন**, `GET /admin/tracking/usage` + `/admin/tracking` পেজ (§6.4)।
 
 **Admin-এর জন্য:** per-seller override (প্যাকেজ লিমিটের উপরে একটা `tracking_events_daily_override` কলাম users-এ) — বড় সেলারের সাথে আলাদা চুক্তি হলে প্যাকেজ না বদলে ছাড় দেওয়া যায়।
 
@@ -332,16 +332,19 @@ Route::prefix('tracking/destinations')->middleware('owner_only')->group(function
     Route::put('/{id}', ...); Route::delete('/{id}', ...);
     Route::post('/{id}/test-event', ...);
 });
-// dashboard read-only (Pattern A — staff দেখতে পারে), T7-এ
+// dashboard read-only (Pattern A — staff দেখতে পারে) — ✅ T7-এ লাইভ
 Route::middleware('staff_permission:tracking')->group(function () {
-    Route::get('/tracking/events', ...);   // event log, filter/paginate
-    Route::get('/tracking/usage', ...);    // quota meter + দৈনিক গ্রাফ
+    Route::get('/tracking/events', [TrackingEventController::class, 'index']); // event log, filter/paginate + match-quality
+    Route::get('/tracking/usage', [TrackingUsageController::class, 'show']);   // quota meter + দৈনিক গ্রাফ (T1-এ তৈরি, T7-এ এখানে সরানো)
 });
+
+// admin — সব সেলারের আজকের ব্যবহার এক স্ক্রিনে — ✅ T7-এ লাইভ
+Route::middleware('is_admin')->get('/admin/tracking/usage', [AdminTrackingController::class, 'usage']);
 ```
 
-**✅ যা ইতিমধ্যে লাইভ (T1):** `GET /tracking/usage` — quota মিটার, **এখন `owner_only`**, Settings → Facebook Page-এর কার্ডে দেখায় (আজকের ব্যবহার/লিমিট, রঙিন বার, dropped ও overage, গত ৭ দিন)। `state` (`ok`/`sampling`/`critical`/`exhausted`/`unlimited`/`not_in_package`) ব্যাকএন্ডে হিসাব হয়, যাতে ড্যাশবোর্ড আর পরের admin ভিউ threshold নিয়ে দ্বিমত করতে না পারে।
+**✅ T1-এ তৈরি, T7-এ Pattern A-তে সরানো:** `GET /tracking/usage` — quota মিটার, `Marketing → Facebook CAPI`-এর কার্ডে (owner) এবং `Analytics → Tracking Log`-এ (owner + granted staff) দুই জায়গাতেই দেখায় (আজকের ব্যবহার/লিমিট, রঙিন বার, dropped ও overage, গত ৭ দিন)। `state` (`ok`/`sampling`/`critical`/`exhausted`/`unlimited`/`not_in_package`) ব্যাকএন্ডে হিসাব হয়, যাতে ড্যাশবোর্ড আর admin ভিউ threshold নিয়ে দ্বিমত করতে না পারে।
 
-**কেন `owner_only`, §6.2-এর Pattern A নয়:** এই পেজে যা আছে (destination CRUD + access token, quota মিটার) — দুটোই credential/owner-level তথ্য; staff-কে permission দিলে খোলার মতো কিছুই থাকত না। **T7-এ event log UI-র সাথে** `tracking` module key যোগ হবে এবং শুধু usage/events-পড়া রুট দুটো `staff_permission:tracking`-এ সরবে (destination CRUD চিরকাল `owner_only`ই থাকবে) — নিচের চার-জায়গার চেকলিস্ট তখনই প্রযোজ্য।
+**destination CRUD এখনো `owner_only`ই** — access token সহ credential, কোনো staff grant-এই খোলে না। §6.4-এ পুরো T7 বর্ণনা।
 
 ### 6.3 ✅ T3-এ সম্পন্ন — Multi-destination dashboard UI (২০২৬-০৮-১৬)
 
@@ -365,6 +368,23 @@ Route::middleware('staff_permission:tracking')->group(function () {
 - `tracking_events` / `tracking_usage_daily` পড়া = **Pattern A** (team-shared, `whereIn(shopUserIds())`), নতুন module key `tracking`।
 - `StaffPermission::MODULE_KEYS` + `frontend/src/lib/dashboard-client.ts::STAFF_MODULE_KEYS` + `user-shell.tsx::MODULE_KEY_BY_MENU_ITEM` + `settings/staff/page.tsx::MODULE_KEYS` — চার জায়গাতেই `tracking` যোগ করতে হবে।
 - Verification-এ owner + granted staff + non-granted staff — তিনটাই টেস্ট করতে হবে।
+
+### 6.4 ✅ T7-এ সম্পন্ন — Event log, match-quality, admin usage view, অর্ডার fraud সিগন্যাল (২০২৬-০৮-১৬)
+
+রোডম্যাপের শেষ ফেজ। কোনো নতুন migration নেই — `tracking_events`/`tracking_usage_daily` T1-এ তৈরি, এই ফেজ শুধু তার উপর read-only ভিউ বানিয়েছে।
+
+**ব্যাকএন্ড:**
+- `App\Http\Controllers\Api\TrackingEventController::index()` — `GET /tracking/events`, `staff_permission:tracking` (Pattern A)। ফিল্টার: `status`, `event_name`, `order_id`, `from`/`to`, পেজিনেটেড (ডিফল্ট ২০/পেজ, সর্বোচ্চ ১০০)। প্রতিটা row-এ raw `user_data_hashed` পাঠানো হয় না — শুধু `has_fbp`/`has_fbc` বুলিয়ান বের করে দেওয়া হয়, destination label/landing page/site name eager-loaded।
+- একই কল-এ `match_quality` — সাম্প্রতিক ৫০০টা (ফিল্টার-স্কোপড) ইভেন্টের মধ্যে কতগুলোতে `fbp`/`fbc`/`ph` ছিল, শতাংশ হিসেবে। পুরো টেবিল স্ক্যান না করে ৫০০-এর sample নেওয়া ইচ্ছাকৃত — এটা দিকনির্দেশক স্বাস্থ্য-সূচক, বিলিং সংখ্যা নয়।
+- `App\Http\Controllers\Api\Admin\AdminTrackingController::usage()` — `GET /admin/tracking/usage`, `is_admin`। প্রতিটা সেলারের আজকের (Asia/Dhaka) `accepted`/`dropped`/`overage`/`sent`/`failed` + প্যাকেজ লিমিট + destination সংখ্যা, এক ফ্ল্যাট লিস্টে (staff sub-account বাদ, `AdminSmsCreditController::listUserCredits()`-এর হুবহু একই shape/কনভেনশন — এই স্কেলে pagination লাগেনি)।
+- `Order::trackingEvents(): HasMany` + `OrderController::show()`-এ trimmed `tracking_events` (`event_name`, `event_time`, `status`, `has_fbp`, `has_fbc`) — §৯-এর fraud feedback loop-এর প্রথম ধাপ (শুধু দেখানো, স্কোরে ওজন বসানো এখনো স্থগিত)। কোনো ইভেন্ট না থাকা নিজেই একটা সিগন্যাল, তাই খালি হলেও স্পষ্ট বার্তা দেখায়।
+- Routes: `/tracking/usage` `owner_only` থেকে `staff_permission:tracking`-এ সরানো হয়েছে (§6.2)।
+
+**ফ্রন্টএন্ড:**
+- নতুন `Analytics → Tracking Log` (`/dashboard/analytics/tracking`) — usage মিটার (Marketing → Facebook CAPI-এর মতোই, একই এন্ডপয়েন্ট, staff-দের জন্যও দৃশ্যমান কারণ এই পেজ owner-only নয়) + match-quality কার্ড + ফিল্টারযোগ্য/পেজিনেটেড event log টেবিল। `user-shell.tsx`-এ `analytics` গ্রুপের নতুন সন্তান `tracking-log`, module key `tracking`।
+- নতুন `/admin/tracking` — `admin-menu.tsx`-এ নতুন আইটেম, `AdminSmsCreditController`-এর মতোই ফ্ল্যাট টেবিল UI।
+- `dashboard/orders/[id]/page.tsx` — Status Timeline-এর পরে নতুন "ট্র্যাকিং সিগন্যাল" প্যানেল, প্রতিটা ইভেন্ট একটা chip (নাম, সময়, fbp/fbc ব্যাজ); কোনো ইভেন্ট না থাকলে সতর্কতা বার্তা।
+- `Marketing → Facebook CAPI` পেজ **অপরিবর্তিত** — destination CRUD ও usage মিটার সেখানেই থাকে (owner-only), এই ফেজ শুধু staff-দের জন্য একটা সমান্তরাল read-only ভিউ যোগ করেছে, ডুপ্লিকেট কোড নয় (দুটো পেজই একই `/tracking/usage` কল করে)।
 
 ---
 
@@ -569,7 +589,7 @@ Landing page BSOL-এর Next.js-এ: পাবলিক ঠিকানা `{se
 | `fbc` আছে (আসল ad click) | ইতিবাচক সিগন্যাল, ঝুঁকি কমায় |
 | ViewContent → AddToCart → Checkout স্বাভাবিক সময় ব্যবধানে | ইতিবাচক |
 
-**স্কোপ:** এটা এই রাউন্ডে **শুধু ডেটা সংগ্রহ ও অর্ডার-ডিটেইলে দেখানো** পর্যন্ত (Phase T7)। fraud score-এ ওজন বসানো আলাদা কাজ, বাস্তব ডেটা জমার পরে ক্যালিব্রেট করতে হবে — অন্ধভাবে ওজন বসালে ভালো অর্ডার ব্লক হবে, যা COD ব্যবসায় বেশি ক্ষতিকর।
+**স্কোপ:** ✅ **T7-এ সম্পন্ন** — অর্ডার-ডিটেইলে ট্র্যাকিং ইভেন্ট + fbp/fbc উপস্থিতি দেখানো পর্যন্ত (§6.4)। fraud score-এ ওজন বসানো এখনো আলাদা, ভবিষ্যতের কাজ — বাস্তব ডেটা জমার পরে ক্যালিব্রেট করতে হবে, অন্ধভাবে ওজন বসালে ভালো অর্ডার ব্লক হবে, যা COD ব্যবসায় বেশি ক্ষতিকর।
 
 ---
 
@@ -585,7 +605,7 @@ Landing page BSOL-এর Next.js-এ: পাবলিক ঠিকানা `{se
 | **T6** ✅ | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0)। **সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T2 |
 | **T4** ✅ | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS (jQuery), `admin-ajax.php` batch relay, funnel ইভেন্ট। **সম্পন্ন ২০২৬-০৮-১৬** (plugin v1.17.0), migration নেই। সাথে `FacebookPixelSettingController`-এর critical fix (§7.2) | T2 |
 | **T3** ✅ | Multi-destination **UI** — dashboard CRUD, scope selector (শপ-ওয়াইড/ল্যান্ডিং পেজ/WooCommerce সাইট), একাধিক pixel। **সম্পন্ন ২০২৬-০৮-১৬**, migration নেই | T1 |
-| **T7** ← **পরবর্তী** | Dashboard: event log, quota মিটার, match-quality সারাংশ; fraud signal অর্ডার-ডিটেইলে প্রদর্শন | T2–T6 |
+| **T7** ✅ | Dashboard: event log, quota মিটার, match-quality সারাংশ; fraud signal অর্ডার-ডিটেইলে প্রদর্শন; অ্যাডমিন per-seller usage ভিউ; `tracking` staff module key। **সম্পন্ন ২০২৬-০৮-১৬**, migration নেই | T2–T6 |
 | **T8b** | সেলারের নিজের ডোমেইন (§8.4) — `landing_domains` টেবিল, DNS verification, per-domain Certbot, catch-all nginx। **বিক্রয়-যুক্তি ব্র্যান্ডিং + রেপুটেশন আলাদা রাখা** — AEM আর যুক্তি নয়, কারণ AEM এখন সবার জন্যই স্বয়ংক্রিয় (§11.2) | T6 |
 
 **T8a** — ✅ সম্পন্ন (per-seller সাবডোমেইন), `custom_domain_context.md` দেখো।

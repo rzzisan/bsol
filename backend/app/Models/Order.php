@@ -63,6 +63,13 @@ class Order extends Model
         return $this->hasMany(OrderStatusLog::class)->orderBy('created_at', 'desc');
     }
 
+    /** Every tracking event this order fired — Purchase plus every order-flow
+     *  status event (tracking_capi_context.md §9, T7 fraud-signal display). */
+    public function trackingEvents(): HasMany
+    {
+        return $this->hasMany(TrackingEvent::class)->orderBy('event_time');
+    }
+
     /**
      * Generate next order number like ORD-20260502-0001.
      *
