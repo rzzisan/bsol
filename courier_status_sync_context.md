@@ -75,9 +75,19 @@ $order->update(['courier_status' => $result['status']]);
 
 `onOrderCancelledOrReturned()`-এ যোগ হয়েছে (সিমেট্রিক্যাল): COD অর্ডার আগে `paid` থাকলে (মানে delivered ছিল, এখন returned হচ্ছে), `payment_status` আবার `due`-এ রিসেট হয় — টাকা আর হাতে নেই। শুধু এই একই অটো-লজিক যা `paid` করেছিল সেটাই touch করে — সেলারের নিজের ম্যানুয়াল নোট (যেমন return হওয়া সত্ত্বেও advance রেখে দেওয়া) অক্ষত থাকে।
 
+### ৩.৫ ✅ (একই দিনে, ফলো-আপ) `AccountingService` — COD income-এর amount `order->total` না, `courier_cod_amount`
+
+**ইউজার-কনফার্মড রুল (২০২৬-০৮-১৬):** *"বাস্তবে সম্পূর্ণ বকেয়া টাকাই COD হিসেবে থাকবে। যদি অ্যাডভান্স কেউ পেইড করে সেটি আগেই ইনভয়েসে জমা হবে। কুরিয়ারের কাছে পাঠানোর সময় ইনভয়েসে যা বকেয়া থাকবে সেটাই COD হবে।"* — অর্থাৎ কুরিয়ারে বুকিং-এর সময় যা `courier_cod_amount` হিসেবে পাঠানো হয় (ইতিমধ্যেই `CourierController::book()`-এর নিজস্ব কমেন্ট অনুযায়ী "amount actually asked of the courier", courier_waybill_context.md), সেটাই ওই অর্ডারের প্রকৃত বকেয়া/COD — কোনো আগে-নেওয়া অ্যাডভান্স-এর অংশ না, কারণ অ্যাডভান্স সেলার নিজেই আলাদাভাবে (ম্যানুয়াল Transaction হিসেবে) রেকর্ড করে ফেলে বুকিং-এর আগেই।
+
+§৩.৪-এ যোগ করা `onOrderDelivered()` তখনো পুরো `order->total`-ই COD income হিসেবে বুক করত — একটা advance-partial অর্ডারে (যেমন total ৳620, advance ৳500 আগেই নেওয়া, courier_cod_amount শুধু ৳120) এটা COD income ৳500 বেশি দেখাত (এবং সেলার যদি অ্যাডভান্সটা আলাদাভাবেও রেকর্ড করে থাকে, ডাবল-কাউন্ট হতো)।
+
+**ফিক্স:** নতুন প্রাইভেট হেল্পার `codIncomeAmount(Order $order): float` — `courier_cod_amount ?? order->total` (কুরিয়ার বুক না হলে `courier_cod_amount` null থাকে, তখনো পুরো total-ই সঠিক, কিছু কমেনি)। `onOrderCreated()`, `onOrderDelivered()`, `onOrderTotalUpdated()` — তিনটাই এখন এই হেল্পার ব্যবহার করে। সাধারণ (কোনো advance ছাড়া, পুরো টোটালই COD) অর্ডারে `courier_cod_amount === order->total` হয় বুকিং-এর সময়ই (book()-এর নিজস্ব ডিফল্ট), তাই এই বেশিরভাগ অর্ডারের জন্য আচরণ অপরিবর্তিত — শুধু partial-advance অর্ডারেই পার্থক্য পড়ে।
+
+**নোট — `ORD-20260811-0002` (§৭)-এর Transaction রো এখনো ৳620 দেখায়:** এই অর্ডারটা ইউজার নিজেই কনফার্ম করেছে টেস্ট ডেটা (courier_cod_amount=120 বাস্তব advance না, শুধু টেস্ট করার জন্য বসানো)। `status` ইতিমধ্যে `delivered` (terminal) হয়ে যাওয়ায় নতুন কোনো `transition()` কল আর হবে না, তাই এই ফিক্স স্বয়ংক্রিয়ভাবে ওই পুরনো Transaction-কে রিট্রোঅ্যাক্টিভলি সংশোধন করবে না — ইচ্ছাকৃতভাবে হাতে টাচ করা হয়নি যেহেতু এটা রিয়েল ডেটা না।
+
 ## ৪. যা **ইচ্ছাকৃতভাবে** বাদ রাখা হয়েছে
 
-- **COD income Transaction-এর amount** এখনো সবসময় `order->total` (পুরো অর্ডার টোটাল), `courier_cod_amount` (কুরিয়ারকে কালেক্ট করতে বলা প্রকৃত COD, advance বাদ দিয়ে) না — এটা `AccountingService::onOrderDelivered()`-এর একটা প্রি-এক্সিস্টিং ডিজাইন সিদ্ধান্ত, এই ফিক্সের স্কোপের বাইরে। বাস্তব উদাহরণ: `ORD-20260811-0002`-এ `total=620` কিন্তু `courier_cod_amount=120` (advance ৫০০ আগেই নেওয়া হয়েছিল) — Transaction তবুও পুরো ৬২০ বুক করে।
+- ~~COD income Transaction-এর amount `order->total`, `courier_cod_amount` না~~ — **✅ ঠিক হয়ে গেছে, §৩.৫ দেখো (একই দিনে ফলো-আপ)।**
 - **Partial delivery-র জন্য partial COD amount** ট্র্যাক করা হয় না — `classify()` partial-কেও সম্পূর্ণ `delivered` হিসেবে গোনে (§৩.১)।
 - **Steadfast/Pathao ইত্যাদির নিজস্ব push webhook** ব্যবহার করা হয়নি — polling-ই যথেষ্ট এই স্কেলে, আর কোনো courier-ই BSOL-কে outbound webhook পাঠানোর সুবিধা দেয় না (নিশ্চিত করা হয়নি প্রতিটার জন্য, কিন্তু কোনো কোডে existing webhook route নেই)।
 
@@ -93,8 +103,8 @@ $order->update(['courier_status' => $result['status']]);
 
 ## ৬. যাচাই
 
-Isolated Postgres schema-তে টার্গেটেড টেস্ট (৬/৬ পাস) + ফুল স্যুট (312 passed, established ২-ফেইলিওর বেসলাইনে — `AuthApiTest`, `CourierFraudCheckApiTest`, দুটোই অসম্পর্কিত প্রি-এক্সিস্টিং)। কোনো migration লাগেনি (নতুন কলাম নেই)। নতুন ক্লাস তৈরি হওয়ায় `composer dump-autoload` + `php8.3-fpm`/queue-worker রিস্টার্ট লেগেছে ডিপ্লয়ে। প্রোডাকশনের রিয়াল অর্ডার `ORD-20260811-0002`-এ `php artisan tinker`-এ সরাসরি `CourierStatusSyncService::sync()` চালিয়ে রেট্রোঅ্যাক্টিভলি ঠিক করা হয়েছে (§৭)।
+Isolated Postgres schema-তে টার্গেটেড টেস্ট + ফুল স্যুট — দুই দফায় (§৩.১-৩.৪-এর জন্য ৬/৬, §৩.৫-এর জন্য +১ টা নতুন টেস্ট) — দুই দফাতেই established ২-ফেইলিওর বেসলাইনে (`AuthApiTest`, `CourierFraudCheckApiTest`, দুটোই অসম্পর্কিত প্রি-এক্সিস্টিং), কোনো নতুন রিগ্রেশন নেই (313 passed শেষ রানে)। কোনো migration লাগেনি (নতুন কলাম নেই)। নতুন ক্লাস তৈরি হওয়ায় `composer dump-autoload` + `php8.3-fpm`/queue-worker রিস্টার্ট লেগেছে দুই দফা ডিপ্লয়েই (`queue:restart` ব্যবহার করা হয়েছে সরাসরি `systemctl` অনুমতি না থাকায় — www-data ইউজার হিসেবে চালালে systemd নিজেই graceful respawn করে)। প্রোডাকশনের রিয়াল অর্ডার `ORD-20260811-0002`-এ `app:sync-courier-statuses` লাইভ চালিয়ে রেট্রোঅ্যাক্টিভলি ঠিক করা হয়েছে (§৭)।
 
 ## ৭. রিয়াল অর্ডার ফিক্স লগ
 
-`ORD-20260811-0002` (id 53, user_id 3, zareen): fix ডিপ্লয়ের পর `CourierStatusSyncService::sync($order)` ম্যানুয়ালি চালানো হয়েছে (আসল Steadfast/Pathao credentials দিয়ে live re-track, বানানো ডেটা না) — ফলাফল: `status: processing → delivered`, `payment_status: partial → paid`, `Transaction#33: pending → confirmed`, `OrderStatusLog` নতুন রো, Meta-তে `OrderDelivered` pixel event পাঠানো হয়েছে।
+`ORD-20260811-0002` (id 53, user_id 3, zareen): §৩.১-৩.৪ ডিপ্লয়ের পর `app:sync-courier-statuses` লাইভ চালানো হয়েছে (আসল Steadfast/Pathao credentials দিয়ে live re-track, বানানো ডেটা না — একই রানে আরও ৩টা পুরনো stuck অর্ডারও সঠিকভাবে `cancelled`-এ সিঙ্ক হয়ে যায়) — ফলাফল: `status: processing → delivered`, `payment_status: partial → paid`, `Transaction#33: pending → confirmed (amount ৳620)`, `OrderStatusLog` নতুন রো, Meta-তে `OrderDelivered` pixel event পাঠানো হয়েছে। §৩.৫-এর ফিক্সের পরেও এই Transaction#33 রো ম্যানুয়ালি ছোঁয়া হয়নি (কারণ ব্যাখ্যা §৩.৫-এর নোটে) — ইউজার নিজেই নিশ্চিত করেছেন এই অর্ডারের ৳120 courier_cod_amount টেস্ট ডেটা, রিয়াল advance-partial কেস না।

@@ -7,6 +7,22 @@ use App\Models\Transaction;
 
 class AccountingService
 {
+    /**
+     * "Whatever's due on the invoice at the moment it's handed to the
+     * courier is the COD amount" (courier_status_sync_context.md §4.1) — an
+     * advance already collected before booking (and, per that same rule,
+     * already recorded as its own income by the seller) is never part of
+     * it. `courier_cod_amount` is exactly that figure — the amount actually
+     * asked of the courier at booking time (book()'s own `$data['cod_amount']
+     * ?? $order->total`, see courier_waybill_context.md). For an order never
+     * yet booked with a courier (`courier_cod_amount` still null), nothing
+     * has reduced what's owed, so the full order total is still correct.
+     */
+    private function codIncomeAmount(Order $order): float
+    {
+        return (float) ($order->courier_cod_amount ?? $order->total);
+    }
+
     public function onOrderCreated(Order $order): void
     {
         if ($order->payment_method !== 'cod') {
@@ -23,7 +39,7 @@ class AccountingService
             ],
             [
                 'status' => Transaction::STATUS_PENDING,
-                'amount' => (float) $order->total,
+                'amount' => $this->codIncomeAmount($order),
                 'note' => 'COD income (pending at order creation).',
                 'transaction_date' => now()->toDateString(),
                 'is_auto' => true,
@@ -48,7 +64,7 @@ class AccountingService
             ],
             [
                 'status' => Transaction::STATUS_CONFIRMED,
-                'amount' => (float) $order->total,
+                'amount' => $this->codIncomeAmount($order),
                 'note' => 'COD income confirmed on delivered order.',
                 'transaction_date' => now()->toDateString(),
                 'is_auto' => true,
@@ -87,7 +103,7 @@ class AccountingService
             ->where('type', Transaction::TYPE_INCOME)
             ->where('category', 'order_cod')
             ->update([
-                'amount' => (float) $order->total,
+                'amount' => $this->codIncomeAmount($order),
             ]);
     }
 

@@ -92,6 +92,31 @@ class CourierStatusSyncTest extends TestCase
         $this->assertEquals(620.0, (float) $transaction->amount);
     }
 
+    /**
+     * "Whatever's due at the moment it's handed to the courier is the COD
+     * amount" — an advance already collected before booking is never part of
+     * the COD income. Real-world case that surfaced this (courier_status_sync_context.md
+     * §4.1): total ৳620, ৳500 advance already taken, courier only asked to
+     * collect the remaining ৳120 (courier_cod_amount) — the confirmed
+     * income on delivery must be ৳120, not the full ৳620.
+     */
+    public function test_the_cod_income_booked_on_delivery_is_the_amount_actually_asked_of_the_courier(): void
+    {
+        $user = User::factory()->create();
+        $order = $this->steadfastOrder($user, ['courier_cod_amount' => 120]);
+        $this->fakeSteadfastStatus('Delivered');
+
+        Sanctum::actingAs($user);
+        $this->getJson("/api/courier/track/{$order->id}")->assertOk();
+
+        $order->refresh();
+        $this->assertSame('delivered', $order->status);
+        $this->assertSame('paid', $order->payment_status);
+
+        $transaction = Transaction::where('reference_type', 'order')->where('reference_id', $order->id)->first();
+        $this->assertEquals(120.0, (float) $transaction->amount);
+    }
+
     public function test_an_in_transit_status_advances_to_shipped_not_delivered(): void
     {
         $user = User::factory()->create();
