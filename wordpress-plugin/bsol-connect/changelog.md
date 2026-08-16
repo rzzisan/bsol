@@ -1,5 +1,25 @@
 # BSOL Connect — Changelog
 
+## 1.18.0 — 2026-08-16
+
+- **Purchase event match-quality fix**: `build_order_payload()` now
+  forwards `_fbp`/`_fbc` cookies (read from `$_COOKIE` at order-sync
+  time, same PHP request as checkout — same source `client_ip`/
+  `user_agent` already used) alongside the existing IP/UA/URL fields.
+  1.17.0's changelog entry claimed the browser-side Purchase copy on
+  the order-received page "dedupes for free" against the server-side
+  one for match-quality enrichment — that was wrong: BSOL's ingest
+  only ever kept the *first* copy of a duplicate event_id and silently
+  dropped every field the second copy carried, so fbp/fbc from the
+  browser copy never actually reached Meta. The server-side Purchase
+  event (fired at order-sync time, from `ConnectOrderController`) now
+  carries fbp/fbc directly, and BSOL's ingest pipeline separately
+  gained a genuine merge-on-duplicate fallback for any race this
+  doesn't already cover. No plugin-side action needed for the fix
+  itself beyond updating — the browser-side Purchase copy this file's
+  own JS already fires stays as-is, it's simply no longer the only way
+  fbp/fbc could reach Meta.
+
 ## 1.17.0 — 2026-08-16
 
 - **Facebook/Meta tracking for WooCommerce**: a new `Bsol_Tracking`

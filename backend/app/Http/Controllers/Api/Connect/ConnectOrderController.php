@@ -69,6 +69,14 @@ class ConnectOrderController extends Controller
             'client_ip'            => 'nullable|ip',
             'user_agent'           => 'nullable|string|max:500',
             'event_source_url'     => 'nullable|string|max:500',
+            // Same source/reasoning as client_ip/user_agent — WooCommerce's
+            // own first-party cookies on the checkout request, forwarded
+            // as-is (never PII, never hashed). Persisted on the order (see
+            // the follow-up update below) so order-flow events fired later
+            // from OrderStatusService::transition() — which have no
+            // checkout request behind them at all — can still carry them.
+            'fbp'                  => 'nullable|string|max:255',
+            'fbc'                  => 'nullable|string|max:255',
             // Set by the plugin's bulk/historical sync (Phase 11) — a
             // backfilled order that was actually placed weeks/months ago
             // shouldn't send a fresh checkout-OTP SMS or a fresh Facebook
@@ -169,10 +177,14 @@ class ConnectOrderController extends Controller
             if (! empty($responseData['success'])) {
                 // OrderController::store() has its own hardcoded field list
                 // (shared with the plain dashboard "create order manually"
-                // path, where this column must stay absent) — tag the site
-                // with a narrow follow-up write instead of threading it
-                // through there.
-                Order::whereKey($responseData['data']['id'])->update(['platform_api_key_id' => $apiKey?->id]);
+                // path, where these columns must stay absent) — tag the
+                // site and the match-quality identifiers with a narrow
+                // follow-up write instead of threading them through there.
+                Order::whereKey($responseData['data']['id'])->update([
+                    'platform_api_key_id' => $apiKey?->id,
+                    'fbp' => $data['fbp'] ?? null,
+                    'fbc' => $data['fbc'] ?? null,
+                ]);
 
                 $isHistorical = ! empty($data['is_historical_sync']);
                 $otpRequired = false;

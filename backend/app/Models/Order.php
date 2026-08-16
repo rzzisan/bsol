@@ -20,7 +20,7 @@ class Order extends Model
         'fraud_score', 'risk_level',
         'courier_name', 'courier_tracking_id', 'courier_status', 'courier_charge',
         'courier_cod_amount', 'courier_weight_kg', 'courier_booked_at',
-        'assigned_to', 'otp_required', 'otp_verified_at',
+        'assigned_to', 'otp_required', 'otp_verified_at', 'fbp', 'fbc',
     ];
 
     protected $casts = [

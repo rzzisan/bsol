@@ -132,7 +132,17 @@ class OrderStatusService
                 // itself (or a WooCommerce status sync) deciding the order
                 // moved, never a customer action (§7).
                 'action_source' => 'system_generated',
-                'user_data' => array_filter(['ph' => $order->customer_phone]),
+                // fbp/fbc from the order row, not a live request — this
+                // fires from a status transition, potentially days after
+                // checkout, with no browser attached to borrow cookies
+                // from. Only the phone hash was ever sent here before
+                // fbp/fbc started being persisted on the order
+                // (tracking_capi_context.md §11.4).
+                'user_data' => array_filter([
+                    'ph' => $order->customer_phone,
+                    'fbp' => $order->fbp,
+                    'fbc' => $order->fbc,
+                ]),
                 'custom_data' => [
                     'currency' => 'BDT',
                     'value' => $value,

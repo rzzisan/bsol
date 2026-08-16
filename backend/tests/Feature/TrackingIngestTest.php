@@ -285,6 +285,60 @@ class TrackingIngestTest extends TestCase
         $this->assertSame('EAAG-secret-token', $copy->fresh()->access_token);
     }
 
+    /**
+     * A duplicate event_id is usually a second copy of the same real
+     * conversion racing the first (a browser Pixel Purchase call landing
+     * seconds after the server-side CAPI one) — whichever fields the first
+     * copy lacks, the second should fill in rather than being dropped
+     * outright (tracking_capi_context.md §11.4).
+     */
+    public function test_a_repeated_event_id_fills_in_missing_user_data_while_still_queued(): void
+    {
+        $user = $this->seller(100);
+        $this->destination($user);
+
+        $this->ingest->ingest($user->id, $this->event(['user_data' => ['ph' => '01712345678']]));
+        $second = $this->ingest->ingest($user->id, $this->event(['user_data' => [
+            'fbp' => 'fb.1.1700000000000.111',
+            'fbc' => 'fb.1.1700000000000.222',
+        ]]));
+
+        $this->assertSame(TrackingIngestService::DUPLICATE, $second['status']);
+        $this->assertSame(1, TrackingEvent::count());
+
+        $stored = TrackingEvent::sole()->user_data_hashed;
+        $this->assertSame([hash('sha256', '8801712345678')], $stored['ph']);
+        $this->assertSame('fb.1.1700000000000.111', $stored['fbp']);
+        $this->assertSame('fb.1.1700000000000.222', $stored['fbc']);
+    }
+
+    /** The first copy's values win on overlap — a merge only ever fills gaps. */
+    public function test_a_repeated_event_id_does_not_overwrite_a_field_the_first_copy_already_set(): void
+    {
+        $user = $this->seller(100);
+        $this->destination($user);
+
+        $this->ingest->ingest($user->id, $this->event(['user_data' => ['fbp' => 'fb.1.1700000000000.first']]));
+        $this->ingest->ingest($user->id, $this->event(['user_data' => ['fbp' => 'fb.1.1700000000000.second']]));
+
+        $this->assertSame('fb.1.1700000000000.first', TrackingEvent::sole()->user_data_hashed['fbp']);
+    }
+
+    /** Once DispatchTrackingEventsJob has picked the row up, there's nothing left here to enrich before it ships. */
+    public function test_a_repeated_event_id_is_not_merged_once_the_row_has_already_been_sent(): void
+    {
+        $user = $this->seller(100);
+        $this->destination($user);
+
+        $this->ingest->ingest($user->id, $this->event(['user_data' => ['ph' => '01712345678']]));
+        TrackingEvent::sole()->update(['status' => TrackingEvent::STATUS_SENT]);
+
+        $this->ingest->ingest($user->id, $this->event(['user_data' => ['fbp' => 'fb.1.1700000000000.late']]));
+
+        $stored = TrackingEvent::sole()->user_data_hashed;
+        $this->assertArrayNotHasKey('fbp', $stored);
+    }
+
     public function test_fbc_is_synthesised_from_a_click_id_when_the_cookie_is_missing(): void
     {
         $fbc = app(TrackingUserDataBuilder::class)->fbcFromClickId('IwAR123', 1700000000000);

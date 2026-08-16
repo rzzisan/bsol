@@ -135,6 +135,14 @@ class Bsol_Order_Sync {
 			'client_ip'          => $order->get_customer_ip_address(),
 			'user_agent'         => $order->get_customer_user_agent(),
 			'event_source_url'   => wc_get_checkout_url(),
+			// Same reasoning as client_ip/user_agent above, same source
+			// (checkout is same-origin, so these are real first-party
+			// cookies on this exact request) — but read from $_COOKIE
+			// directly since WC_Order has no getter for them. Null on a
+			// historical/bulk-sync backfill or a retry via WP-Cron, neither
+			// of which has a browser attached to this PHP request.
+			'fbp'                => isset( $_COOKIE['_fbp'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['_fbp'] ) ) : null,
+			'fbc'                => isset( $_COOKIE['_fbc'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['_fbc'] ) ) : null,
 			'is_historical_sync' => (bool) $is_historical_sync,
 			// Set by Bsol_Abandoned_Checkout's AJAX capture into WC()->session
 			// (Phase 17) when this checkout was previously tracked as

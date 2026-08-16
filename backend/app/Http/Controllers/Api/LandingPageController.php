@@ -152,6 +152,19 @@ class LandingPageController extends Controller
         }
 
         $order = app(LandingPageOrderService::class)->create($page, $validated, $lineItems, $resolvedFields);
+
+        // Checkout submit is same-origin on the seller's own subdomain, so
+        // Meta's own cookies (set by the base pixel code loaded earlier in
+        // this same visit) are directly readable here — no separate relay
+        // needed. Persisted (not just read-and-forget) so order-flow events
+        // fired later from OrderStatusService::transition(), which have no
+        // browser request behind them at all, can still carry them
+        // (tracking_capi_context.md §11.4).
+        $order->update([
+            'fbp' => $request->cookie('_fbp'),
+            'fbc' => $request->cookie('_fbc'),
+        ]);
+
         app(CheckoutOtpService::class)->maybeSendForOrder($page->content['settings'] ?? [], $order);
         app(AbandonedCheckoutService::class)->convertMatching(
             $page,

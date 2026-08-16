@@ -6,7 +6,7 @@
 2. **আসল কাস্টমার ট্র্যাকিং** — browser (Pixel) + server (Conversions API) দুই দিক থেকে একই ইভেন্ট, `event_id` দিয়ে dedup, উচ্চ Event Match Quality।
 3. **SaaS ফিচার হিসেবে বিক্রয়যোগ্য** — সেলার নিজের WordPress/WooCommerce সাইট বা BSOL landing page-এ এক ক্লিকে ট্র্যাকিং চালু করবে, প্যাকেজ অনুযায়ী দৈনিক ইভেন্ট লিমিট।
 
-**অবস্থা (২০২৬-০৮-১৬):** **T1, T2, T5, T6, T4, T3, T7 সম্পন্ন ও লাইভ** — পরিকল্পিত পুরো ট্র্যাকিং প্ল্যাটফর্ম এখন সম্পূর্ণ। পাইপলাইন দুই কেসেই (নিজের WordPress সাইট আর BSOL সাবডোমেইন) কাজ করছে: Meta Pixel base code, browser+server funnel ইভেন্ট, order-flow ইভেন্ট BSOL সার্ভার থেকে, quota/dedup/log, dashboard থেকেই একাধিক pixel ম্যানেজ করা যায় (§6.3), **আর এখন সেলার/স্টাফ নিজেই event log ও match-quality দেখতে পারে, অ্যাডমিন এক স্ক্রিনে সব সেলারের ব্যবহার দেখতে পারে, আর অর্ডার-ডিটেইলে ট্র্যাকিং সিগন্যাল দেখা যায় (§6.4, T7)**। T4-এ একটা critical gap-ও ধরা পড়েছিল ও ঠিক হয়েছে — dashboard-এর একমাত্র Pixel-সেটিংস UI T1-এর পর থেকে পুরনো টেবিলে লিখছিল (§7.2)। রোডম্যাপে কোনো ট্র্যাকিং ফেজ বাকি নেই — বাকি যা আছে (fraud score-এ ওজন বসানো, TikTok/GA4 destination) নতুন কাজ হিসেবে আলাদা অনুরোধ লাগবে।
+**অবস্থা (২০২৬-০৮-১৬):** **T1, T2, T5, T6, T4, T3, T7 সম্পন্ন ও লাইভ** — পরিকল্পিত পুরো ট্র্যাকিং প্ল্যাটফর্ম এখন সম্পূর্ণ। পাইপলাইন দুই কেসেই (নিজের WordPress সাইট আর BSOL সাবডোমেইন) কাজ করছে: Meta Pixel base code, browser+server funnel ইভেন্ট, order-flow ইভেন্ট BSOL সার্ভার থেকে, quota/dedup/log, dashboard থেকেই একাধিক pixel ম্যানেজ করা যায় (§6.3), **আর এখন সেলার/স্টাফ নিজেই event log ও match-quality দেখতে পারে, অ্যাডমিন এক স্ক্রিনে সব সেলারের ব্যবহার দেখতে পারে, আর অর্ডার-ডিটেইলে ট্র্যাকিং সিগন্যাল দেখা যায় (§6.4, T7)**। T4-এ একটা critical gap-ও ধরা পড়েছিল ও ঠিক হয়েছে — dashboard-এর একমাত্র Pixel-সেটিংস UI T1-এর পর থেকে পুরনো টেবিলে লিখছিল (§7.2)। একই দিনে আরেকটা gap ধরা পড়েছে ও ঠিক হয়েছে — Purchase-এর Event Match Quality কম ছিল কারণ ডুপ্লিকেট ইভেন্ট merge না হয়ে drop হতো, fbp/fbc হারিয়ে যেত (§11.4, plugin v1.18.0)। রোডম্যাপে কোনো ট্র্যাকিং ফেজ বাকি নেই — বাকি যা আছে (fraud score-এ ওজন বসানো, TikTok/GA4 destination) নতুন কাজ হিসেবে আলাদা অনুরোধ লাগবে।
 
 > ⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)।** Migration ইচ্ছাকৃতভাবে কোনো মান বসায়নি — চালু প্যাকেজে নীরবে লিমিট বসানো মানে সেলারের ইভেন্ট হারানো। **Admin → Packages** থেকে বাস্তব মান বসাতে হবে; seeder-এর প্রস্তাব: Free Trial 2,000 · Starter 5,000 · Growth 15,000 · Business আনলিমিটেড।
 
@@ -142,6 +142,8 @@ Meta browser ও server ইভেন্ট মেলায় `event_name` + `ev
 | `client_ip_address` / `client_user_agent` | ব্রাউজারের আসল IP/UA (WordPress সার্ভারের নয় — §3.1-এর রিলে চেইনে এটা বহন করতে হবে) | raw |
 
 **সতর্কতা (Phase 10-এ একবার ধরা পড়েছে):** WooCommerce থেকে আসা ইভেন্টে `$request->ip()` হলো **WordPress সার্ভারের IP**, ক্রেতার নয় — ক্রেতার IP/UA প্লাগইনকেই payload-এ পাঠাতে হবে।
+
+**দ্বিতীয় গ্যাপ, ২০২৬-০৮-১৬-তে ধরা পড়েছে ও ঠিক করা হয়েছে — §11.4 দেখুন:** `fbp`/`fbc` এখন `orders.fbp`/`orders.fbc`-তে persist হয় (checkout-এর সময়), শুধু ইভেন্ট payload-এ transient হিসেবে থাকে না — কারণ order-flow ইভেন্ট (Confirmed/Shipped/Delivered/Returned/Canceled, §7-এ বর্ণিত) ব্রাউজার রিকোয়েস্টের অনেক পরে fire হয়, তখন কুকি পড়ার কোনো live request থাকে না।
 
 ### 3.4 Provider abstraction
 
@@ -672,6 +674,20 @@ Meta-র "Add a domain" ডায়ালগ:
 | # | প্রশ্ন | কখন লাগবে | প্রাথমিক ঝোঁক |
 |---|---|---|---|
 | ৮ | **T8b-তে DNS পদ্ধতি** — CNAME (সহজ, apex-এ চলে না) বনাম A রেকর্ড (apex-এ চলে, সার্ভার IP বদলালে সব সেলারকে বদলাতে হয়) | **T8b** | সাবডোমেইনে CNAME বাধ্যতামূলক (`lp.sellershop.com`), apex সাপোর্ট নয় |
+
+### 11.4 ⚠️ Purchase-এর Event Match Quality কম ছিল — root cause ধরা পড়েছে ও ঠিক করা হয়েছে (২০২৬-০৮-১৬)
+
+সেলার একটা Meta Events Manager স্ক্রিনশট দিয়ে জানালেন Purchase-এর EMQ 3.8/10, Browser ID (fbp) মাত্র ৩৩% ইভেন্টে যাচ্ছে। কোড পড়ে root cause বের হলো:
+
+**`tracking_events`-এর dedup (`unique(user_id, event_name, event_id)`) শুধু ডুপ্লিকেট ঠেকাত, merge করত না।** প্রতিটা অর্ডারে Purchase-এর জন্য দুইটা সোর্স একই `event_id` (`order_{id}`) দিয়ে পাঠানোর চেষ্টা করে — সার্ভার-সাইড (checkout submit-এই dispatch, ph+IP+UA আছে কিন্তু fbp/fbc নেই — job-এর constructor-এ সেগুলো নেওয়ারই ব্যবস্থা ছিল না) আর ব্রাউজার-সাইড pixel কল (thank-you/order-received পেজে, fbp/fbc আছে কিন্তু ad-blocker-এ প্রায়ই ব্লক হয়ে যায় এবং সার্ভার ইভেন্টের অনেক পরে fire হয়)। দুটোই একই event_id-তে ঢুকতে চাইলে **দ্বিতীয়টা silently drop হতো** — অথচ কোডের দুটো আলাদা জায়গার কমেন্টেই ("free duplicate", "enrichment") ধরে নেওয়া হয়েছিল merge হয়। বাস্তবে হতো না — বিজয়ী (প্রায় সবসময় সার্ভার-সাইড) ইভেন্টেই fbp/fbc কখনো পৌঁছাতই না।
+
+**ফিক্স, তিন স্তরে:**
+
+1. **`TrackingIngestService::mergeIfStillQueued()`** (নতুন) — ডুপ্লিকেট event_id এলে, আর row এখনো `queued` (dispatch হয়নি) থাকলে, নতুন কপির যেসব ফিল্ড প্রথম কপিতে নেই সেগুলো ভরে দেয় (gap-fill only — যেটা প্রথমেই ছিল সেটাই জেতে)। যেকোনো ভবিষ্যৎ client-vs-server race-এর জন্য জেনেরিক backstop।
+2. **`orders.fbp` / `orders.fbc`** (নতুন কলাম, raw pass-through — কখনো hash হয় না, TrackingUserDataBuilder-এর RAW ক্লাসিফিকেশনের মতোই) — checkout submit-এর সময়ই persist হয় (landing page: `$request->cookie('_fbp')`/`('_fbc')`, same-origin request; WooCommerce: `$_COOKIE` প্লাগইনের `build_order_payload()`-এ, একই request-এ যেখানে `client_ip`/`user_agent` আগে থেকেই forward হচ্ছিল)। এটাই আসল ফিক্স — race-এর ফলাফলের ওপর নির্ভর করে না।
+3. **`SendFacebookCapiPurchaseEventJob`** ও **`OrderStatusService::submitTrackingEvent()`** (order-flow ইভেন্ট) দুটোই এখন `$order->fbp`/`$order->fbc` পড়ে পাঠায় — order-flow ইভেন্টের (Confirmed/Shipped/Delivered/Returned/Canceled) কোনো browser counterpart কখনোই থাকে না, তাই এদের জন্য persist করা ছাড়া fbp/fbc পাওয়ার আর কোনো উপায়ই ছিল না — এতদিন শুধু `ph` পাঠানো হতো।
+
+WordPress প্লাগইন v1.18.0 — শুধু `build_order_payload()`-এ দুটো ফিল্ড যোগ, কোনো নতুন hook/JS লাগেনি (কুকি আগে থেকেই `Bsol_Tracking::ajax_track()`-এ পড়া হচ্ছিল, এখানে শুধু order-sync payload-এও যোগ করা হলো)।
 
 ---
 

@@ -68,6 +68,15 @@ class SendFacebookCapiPurchaseEventJob implements ShouldQueue
                 'ph' => $order->customer_phone,
                 'client_ip_address' => $this->clientIp,
                 'client_user_agent' => $this->userAgent,
+                // Persisted on the order at checkout time (LandingPageController/
+                // ConnectOrderController) rather than threaded through this
+                // job's constructor — TrackingIngestService's merge-on-duplicate
+                // also backstops this for the same-order-id race against a
+                // browser-side Purchase copy, but sending it here directly
+                // means match quality doesn't depend on that race resolving
+                // favorably (tracking_capi_context.md §11.4).
+                'fbp' => $order->fbp,
+                'fbc' => $order->fbc,
             ]),
             'custom_data' => [
                 'currency' => 'BDT',

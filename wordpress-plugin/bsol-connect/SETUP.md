@@ -373,3 +373,28 @@ a real WooCommerce staging site before rolling out to sellers.
    plugin's cached config expires (delete the `bsol_tracking_config`
    transient on staging to see it immediately instead of waiting out
    the ~1h TTL).
+
+## Purchase match-quality fix (1.18.0)
+
+Step 6 above ("the repeat submission is a free duplicate") undersold what
+was actually happening — BSOL kept whichever copy of a duplicate
+`event_id` arrived first and *dropped every field the second copy carried*,
+so the browser-side Purchase's fbp/fbc never reached Meta at all. Fixed
+two ways: `build_order_payload()` now forwards `_fbp`/`_fbc` cookies
+directly in the server-side sync (so match quality doesn't depend on the
+browser copy racing it), and BSOL's ingest pipeline separately gained a
+genuine merge for whatever this doesn't already cover.
+
+1. Complete an order on a connected storefront with real `_fbp`/`_fbc`
+   cookies present (visit a page first so Meta's base pixel code has had a
+   chance to set them).
+2. On the BSOL dashboard, open the order in **Orders**, check the
+   "Tracking Signals" panel — the Purchase entry should show both an
+   `fbp` and `fbc` badge (not just the phone-hash signal).
+3. In Meta Events Manager, the Purchase event's Event Match Quality
+   should now include Browser ID / Click ID alongside phone — check the
+   per-parameter coverage breakdown, not just the headline score (a
+   single order won't move the aggregate score by itself).
+4. Confirm a historical/bulk-synced order (no live checkout request) still
+   syncs fine with `fbp`/`fbc` simply absent — this must never block order
+   creation.

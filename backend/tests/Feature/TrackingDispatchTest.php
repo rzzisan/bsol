@@ -259,6 +259,25 @@ class TrackingDispatchTest extends TestCase
     }
 
     /** No pixel configured — silent no-op, exactly like the job's previous behavior. */
+    /** fbp/fbc come from the order row (persisted at checkout time), not this job's constructor. */
+    public function test_the_purchase_job_carries_the_orders_persisted_fbp_and_fbc(): void
+    {
+        $user = $this->seller();
+        $this->destination($user);
+        $order = $this->orderWithItem($user, [
+            'fbp' => 'fb.1.1700000000000.111',
+            'fbc' => 'fb.1.1700000000000.222',
+        ]);
+
+        Http::fake(['graph.facebook.com/*' => Http::response(['events_received' => 1], 200)]);
+
+        SendFacebookCapiPurchaseEventJob::dispatch($order->id, null, null, 'https://zareen.zyrotechbd.com/thank-you');
+
+        $stored = TrackingEvent::sole()->user_data_hashed;
+        $this->assertSame('fb.1.1700000000000.111', $stored['fbp']);
+        $this->assertSame('fb.1.1700000000000.222', $stored['fbc']);
+    }
+
     public function test_the_purchase_job_is_a_silent_no_op_with_no_destination_configured(): void
     {
         $user = $this->seller();

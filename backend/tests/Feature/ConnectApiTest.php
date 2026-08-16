@@ -465,6 +465,28 @@ class ConnectApiTest extends TestCase
         );
     }
 
+    /**
+     * fbp/fbc are persisted on the order itself (not threaded through the
+     * job's constructor) so later order-flow events — which have no
+     * checkout request behind them at all — can still carry them
+     * (tracking_capi_context.md §11.4).
+     */
+    public function test_sync_persists_forwarded_fbp_and_fbc_onto_the_order(): void
+    {
+        Queue::fake();
+        [$user, $rawKey] = $this->connectedMerchant();
+
+        $payload = $this->samplePayload('wc-capi-4');
+        $payload['fbp'] = 'fb.1.1700000000000.111';
+        $payload['fbc'] = 'fb.1.1700000000000.222';
+
+        $this->postJson('/api/connect/v1/orders/sync', $payload, $this->connectHeaders($rawKey))->assertCreated();
+
+        $order = Order::where('user_id', $user->id)->where('source_ref', 'wc-capi-4')->firstOrFail();
+        $this->assertSame('fb.1.1700000000000.111', $order->fbp);
+        $this->assertSame('fb.1.1700000000000.222', $order->fbc);
+    }
+
     public function test_sync_does_not_redispatch_capi_job_on_update(): void
     {
         Queue::fake();

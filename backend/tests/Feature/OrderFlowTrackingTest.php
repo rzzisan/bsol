@@ -116,6 +116,28 @@ class OrderFlowTrackingTest extends TestCase
         $this->assertSame([hash('sha256', '8801712345678')], $event->user_data_hashed['ph']);
     }
 
+    /**
+     * Order-flow events fire from a status transition, not a checkout
+     * request — the order row is the only place fbp/fbc can come from here
+     * (tracking_capi_context.md §11.4).
+     */
+    public function test_delivered_carries_the_orders_persisted_fbp_and_fbc(): void
+    {
+        $user = $this->seller();
+        $this->destination($user);
+        $order = $this->order($user, [
+            'status' => 'processing',
+            'fbp' => 'fb.1.1700000000000.111',
+            'fbc' => 'fb.1.1700000000000.222',
+        ]);
+
+        $this->transition($order, 'delivered');
+
+        $stored = TrackingEvent::sole()->user_data_hashed;
+        $this->assertSame('fb.1.1700000000000.111', $stored['fbp']);
+        $this->assertSame('fb.1.1700000000000.222', $stored['fbc']);
+    }
+
     public function test_returned_submits_a_negative_value(): void
     {
         $user = $this->seller();

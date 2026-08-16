@@ -74,7 +74,10 @@ class TrackingIngestService
         // slot (§5.3). The unique index below is still the real guarantee —
         // this only keeps the common case from spending quota it would then
         // have to refund.
-        if ($this->alreadyIngested($ownerId, $name, $eventId)) {
+        $existing = $this->findExisting($ownerId, $name, $eventId);
+        if ($existing) {
+            $this->mergeIfStillQueued($existing, $event);
+
             return $this->result(self::DUPLICATE, reason: 'This event was already ingested.');
         }
 
@@ -104,6 +107,11 @@ class TrackingIngestService
             // the first one already paid for this event.
             $this->quota->refund($ownerId, $decision['overage']);
 
+            $winner = $this->findExisting($ownerId, $name, $eventId);
+            if ($winner) {
+                $this->mergeIfStillQueued($winner, $event);
+            }
+
             return $this->result(self::DUPLICATE, reason: 'This event was already ingested.');
         }
 
@@ -125,12 +133,45 @@ class TrackingIngestService
         return array_map(fn (array $event) => $this->ingest($ownerId, $event, $context), array_values($events));
     }
 
-    private function alreadyIngested(int $ownerId, string $name, string $eventId): bool
+    private function findExisting(int $ownerId, string $name, string $eventId): ?TrackingEvent
     {
         return TrackingEvent::where('user_id', $ownerId)
             ->where('event_name', $name)
             ->where('event_id', $eventId)
-            ->exists();
+            ->first();
+    }
+
+    /**
+     * A duplicate event_id is normally a second copy of the same real-world
+     * event racing the first — a browser Pixel Purchase call landing seconds
+     * after the server-side CAPI one for the same order, say. Historically
+     * this was pure signal loss: whichever copy carried fbp/fbc (almost
+     * always the browser one) was dropped outright even though the two
+     * comments describing this exact scenario (SendFacebookCapiPurchaseEventJob,
+     * bsol-connect's class-bsol-tracking.php) both already assumed an
+     * "enrichment" merge happens here. It never did — tracking_capi_context.md
+     * §11.4.
+     *
+     * Only fills gaps: whichever field the first copy already has wins,
+     * this only adds fields the first copy is missing. Only while the row
+     * is still `queued` — once DispatchTrackingEventsJob has picked it up
+     * there's nothing left here to enrich before it ships.
+     */
+    private function mergeIfStillQueued(TrackingEvent $existing, array $event): void
+    {
+        if ($existing->status !== TrackingEvent::STATUS_QUEUED) {
+            return;
+        }
+
+        $incoming = $this->userData->build($event['user_data'] ?? []);
+        $current = $existing->user_data_hashed ?? [];
+        $additions = array_diff_key($incoming, $current);
+
+        if (empty($additions)) {
+            return;
+        }
+
+        $existing->update(['user_data_hashed' => array_merge($current, $additions)]);
     }
 
     /**
