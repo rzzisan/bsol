@@ -33,6 +33,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১৭ | Incomplete/Abandoned Order Tracking (WooCommerce) — checkout-in-progress ক্যাপচার, সাইট-ফ্ল্যাগড, বিদ্যমান abandoned-checkouts সিস্টেম reuse (v1.14.0) | `9fe4ff8` |
 | ১৮ | Repeat order block (WooCommerce) — একই ফোন নম্বর দিয়ে X ঘণ্টার মধ্যে repeat checkout ব্লক, ক্লাসিক + block-based checkout দুটোতেই, সম্পূর্ণ WP-লোকাল (v1.15.0) | `6e28935` |
 | ১৯ | চেকআউট ব্ল্যাকলিস্ট ব্লক + BSOL order status (Confirmed/Shipped) + wp-admin থেকে Manual SMS (v1.16.0) | `d8d5cd6` |
+| ২০ | Facebook/Meta ট্র্যাকিং (`Bsol_Tracking` মডিউল) — Pixel base code, PageView/ViewContent/AddToCart/InitiateCheckout/Lead/Purchase, `admin-ajax.php` রিলে (v1.17.0)। বিস্তারিত ডিজাইন `tracking_capi_context.md` §7-এ (এই ডকের চেয়ে ভালো read order সেখানে) | `6bdf9e6` |
 
 ---
 
