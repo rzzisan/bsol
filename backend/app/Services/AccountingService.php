@@ -55,6 +55,16 @@ class AccountingService
                 'meta' => ['order_number' => $order->order_number],
             ]
         );
+
+        // The courier collected the full remaining balance on handover — a
+        // "partial" order (advance already paid, rest COD) and a plain
+        // "due" order are both fully settled the moment delivery succeeds.
+        // Was never auto-set anywhere before (courier_status_sync_context.md
+        // §2) — the order detail page's payment badge stayed on whatever it
+        // was at creation forever, even after the money was in hand.
+        if ($order->payment_status !== 'paid') {
+            $order->update(['payment_status' => 'paid']);
+        }
     }
 
     /**
@@ -88,6 +98,16 @@ class AccountingService
             ->where('reference_id', $order->id)
             ->where('type', Transaction::TYPE_INCOME)
             ->delete();
+
+        // Mirrors onOrderDelivered()'s auto-paid: a return reverses a
+        // delivery whose COD was already marked collected, so the money is
+        // no longer in hand either. Only touches orders this same
+        // auto-paid logic put into "paid" — a seller's own manual
+        // "paid"/"partial" note (e.g. an advance kept despite the return)
+        // is left alone.
+        if ($order->payment_method === 'cod' && $order->payment_status === 'paid') {
+            $order->update(['payment_status' => 'due']);
+        }
     }
 
     public function onCourierChargeUpdated(Order $order): void

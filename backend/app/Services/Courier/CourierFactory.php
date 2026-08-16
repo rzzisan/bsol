@@ -26,4 +26,10 @@ class CourierFactory
     {
         return isset(self::PROVIDERS[$courier]);
     }
+
+    /** @return string[] */
+    public static function supportedCouriers(): array
+    {
+        return array_keys(self::PROVIDERS);
+    }
 }

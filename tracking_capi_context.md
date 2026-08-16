@@ -425,6 +425,8 @@ Route::middleware('is_admin')->get('/admin/tracking/usage', [AdminTrackingContro
 
 **⚠️ Order-flow ইভেন্ট (Confirmed/Shipped/Delivered/Returned/Canceled) এই মডিউল থেকে যায় না — সম্পূর্ণ বাদ, `woocommerce_order_status_changed` hook নেই।** T5-এ `OrderStatusService::transition()` এগুলো ইতিমধ্যেই পাঠায়, BSOL-এর courier-verified স্ট্যাটাস দিয়ে — WooCommerce-এর নিজস্ব স্ট্যাটাস (courier delivery-র চেয়ে পিছিয়ে থাকে) থেকে ডুপ্লিকেট/ভুল সিগন্যাল পাঠানোর কোনো কারণ নেই।
 
+> **⚠️ সংশোধনী (২০২৬-০৮-১৬):** এই লাইনের "courier-verified স্ট্যাটাস" ধরে নিয়েছিল যে `courier_status` কখনো-না-কখনো `transition()`-এ পৌঁছায় — WooCommerce sync path (`ConnectOrderController::syncStatus()`)-এর জন্য সত্যি, কিন্তু **BSOL-নেটিভ courier বুকিং (Pathao/Steadfast/RedX/CarryBee/Paperfly সরাসরি BSOL ড্যাশবোর্ড থেকে)-এর জন্য এই ফিক্সের আগ পর্যন্ত সম্পূর্ণ মিথ্যা ছিল** — `CourierController::trackOrder()` কখনো `transition()` কলই করত না, শুধু `courier_status` কলাম লিখত। রুট কজ, ফিক্স, ও রিয়াল প্রোডাকশন উদাহরণ: `courier_status_sync_context.md`।
+
 **Purchase-এর দুই কপি, ইচ্ছাকৃতভাবে:**
 - **Authoritative:** `ConnectOrderController::sync()`-এর create branch, order sync-এর সময়েই সার্ভার-সাইড (T2, আগে থেকেই লাইভ)। `class-bsol-order-sync.php` সেই রেসপন্স থেকে `_bsol_order_id` মেটা লেখে (T4-এ নতুন — এই মেটা না থাকলে browser-side Purchase-এর eventID বানানো যেত না)।
 - **Browser copy:** `bsol-tracking.js`, order-received পেজে, একই `order_{id}` eventID দিয়ে। BSOL-এর নিজস্ব `tracking_events` unique index-এ ডুপ্লিকেট ধরা পড়ে (বিনামূল্যে no-op, দ্বিতীয়বার গোনা হয় না) — এর একমাত্র মূল্য fbp/fbc match-quality enrichment আর ব্রাউজার Pixel এক্সটেনশন visibility, কোনো নতুন conversion নয়।

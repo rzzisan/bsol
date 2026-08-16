@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CourierSetting;
 use App\Models\Order;
 use App\Services\Courier\CourierFactory;
+use App\Services\Courier\CourierStatusSyncService;
 use App\Services\PathaoLocationService;
 use App\Services\SteadfastService;
 use App\Services\PathaoService;
@@ -18,6 +19,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CourierController extends Controller
 {
+    public function __construct(
+        private readonly CourierStatusSyncService $courierStatusSyncService,
+    ) {}
+
     private function getSteadfastSettings(): ?CourierSetting
     {
         $settings = CourierSetting::where('user_id', auth()->user()->shopOwnerId())->first();
@@ -639,16 +644,12 @@ class CourierController extends Controller
             return response()->json(['success' => false, 'message' => 'No tracking ID.'], 422);
         }
 
-        $provider = CourierFactory::make($order->courier_name);
-        if (! $provider) {
-            return response()->json(['success' => true, 'data' => ['status' => $order->courier_status], 'message' => 'Manual tracking.']);
-        }
-
-        $result = $provider->track($order);
-
-        if ($result['success'] && ! empty($result['status'])) {
-            $order->update(['courier_status' => $result['status']]);
-        }
+        // sync() persists courier_status and — when the raw status maps to a
+        // confident outcome — cascades it into order.status via
+        // OrderStatusService::transition() (inventory, COD accounting,
+        // payment_status, order_status_logs, the Meta OrderDelivered pixel
+        // event). See CourierStatusSyncService's docblock.
+        $result = $this->courierStatusSyncService->sync($order);
 
         return response()->json([
             'success' => $result['success'],
