@@ -21,6 +21,28 @@ class Bsol_Helpers {
 	}
 
 	/**
+	 * Best-effort real visitor IP for tracking's client_ip_address
+	 * (tracking_capi_context.md §3.3) — Cloudflare's own header first (most
+	 * sites proxy through it), then the general X-Forwarded-For, then the
+	 * raw connection as a last resort. Not used for any security decision,
+	 * only ad-attribution match quality, so a spoofable header here is an
+	 * accepted trade-off, not a vulnerability.
+	 */
+	public static function client_ip() {
+		foreach ( array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR' ) as $key ) {
+			if ( empty( $_SERVER[ $key ] ) ) {
+				continue;
+			}
+			$value = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
+			$first = trim( explode( ',', $value )[0] );
+			if ( filter_var( $first, FILTER_VALIDATE_IP ) ) {
+				return $first;
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Clean and format a Bangladeshi phone number to 01XXXXXXXXX.
 	 * Returns false if the input can't be normalized into a valid BD number.
 	 *

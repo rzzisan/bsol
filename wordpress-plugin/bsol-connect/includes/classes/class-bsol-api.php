@@ -127,6 +127,41 @@ class Bsol_Api {
 		return $this->remote_post( 'checkout/abandoned', $data );
 	}
 
+	/**
+	 * @param array $events Up to 50 event objects — Bsol_Tracking batches
+	 *                       what one page load produced into a single call.
+	 */
+	public function send_tracking_events( $events ) {
+		return $this->remote_post( 'tracking/events', array( 'events' => $events ) );
+	}
+
+	/**
+	 * Which pixel to load and whether tracking is on at all for this site —
+	 * cached by the caller (Bsol_Tracking), not called on every page load.
+	 * A plain wp_remote_get() like steadfast_balance(), not remote_post():
+	 * this is a read, and logging every cache refresh to the Activity Log
+	 * would just be noise next to real sync/booking actions.
+	 */
+	public function get_tracking_config() {
+		$response = wp_remote_get(
+			BSOL_API_URL . 'tracking/config',
+			array(
+				'headers' => array(
+					'X-API-KEY'       => $this->get_api_key(),
+					'X-Client-Domain' => Bsol_Helpers::site_domain(),
+				),
+				'timeout' => 10,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array( 'success' => false, 'message' => $response->get_error_message() );
+		}
+
+		$decoded = json_decode( wp_remote_retrieve_body( $response ), true );
+		return is_array( $decoded ) ? $decoded : array( 'success' => false, 'message' => 'Unexpected server response.' );
+	}
+
 	public function verify_otp( $wc_order_id, $otp_code ) {
 		return $this->remote_post(
 			'orders/verify-otp',

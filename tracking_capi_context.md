@@ -6,7 +6,7 @@
 2. **আসল কাস্টমার ট্র্যাকিং** — browser (Pixel) + server (Conversions API) দুই দিক থেকে একই ইভেন্ট, `event_id` দিয়ে dedup, উচ্চ Event Match Quality।
 3. **SaaS ফিচার হিসেবে বিক্রয়যোগ্য** — সেলার নিজের WordPress/WooCommerce সাইট বা BSOL landing page-এ এক ক্লিকে ট্র্যাকিং চালু করবে, প্যাকেজ অনুযায়ী দৈনিক ইভেন্ট লিমিট।
 
-**অবস্থা (২০২৬-০৮-১৫):** **T1, T2, T5, T6 সম্পন্ন ও লাইভ** — ডেটা মডেল, quota, ingest পাইপলাইন, Meta-তে আসল send, order-flow ইভেন্ট, আর এখন **সেলার সাবডোমেইনে ল্যান্ডিং পেজে Full browser + server tracking**: Meta Pixel base code, PageView/ViewContent/InitiateCheckout/Lead/Purchase, প্রতি পেজে toggle। **শুধু WooCommerce (কেস A, সংখ্যাগরিষ্ঠ সেলার) বাকি** — সেটা T4।
+**অবস্থা (২০২৬-০৮-১৬):** **T1, T2, T5, T6, T4 সম্পন্ন ও লাইভ** — পুরো পরিকল্পিত ট্র্যাকিং পাইপলাইন এখন দুই কেসেই (নিজের WordPress সাইট আর BSOL সাবডোমেইন) কাজ করছে: Meta Pixel base code, browser+server funnel ইভেন্ট, order-flow ইভেন্ট BSOL সার্ভার থেকে, quota/dedup/log। **T4-এ একটা critical gap-ও ধরা পড়েছে ও ঠিক হয়েছে** — dashboard-এর একমাত্র Pixel-সেটিংস UI T1-এর পর থেকে পুরনো টেবিলে লিখছিল, নতুন destination টেবিলে নয় (§7.2)। বাকি — T3 (multi-destination CRUD UI), T7 (event log/admin usage view)।
 
 > ⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)।** Migration ইচ্ছাকৃতভাবে কোনো মান বসায়নি — চালু প্যাকেজে নীরবে লিমিট বসানো মানে সেলারের ইভেন্ট হারানো। **Admin → Packages** থেকে বাস্তব মান বসাতে হবে; seeder-এর প্রস্তাব: Free Trial 2,000 · Starter 5,000 · Growth 15,000 · Business আনলিমিটেড।
 
@@ -59,7 +59,8 @@ BSOL-এর কাছে যা আছে অথচ কোনো সাধার
 > **T1-এ যা তৈরি হয়েছে:** নিচের ৪, ৫, ৬ নম্বরের **ভিত্তি** — `tracking_destinations` (multi-pixel), `tracking_events` (log + idempotency), `tracking_usage_daily` + `TrackingQuotaService` (quota), `TrackingIngestService`, `TrackingUserDataBuilder`।
 > **T2-এ যা তৈরি হয়েছে:** `MetaCapiDriver` (আসল Meta HTTP call), `DispatchTrackingEventsJob` (fan-out + retry + log), আর `SendFacebookCapiPurchaseEventJob` নতুন পাইপলাইনের thin wrapper হয়ে গেছে — তার দুই লাইভ call site অপরিবর্তিত, শুধু ভেতরের রাস্তা বদলেছে। **Purchase এখন সত্যিই Meta-তে যাচ্ছে।**
 > **T5-এ যা তৈরি হয়েছে:** `OrderStatusService::transition()`-এ hook — Confirmed/Shipped/Delivered/Returned/Canceled পাঁচটাই এখন Meta-তে যাচ্ছে, deterministic `order_{id}_{event}` id দিয়ে, P0 অগ্রাধিকারে কখনো drop হয় না। **§1-এর মূল লিভার এখন বাস্তব।**
-> **T6-এ যা তৈরি হয়েছে (২০২৬-০৮-১৫):** সেলার সাবডোমেইনের ল্যান্ডিং পেজে Meta Pixel base code (`frontend/src/lib/tracking.ts::useBsolTracking()`), PageView/ViewContent (মাউন্টে) + InitiateCheckout/Lead (checkout ফর্মে) + Purchase (থ্যাংক ইউ পেজে) — browser + server একই `event_id`। `POST /api/public/track` (`PublicTrackingController`), host থেকে সেলার resolve, `LandingPageController::publicShow()` প্রতিটা পেজের জন্য একটামাত্র resolved `{enabled, pixel_id}` ফেরত দেয় (access token কখনো নয়)। ড্যাশবোর্ড এডিটরে per-page টগল। **নিচের তালিকা তাই এখন শুধু WooCommerce (T4) নিয়ে।**
+> **T6-এ যা তৈরি হয়েছে:** সেলার সাবডোমেইনের ল্যান্ডিং পেজে Meta Pixel base code (`frontend/src/lib/tracking.ts::useBsolTracking()`), PageView/ViewContent (মাউন্টে) + InitiateCheckout/Lead (checkout ফর্মে) + Purchase (থ্যাংক ইউ পেজে) — browser + server একই `event_id`। `POST /api/public/track` (`PublicTrackingController`), host থেকে সেলার resolve, `LandingPageController::publicShow()` প্রতিটা পেজের জন্য একটামাত্র resolved `{enabled, pixel_id}` ফেরত দেয় (access token কখনো নয়)। ড্যাশবোর্ড এডিটরে per-page টগল।
+> **T4-এ যা তৈরি হয়েছে (২০২৬-০৮-১৬):** WordPress প্লাগইনে `Bsol_Tracking` মডিউল (v1.17.0) — কেস A (সেলারের নিজের WordPress) এখন Full tracking পায়। `ConnectTrackingController` (batched ingest + cached config)। সাথে `FacebookPixelSettingController`-এর critical fix (§7.2)। **এখন দুটো কেসেই (A, C2) পুরো funnel + order-flow ট্র্যাকিং লাইভ** — বাকি শুধু T3 (multi-destination UI) আর T7 (event log/admin view)।
 
 1. ~~**কোনো client-side Pixel নেই কোথাও।**~~ ✅ **T6-এ সম্পন্ন, ল্যান্ডিং পেজে** — WooCommerce সাইটে এখনো নেই (T4)।
 2. ~~**Funnel-এর মাত্র শেষ ধাপ ট্র্যাক হয়।**~~ ✅ **T6-এ সম্পন্ন, ল্যান্ডিং পেজে** (AddToCart প্রযোজ্য নয় — ল্যান্ডিং পেজে আলাদা কার্ট ধাপ নেই)। WooCommerce-এ এখনো শুধু Purchase (T4)।
@@ -307,16 +308,18 @@ Drop হলে: `tracking_events`-এ `status='dropped_quota'` লেখা হ�
 | ✅ `App\Http\Controllers\Api\PublicTrackingController` (T6) | `POST /public/track` — Host থেকে সেলার resolve (`LandingPageResolver`), `slug` (ঐচ্ছিক) থেকে পেজ scope, client IP/UA request থেকেই নেয় (body-র মান কখনো নয়), `fbclid`→`fbc` synthesis। অজানা host নিঃশব্দে `{success:true}` — host-enumeration oracle এড়াতে |
 | ✅ `App\Support\LandingPageResolver::shopOwnerIdForLabel()` (T6) | নতুন resolver নয় — বিদ্যমান ক্লাসেই যোগ, `shopUserIdsForLabel()`-এর ভিত্তি হিসেবে refactor (§8.0) |
 | ✅ `frontend/src/lib/tracking.ts::useBsolTracking()` (T6) | Pixel base code (default PageView suppressed), PageView/ViewContent (মাউন্টে), InitiateCheckout/Lead/Purchase (caller-triggered), সব ইভেন্টে browser+server একই `event_id` |
+| ✅ `App\Http\Controllers\Api\Connect\ConnectTrackingController` (T4) | `ingest()` — batched (≤৫০), `TrackingIngestService::ingestBatch()`-এ ডেলিগেট, প্রতি ইভেন্টের status আলাদা রিপোর্ট করে। `config()` — resolved `{enabled, pixel_id}`, WooCommerce প্লাগইনের জন্য (landing page-র জন্য `LandingPageController::publicShow()`-এর সমান্তরাল) |
+| ✅ `wordpress-plugin/bsol-connect/includes/modules/tracking/class-bsol-tracking.php` (T4) | `wp_head` Pixel inject, `wp_enqueue_scripts` context, `wp_ajax_bsol_track_event` (+nopriv) ব্যাচ রিলে। **REST route নয়, admin-ajax.php** — §7-এর বিচ্যুতি নোট দেখো |
 
 **`FacebookCapiClient` ও `SendFacebookCapiPurchaseEventJob` ✅ T2-তে সম্পন্ন।** `FacebookCapiClient` মোছা হয়নি কিন্তু আর ডাকা হয় না (legacy, রোলব্যাক-নিরাপত্তা হিসেবে রাখা)। `SendFacebookCapiPurchaseEventJob` এখন `TrackingIngestService::ingest()`-এর পাতলা wrapper — constructor ও দুই লাইভ dispatch call-site (`LandingPageController.php`, `ConnectOrderController.php`) অপরিবর্তিত, `FacebookPixelSetting` lookup আর সরাসরি Meta HTTP call ভেতর থেকে সরে গেছে। বাড়তি সুবিধা যেটা আগে ছিল না: এখন একই অর্ডারের জন্য দুবার dispatch হলে `tracking_events`-এর unique constraint দ্বিতীয়টা নিঃশব্দে বাতিল করে — আগে প্রতিবার সরাসরি Meta-তে যেত, ডুপ্লিকেট-প্রতিরোধ ছিল না।
 
 ### 6.2 নতুন রুট
 
 ```php
-// connect/v1 group (X-API-KEY + active_subscription), WooCommerce plugin থেকে
+// connect/v1 group (X-API-KEY + active_subscription), WooCommerce plugin থেকে — ✅ T4-এ লাইভ
 Route::post('/tracking/events', [ConnectTrackingController::class, 'ingest'])->middleware('throttle:600,1');
 Route::get('/tracking/config',  [ConnectTrackingController::class, 'config'])->middleware('throttle:60,1');
-//   config = কোন pixel id, কোন ইভেন্ট চালু, consent mode, quota অবস্থা — প্লাগইন ক্যাশ করবে (১ ঘণ্টা)
+//   config = {enabled, pixel_id} — consent mode/quota অবস্থা এখনো এই রেসপন্সে নেই (T7-এ প্রয়োজনমতো), প্লাগইন ক্যাশ করে (১ ঘণ্টা)
 
 // public (landing page browser থেকে), API-key ছাড়া — সেলার resolve হয় Host থেকে (§8.0)
 // slug-ভিত্তিক রুট নয়: slug এখন per-shop unique, তাই slug একা কোনো শপ নির্দেশ করে না
@@ -347,32 +350,58 @@ Route::middleware('staff_permission:tracking')->group(function () {
 
 ---
 
-## 7. WordPress প্লাগইন ডিজাইন (`Bsol_Tracking` মডিউল)
+## 7. WordPress প্লাগইন ডিজাইন (`Bsol_Tracking` মডিউল) ✅ **T4-এ সম্পন্ন (২০২৬-০৮-১৬, plugin v1.17.0)**
 
-নতুন মডিউল `includes/modules/tracking/class-bsol-tracking.php`, `class-bsol-master.php`-এর connected + WooCommerce-active gate-এ instantiate (বিদ্যমান ১২টা মডিউলের মতোই)।
+`includes/modules/tracking/class-bsol-tracking.php`, `class-bsol-master.php`-এর connected + WooCommerce-active gate-এ instantiate (বিদ্যমান ১৯টা মডিউলের মতোই — এই প্লাগইন এখন v1.16.0-এ, মূল ডিজাইনের সময়ের চেয়ে অনেক দূর এগিয়েছে; সবচেয়ে আপডেট তথ্যের জন্য `wordpress_connect_context.md` দেখো, এই ফাইল নয়)।
 
-**দায়িত্ব:**
-1. `wp_head` — Pixel base code inject (pixel id `Bsol_Api::get_tracking_config()`-এর ক্যাশড রেসপন্স থেকে, **কখনো hardcoded নয়**), default PageView suppress করে JS-কে `eventID` সহ পাঠাতে দেওয়া।
-2. `wp_enqueue_scripts` — `assets/js/bsol-tracking.js` + একটা localized context object (page type, product, cart, currency, nonce, rest url)। **vanilla JS, jQuery নির্ভরতা নেই** (প্লাগইনের বিদ্যমান `bsol-abandoned-checkout.js`-এর মতো)।
-3. `register_rest_route('bsol-connect/v1', '/t')` — first-party ingest endpoint (`permission_callback` = public, কারণ ক্রেতা লগইন করা নেই; nonce + origin চেক + rate limit)। এখানে server-side enrichment হয় (fbp/fbc কুকি, আসল client IP/UA, cart/product ডেটা `WC()->cart` থেকে — DOM scraping কখনো নয়, Phase 17-এর প্রতিষ্ঠিত নীতি)।
-4. Server-side hook থেকে সরাসরি ইভেন্ট: `woocommerce_add_to_cart`, `woocommerce_order_status_changed` (order-flow ম্যাপিং), `woocommerce_thankyou`।
-5. Batch buffer — একই page load-এর একাধিক ইভেন্ট একসাথে BSOL-এ পাঠানো; `shutdown` hook বা ৫ সেকেন্ডের `wp_schedule_single_event`।
-6. Duplicate-pixel ডিটেকশন — PixelYourSite / Facebook for WooCommerce সক্রিয় থাকলে admin notice ("দুটো একসাথে চললে ইভেন্ট ডবল গোনা হবে"), base code inject বন্ধ রাখার অপশন সহ। legacy sbsp এই চেকটা করত, এটা বাস্তব সমস্যা।
-7. Consent/DNT — `consent_mode='required'` হলে কুকি-কনসেন্ট না পাওয়া পর্যন্ত কিছুই পাঠাবে না; `DNT: 1` সবসময় সম্মান করা হবে।
+### ⚠️ বাস্তবায়নে একটা ইচ্ছাকৃত বিচ্যুতি — `register_rest_route()` নয়, `admin-ajax.php` রিলে
 
-**ইভেন্ট → WooCommerce hook ম্যাপ:**
+মূল পরিকল্পনায় ছিল একটা first-party REST endpoint (`register_rest_route('bsol-connect/v1', '/t')`, public `permission_callback`)। কোড লেখার সময় দেখা গেল প্লাগইনের **প্রতিটা** storefront-facing মডিউল (checkout-otp, abandoned-checkout — দুটোই storefront JS থেকে BSOL-এ ডেটা পাঠায়) ইতিমধ্যেই একটা ভিন্ন, প্রমাণিত প্যাটার্নে দাঁড়িয়ে আছে: `admin-ajax.php` + nonce + `nopriv` hook pair, PHP-সাইড `Bsol_Api` দিয়ে BSOL-এ রিলে।
 
-| ইভেন্ট | ব্রাউজার ট্রিগার | সার্ভার ট্রিগার |
-|---|---|---|
-| PageView | সব পেজে (thank-you বাদে) | — |
-| ViewContent | `is_product()` | `woocommerce_before_single_product` |
-| AddToCart | ৪টা binding (single button, loop button, `added_to_cart`, `form.cart` submit) | `woocommerce_add_to_cart` + `woocommerce_ajax_added_to_cart` (৩s transient lock) |
-| InitiateCheckout | `is_checkout()` | `wp` hook, checkout পেজে একবার |
-| Lead | ফোন/ইমেইল ফিল্ড valid হলে (abandoned-checkout মডিউলের ট্রিগারের সাথে মিলিয়ে) | — |
-| Purchase | thank-you পেজ (eventID = `order_{bsolOrderId}`) | `woocommerce_thankyou` (আসল উৎস; browser fallback) |
-| OrderConfirmed / OrderShipped / OrderDelivered / OrderReturned / OrderCanceled ✅ **T5** | — | `OrderStatusService::transition()` (BSOL সার্ভার, নিচে দেখো) |
+**সিদ্ধান্ত: সেই বিদ্যমান প্যাটার্নই অনুসরণ করা হয়েছে, নতুন REST route বানানো হয়নি।** কারণ:
+- মূল পরিকল্পনার same-origin যুক্তি (ad blocker/Safari ITP এড়ানো) **অক্ষুণ্ণ থাকে** — `admin-ajax.php` সেলারের নিজের ডোমেইনেই, browser-এর কাছে এটাও same-origin।
+- API key কখনো ব্রাউজারে পৌঁছায় না — PHP-সাইড রিলে-ই সেটা নিশ্চিত করে, একটা নতুন REST endpoint বানালেও একই গ্যারান্টি লাগত, তাই দ্বিতীয় প্যাটার্ন যোগ করার কোনো লাভ ছিল না।
+- একই প্লাগইনে দুই রকম storefront-relay প্যাটার্ন (কিছু REST route দিয়ে, কিছু admin-ajax দিয়ে) রক্ষণাবেক্ষণের জটিলতা বাড়াত — একটাই কনভেনশন সহজ।
 
-**✅ T5-এ বাস্তবায়িত ঠিক এই যুক্তিতেই:** BSOL অর্ডারের আসল ডেলিভারি স্ট্যাটাস জানে (courier tracking), WordPress জানে না। তাই `OrderDelivered` ইভেন্টের **authoritative উৎস BSOL সার্ভার**, প্লাগইন নয় — `OrderStatusService::transition()`-এ hook করা হয়েছে, প্লাগইনের কোনো status-change hook ছাড়াই। T4-এর প্লাগইন মডিউল তাই এই পাঁচটার জন্য কিছু করবে না — শুধু funnel ইভেন্ট (PageView/ViewContent/AddToCart/InitiateCheckout/Lead) আর Purchase-এর browser fallback পাঠাবে।
+**দায়িত্ব (বাস্তবায়িত):**
+1. `wp_head` — Pixel base code inject, pixel id `Bsol_Api::get_tracking_config()`-এর ক্যাশড (১ ঘণ্টা hit / ৫ মিনিট miss — `Bsol_Update_Checker`-এর একই TTL-ভিন্ন প্যাটার্ন) রেসপন্স থেকে, **কখনো hardcoded নয়**। ডিফল্ট `fbq('track','PageView')` নেই — JS নিজে eventID সহ পাঠায়।
+2. `wp_enqueue_scripts` — `assets/js/bsol-tracking.js` + localized context (page type, product/purchase ডেটা, currency, nonce, ajax_url, DNT flag)। **jQuery-নির্ভর** — মূল পরিকল্পনায় "vanilla JS" লেখা ছিল, কিন্তু প্লাগইনের প্রতিটা বিদ্যমান storefront/admin JS ফাইল (checkout-otp, abandoned-checkout, admin.js) ইতিমধ্যেই jQuery ব্যবহার করে (WordPress core dependency, বাড়তি payload নয়) — সামঞ্জস্য রাখা হয়েছে।
+3. `wp_ajax_bsol_track_event` + `_nopriv_` — ব্যাচ রিলে (উপরের নোট দেখো)। এখানে server-side enrichment হয় (`$_COOKIE['_fbp']`/`_fbc`, real client IP `Bsol_Helpers::client_ip()`-এ নতুন, UA)।
+4. **Server-side hook থেকে কোনো order-flow ইভেন্ট নয়** — নিচে দেখো, এটা মূল পরিকল্পনা থেকে সবচেয়ে বড় সরল করা।
+5. Batch buffer — একই page load-এর PageView+ViewContent একসাথে; একটা ৫০ms debounce timer (JS-সাইড, `setTimeout`), `pagehide`-এ flush। ৫ সেকেন্ডের `wp_schedule_single_event`-ভিত্তিক সার্ভার-সাইড ব্যাচিং লাগেনি — client-side debounce যথেষ্ট, আর সরল।
+6. Duplicate-pixel ডিটেকশন (PixelYourSite/Facebook-for-WooCommerce warning) — **স্থগিত**, নিচে §7.1 দেখো।
+7. Consent/DNT — **শুধু DNT বাস্তবায়িত** (`DNT: 1` হলে JS কিছুই পাঠায় না)। `consent_mode='required'` গেটিং UI **স্থগিত** — বাংলাদেশে আইনি বাধ্যবাধকতা নেই (§11.1 #5), আর কোনো seller এখনো এই টগল চায়নি।
+
+**ইভেন্ট → WooCommerce hook ম্যাপ (বাস্তবায়িত):**
+
+| ইভেন্ট | ব্রাউজার ট্রিগার |
+|---|---|
+| PageView | সব পেজে (order-received বাদে) |
+| ViewContent | `is_product()`, ১ ঘণ্টা কুকি-bucket (product id-ভিত্তিক) |
+| AddToCart | ২টা binding — `form.cart` submit (single-product ক্লাসিক) + WooCommerce-এর নিজস্ব `added_to_cart` jQuery ইভেন্ট (AJAX loop button)। মূল পরিকল্পনার ৪টার মধ্যে বাকি দুটো (non-AJAX loop button, `woocommerce_ajax_added_to_cart` PHP hook) **স্থগিত** — এই দুটোই বাস্তবে বিরল কেস কভার করে |
+| InitiateCheckout | `is_checkout()`, পেজ লোডে একবার, ১ ঘণ্টা bucket |
+| Lead | `#billing_phone`/`#billing_email` blur/change-এ valid হলে, একবার |
+| Purchase | order-received পেজে, `order_{bsolOrderId}` (নিচে দেখো) |
+
+**⚠️ Order-flow ইভেন্ট (Confirmed/Shipped/Delivered/Returned/Canceled) এই মডিউল থেকে যায় না — সম্পূর্ণ বাদ, `woocommerce_order_status_changed` hook নেই।** T5-এ `OrderStatusService::transition()` এগুলো ইতিমধ্যেই পাঠায়, BSOL-এর courier-verified স্ট্যাটাস দিয়ে — WooCommerce-এর নিজস্ব স্ট্যাটাস (courier delivery-র চেয়ে পিছিয়ে থাকে) থেকে ডুপ্লিকেট/ভুল সিগন্যাল পাঠানোর কোনো কারণ নেই।
+
+**Purchase-এর দুই কপি, ইচ্ছাকৃতভাবে:**
+- **Authoritative:** `ConnectOrderController::sync()`-এর create branch, order sync-এর সময়েই সার্ভার-সাইড (T2, আগে থেকেই লাইভ)। `class-bsol-order-sync.php` সেই রেসপন্স থেকে `_bsol_order_id` মেটা লেখে (T4-এ নতুন — এই মেটা না থাকলে browser-side Purchase-এর eventID বানানো যেত না)।
+- **Browser copy:** `bsol-tracking.js`, order-received পেজে, একই `order_{id}` eventID দিয়ে। BSOL-এর নিজস্ব `tracking_events` unique index-এ ডুপ্লিকেট ধরা পড়ে (বিনামূল্যে no-op, দ্বিতীয়বার গোনা হয় না) — এর একমাত্র মূল্য fbp/fbc match-quality enrichment আর ব্রাউজার Pixel এক্সটেনশন visibility, কোনো নতুন conversion নয়।
+
+### 7.1 এই রাউন্ডে যা স্থগিত
+
+- **Duplicate-pixel detection** (PixelYourSite/Facebook-for-WooCommerce সক্রিয় থাকলে admin notice) — polish আইটেম, ফিচার কাজ করার জন্য জরুরি নয়।
+- **Consent-mode গেটিং UI** — কোনো ব্যবহারকারী এখনো চায়নি, আইনি বাধ্যবাধকতাও নেই।
+- **AddToCart-এর বাকি ২টা binding** (উপরে দেখো)।
+
+কোনোটাই স্থাপত্যগত বাধা নয় — যেকোনোটা পরে যোগ করা যাবে একটা ছোট, স্বয়ংসম্পূর্ণ ফেজে।
+
+### 7.2 ⚠️ একটা critical gap ধরা পড়েছে এবং সাথে সাথে ঠিক করা হয়েছে — dashboard-এর একমাত্র Pixel-সেটিংস UI পুরনো টেবিলে লিখছিল
+
+T4 বানানোর সময় দেখা গেল: `FacebookPixelSettingController` (Settings → Facebook Page-এর `GET`/`PUT /facebook/pixel`) T1-এর পরেও **এখনো `facebook_pixel_settings`-এ পড়ছিল ও লিখছিল**, `tracking_destinations`-এ নয়। T1-এর backfill migration-time-এ একবারই চলেছিল — তারপর থেকে দাশবোর্ড দিয়ে Pixel কনফিগার করা **যেকোনো সেলারের জন্য** `tracking_destinations`-এ কোনো row তৈরিই হতো না, মানে T2/T5/T6/T4 পুরো পাইপলাইনটাই তাদের জন্য নীরবে `no_destination` থাকত। এটাই এই মুহূর্তে একমাত্র UI যেটা দিয়ে একটা destination তৈরি করা যায় (T3-এর ফুল CRUD এখনো হয়নি), তাই এই বাগ থাকা অবস্থায় T4 বানানোর কোনো ব্যবহারিক মূল্য ছিল না — **একই পাসে ঠিক করা হয়েছে**।
+
+**ফিক্স:** কন্ট্রোলার এখন `TrackingDestination` (scope_type IS NULL, shop-wide) পড়ে/লেখে। Frontend অপরিবর্তিত — `masked()`-এর আউটপুট shape (`pixel_id`, `access_token_set`, `test_event_code`, `enabled`, `last_sent_at`, `last_error`) `FacebookPixelSetting::masked()`-এর হুবহু superset, তাই কোনো ফ্রন্টএন্ড বদল লাগেনি। `facebook_pixel_settings` টেবিল/মডেল স্পর্শ করা হয়নি (রোলব্যাক-নিরাপত্তা, T1-এর কনভেনশন), শুধু আর কেউ লেখে না। প্রোডাকশনে দুটো টেবিলই খালি ছিল (যাচাই করা হয়েছে) — কোনো ডেটা-মিসম্যাচ ঠিক করার দরকার হয়নি, শুধু ভবিষ্যতের জন্য পথ বন্ধ করা হয়েছে।
 
 ---
 
@@ -384,7 +413,7 @@ Route::middleware('staff_permission:tracking')->group(function () {
 
 | কেস | কোথায় | কারা | অবস্থা |
 |---|---|---|---|
-| **A** | সেলারের নিজের WordPress/WooCommerce সাইট | **সংখ্যাগরিষ্ঠ** — যারা নিজের সাইটে বিজ্ঞাপন চালায় | প্লাগইন T4-এ |
+| **A** | সেলারের নিজের WordPress/WooCommerce সাইট | **সংখ্যাগরিষ্ঠ** — যারা নিজের সাইটে বিজ্ঞাপন চালায় | **লাইভ**, ট্র্যাকিং T4-এ (plugin v1.17.0) |
 | **C2** | `{seller}.zyrotechbd.com` | যারা শুধু BSOL ল্যান্ডিং পেজ ব্যবহার করে | **লাইভ**, ট্র্যাকিং T6-এ |
 
 **দুটোতেই Full tracking** — browser Pixel + server CAPI, `event_id` dedup। কেস B (শেয়ার্ড প্ল্যাটফর্ম ডোমেইন) বিলুপ্ত, কেস C1 (সেলারের নিজের ডোমেইন) T8b-তে।
@@ -536,8 +565,8 @@ Landing page BSOL-এর Next.js-এ: পাবলিক ঠিকানা `{se
 | **T2** ✅ | `MetaCapiDriver` + `DispatchTrackingEventsJob` (fan-out/retry/log) + `SendFacebookCapiPurchaseEventJob`-কে নতুন পাইপলাইনে wrapper করা (behavior অপরিবর্তিত, দুটো লাইভ call-site অস্পৃশ্য)। **সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T1 |
 | **T5** ✅ | **Order-flow ইভেন্ট** — `OrderStatusService::transition()`-এ hook, Confirmed/Shipped/Delivered/Returned/Canceled, deterministic `order_{id}_{event}`, ব্যর্থতা status transition আটকায় না। ← **এখানেই প্রোডাক্টের মূল মূল্য, এখন লাইভ। সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T2 |
 | **T6** ✅ | Landing page ট্র্যাকিং (Next.js), সেলার সাবডোমেইনে **Full tracking** (browser Pixel + CAPI, `event_id` dedup) + per-page toggle। host resolution বিদ্যমান `LandingPageResolver`-এ (§8.0)। **সম্পন্ন ২০২৬-০৮-১৫**, migration নেই | T2 |
-| **T4** ← **পরবর্তী** | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS, first-party REST endpoint, batch relay, funnel ইভেন্ট (plugin v1.17.0) | T2 |
-| **T3** | Multi-destination **UI** — dashboard CRUD, scope selector, একাধিক pixel (backfill T1-এ হয়ে গেছে) | T1 |
+| **T4** ✅ | WordPress প্লাগইন `Bsol_Tracking` মডিউল — base code, browser JS (jQuery), `admin-ajax.php` batch relay, funnel ইভেন্ট। **সম্পন্ন ২০২৬-০৮-১৬** (plugin v1.17.0), migration নেই। সাথে `FacebookPixelSettingController`-এর critical fix (§7.2) | T2 |
+| **T3** ← **পরবর্তী** | Multi-destination **UI** — dashboard CRUD, scope selector, একাধিক pixel (backfill T1-এ হয়ে গেছে)। §7.2-এর ফিক্স এটাকে আরও জরুরি করে তুলেছে — এখনো একমাত্র destination তৈরির পথ Settings → Facebook Page-এর single shop-wide ফর্ম | T1 |
 | **T7** | Dashboard: event log, quota মিটার, match-quality সারাংশ; fraud signal অর্ডার-ডিটেইলে প্রদর্শন | T2–T6 |
 | **T8b** | সেলারের নিজের ডোমেইন (§8.4) — `landing_domains` টেবিল, DNS verification, per-domain Certbot, catch-all nginx। **বিক্রয়-যুক্তি ব্র্যান্ডিং + রেপুটেশন আলাদা রাখা** — AEM আর যুক্তি নয়, কারণ AEM এখন সবার জন্যই স্বয়ংক্রিয় (§11.2) | T6 |
 

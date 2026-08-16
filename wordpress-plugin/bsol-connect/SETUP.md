@@ -331,3 +331,45 @@ a real WooCommerce staging site before rolling out to sellers.
 5. Try with no SMS gateway assigned / zero credit on the BSOL account
    — confirm a clear failure message appears (not a silent failure or
    a PHP error).
+
+## Facebook/Meta tracking (1.17.0)
+
+1. On the BSOL dashboard, go to **Settings → Facebook Page**, enter a
+   real Pixel ID + CAPI access token, enable it, save. (This writes a
+   shop-wide `tracking_destinations` row — the only way to create one
+   until T3's full multi-pixel UI ships.)
+2. View any page on the connected storefront with the browser's
+   Network tab open — confirm a request to
+   `connect.facebook.net/en_US/fbevents.js` loads, and confirm one
+   `admin-ajax.php?action=bsol_track_event` POST fires shortly after
+   with `PageView` (and `ViewContent` too, batched together, on a
+   product page).
+3. In Meta Events Manager → Test Events (paste the site's URL or use
+   the Pixel Helper browser extension), confirm PageView/ViewContent
+   show up with both **Browser** and **Server** sources — that's the
+   dedup pair working.
+4. Add a product to cart (both the single-product "Add to cart"
+   button and a shop-page quick-add) — confirm `AddToCart` fires each
+   time.
+5. Go to checkout — confirm `InitiateCheckout` fires once. Type a
+   valid phone or email into the billing field — confirm `Lead` fires
+   once (not on every keystroke).
+6. Complete an order — confirm `Purchase` appears in Events Manager
+   with a **Server** source at order-sync time (this is the
+   authoritative one, already live since T2) and check the order's
+   `_bsol_order_id` meta got written; then on the order-received page,
+   confirm a browser-side `Purchase` also fires with the *same*
+   `order_{id}` event ID (check the BSOL dashboard's Settings →
+   Facebook Page quota card — the count should NOT go up a second
+   time for this order; the repeat submission is a free duplicate).
+7. Confirm nothing above fires when the browser sends `DNT: 1`
+   (enable "Do Not Track" in the browser's privacy settings and
+   reload).
+8. Confirm order status changes (Processing → Completed, etc.) do
+   **not** trigger any `bsol_track_event` AJAX call — those are BSOL
+   server-side only (T5), this plugin doesn't send them.
+9. Disable the shop-wide destination on the BSOL dashboard — confirm
+   the Pixel base code and `bsol_track_event` calls stop once the
+   plugin's cached config expires (delete the `bsol_tracking_config`
+   transient on staging to see it immediately instead of waiting out
+   the ~1h TTL).

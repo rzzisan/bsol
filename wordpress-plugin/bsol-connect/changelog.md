@@ -1,5 +1,26 @@
 # BSOL Connect — Changelog
 
+## 1.17.0 — 2026-08-16
+
+- **Facebook/Meta tracking for WooCommerce**: a new `Bsol_Tracking`
+  module — Meta Pixel base code in `wp_head` (id fetched from BSOL,
+  cached 1h, never hardcoded), PageView/ViewContent on load,
+  AddToCart (classic form submit + WooCommerce's own AJAX
+  `added_to_cart` event), InitiateCheckout on the checkout page,
+  Lead when billing phone/email becomes valid, and a browser-side
+  Purchase copy on the order-received page for fbp/fbc match-quality
+  enrichment (the authoritative Purchase already fires server-side at
+  order-sync time — this repeat submission dedupes for free against
+  BSOL's own `tracking_events` unique index). Every event relays
+  through `admin-ajax.php` (`bsol_track_event`, nopriv) rather than a
+  direct browser→BSOL call — the plugin's API key never reaches the
+  browser, same trust model as every other module, and still
+  same-origin against ad blockers/Safari ITP either way. `DNT: 1` is
+  always honoured. Order-flow events (Confirmed/Shipped/Delivered/
+  Returned/Canceled) are deliberately *not* sent from here — BSOL's
+  own `OrderStatusService::transition()` is their authoritative
+  source, not WooCommerce's lagging status.
+
 ## 1.16.0 — 2026-08-14
 
 - **Checkout blacklist block**: optionally stop checkout for a phone

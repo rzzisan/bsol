@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\Connect\ConnectFraudController;
 use App\Http\Controllers\Api\Connect\ConnectOrderController;
 use App\Http\Controllers\Api\Connect\ConnectProductController;
 use App\Http\Controllers\Api\Connect\ConnectSmsController;
+use App\Http\Controllers\Api\Connect\ConnectTrackingController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
@@ -222,6 +223,10 @@ Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
             ->middleware('throttle:20,1');
         Route::post('/sms/send', [ConnectSmsController::class, 'send'])
             ->middleware('throttle:20,1');
+        Route::post('/tracking/events', [ConnectTrackingController::class, 'ingest'])
+            ->middleware('throttle:600,1');
+        Route::get('/tracking/config', [ConnectTrackingController::class, 'config'])
+            ->middleware('throttle:60,1');
     });
 });
 

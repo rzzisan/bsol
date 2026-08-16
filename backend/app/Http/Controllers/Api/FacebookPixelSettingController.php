@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\FacebookPixelSetting;
+use App\Models\TrackingDestination;
 use App\Services\Facebook\FacebookCapiClient;
 use Illuminate\Http\JsonResponse;
 use App\Support\FrontendUrl;
@@ -11,16 +11,29 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 /**
- * Per-seller Conversions API (CAPI) config — §6 item 4 in
+ * Per-seller Meta Pixel/CAPI config — §6 item 4 in
  * facebook_integration_context.md. Unlike Facebook Page connect, this
  * needs no Meta OAuth/App Review: the seller pastes their own Pixel ID +
  * CAPI access token straight from their Events Manager.
+ *
+ * Reads/writes the shop-wide TrackingDestination row (scope_type IS NULL)
+ * — the *only* dashboard surface that can create/edit one, since T3
+ * (multi-destination CRUD) hasn't shipped yet. This used to read/write
+ * facebook_pixel_settings directly; T1's backfill only ran once at
+ * migration time, so anything saved through here after that stayed
+ * invisible to tracking_destinations, which is what T2/T5/T6/T4 actually
+ * read — silently breaking tracking for every seller who touched this
+ * page (or set it up for the first time) after T1. Discovered while
+ * building T4 and fixed in the same pass, since T4 is worthless while its
+ * only real-world destination source can't populate the table it reads.
+ * facebook_pixel_settings itself is untouched (still there for rollback,
+ * per T1's note) — just nothing writes to it anymore.
  */
 class FacebookPixelSettingController extends Controller
 {
     public function show(): JsonResponse
     {
-        $settings = FacebookPixelSetting::where('user_id', auth()->id())->first();
+        $settings = $this->shopWideDestination();
 
         return response()->json([
             'success' => true,
@@ -44,8 +57,11 @@ class FacebookPixelSettingController extends Controller
             'enabled' => ['nullable', 'boolean'],
         ]);
 
-        $settings = FacebookPixelSetting::firstOrNew(['user_id' => auth()->id()]);
-        $settings->user_id = auth()->id();
+        $settings = $this->shopWideDestination() ?? new TrackingDestination([
+            'user_id' => auth()->id(),
+            'provider' => 'meta',
+            'label' => 'Default',
+        ]);
 
         if ($request->has('pixel_id')) {
             $settings->pixel_id = $data['pixel_id'] ?: null;
@@ -70,12 +86,18 @@ class FacebookPixelSettingController extends Controller
 
     public function testEvent(FacebookCapiClient $capi): JsonResponse
     {
-        $settings = FacebookPixelSetting::where('user_id', auth()->id())->first();
+        $settings = $this->shopWideDestination();
 
         if (! $settings?->pixel_id || ! $settings?->access_token) {
             return response()->json(['success' => false, 'message' => 'Set the Pixel ID and Access Token first.'], 422);
         }
 
+        // A one-off ad-hoc payload, not a real tracking_events row — the
+        // provider-agnostic client is the right tool here, not
+        // MetaCapiDriver (which reads its payload from a persisted
+        // TrackingEvent) or the full ingest pipeline (which would spend a
+        // quota slot on what is explicitly a connectivity check, not a
+        // real visitor event).
         $ok = $capi->sendEvent($settings->pixel_id, $settings->access_token, [
             'event_name' => 'Purchase',
             'event_time' => now()->timestamp,
@@ -97,5 +119,13 @@ class FacebookPixelSettingController extends Controller
                 ? 'Test event sent — check Events Manager → Test Events.'
                 : 'Facebook rejected the test event. Check the Pixel ID / Access Token.',
         ]);
+    }
+
+    private function shopWideDestination(): ?TrackingDestination
+    {
+        return TrackingDestination::where('user_id', auth()->id())
+            ->where('provider', 'meta')
+            ->whereNull('scope_type')
+            ->first();
     }
 }

@@ -44,6 +44,7 @@ class Bsol_Master {
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/checkout-block/class-bsol-checkout-block.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/order-status/class-bsol-order-status.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/manual-sms/class-bsol-manual-sms.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/tracking/class-bsol-tracking.php';
 
 		// Admin menu must render even when not connected (that's where the
 		// Settings/connect form lives), so this is always instantiated.
@@ -80,6 +81,7 @@ class Bsol_Master {
 		new Bsol_Checkout_Block();
 		new Bsol_Order_Status();
 		new Bsol_Manual_Sms();
+		new Bsol_Tracking();
 	}
 
 	public function maybe_render_woocommerce_missing_notice() {

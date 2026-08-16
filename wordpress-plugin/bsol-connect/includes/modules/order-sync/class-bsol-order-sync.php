@@ -19,6 +19,7 @@ class Bsol_Order_Sync {
 
 	const META_RETRY_COUNT  = '_bsol_sync_retry_count';
 	const META_OTP_REQUIRED = '_bsol_otp_required';
+	const META_ORDER_ID     = '_bsol_order_id';
 	const MAX_RETRIES       = 3;
 	const RETRY_DELAY       = 5 * MINUTE_IN_SECONDS;
 
@@ -50,6 +51,13 @@ class Bsol_Order_Sync {
 			$order->delete_meta_data( self::META_RETRY_COUNT );
 			if ( ! empty( $response['data']['otp_required'] ) ) {
 				$order->update_meta_data( self::META_OTP_REQUIRED, true );
+			}
+			// Bsol_Tracking's thank-you page hook needs this to build the
+			// same order_{id} eventID the server-side Purchase CAPI event
+			// already uses (SendFacebookCapiPurchaseEventJob), so the
+			// browser and server copies of that one event dedupe.
+			if ( ! empty( $response['data']['id'] ) ) {
+				$order->update_meta_data( self::META_ORDER_ID, (int) $response['data']['id'] );
 			}
 			$order->save();
 			return;
