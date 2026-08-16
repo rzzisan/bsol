@@ -188,7 +188,16 @@ export async function proxy(request: NextRequest) {
   // redirect: the seller's own address is the canonical one, so /lp/ must
   // never appear in the URL bar or in an ad's destination.
   if (isLandingSlugPath(pathname)) {
-    return NextResponse.rewrite(new URL(`/lp${pathname}`, request.url), {
+    // new URL(path, base) does NOT inherit the base's query string once
+    // `path` is itself a non-empty absolute path (RFC 3986 relative
+    // resolution) — it must be copied over explicitly, same as the
+    // shop-moved redirect above already does. Without this, every query
+    // param (thank-you's ?order=&token=, fbclid, ...) is silently dropped
+    // before the /lp page ever sees it.
+    const rewritten = new URL(`/lp${pathname}`, request.url);
+    rewritten.search = request.nextUrl.search;
+
+    return NextResponse.rewrite(rewritten, {
       request: { headers },
     });
   }
