@@ -76,6 +76,7 @@ const menuText = {
     dailyReport: "দৈনিক রিপোর্ট",
     expenses: "খরচ",
     profit: "মুনাফা",
+    collectionHistory: "কালেকশন হিস্ট্রি",
 
     landingPages: "ল্যান্ডিং পেজ",
     abandonedCheckouts: "অসম্পূর্ণ অর্ডার",
@@ -154,6 +155,7 @@ const menuText = {
     dailyReport: "Daily Report",
     expenses: "Expenses",
     profit: "Profit",
+    collectionHistory: "Collection History",
 
     landingPages: "Landing Pages",
     abandonedCheckouts: "Abandoned Checkouts",
@@ -287,6 +289,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
         { key: "daily-report", label: t.dailyReport, href: "/dashboard/accounting" },
         { key: "expenses", label: t.expenses, href: "/dashboard/accounting/expenses" },
         { key: "profit", label: t.profit, href: "/dashboard/accounting/profit" },
+        { key: "collection-history", label: t.collectionHistory, href: "/dashboard/accounting/collections" },
       ],
     },
     {
@@ -366,6 +369,7 @@ const MODULE_KEY_BY_MENU_ITEM: Record<string, StaffModuleKey> = {
   "daily-report": "accounting",
   expenses: "accounting",
   profit: "accounting",
+  "collection-history": "accounting",
 };
 
 function filterMenuForStaff(menu: ShellMenuItem[], user: AuthUser | null): ShellMenuItem[] {

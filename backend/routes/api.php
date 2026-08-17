@@ -48,6 +48,7 @@ use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\TrackingDestinationController;
 use App\Http\Controllers\Api\TrackingEventController;
 use App\Http\Controllers\Api\TrackingUsageController;
+use App\Http\Controllers\Api\CollectionHistoryController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\AdminSupportController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
@@ -405,6 +406,8 @@ Route::middleware('active_subscription')->group(function () {
         Route::post('/accounting/transactions', [TransactionController::class, 'store']);
         Route::put('/accounting/transactions/{id}', [TransactionController::class, 'update']);
         Route::delete('/accounting/transactions/{id}', [TransactionController::class, 'destroy']);
+        Route::get('/accounting/collections', [CollectionHistoryController::class, 'index']);
+        Route::get('/accounting/collections/summary', [CollectionHistoryController::class, 'summary']);
     });
 
     // ── Analytics ────────────────────────────────────────────────────────────

@@ -1088,4 +1088,53 @@ Business পেয়ে গেছে real bKash merchant credential — কি�
 
 **Live verification (real money, 2026-08-09):** ৳5 Starter package দিয়ে end-to-end টেস্ট — bKash popup ওপেন হয়েছে, real bKash account দিয়ে pay করা হয়েছে, `SubscriptionPayment` row `approved` (real `trx_id`), subscription `subscription_ends_at` সঠিকভাবে extend হয়েছে। `npm run deploy:prod:safe` 8/8 pass।
 
+## 19. Collection History — সব উৎসের পেমেন্ট কালেকশন একসাথে (design: 2026-08-17)
+
+### সমস্যা
+
+সেলার প্রশ্ন করেছেন: "সেলার ড্যাশবোর্ডে একটা বিল কালেকশন হিস্ট্রি টাইপ মডিউল দরকার কি না?" — যেখানে **সব উৎসের** পেমেন্ট কালেকশন এক জায়গায় দেখা যাবে (ম্যানুয়াল কালেকশন + কুরিয়ারের COD + ভবিষ্যতের অনলাইন পেমেন্ট), তারিখ/ইউজার(স্টাফ)/ধরন দিয়ে ফিল্টার করা যাবে।
+
+**আজ যা আছে তা যথেষ্ট না:**
+- `TransactionController::index()` (Accounting → Daily Report) ইতিমধ্যে income+expense উভয়ই লিস্ট করে, কিন্তু এটা একটা সাধারণ P&L bookkeeping ledger — কে (কোন স্টাফ) কালেক্ট করলো তার কোনো ধারণাই নেই (`Transaction.user_id` সবসময় শপ-মালিক, `manual_payment_collection_context.md`-এর কনভেনশন অনুসরণ করে) এবং expense entry-ও (`courier_charge`) একসাথে মিশে থাকে — শুধু "টাকা কে/কখন/কীভাবে নিলো" প্রশ্নের সরাসরি উত্তর দেয় না।
+- ম্যানুয়াল কালেকশনের নিজস্ব ডিটেইল (`collected_by`, purpose, method, screenshot) আছে শুধু `OrderPayment`-এ ([manual_payment_collection_context.md](manual_payment_collection_context.md)) — কুরিয়ারের COD-এর সাথে একসাথে কোথাও দেখা যায় না।
+- অনলাইন পেমেন্ট গেটওয়ে (কাস্টমার-ফেসিং, checkout-এ সরাসরি bKash/card পে করা) এখনো ইমপ্লিমেন্ট করা হয়নি (§16.4-এ শুধু platform-এর নিজের subscription billing-এর জন্য bKash আছে, §18/§18.2 — কাস্টমার অর্ডারের জন্য না) — তাই এই মুহূর্তে এই উৎস থেকে কোনো ডেটা নেই, কিন্তু ডিজাইন যেন ready থাকে।
+
+**সিদ্ধান্ত: হ্যাঁ, দরকার** — এটা bookkeeping (accounting) থেকে আলাদা একটা প্রশ্নের উত্তর দেয়: "কবে, কে, কোন মাধ্যমে টাকা নিয়ে এসেছে" (receivables/collections লগ), "কত লাভ হলো" (accounting) না। নতুন core module হিসেবে তৈরি হচ্ছে, বিদ্যমান ডেটা মডেলের উপর — **কোনো নতুন টেবিল/মাইগ্রেশন লাগছে না**, শুধু একটা read-only aggregating view।
+
+### ডেটা উৎস (union, প্রতিটা আলাদাভাবে verify করা কনভেনশন থেকে)
+
+| উৎস | রো আসে কোথা থেকে | কে কালেক্ট করলো | 
+|---|---|---|
+| `manual` | `order_payments` টেবিল (পুরোটাই — advance/courier_charge/full_payment/other) | `collected_by` (শপের owner/staff) |
+| `courier_cod` | `transactions` টেবিল, `category='order_cod'` + `status=confirmed` + `type=income` (courier ডেলিভারি করার পর `AccountingService::onOrderDelivered()` যা বুক করে — `courier_status_sync_context.md` §3.4/§3.5) | কেউ না — courier remittance, নির্দিষ্ট কোনো স্টাফ ব্যক্তিগতভাবে হাতে নেয়নি, তাই `collected_by = null`, UI-তে "Courier" লেবেল দেখানো হয় |
+| `online` | **এখনো নেই** — কাস্টমার-ফেসিং অনলাইন পেমেন্ট গেটওয়ে ইমপ্লিমেন্ট হলে তৃতীয় UNION branch হিসেবে যোগ হবে (স্কিমা/ফিল্টার এখনই সেই ভবিষ্যতের জন্য নামকরণ করা, কিন্তু আজ কোনো ডেটা/UI filter option হিসেবে দেখানো হচ্ছে না — অস্তিত্বহীন জিনিসের জন্য মিথ্যা "খালি ফলাফল" ফিল্টার দেখানো বিভ্রান্তিকর) |
+
+**কেন নতুন টেবিল/derived-storage না বানিয়ে সরাসরি UNION:** `order_payments` আর `transactions` দুটোই ইতিমধ্যে authoritative — একটা তৃতীয় সিঙ্ক-করা টেবিল বানালে আরেকটা "কোনটা source of truth" সমস্যা তৈরি হতো (ঠিক যেভাবে courier_status vs order.status আলাদা রাখা ভুল ছিল, `courier_status_sync_context.md` §2)। Postgres-এর `UNION ALL` (dedup লাগে না — `source`+`source_id` কম্বো সবসময় ইউনিক) দিয়ে দুটো normalized SELECT একত্র করে সরাসরি DB-level pagination (real `LIMIT`/`OFFSET`, PHP-সাইড মার্জ-এন্ড-স্লাইস না — বড় ডেটাসেটে ভুল/ধীর হতো)।
+
+### Backend
+
+নতুন `App\Http\Controllers\Api\CollectionHistoryController`:
+
+- **`index(Request $request)`** — ফিল্টার: `from`/`to` (date, ঐচ্ছিক — না দিলে সব সময়ের ডেটা, `TransactionController::index()`-এর কনভেনশন অনুসরণ করে), `source` (`manual`|`courier_cod`, ঐচ্ছিক — দিলে শুধু সেই branch-এর query বানানো হয়, অন্যটা বাদ), `collected_by` (user id — দিলে `courier_cod` branch পুরোপুরি স্কিপ হয়, কারণ ওখানে সবসময় `collected_by = null`, filter করলে কখনোই ম্যাচ করবে না), `search` (order_number, উভয় branch-এ প্রযোজ্য)। প্রতিটা রো: `source, source_id, collected_at, type, method, amount, discount, collected_by_id, collected_by_name, screenshot_url, note, order_id, order_number, customer_name`। `unionAll()`-এর পর `orderByDesc('collected_at')->paginate()` — Laravel সঠিকভাবে পুরো union-কে subquery-তে wrap করে count+limit/offset চালায়।
+- **`summary(Request $request)`** — `range=today|week|month` + `from`/`to` override (`TransactionController::summary()`-এর হুবহু একই date-resolution idiom পুনর্ব্যবহার) — `manual_total`, `courier_cod_total`, `grand_total` (সাধারণ `OrderPayment::sum('amount')`/`Transaction::sum('amount')` কল, union লাগে না — pure aggregate)।
+- Route: বিদ্যমান `staff_permission:accounting` গ্রুপে (`/accounting/collections`, `/accounting/collections/summary`) — নতুন module key দরকার নেই, এটা accounting-এরই একটা sub-view।
+
+**Postgres UNION টাইপ-ম্যাচিং সতর্কতা:** `courier_cod` branch-এ `discount`/`collected_by_id`/`collected_by_name`/`screenshot_url`/`note` কলামের কোনো বাস্তব ভ্যালু নেই — এগুলো explicit-cast করা লিটারেল (`0::numeric(12,2)`, `NULL::bigint`, `NULL::varchar`) হিসেবে সিলেক্ট করা হয়, খালি literal `NULL`/`0` না — নাহলে Postgres "could not determine polymorphic type" এরর দেয়।
+
+### Frontend
+
+`frontend/src/app/dashboard/accounting/collections/page.tsx` — মেনুতে নতুন এন্ট্রি "Collection History"/"কালেকশন হিস্ট্রি" (`accounting` সাবমেনুর ৪র্থ আইটেম, key `collection-history`, `MODULE_KEY_BY_MENU_KEY`-এ `accounting`-এ ম্যাপ করা)। পেজে: সামারি স্ট্যাট কার্ড (মোট/ম্যানুয়াল/কুরিয়ার COD), ফিল্টার বার (তারিখ রেঞ্জ, উৎস dropdown — manual/courier COD, স্টাফ dropdown — শপের owner+staff লিস্ট, সার্চ), পেজিনেটেড টেবিল (তারিখ, উৎস ব্যাজ, ধরন, মাধ্যম, পরিমাণ, রিসিভার — courier_cod রো-তে "Courier" ফিক্সড লেবেল, অর্ডার নং লিংক, স্ক্রিনশট লিংক)।
+
+### স্কোপের বাইরে
+
+- **অনলাইন পেমেন্ট branch** — গেটওয়ে নিজেই এখনো তৈরি হয়নি, তাই UNION-এ যোগ করা যাচ্ছে না। গেটওয়ে তৈরি হলে এই মডিউলে তৃতীয় branch যোগ করা একটা ছোট follow-up হবে (ডিজাইন এখনই সেই সম্প্রসারণের জন্য প্রস্তুত)।
+- **এক্সপোর্ট (CSV/PDF)** — এই ধাপে শুধু on-screen লিস্ট, ডাউনলোডযোগ্য রিপোর্ট না।
+- **এখান থেকে সরাসরি নতুন ম্যানুয়াল পেমেন্ট এন্ট্রি করা** — এটা ভিউ-অনলি (অর্ডার লিস্টের Payment মডাল বা অর্ডার ডিটেইলের মতোই), এন্ট্রি এখনো অর্ডার-স্কোপড জায়গা থেকেই করতে হয়।
+
+### যাচাই (implement করার পর)
+
+Backend: isolated Postgres schema কনভেনশনে — manual + courier_cod উভয় সোর্স থেকে সঠিক রো ইউনিয়নড হয় ও একসাথে তারিখ অনুযায়ী sort হয়; `source` ফিল্টার শুধু সেই branch দেখায়; `collected_by` ফিল্টার courier_cod রো বাদ দেয় (কখনো ম্যাচ করে না); `search` (order_number) উভয় branch-এ কাজ করে; pagination সঠিক (২ পৃষ্ঠার বেশি ডেটা দিয়ে verify — merge-then-slice বাগ থাকলে এটাই ধরবে); অন্য শপের ডেটা leak হয় না; `summary()` `manual_total + courier_cod_total = grand_total`। ফুল স্যুট বেসলাইনের বিপরীতে রি-রান।
+
+**✅ ইমপ্লিমেন্ট + ডিপ্লয় সম্পন্ন (2026-08-17)।** ৯টা নতুন টেস্ট ([CollectionHistoryApiTest.php](backend/tests/Feature/CollectionHistoryApiTest.php)) সহ ফুল স্যুট রান — ৩৪২ passed, বেসলাইনের সেই ২টা পুরনো/অসম্পর্কিত ফেইলিউর (`AuthApiTest`, `CourierFraudCheckApiTest`) ছাড়া কিছু না। Postgres `UNION ALL`-এ explicit type-cast (`0::numeric(12,2)`, `NULL::bigint`, `NULL::varchar`) ছাড়া "could not determine polymorphic type" এরর ধরা পড়েছিল প্রথম রানেই — ডকুমেন্টেড সতর্কতা কাজে লেগেছে। মেনুতে "Accounting" সাবমেনুর ৪র্থ আইটেম হিসেবে "কালেকশন হিস্ট্রি" যোগ হয়েছে (`user-shell.tsx`, `MODULE_KEY_BY_MENU_KEY`-তে `accounting`-এ ম্যাপড, নতুন module key লাগেনি)। `tsc --noEmit` clean। Migration লাগেনি (কোনো নতুন টেবিল না, বিদ্যমান `order_payments`+`transactions`-এর উপর read-only view)। Backend `php8.3-fpm` restart + queue restart, frontend `deploy-safe.sh` — উভয়ই সফল, লাইভ smoke check pass।
+
 **ভবিষ্যতের জন্য নোট:** bKash merchant credential হাতে পেলে সবসময় প্রথমে confirm করা — Tokenized Checkout নাকি PGW/Checkout API (email/document-এ "Tokenized" vs "PGW"/"Checkout" শব্দ খুঁজুন) — দুটো product-এর credential/domain/client flow সম্পূর্ণ আলাদা, একটা ধরে নিয়ে implement শুরু করলে generic "invalid credential" error দিয়ে আটকে যাওয়ার ঝুঁকি আছে।
