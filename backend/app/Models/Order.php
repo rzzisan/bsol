@@ -66,6 +66,14 @@ class Order extends Model
         return $this->hasMany(OrderPayment::class)->orderByDesc('collected_at');
     }
 
+    /** Customer-facing online-payment attempts (wallet claims / gateway
+     *  sessions) — see online_payment_context.md. Raw/technical, distinct
+     *  from payments() above (the clean collected-money ledger). */
+    public function onlinePayments(): HasMany
+    {
+        return $this->hasMany(OrderOnlinePayment::class)->orderByDesc('created_at');
+    }
+
     public function paidAmount(): float
     {
         return (float) $this->payments()->sum('amount');

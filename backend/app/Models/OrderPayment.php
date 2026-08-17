@@ -20,8 +20,11 @@ class OrderPayment extends Model
     /** Mobile-banking methods where a transfer screenshot is the only proof of payment. */
     public const SCREENSHOT_REQUIRED_METHODS = ['bkash', 'nagad', 'rocket', 'upay'];
 
+    /** Who/what created this ledger row — see online_payment_context.md. */
+    public const SOURCES = ['manual', 'online_wallet', 'online_gateway'];
+
     protected $fillable = [
-        'order_id', 'user_id', 'collected_by', 'created_by',
+        'order_id', 'user_id', 'source', 'collected_by', 'created_by',
         'purpose', 'method', 'amount', 'discount',
         'screenshot_path', 'note', 'collected_at',
     ];

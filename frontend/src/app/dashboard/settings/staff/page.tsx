@@ -33,6 +33,7 @@ const MODULE_KEYS = [
   "fraud",
   "facebook",
   "tracking",
+  "payments",
 ] as const;
 type ModuleKey = (typeof MODULE_KEYS)[number];
 
@@ -49,6 +50,7 @@ const moduleLabels: Record<Locale, Record<ModuleKey, string>> = {
     fraud: "ফ্রড চেক",
     facebook: "ফেসবুক লিডস",
     tracking: "ট্র্যাকিং লগ",
+    payments: "অনলাইন পেমেন্ট",
   },
   en: {
     orders: "Orders",
@@ -62,6 +64,7 @@ const moduleLabels: Record<Locale, Record<ModuleKey, string>> = {
     fraud: "Fraud Check",
     facebook: "Facebook Leads",
     tracking: "Tracking Log",
+    payments: "Online Payments",
   },
 };
 

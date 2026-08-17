@@ -41,6 +41,19 @@ class CollectionHistoryApiTest extends TestCase
         ])->assertCreated();
     }
 
+    /** Direct row insert — the full wallet-claim→verify flow has its own
+     *  dedicated coverage in OnlinePaymentWalletClaimTest; this file only
+     *  needs to confirm the union query surfaces/filters the source column
+     *  correctly, whichever flow produced the row. */
+    private function makeOnlinePaymentRow(Order $order, string $source = 'online_wallet'): void
+    {
+        \App\Models\OrderPayment::create([
+            'order_id' => $order->id, 'user_id' => $order->user_id, 'source' => $source,
+            'purpose' => 'full_payment', 'method' => 'bkash', 'amount' => 300,
+            'collected_at' => now(),
+        ]);
+    }
+
     private function makeCourierCodTransaction(Order $order): void
     {
         Transaction::create([
@@ -149,6 +162,28 @@ class CollectionHistoryApiTest extends TestCase
 
         $response->assertOk();
         $this->assertCount(0, $response->json('data'));
+    }
+
+    public function test_online_wallet_rows_are_tagged_and_filterable_by_source(): void
+    {
+        $owner = User::factory()->create();
+        $order = $this->makeOrder($owner);
+        $this->makeManualPayment($order, $owner);
+        $this->makeOnlinePaymentRow($order, 'online_wallet');
+        $this->makeCourierCodTransaction($order);
+
+        Sanctum::actingAs($owner);
+
+        $all = $this->getJson('/api/accounting/collections')->assertOk();
+        $this->assertSame(
+            ['courier_cod', 'manual', 'online_wallet'],
+            collect($all->json('data'))->pluck('source')->unique()->sort()->values()->all()
+        );
+
+        $onlineOnly = $this->getJson('/api/accounting/collections?source=online_wallet')->assertOk();
+        $sources = collect($onlineOnly->json('data'))->pluck('source')->unique()->all();
+        $this->assertSame(['online_wallet'], $sources);
+        $this->assertEquals(300.0, $onlineOnly->json('data.0.amount'));
     }
 
     public function test_a_staff_member_with_accounting_permission_can_read_it(): void

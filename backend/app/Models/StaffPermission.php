@@ -24,6 +24,7 @@ class StaffPermission extends Model
         'fraud',
         'facebook',
         'tracking',
+        'payments',
     ];
 
     protected function casts(): array

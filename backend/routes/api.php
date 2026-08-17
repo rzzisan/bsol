@@ -62,8 +62,10 @@ use App\Http\Controllers\Api\Admin\CourierCacheController;
 use App\Http\Controllers\Api\Admin\AdminTrackingController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\PublicTrackingController;
+use App\Http\Controllers\Api\OnlinePaymentController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderPaymentController;
+use App\Http\Controllers\Api\PaymentGatewaySettingController;
 use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -149,6 +151,15 @@ Route::post('/public/landing-pages/{slug}/orders/{orderId}/verify-otp', [Checkou
     ->where('orderId', '[0-9]+')
     ->middleware('throttle:10,1');
 Route::post('/public/landing-pages/{slug}/orders/{orderId}/resend-otp', [CheckoutOtpController::class, 'resend'])
+    ->where('orderId', '[0-9]+')
+    ->middleware('throttle:10,1');
+
+// Online payment (Phase A: wallet_manual only) — channel list for the
+// checkout selector, and the token-guarded wallet-claim submit. See
+// online_payment_context.md.
+Route::get('/public/landing-pages/{slug}/payment-channels', [OnlinePaymentController::class, 'publicChannels'])
+    ->middleware('throttle:60,1');
+Route::post('/public/landing-pages/{slug}/orders/{orderId}/online-payment/wallet-claim', [OnlinePaymentController::class, 'submitWalletClaim'])
     ->where('orderId', '[0-9]+')
     ->middleware('throttle:10,1');
 
@@ -408,6 +419,17 @@ Route::middleware('active_subscription')->group(function () {
         Route::delete('/accounting/transactions/{id}', [TransactionController::class, 'destroy']);
         Route::get('/accounting/collections', [CollectionHistoryController::class, 'index']);
         Route::get('/accounting/collections/summary', [CollectionHistoryController::class, 'summary']);
+    });
+
+    // ── Online Payment (Phase A: wallet_manual only) ───────────────────────────
+    // Own permission key — payment-gateway credentials are sensitive enough to
+    // gate separately from general order/accounting access. See
+    // online_payment_context.md.
+    Route::middleware('staff_permission:payments')->group(function () {
+        Route::get('/payment-gateway-settings', [PaymentGatewaySettingController::class, 'getSettings']);
+        Route::put('/payment-gateway-settings', [PaymentGatewaySettingController::class, 'saveSettings']);
+        Route::get('/online-payments/pending-verification', [OnlinePaymentController::class, 'pendingVerification']);
+        Route::post('/online-payments/{id}/verify', [OnlinePaymentController::class, 'verify'])->where('id', '[0-9]+');
     });
 
     // ── Analytics ────────────────────────────────────────────────────────────

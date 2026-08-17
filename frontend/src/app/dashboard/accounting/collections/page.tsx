@@ -18,6 +18,8 @@ const t = {
     allSources: "সব উৎস",
     sourceManual: "ম্যানুয়াল",
     sourceCod: "কুরিয়ার COD",
+    sourceOnlineWallet: "অনলাইন (ওয়ালেট)",
+    sourceOnlineGateway: "অনলাইন (গেটওয়ে)",
     allCollectors: "সবাই",
     search: "অর্ডার নং",
     fromDate: "শুরু",
@@ -46,6 +48,8 @@ const t = {
     allSources: "All Sources",
     sourceManual: "Manual",
     sourceCod: "Courier COD",
+    sourceOnlineWallet: "Online (Wallet)",
+    sourceOnlineGateway: "Online (Gateway)",
     allCollectors: "Everyone",
     search: "Order #",
     fromDate: "From",
@@ -67,7 +71,7 @@ const t = {
 
 type Collector = { id: number; name: string };
 type Row = {
-  source: "manual" | "courier_cod";
+  source: "manual" | "online_wallet" | "online_gateway" | "courier_cod";
   source_id: number;
   collected_at: string;
   type: string;
@@ -86,6 +90,8 @@ type Summary = { manual_total: number; courier_cod_total: number; grand_total: n
 
 const sourceColor: Record<string, string> = {
   manual: "bg-blue-500/15 text-blue-400",
+  online_wallet: "bg-emerald-500/15 text-emerald-400",
+  online_gateway: "bg-emerald-600/15 text-emerald-500",
   courier_cod: "bg-purple-500/15 text-purple-400",
 };
 
@@ -182,6 +188,8 @@ export default function CollectionHistoryPage() {
           className="rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
           <option value="all">{txt.allSources}</option>
           <option value="manual">{txt.sourceManual}</option>
+          <option value="online_wallet">{txt.sourceOnlineWallet}</option>
+          <option value="online_gateway">{txt.sourceOnlineGateway}</option>
           <option value="courier_cod">{txt.sourceCod}</option>
         </select>
 
@@ -233,7 +241,12 @@ export default function CollectionHistoryPage() {
                 <td className="px-3 py-3 text-xs text-[var(--muted)]">{fmtDate(r.collected_at)}</td>
                 <td className="px-3 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sourceColor[r.source] ?? ""}`}>
-                    {r.source === "manual" ? txt.sourceManual : txt.sourceCod}
+                    {{
+                      manual: txt.sourceManual,
+                      online_wallet: txt.sourceOnlineWallet,
+                      online_gateway: txt.sourceOnlineGateway,
+                      courier_cod: txt.sourceCod,
+                    }[r.source] ?? r.source}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-xs">{txt.purposeNames[r.type] ?? r.type}</td>
@@ -243,7 +256,9 @@ export default function CollectionHistoryPage() {
                   {r.discount > 0 && <span className="ml-1 text-xs font-normal text-[var(--muted)]">(−৳{r.discount.toLocaleString()})</span>}
                 </td>
                 <td className="px-3 py-3 text-xs">
-                  {r.source === "courier_cod" ? txt.courierLabel : (r.collected_by_name ?? "—")}
+                  {r.source === "courier_cod"
+                    ? txt.courierLabel
+                    : r.collected_by_name ?? (r.source === "online_wallet" || r.source === "online_gateway" ? txt.sourceOnlineWallet : "—")}
                   {r.screenshot_url && (
                     <>
                       {" · "}

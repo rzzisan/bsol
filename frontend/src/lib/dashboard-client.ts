@@ -39,6 +39,7 @@ export const STAFF_MODULE_KEYS = [
   "fraud",
   "facebook",
   "tracking",
+  "payments",
 ] as const;
 
 export type StaffModuleKey = (typeof STAFF_MODULE_KEYS)[number];

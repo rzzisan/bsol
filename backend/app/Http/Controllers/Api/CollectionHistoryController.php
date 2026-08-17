@@ -13,16 +13,17 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * Unified "who collected what money, when, how" view across every
- * collection source — manual (OrderPayment), courier COD (Transaction
- * category=order_cod), and (later) online payment gateway. See
- * SAAS_MODULE_CONTEXT.md §19.
+ * collection source — manual (OrderPayment source=manual), online payment
+ * (OrderPayment source=online_wallet/online_gateway — see
+ * online_payment_context.md), and courier COD (Transaction
+ * category=order_cod). See SAAS_MODULE_CONTEXT.md §19.
  */
 class CollectionHistoryController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         $request->validate([
-            'source' => 'nullable|in:manual,courier_cod',
+            'source' => 'nullable|in:manual,online_wallet,online_gateway,courier_cod',
             'collected_by' => 'nullable|integer',
             'from' => 'nullable|date',
             'to' => 'nullable|date',
@@ -35,8 +36,13 @@ class CollectionHistoryController extends Controller
 
         $branches = [];
 
-        if ($source === null || $source === 'manual') {
-            $branches[] = $this->manualBranch($request, $shopUserIds);
+        // 'manual', 'online_wallet' and 'online_gateway' are all rows in the
+        // same order_payments table, distinguished by its source column —
+        // one SQL branch covers all three, filtered further when a specific
+        // one was asked for.
+        $orderPaymentsSources = ['manual', 'online_wallet', 'online_gateway'];
+        if ($source === null || in_array($source, $orderPaymentsSources, true)) {
+            $branches[] = $this->manualBranch($request, $shopUserIds, $source);
         }
 
         // collected_by only ever applies to manual rows — courier COD has no
@@ -142,14 +148,14 @@ class CollectionHistoryController extends Controller
     }
 
     /** @param array<int,int> $shopUserIds */
-    private function manualBranch(Request $request, array $shopUserIds): \Illuminate\Database\Query\Builder
+    private function manualBranch(Request $request, array $shopUserIds, ?string $source = null): \Illuminate\Database\Query\Builder
     {
         $query = DB::table('order_payments')
             ->join('orders', 'orders.id', '=', 'order_payments.order_id')
             ->leftJoin('users as op_collectors', 'op_collectors.id', '=', 'order_payments.collected_by')
             ->whereIn('order_payments.user_id', $shopUserIds)
             ->select([
-                DB::raw("'manual' as source"),
+                'order_payments.source as source',
                 'order_payments.id as source_id',
                 'order_payments.collected_at as collected_at',
                 'order_payments.purpose as type',
@@ -164,6 +170,13 @@ class CollectionHistoryController extends Controller
                 'orders.order_number as order_number',
                 'orders.customer_name as customer_name',
             ]);
+
+        // null $source ('manual'+'online_wallet'+'online_gateway' combined,
+        // handled by index()'s $orderPaymentsSources check) vs. a specific
+        // one of those three narrows this same branch further.
+        if ($source !== null) {
+            $query->where('order_payments.source', $source);
+        }
 
         if ($request->filled('from')) {
             $query->whereDate('order_payments.collected_at', '>=', $request->string('from'));

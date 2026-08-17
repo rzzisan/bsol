@@ -193,6 +193,141 @@ function OtpVerificationCard({
   );
 }
 
+const WALLET_CLAIM_TEXT = {
+  bn: {
+    title: (provider: string) => `${provider}-এ পেমেন্ট`,
+    description: (provider: string, number: string) =>
+      `আপনার নিজের ${provider} অ্যাপ থেকে ${number} নম্বরে টাকা পাঠান, তারপর নিচে Transaction ID দিন।`,
+    senderNumber: "যে নম্বর থেকে পাঠিয়েছেন",
+    trxId: "Transaction ID",
+    screenshot: "স্ক্রিনশট (ঐচ্ছিক)",
+    submit: "জমা দিন",
+    submitting: "জমা হচ্ছে...",
+    submitted: "পেমেন্টের তথ্য জমা হয়েছে। সেলার যাচাই করার পর কনফার্ম হবে।",
+    genericError: "কিছু একটা সমস্যা হয়েছে, আবার চেষ্টা করুন।",
+  },
+  en: {
+    title: (provider: string) => `Pay with ${provider}`,
+    description: (provider: string, number: string) =>
+      `Send money to ${number} from your own ${provider} app, then enter the Transaction ID below.`,
+    senderNumber: "Number you sent from",
+    trxId: "Transaction ID",
+    screenshot: "Screenshot (optional)",
+    submit: "Submit",
+    submitting: "Submitting...",
+    submitted: "Payment info submitted. It will be confirmed once the seller verifies it.",
+    genericError: "Something went wrong, please try again.",
+  },
+} as const;
+
+function WalletClaimCard({
+  slug,
+  orderId,
+  token,
+  provider,
+  number,
+  language,
+}: {
+  slug: string;
+  orderId: string;
+  token: string;
+  provider: string;
+  number: string;
+  language: "bn" | "en";
+}) {
+  const t = WALLET_CLAIM_TEXT[language] ?? WALLET_CLAIM_TEXT.bn;
+  const providerName = provider === "bkash" ? "bKash" : provider === "nagad" ? "Nagad" : "Rocket";
+  const [senderNumber, setSenderNumber] = useState("");
+  const [trxId, setTrxId] = useState("");
+  const [screenshot, setScreenshot] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const form = new FormData();
+      form.set("token", token);
+      form.set("provider", provider);
+      form.set("sender_number", senderNumber.trim());
+      form.set("customer_trx_id", trxId.trim());
+      if (screenshot) form.set("screenshot", screenshot);
+
+      const res = await fetch(`/api/public/landing-pages/${slug}/orders/${orderId}/online-payment/wallet-claim`, {
+        method: "POST",
+        body: form,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        setError(json?.message || Object.values(json?.errors ?? {}).flat()[0] as string || t.genericError);
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setError(t.genericError);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="lp-card rounded-3xl p-6 sm:p-8">
+        <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{t.submitted}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      <h2 className="text-xl font-bold text-slate-900">{t.title(providerName)}</h2>
+      <p className="mt-2 text-sm text-slate-500">{t.description(providerName, number)}</p>
+      <form onSubmit={submit} className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="sm:col-span-1">
+          <span className="mb-1 block text-xs text-slate-500">{t.senderNumber}</span>
+          <input
+            value={senderNumber}
+            onChange={(e) => setSenderNumber(e.target.value)}
+            required
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900"
+          />
+        </label>
+        <label className="sm:col-span-1">
+          <span className="mb-1 block text-xs text-slate-500">{t.trxId}</span>
+          <input
+            value={trxId}
+            onChange={(e) => setTrxId(e.target.value)}
+            required
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900"
+          />
+        </label>
+        <label className="sm:col-span-2">
+          <span className="mb-1 block text-xs text-slate-500">{t.screenshot}</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900"
+          />
+        </label>
+        <div className="sm:col-span-2">
+          <button
+            type="submit"
+            disabled={submitting || !senderNumber.trim() || !trxId.trim()}
+            className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {submitting ? t.submitting : t.submit}
+          </button>
+        </div>
+      </form>
+      {error ? <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div> : null}
+    </div>
+  );
+}
+
 function money(value: string | number | null | undefined) {
   const amount = Number(value ?? 0);
   return Number.isFinite(amount)
@@ -249,6 +384,29 @@ export default function ThankYouView({
   const contactPhone = content.contact?.phone ?? null;
   const otpVerifiedMessage = content.settings?.otp_verified_message || defaultSettings.otp_verified_message;
   const showOtpGate = Boolean(order?.otp_required) && !otpVerified && Boolean(orderId) && Boolean(token);
+
+  // Personal-wallet "send & verify" — the seller's receiving number for the
+  // channel this customer picked at checkout. Only shown while the order is
+  // still due (a verified/paid order has nothing left to submit). See
+  // online_payment_context.md.
+  const walletProvider = order?.payment_method && ["bkash", "nagad", "rocket"].includes(order.payment_method)
+    ? order.payment_method
+    : null;
+  const showWalletClaim = Boolean(walletProvider) && order?.payment_status !== "paid" && Boolean(orderId) && Boolean(token);
+  const [walletNumber, setWalletNumber] = useState<string | null>(null);
+  useEffect(() => {
+    if (!walletProvider) return;
+    fetch(`/api/public/landing-pages/${page.slug}/payment-channels`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const channels: Array<{ provider: string; number: string }> = json?.data?.wallet_channels ?? [];
+        setWalletNumber(channels.find((c) => c.provider === walletProvider)?.number ?? null);
+      })
+      .catch(() => {});
+    // Only needs to run once per landing on this page — walletProvider is
+    // derived from the (unchanging) order, not user interaction.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletProvider, page.slug]);
 
   const areaLine = order
     ? [order.customer_area, order.customer_thana, order.customer_district].filter((part) => (part ?? "").trim()).join(", ")
@@ -319,6 +477,17 @@ export default function ThankYouView({
                 </div>
               ) : null}
 
+              {showWalletClaim && walletNumber ? (
+                <WalletClaimCard
+                  slug={page.slug}
+                  orderId={orderId!}
+                  token={token!}
+                  provider={walletProvider!}
+                  number={walletNumber}
+                  language={language}
+                />
+              ) : null}
+
               {showSummary ? (
                 <div className="lp-card rounded-3xl p-6 sm:p-8">
                   <h2 className="text-xl font-bold" style={{ color: theme.primary }}>{t.orderSummary}</h2>
@@ -354,7 +523,15 @@ export default function ThankYouView({
                     </div>
                   </div>
                   <div className="mt-4 text-xs text-slate-500">
-                    {t.paymentLabel}: {order.payment_method === "cod" ? t.cashOnDelivery : order.payment_method ?? "—"}
+                    {t.paymentLabel}: {order.payment_method === "cod"
+                      ? t.cashOnDelivery
+                      : order.payment_method === "bkash"
+                        ? "bKash"
+                        : order.payment_method === "nagad"
+                          ? "Nagad"
+                          : order.payment_method === "rocket"
+                            ? "Rocket"
+                            : order.payment_method ?? "—"}
                   </div>
                 </div>
               ) : null}

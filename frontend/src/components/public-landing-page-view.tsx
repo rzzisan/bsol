@@ -851,7 +851,12 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "bkash" | "card">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "bkash" | "nagad" | "rocket">("cod");
+  // Personal-wallet "send & verify" channels the seller has turned on —
+  // see online_payment_context.md. Empty until fetched; the selector only
+  // ever shows COD until this resolves, so there's no flash of enabled
+  // options for channels the seller hasn't actually configured.
+  const [walletChannels, setWalletChannels] = useState<Array<{ provider: string; number: string }>>([]);
 
   // previewMode covers both the editor's live-preview iframe and any other
   // non-visitor render — neither should count as a real page view or spend
@@ -905,6 +910,17 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       .then((json) => setPlatformSettings(json?.data ?? null))
       .catch(() => {});
   }, []);
+
+  // Personal-wallet channels this seller has enabled — see
+  // online_payment_context.md. Skipped in the builder preview like every
+  // other network call on this page.
+  useEffect(() => {
+    if (previewMode) return;
+    fetch(`/api/public/landing-pages/${page.slug}/payment-channels`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => setWalletChannels(json?.data?.wallet_channels ?? []))
+      .catch(() => {});
+  }, [previewMode, page.slug]);
 
   // Resolve/adopt the checkout session token, and — if this is a resumed
   // abandoned-checkout link (?resume=<token>) — prefill the form from the
@@ -1103,6 +1119,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         custom_fields: customFieldValues,
         checkout_session_id: sessionToken || undefined,
         shipping_charge: shippingCharge,
+        payment_method: paymentMethod,
         items: products.map((item) => ({
           enabled: checkout[item.product_id]?.enabled ?? false,
           product_id: item.product_id,
@@ -1549,20 +1566,29 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                       <div className="mt-1 text-xs text-slate-500">Pay with cash upon delivery.</div>
                     </div>
                   </label>
-                  <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 opacity-60">
-                    <input type="radio" disabled />
-                    <div>
-                      <div className="text-sm font-semibold text-slate-700">Pay with bKash</div>
-                      <div className="mt-1 text-xs text-slate-500">Coming soon</div>
-                    </div>
-                  </label>
-                  <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 opacity-60">
-                    <input type="radio" disabled />
-                    <div>
-                      <div className="text-sm font-semibold text-slate-700">Card / Mobile Banking</div>
-                      <div className="mt-1 text-xs text-slate-500">Coming soon</div>
-                    </div>
-                  </label>
+                  {/* Personal-wallet "send & verify" channels — only the ones
+                      this seller actually turned on, from /payment-channels.
+                      See online_payment_context.md. */}
+                  {walletChannels.map((ch) => {
+                    const providerName = ch.provider === "bkash" ? "bKash" : ch.provider === "nagad" ? "Nagad" : "Rocket";
+                    const selected = paymentMethod === ch.provider;
+                    return (
+                      <label key={ch.provider} className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${selected ? "border-orange-300 bg-orange-50" : "border-slate-200 bg-white"}`}>
+                        <input
+                          type="radio"
+                          checked={selected}
+                          onChange={() => setPaymentMethod(ch.provider as "bkash" | "nagad" | "rocket")}
+                          className="mt-1"
+                        />
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">Pay with {providerName}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Send money to {ch.number} after placing the order, then submit the Transaction ID.
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
 
                 <p className="mt-4 text-xs leading-6 text-slate-500">Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our privacy policy.</p>

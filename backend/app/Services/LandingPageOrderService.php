@@ -43,7 +43,14 @@ class LandingPageOrderService
                 'source' => 'landing_page',
                 'source_ref' => (string) $page->id,
                 'status' => 'pending',
-                'payment_method' => 'cod',
+                // Customer's checkout selection — defaults to 'cod' for
+                // requests that don't send it (older frontend builds,
+                // WooCommerce-synced orders via a separate path).
+                // payment_status stays 'due' regardless: an online-payment
+                // pick doesn't pre-mark the order paid, it just tells the
+                // thank-you page which payment step to show next. See
+                // online_payment_context.md.
+                'payment_method' => $validated['payment_method'] ?? 'cod',
                 'payment_status' => 'due',
                 'shipping_charge' => (float) ($validated['shipping_charge'] ?? data_get($page->content, 'shipping.inside_dhaka', 80)),
                 'discount' => 0,

@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-17 (২) — **Customer-facing Online Payment, Phase A (`wallet_manual`) সম্পন্ন ও deploy করা হয়েছে** — কাস্টমার এখন চেকআউটে সেলারের পার্সোনাল বিকাশ/নগদ/রকেট নম্বরে টাকা পাঠিয়ে অর্ডার পেমেন্ট করতে পারে (send & verify, মার্চেন্ট একাউন্ট ছাড়াই), সেলার Dashboard → Accounting → Online Payment Verification-এ গিয়ে অ্যাপ্রুভ করে। নতুন §15.15 দেখো। Migration production-এ apply করা হয়েছে (`payment_gateway_settings`, `order_online_payments`, `order_payments.source`), ব্যাকএন্ড+ফ্রন্টএন্ড টেস্ট/বিল্ড পাস। বিস্তারিত `online_payment_context.md`। Phase B (SSLCommerz gateway) ও Phase C (bKash merchant gateway) এখনো বাকি। Older entries kept as-is:
+
 Last updated: 2026-08-17 — সব `*_context.md` ফাইল পড়ে এই ফাইলের ground-truth বড় sync করা হলো (§15.10-এর "সম্পূর্ণ অনুপস্থিত" টেবিলে Staff/Team ভুলভাবে রয়ে গিয়েছিল — আসলে Phase 1+2 শেষ; §15.3-এর courier status-sync row "NEEDS VERIFICATION" বলছিল, আসলে ২০২৬-০৮-১৬-এ bug ধরা পড়ে ফিক্স+scheduled হয়ে গেছে)। সাথে **তিনটা সম্পূর্ণ মডিউল যোগ হলো যেগুলো এই ফাইলে আগে কখনো ছিলই না** — WordPress/WooCommerce Connector (২০ ফেজ, `wordpress_connect_context.md`), Per-seller Subdomain/Custom Domain (`custom_domain_context.md` + `domain_security_audit.md`), এবং Tracking Platform/Facebook CAPI+Pixel (`tracking_capi_context.md`) — দেখো নতুন §15.12–§15.14। এই তিনটাই ✅ সম্পূর্ণ ও লাইভ। Manual Payment Collection + Collection History (`manual_payment_collection_context.md`) ও Invoice/Waybill payment-history addition (`courier_waybill_context.md` §৮.১) আগেই এই সেশনে অন্য জায়গায় sync করা হয়েছে। Older entries kept as-is:
 
 Last updated: 2026-08-15 — **প্রতিটি সেলার এখন নিজের সাবডোমেইন পায় (`{label}.zyrotechbd.com`) এবং সেখানেই তার ড্যাশবোর্ড ও ল্যান্ডিং পেজ চলে** — SaaS-এর URL কাঠামোর মৌলিক পরিবর্তন। রেজিস্ট্রেশনের পর শপ প্রোফাইল + ঠিকানা সেট করা বাধ্যতামূলক, তারপর সেলার নিজের ঠিকানায় চলে যায়; প্ল্যাটফর্ম ডোমেইনে লগইন করলেও handoff টোকেন দিয়ে সেখানেই পৌঁছে যায়। ল্যান্ডিং পেজের slug এখন **shop-প্রতি unique** (আগের global unique নয়), `/lp/{slug}` রুট সম্পূর্ণ সরানো হয়েছে, আর publish করতে সাবডোমেইন লাগে। সাথে: reserved-subdomain admin মডিউল, সাপোর্টের জন্য impersonation, এবং একটা নিরাপত্তা অডিট (১ High + ২ Medium, তিনটিই ফিক্সড)। **নতুন যেকোনো মডিউল লেখার আগে CONTEXT.md §৩২ পড়া বাধ্যতামূলক** — বিস্তারিত `custom_domain_context.md`, অডিট `domain_security_audit.md`। Older entries kept as-is:
@@ -792,6 +794,16 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 ⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)** — ইচ্ছাকৃত সেফ ডিফল্ট, বাস্তব লিমিট admin-কে **Admin → Packages** থেকে হাতে বসাতে হবে (কোনো সেলারের ইভেন্ট নীরবে হারানো এড়াতে)।
 
 **সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`tracking_capi_context.md`](tracking_capi_context.md) — সমস্যা-বিবৃতি, ডোমেইন-মডেল নির্ভরতা (§৮, `custom_domain_context.md`-এর উপর দাঁড়িয়ে), ফেজ ব্রেকডাউন। রোডম্যাপে কোনো ট্র্যাকিং ফেজ বাকি নেই — বাকি যা আছে (fraud score-এ ওজন বসানো, TikTok/GA4 destination) নতুন কাজ হিসেবে আলাদা অনুরোধ লাগবে।
+
+### 15.15 Customer-Facing Online Payment — 🟡 আংশিক (Phase A ✅ DONE, ২০২৬-০৮-১৭; Phase B/C ⬜ বাকি)
+
+কাস্টমার এখন চেকআউটে সরাসরি সেলারের পার্সোনাল বিকাশ/নগদ/রকেট নম্বরে টাকা পাঠিয়ে অর্ডার পেমেন্ট করতে পারে — আগে শুধু COD ছিল। ChatGPT ও Gemini দুটো external review-ই independently এটাকে সবচেয়ে বড় gap বলেছিল (`OtherAI/`)। **মার্চেন্ট একাউন্ট লাগে না** ইচ্ছাকৃতভাবে — ছোট/নতুন সেলারদের বাস্তবতা মাথায় রেখে "send & verify" (কাস্টমার টাকা পাঠায়, TrxID সাবমিট করে, সেলার যাচাই করে অ্যাপ্রুভ করে) ফ্লো আগে শিপ করা হয়েছে; সত্যিকারের automated gateway (SSLCommerz/bKash Merchant API) পরের ফেজ।
+
+সেলার-সাবস্ক্রিপশন বিলিং-এর bKash কোড (§18.2) থেকে **সম্পূর্ণ আলাদা** — সেটা platform-wide singleton merchant creds দিয়ে seller→platform ফি নেয়, এটা per-seller personal-wallet দিয়ে customer→seller অর্ডার পেমেন্ট। একটা কোডও শেয়ার হয়নি, রিভিনিউ-ক্রিটিক্যাল লাইভ ফ্লো ভাঙার ঝুঁকি এড়াতে ইচ্ছাকৃতভাবে।
+
+একটা reuse-heavy ডিজাইন: verified পেমেন্ট বিদ্যমান `order_payments` টেবিলেই যোগ হয় (নতুন `source` কলাম দিয়ে ট্যাগড) — তাই Collection History, invoice PDF payment-history, এবং `AccountingService::syncPaymentStatus()` সব বিনা পরিবর্তনে কাজ করে।
+
+**সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`online_payment_context.md`](online_payment_context.md) — data model, backend/frontend ফাইল লিস্ট, ডিজাইন সিদ্ধান্ত, test coverage, Phase B/C-এর পরিকল্পনা।
 
 ---
 

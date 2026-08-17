@@ -134,19 +134,27 @@ class AccountingService
      * transactions above. See manual_payment_collection_context.md §3.
      * discount-only entries (amount 0) book no transaction — nothing was
      * actually collected — but still recompute payment_status below.
+     *
+     * $category defaults to the seller-manual-collection bucket; the online-
+     * payment flow (online_payment_context.md) passes 'order_online_payment'
+     * so the ledger can distinguish auto-collected-via-gateway money from
+     * money a seller typed in themselves, without changing any other
+     * behavior here — same OrderPayment row shape either way.
      */
-    public function recordManualPayment(OrderPayment $payment): void
+    public function recordManualPayment(OrderPayment $payment, ?string $category = null): void
     {
         if ((float) $payment->amount > 0) {
             Transaction::create([
                 'user_id' => $payment->user_id,
                 'type' => Transaction::TYPE_INCOME,
                 'status' => Transaction::STATUS_CONFIRMED,
-                'category' => 'order_manual_payment',
+                'category' => $category ?? 'order_manual_payment',
                 'reference_type' => 'order_payment',
                 'reference_id' => $payment->id,
                 'amount' => $payment->amount,
-                'note' => "Manual payment collected ({$payment->purpose}/{$payment->method}) for order {$payment->order->order_number}.",
+                'note' => $category === 'order_online_payment'
+                    ? "Online payment verified ({$payment->purpose}/{$payment->method}) for order {$payment->order->order_number}."
+                    : "Manual payment collected ({$payment->purpose}/{$payment->method}) for order {$payment->order->order_number}.",
                 'transaction_date' => $payment->collected_at->toDateString(),
                 'is_auto' => true,
                 'meta' => [

@@ -125,6 +125,11 @@ class LandingPageController extends Controller
             CheckoutFieldResolver::buildRules($resolvedFields, $phoneValidationEnabled),
             [
                 'shipping_charge' => ['nullable', 'numeric', 'min:0'],
+                // Wallet-manual channels only for now — gateway_auto
+                // providers (sslcommerz/bkash gateway) join this list in
+                // Phase B/C once they have a real client to redirect to.
+                // See online_payment_context.md.
+                'payment_method' => ['nullable', 'in:cod,bkash,nagad,rocket'],
                 'items' => ['required', 'array', 'min:1'],
                 'items.*.enabled' => ['nullable', 'boolean'],
                 'items.*.product_id' => ['required', 'integer'],
@@ -197,6 +202,7 @@ class LandingPageController extends Controller
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
                 'public_token' => $order->public_token,
+                'payment_method' => $order->payment_method,
                 'subtotal' => $order->subtotal,
                 'shipping_charge' => $order->shipping_charge,
                 'total' => $order->total,

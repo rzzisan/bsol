@@ -6,6 +6,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-17 (২) — **আইটেম #১ (checkout online payment)-এর Phase A এখন ✅ সম্পন্ন ও লাইভ** — personal bKash/Nagad/Rocket "send & verify" (মার্চেন্ট একাউন্ট ছাড়াই)। বিস্তারিত `online_payment_context.md`, `SAAS_MODULE_CONTEXT.md §15.15`। নিচের §১-এর বিস্তারিত অংশও দ্রষ্টব্য — Phase B/C (SSLCommerz/bKash merchant gateway) এখনো বাকি।
+
 Last updated: 2026-08-17 — এই ফাইলের status টেবিল অনেকদিন sync হয়নি, বড় আপডেট: Tracking Platform (T1-T7, `tracking_capi_context.md`) এবং Per-seller সাবডোমেইন (D1-D5, `custom_domain_context.md`) দুটোই এখন **✅ সম্পূর্ণ**, আগে "planning/design done" লেখা ছিল যেটা এখন ভুল। WordPress/WooCommerce Connector-এর জন্য নতুন row যোগ হলো (২০ ফেজ, ✅ সম্পূর্ণ, আগে এই টেবিলেই ছিল না)। Custom domain (landing pages, #৬)-এর অর্ধেক (per-seller subdomain অংশ) এখন সম্পূর্ণ — বাকি শুধু সেলারের নিজস্ব ডোমেইন (T8b)।
 
 Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈরি। **Staff/Team sub-account role (Phase 1+2, সব মডিউল) সম্পূর্ণ শেষ** — বিস্তারিত `staff_team_role_context.md`, নিচের status টেবিলে আপডেট করা হয়েছে। নিচের বাকি আইটেমগুলোর কোনোটাতে এখনো কাজ শুরু হয়নি।
@@ -17,7 +19,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | # | ফিচার | স্ট্যাটাস | ডিটেইল ফাইল |
 |---|---|---|---|
 | — | **Staff/Team sub-account role** | ✅ **সম্পন্ন** (Phase 1 + Phase 2, সব মডিউল কভার করা হয়েছে, deployed+verified) | `staff_team_role_context.md` |
-| 1 | চেকআউটে অনলাইন পেমেন্ট কালেকশন | ⬜ Not started | — |
+| 1 | চেকআউটে অনলাইন পেমেন্ট কালেকশন | 🟡 আংশিক — Phase A (personal wallet bKash/Nagad/Rocket send & verify, মার্চেন্ট একাউন্ট ছাড়াই) ✅ সম্পন্ন ও লাইভ (২০২৬-০৮-১৭); Phase B (SSLCommerz gateway) ও Phase C (bKash merchant gateway) এখনো বাকি | `online_payment_context.md` |
 | 2 | WhatsApp Business integration | ⬜ Not started | — |
 | 3 | Auto-top-up / usage-based billing | ⬜ Not started | — |
 | 5 | Courier waybill/label PDF | ✅ সম্পন্ন ও deployed — COD amount বাগ ফিক্স, Pathao-স্টাইল লেবেল, Sticker Template ফিচার (২২টা ডিজাইন, সেলার-সিলেক্টেবল, প্রিভিউ থাম্বনেইল সহ) সম্পূর্ণ, এবং ✅ বাংলা টেক্সট রেন্ডারিং বাগ ফাইনালি সমাধান (real HarfBuzz shaping — সবগুলো ২২টা sticker টেমপ্লেট + order invoice-এ), + Payment History টেবিল (২০২৬-০৮-১৭) | `courier_waybill_context.md` §৪.৭, §৬, §৮.১ |
@@ -40,9 +42,10 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 
 ## উচ্চ-প্রায়োরিটি (সরাসরি রেভিনিউ/রিটেনশন impact)
 
-### 1. চেকআউটে অনলাইন পেমেন্ট কালেকশন (সর্বোচ্চ priority)
-প্রোডাক্ট ভিশনের মূল সমস্যা "৩০-৫০% ফেক/অনুপস্থিত অর্ডার"-এর সবচেয়ে সরাসরি সমাধান — advance/partial payment checkout-এ নেওয়া (এখন সব COD, `payment_method: bkash/online` শুধু লেবেল, কোনো charge/callback হয় না — `SAAS_MODULE_CONTEXT.md §15.8`)। bKash Tokenized/PGW client + OTP verification flow ইতিমধ্যে subscription billing-এ verified প্যাটার্ন হিসেবে আছে (`app/Services/Bkash*`, `BkashPaymentController`, `BkashPgwPaymentController`) — landing page checkout-এ reuse করা তুলনামূলক কম effort।
-**শুরুর পয়েন্ট:** `LandingPageOrderService::create()` + নতুন gateway controller (subscription billing-এর প্যাটার্ন কপি), `landing_pages.content.settings`-এ payment-mode toggle।
+### 1. চেকআউটে অনলাইন পেমেন্ট কালেকশন — 🟡 আংশিক (Phase A ✅ সম্পন্ন, ২০২৬-০৮-১৭)
+প্রোডাক্ট ভিশনের মূল সমস্যা "৩০-৫০% ফেক/অনুপস্থিত অর্ডার"-এর সবচেয়ে সরাসরি সমাধান। **Phase A লাইভ**: personal bKash/Nagad/Rocket "send & verify" — কাস্টমার সেলারের পার্সোনাল নম্বরে টাকা পাঠায়, TrxID সাবমিট করে, সেলার ভেরিফাই করে অ্যাপ্রুভ করে; মার্চেন্ট একাউন্ট লাগে না বলে ছোট/নতুন সেলারদের জন্য প্রথমে শিপ করা হয়েছে (দুটো external AI review-ও independently এই gap-টাই সবচেয়ে বড় বলেছিল)। বিস্তারিত `online_payment_context.md`।
+
+**বাকি (Phase B/C):** সত্যিকারের automated gateway — SSLCommerz (মার্চেন্ট একাউন্ট থাকা সেলারদের জন্য) ও bKash Merchant/PGW (subscription billing-এর bKash কোড থেকে সম্পূর্ণ আলাদা, ইচ্ছাকৃতভাবে touch করা হয়নি — platform-wide vs per-seller creds mismatch)। Provider abstraction ইন্টারফেস (`PaymentGatewayClient`) ডিজাইন করা আছে, `payment_gateway_settings` টেবিলে sslcommerz/bkash_gateway কলামও রেডি — শুধু client+controller+route যোগ করতে হবে।
 
 ### 2. WhatsApp Business integration
 Facebook Messenger lead-capture-এর architecture (webhook + phone auto-link, `FacebookLeadCaptureService`) প্রায় হুবহু reuse করা যাবে। Order confirm/broadcast/CRM follow-up চ্যানেল হিসেবে দ্রুত বাড়ছে বাংলাদেশে।

@@ -77,6 +77,7 @@ const menuText = {
     expenses: "খরচ",
     profit: "মুনাফা",
     collectionHistory: "কালেকশন হিস্ট্রি",
+    onlinePaymentVerification: "অনলাইন পেমেন্ট ভেরিফাই",
 
     landingPages: "ল্যান্ডিং পেজ",
     abandonedCheckouts: "অসম্পূর্ণ অর্ডার",
@@ -89,6 +90,7 @@ const menuText = {
     shopProfile: "শপ প্রোফাইল",
     stickerTemplates: "স্টিকার টেমপ্লেট",
     courierAccounts: "কুরিয়ার একাউন্ট",
+    onlinePaymentSettings: "অনলাইন পেমেন্ট চ্যানেল",
     facebookConnect: "ফেসবুক পেজ",
     wordpressConnect: "ওয়ার্ডপ্রেস কানেক্ট",
     subscription: "সাবস্ক্রিপশন",
@@ -156,6 +158,7 @@ const menuText = {
     expenses: "Expenses",
     profit: "Profit",
     collectionHistory: "Collection History",
+    onlinePaymentVerification: "Online Payment Verification",
 
     landingPages: "Landing Pages",
     abandonedCheckouts: "Abandoned Checkouts",
@@ -168,6 +171,7 @@ const menuText = {
     shopProfile: "Shop Profile",
     stickerTemplates: "Sticker Templates",
     courierAccounts: "Courier Accounts",
+    onlinePaymentSettings: "Online Payment Channels",
     facebookConnect: "Facebook Page",
     wordpressConnect: "WordPress Connect",
     subscription: "Subscription",
@@ -290,6 +294,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
         { key: "expenses", label: t.expenses, href: "/dashboard/accounting/expenses" },
         { key: "profit", label: t.profit, href: "/dashboard/accounting/profit" },
         { key: "collection-history", label: t.collectionHistory, href: "/dashboard/accounting/collections" },
+        { key: "online-payment-verification", label: t.onlinePaymentVerification, href: "/dashboard/accounting/online-payments" },
       ],
     },
     {
@@ -308,6 +313,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
         { key: "shop-profile", label: t.shopProfile, href: "/dashboard/settings/shop" },
         { key: "sticker-templates", label: t.stickerTemplates, href: "/dashboard/settings/sticker-templates" },
         { key: "courier-accounts", label: t.courierAccounts, href: "/dashboard/settings/courier" },
+        { key: "online-payment-settings", label: t.onlinePaymentSettings, href: "/dashboard/settings/payments" },
         { key: "facebook-connect", label: (t as any).facebookConnect ?? "ফেসবুক পেজ", href: "/dashboard/settings/facebook" },
         { key: "wordpress-connect", label: (t as any).wordpressConnect ?? "ওয়ার্ডপ্রেস কানেক্ট", href: "/dashboard/settings/wordpress" },
         { key: "subscription", label: t.subscription, href: "/dashboard/settings/subscription" },
@@ -370,6 +376,7 @@ const MODULE_KEY_BY_MENU_ITEM: Record<string, StaffModuleKey> = {
   expenses: "accounting",
   profit: "accounting",
   "collection-history": "accounting",
+  "online-payment-verification": "payments",
 };
 
 function filterMenuForStaff(menu: ShellMenuItem[], user: AuthUser | null): ShellMenuItem[] {
