@@ -73,6 +73,7 @@ const t = {
     dueAmount: "বাকি",
     overpaidBy: "অতিরিক্ত পরিশোধিত",
     fullyPaid: "সম্পূর্ণ পরিশোধিত",
+    livePreviewHint: "এই এন্ট্রি অনুযায়ী, এখনো সংরক্ষণ হয়নি",
     newEntry: "নতুন পেমেন্ট এন্ট্রি",
     purpose: "পেমেন্ট ধরন",
     purposeNames: { advance: "অগ্রিম", courier_charge: "কুরিয়ার চার্জ", full_payment: "ফুল পেমেন্ট", other: "অন্যান্য" },
@@ -141,6 +142,7 @@ const t = {
     dueAmount: "Due",
     overpaidBy: "Overpaid by",
     fullyPaid: "Fully paid",
+    livePreviewHint: "based on this entry, not yet saved",
     newEntry: "New Payment Entry",
     purpose: "Payment purpose",
     purposeNames: { advance: "Advance", courier_charge: "Courier charge", full_payment: "Full payment", other: "Other" },
@@ -430,6 +432,16 @@ export default function OrdersPage() {
     }
   };
 
+  // Live due-amount preview — subtracts the amount/discount currently being
+  // typed (not yet submitted) from the server-confirmed due, so the seller
+  // sees the effect of this entry before saving it.
+  const previewDueAmount = useMemo(() => {
+    if (!paymentSummary) return 0;
+    const typedAmount = parseFloat(paymentForm.amount) || 0;
+    const typedDiscount = parseFloat(paymentForm.discount) || 0;
+    return paymentSummary.due_amount - typedAmount - typedDiscount;
+  }, [paymentSummary, paymentForm.amount, paymentForm.discount]);
+
   return (
     <UserShell activeKey="all-orders" defaultExpandedKey="orders"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
@@ -659,12 +671,15 @@ export default function OrdersPage() {
                     <span className="text-right font-medium sm:text-left">৳{Number(paymentSummary.collection_discount).toLocaleString()}</span>
                   </div>
                   <div className="mt-2 border-t border-[var(--border)] pt-2 text-sm font-semibold">
-                    {paymentSummary.due_amount > 0 ? (
-                      <span className="text-red-400">{txt.dueAmount}: ৳{paymentSummary.due_amount.toLocaleString()}</span>
-                    ) : paymentSummary.due_amount < 0 ? (
-                      <span className="text-yellow-500">{txt.overpaidBy}: ৳{Math.abs(paymentSummary.due_amount).toLocaleString()}</span>
+                    {previewDueAmount > 0 ? (
+                      <span className="text-red-400">{txt.dueAmount}: ৳{previewDueAmount.toLocaleString()}</span>
+                    ) : previewDueAmount < 0 ? (
+                      <span className="text-yellow-500">{txt.overpaidBy}: ৳{Math.abs(previewDueAmount).toLocaleString()}</span>
                     ) : (
                       <span className="text-emerald-500">{txt.fullyPaid}</span>
+                    )}
+                    {(paymentForm.amount || paymentForm.discount) && (
+                      <span className="ml-2 text-xs font-normal text-[var(--muted)]">({txt.livePreviewHint})</span>
                     )}
                   </div>
                 </div>
