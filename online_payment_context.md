@@ -1,5 +1,7 @@
 # Customer-Facing Online Payment — Context
 
+শেষ আপডেট: 2026-08-17 (২) — Phase A লাইভ টেস্ট করার পর ব্যবহারকারীর ৩টা রিয়েল-ওয়ার্ল্ড ফিডব্যাক অনুযায়ী রিফাইনমেন্ট: (১) OTP এখন শুধু COD-তে সক্রিয়, অনলাইন পেমেন্ট বেছে নিলে OTP আর লাগে না — বদলে অর্ডার লিস্টে "পেমেন্ট বাকি" ফ্ল্যাগ দেখায়, (২) অ্যাপ্রুভ করার সময় সেলার নিজে হাতে amount বসায় (কাস্টমারের claim অন্ধভাবে বিশ্বাস করা হয় না), (৩) প্রতিটা ল্যান্ডিং পেজে আলাদাভাবে কোন পেমেন্ট চ্যানেল দেখাবে তা সিলেক্ট করা যায় (আগে পুরো শপ-ওয়াইড ছিল)। দেখো নিচে §৫। Older entries kept as-is:
+
 শেষ আপডেট: 2026-08-17 — Phase A (`wallet_manual`) সম্পন্ন, deploy করা হয়েছে (migrations + backend + frontend live)।
 
 ## ১. এই ফিচারটা কী
@@ -52,3 +54,31 @@
 ## ৪. Test coverage
 
 `PaymentGatewaySettingApiTest`, `OnlinePaymentWalletClaimTest`, `CollectionHistoryApiTest` (সোর্স-ট্যাগিং কভারেজ যোগ)। Full suite ২ পুরনো unrelated baseline failure (AuthApiTest, CourierFraudCheckApiTest) বাদে সব পাস।
+
+## ৫. Phase A রিফাইনমেন্ট (লাইভ টেস্টিং ফিডব্যাক, ২০২৬-০৮-১৭)
+
+Phase A প্রথমবার production-এ টেস্ট করার পর ব্যবহারকারীর ৩টা সরাসরি observation থেকে এই তিনটা ফিক্স এসেছে।
+
+### ৫.১ OTP শুধু COD-তে সক্রিয়
+আগে landing page-এর `otp_verification_enabled` সেটিং সব অর্ডারে (payment_method নির্বিশেষে) OTP পাঠাতো। এখন `LandingPageController::publicSubmitOrder()` শুধু `payment_method === 'cod'` হলেই `CheckoutOtpService::maybeSendForOrder()` কল করে — যুক্তি: অনলাইন পেমেন্ট বেছে নেওয়া কাস্টমার নিজেই real money পাঠিয়ে + TrxID সাবমিট করে যথেষ্ট intent প্রমাণ করে, দ্বিতীয় ভেরিফিকেশন গেট লাগে না।
+
+এর ফলে যে গ্যাপ তৈরি হতে পারত (কাস্টমার পেমেন্ট চ্যানেল বেছেছে কিন্তু আসলে টাকা পাঠায়নি) — সেটা ঢাকা হয়েছে অর্ডার লিস্টের নতুন ফ্ল্যাগ দিয়ে (নিচে ৫.২)। অর্ডারটা `pending`-এই থেকে যায় যতক্ষণ না ভেরিফাই হয় — নতুন কোনো auto-cancel/expire লজিক যোগ করা হয়নি, সেলার নিজে ফলো-আপ করবে।
+
+### ৫.২ অর্ডার লিস্টে "পেমেন্ট বাকি" ফ্ল্যাগ
+`dashboard/orders/page.tsx` — যেকোনো অর্ডারের `payment_method` bkash/nagad/rocket হলে আর `payment_status !== 'paid'` হলে status pill-এর পাশে একটা amber ব্যাজ দেখায় (`bKash ⏳` স্টাইলে) — সেলার এক নজরে বুঝবে কোন অর্ডারগুলোতে কাস্টমার পেমেন্ট চ্যানেল বেছেছে কিন্তু এখনো ভেরিফাই হয়নি।
+
+### ৫.৩ Approve-এর সময় সেলার নিজে amount বসায়
+আগে approve করলে claim-এ কাস্টমারের নিজের বলা amount সরাসরি `OrderPayment`-এ বসতো — কিন্তু কাস্টমার ভুল amount পাঠাতে পারে বা কম/বেশি পাঠাতে পারে। এখন:
+- `OnlinePaymentService::verifyWalletClaim()` একটা `?float $amount` প্যারাম নেয় — approve করলে required, claim-এর amount-কে trust করে না।
+- `OnlinePaymentController::verify()` — `amount` required_if `approve=true`।
+- Frontend (`dashboard/accounting/online-payments/page.tsx`) — প্রতিটা claim row-এ একটা এডিটেবল amount input, কাস্টমারের claim দিয়ে pre-fill করা কিন্তু সেলার বদলাতে পারে; নিচে ছোট টেক্সটে কাস্টমারের আসল claim দেখায় (রেফারেন্সের জন্য)।
+- `OrderPayment.note`-এ claim ও confirmed amount আলাদা হলে দুটোই লেখা থাকে audit trail-এর জন্য।
+
+### ৫.৪ প্রতি ল্যান্ডিং পেজে আলাদা পেমেন্ট চ্যানেল সিলেকশন
+আগে সব ল্যান্ডিং পেজে শপ-ওয়াইড যা যা চ্যানেল চালু (`payment_gateway_settings`) সব দেখাতো, পেজ-লেভেলে filter করার উপায় ছিল না। এখন:
+- `LandingPage.content.settings.payment_channels` — নতুন optional field, `string[] | null`। `null` (ডিফল্ট, পুরনো পেজেও) মানে "শপ যা যা চালু করেছে সব দেখাও" (backward compatible)। একটা array মানে সেই সাবসেটই (এমনকি `'cod'`-ও এই লিস্টে থাকতে হবে যদি COD দেখাতে হয়)।
+- `OnlinePaymentController::publicChannels()` — শপ-ওয়াইড enabled চ্যানেল বের করে, তারপর পেজের `payment_channels` সেট থাকলে সেটা দিয়ে narrow করে; রেসপন্সে নতুন `cod_enabled: boolean` ফিল্ড যোগ হয়েছে।
+- `landing-page-builder.tsx` — Settings ট্যাবে নতুন "Payment Methods" কার্ড: "এই পেজের জন্য নির্দিষ্ট পেমেন্ট পদ্ধতি বেছে নিন" চেকবক্স বন্ধ থাকলে কিছুই সেভ হয় না (null থাকে); চালু করলে COD + শপ-এ যা যা wallet channel চালু আছে (নতুন `GET /payment-gateway-settings` কল করে) তার চেকবক্স লিস্ট দেখায়, সব ডিফল্ট-চেকড।
+- `public-landing-page-view.tsx` — checkout selector `cod_enabled=false` হলে COD radio লুকায়, প্রথম উপলব্ধ wallet channel-কে ডিফল্ট বানায়।
+
+**সিদ্ধান্ত**: order-submit ভ্যালিডেশন (`payment_method: cod,bkash,nagad,rocket`) পেজ-লেভেল সাবসেটের বিপরীতে strict enforce করা হয়নি — একটা customer URL manipulate করে seller-এর নিজের enable-করা অন্য কোনো চ্যানেল বেছে নিলেও সেটা নিছক UX অসঙ্গতি (সেলার এমন একটা চ্যানেলের instructions দেখাবে যেটা এই পেজে advertise করেনি), নিরাপত্তা ঝুঁকি না — তাই backend-এ আলাদা enforcement যোগ করা হয়নি, scope সীমিত রাখা হয়েছে।

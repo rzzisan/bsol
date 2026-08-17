@@ -17,6 +17,7 @@ const t = {
     colSender: "প্রেরকের নম্বর",
     colTrxId: "Transaction ID",
     colAmount: "পরিমাণ",
+    claimedAmount: (n: string) => `কাস্টমার দাবি করেছে: ৳${n}`,
     colScreenshot: "স্ক্রিনশট",
     viewScreenshot: "দেখুন",
     noScreenshot: "নেই",
@@ -27,6 +28,8 @@ const t = {
     rejectSuccess: "দাবিটি বাতিল করা হয়েছে।",
     actionError: "কিছু একটা সমস্যা হয়েছে।",
     rejectPrompt: "রিজেক্ট করার কারণ (ঐচ্ছিক):",
+    amountRequired: "কত টাকা পেয়েছেন তা লিখুন।",
+    amountHint: "আসলে যা পেয়েছেন তা লিখুন — কাস্টমারের দাবির থেকে ভিন্ন হতে পারে।",
   },
   en: {
     pageTitle: "Online Payment Verification",
@@ -38,6 +41,7 @@ const t = {
     colSender: "Sender number",
     colTrxId: "Transaction ID",
     colAmount: "Amount",
+    claimedAmount: (n: string) => `Customer claimed: ৳${n}`,
     colScreenshot: "Screenshot",
     viewScreenshot: "View",
     noScreenshot: "None",
@@ -48,6 +52,8 @@ const t = {
     rejectSuccess: "Claim rejected.",
     actionError: "Something went wrong.",
     rejectPrompt: "Reason for rejection (optional):",
+    amountRequired: "Enter the amount you actually received.",
+    amountHint: "Enter what you actually received — may differ from the customer's claim.",
   },
 };
 
@@ -73,6 +79,10 @@ export default function OnlinePaymentVerificationPage() {
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<number | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // Seller-entered "what I actually received" per claim — pre-filled from
+  // the customer's own claim amount but always editable/required before
+  // approving. See online_payment_context.md.
+  const [amountInputs, setAmountInputs] = useState<Record<number, string>>({});
 
   const fetchClaims = useCallback(async () => {
     setLoading(true);
@@ -80,7 +90,15 @@ export default function OnlinePaymentVerificationPage() {
       const res = await fetch(`${API}/online-payments/pending-verification`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const d = await res.json();
-        setClaims(d.data ?? []);
+        const list: Claim[] = d.data ?? [];
+        setClaims(list);
+        setAmountInputs((prev) => {
+          const next = { ...prev };
+          for (const c of list) {
+            if (next[c.id] === undefined) next[c.id] = String(c.amount);
+          }
+          return next;
+        });
       }
     } finally {
       setLoading(false);
@@ -90,6 +108,11 @@ export default function OnlinePaymentVerificationPage() {
   useEffect(() => { void fetchClaims(); }, [fetchClaims]);
 
   const act = async (id: number, approve: boolean) => {
+    const amount = amountInputs[id];
+    if (approve && (!amount || Number(amount) <= 0)) {
+      setMessage({ type: "error", text: txt.amountRequired });
+      return;
+    }
     const note = approve ? undefined : (window.prompt(txt.rejectPrompt) ?? undefined);
     setActingId(id);
     setMessage(null);
@@ -97,7 +120,7 @@ export default function OnlinePaymentVerificationPage() {
       const res = await fetch(`${API}/online-payments/${id}/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ approve, note }),
+        body: JSON.stringify({ approve, note, amount: approve ? Number(amount) : undefined }),
       });
       const d = await res.json().catch(() => null);
       if (res.ok) {
@@ -134,7 +157,7 @@ export default function OnlinePaymentVerificationPage() {
               <th className="px-3 py-3">{txt.colProvider}</th>
               <th className="px-3 py-3">{txt.colSender}</th>
               <th className="px-3 py-3">{txt.colTrxId}</th>
-              <th className="px-3 py-3 text-right">{txt.colAmount}</th>
+              <th className="px-3 py-3">{txt.colAmount}</th>
               <th className="px-3 py-3">{txt.colScreenshot}</th>
               <th className="px-3 py-3"></th>
             </tr>
@@ -158,7 +181,19 @@ export default function OnlinePaymentVerificationPage() {
                 <td className="px-3 py-3 text-xs font-semibold">{providerLabel[c.provider] ?? c.provider}</td>
                 <td className="px-3 py-3 font-mono text-xs">{c.sender_number ?? "—"}</td>
                 <td className="px-3 py-3 font-mono text-xs">{c.customer_trx_id ?? "—"}</td>
-                <td className="px-3 py-3 text-right font-semibold">৳{c.amount.toLocaleString()}</td>
+                <td className="px-3 py-3">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={amountInputs[c.id] ?? String(c.amount)}
+                    onChange={(e) => setAmountInputs((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                    className="w-28 rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--muted)]" title={txt.amountHint}>
+                    {txt.claimedAmount(c.amount.toLocaleString())}
+                  </p>
+                </td>
                 <td className="px-3 py-3 text-xs">
                   {c.screenshot_url ? (
                     <a href={c.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">

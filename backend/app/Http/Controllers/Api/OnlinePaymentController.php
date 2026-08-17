@@ -35,10 +35,30 @@ class OnlinePaymentController extends Controller
         // LandingPage::resolveOwnerId() does internally (private there).
         $ownerId = User::find($page->user_id)?->shopOwnerId() ?? $page->user_id;
 
+        $shopWideChannels = $this->onlinePaymentService->getEnabledWalletChannels($ownerId);
+
+        // Per-page selection (content.settings.payment_channels — an array
+        // of 'cod'/'bkash'/'nagad'/'rocket') narrows the shop-wide-enabled
+        // set down to what THIS page actually offers. Unset entirely
+        // (older pages, before this setting existed) means "offer
+        // everything the shop has enabled" — the pre-existing default
+        // behavior, unchanged. See online_payment_context.md.
+        $pageSelection = $page->content['settings']['payment_channels'] ?? null;
+        $codEnabled = true;
+        $walletChannels = $shopWideChannels;
+        if (is_array($pageSelection)) {
+            $codEnabled = in_array('cod', $pageSelection, true);
+            $walletChannels = array_values(array_filter(
+                $shopWideChannels,
+                fn (array $c) => in_array($c['provider'], $pageSelection, true)
+            ));
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
-                'wallet_channels' => $this->onlinePaymentService->getEnabledWalletChannels($ownerId),
+                'cod_enabled' => $codEnabled,
+                'wallet_channels' => $walletChannels,
             ],
         ]);
     }
@@ -91,11 +111,20 @@ class OnlinePaymentController extends Controller
         $data = $request->validate([
             'approve' => ['required', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
+            // Required only when approving — the seller manually confirms
+            // what they actually received, not the customer's own claim.
+            'amount' => [Rule::requiredIf((bool) $request->boolean('approve')), 'nullable', 'numeric', 'min:0.01'],
         ]);
 
         $claim = OrderOnlinePayment::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
-        $claim = $this->onlinePaymentService->verifyWalletClaim($claim, auth()->user(), $data['approve'], $data['note'] ?? null);
+        $claim = $this->onlinePaymentService->verifyWalletClaim(
+            $claim,
+            auth()->user(),
+            $data['approve'],
+            $data['note'] ?? null,
+            isset($data['amount']) ? (float) $data['amount'] : null,
+        );
 
         return response()->json([
             'success' => true,

@@ -54,6 +54,7 @@ const t = {
                    shipped:"পাঠানো হয়েছে", delivered:"ডেলিভারি হয়েছে", cancelled:"বাতিল", returned:"ফেরত" },
     riskNames: { low:"কম", medium:"মাঝারি", high:"উচ্চ" },
     otpVerifiedBadge: "OTP ভেরিফাইড",
+    onlinePaymentPendingBadge: (method: string) => `${method} — পেমেন্ট বাকি`,
     totalOrders: "মোট অর্ডার",
     todayOrders: "আজকের অর্ডার",
     pendingOrders: "অপেক্ষমান",
@@ -125,6 +126,7 @@ const t = {
                    shipped:"Shipped", delivered:"Delivered", cancelled:"Cancelled", returned:"Returned" },
     riskNames: { low:"Low", medium:"Medium", high:"High" },
     otpVerifiedBadge: "OTP verified",
+    onlinePaymentPendingBadge: (method: string) => `${method} — payment pending`,
     totalOrders: "Total Orders",
     todayOrders: "Today",
     pendingOrders: "Pending",
@@ -175,6 +177,7 @@ type Order = {
   id: number; order_number: string; customer_name: string | null;
   customer_phone: string; total: string; status: Status;
   risk_level: string; created_at: string; payment_status: string;
+  payment_method: string;
   otp_verified_at: string | null;
   platform_api_key_id: number | null;
   paid_amount?: number | string | null;
@@ -572,6 +575,14 @@ export default function OrdersPage() {
                         className="rounded-full bg-teal-500/15 px-2 py-0.5 text-xs font-semibold text-teal-400"
                       >
                         OTP
+                      </span>
+                    ) : null}
+                    {["bkash", "nagad", "rocket"].includes(o.payment_method) && o.payment_status !== "paid" ? (
+                      <span
+                        title={txt.onlinePaymentPendingBadge(o.payment_method)}
+                        className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-500"
+                      >
+                        {o.payment_method === "bkash" ? "bKash" : o.payment_method === "nagad" ? "Nagad" : "Rocket"} ⏳
                       </span>
                     ) : null}
                     {o.platform_api_key_id && siteDomainById.get(o.platform_api_key_id) ? (

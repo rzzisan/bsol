@@ -857,6 +857,10 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   // ever shows COD until this resolves, so there's no flash of enabled
   // options for channels the seller hasn't actually configured.
   const [walletChannels, setWalletChannels] = useState<Array<{ provider: string; number: string }>>([]);
+  // Whether this specific landing page offers COD — per-page toggle,
+  // defaults true until the payment-channels call resolves. See
+  // online_payment_context.md.
+  const [codEnabled, setCodEnabled] = useState(true);
 
   // previewMode covers both the editor's live-preview iframe and any other
   // non-visitor render — neither should count as a real page view or spend
@@ -918,7 +922,18 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     if (previewMode) return;
     fetch(`/api/public/landing-pages/${page.slug}/payment-channels`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((json) => setWalletChannels(json?.data?.wallet_channels ?? []))
+      .then((json) => {
+        const channels: Array<{ provider: string; number: string }> = json?.data?.wallet_channels ?? [];
+        const cod = json?.data?.cod_enabled ?? true;
+        setWalletChannels(channels);
+        setCodEnabled(cod);
+        // If this page turned COD off, the default selection can't stay on
+        // an option that isn't offered — fall back to the first enabled
+        // wallet channel instead.
+        if (!cod && channels.length > 0) {
+          setPaymentMethod(channels[0].provider as "bkash" | "nagad" | "rocket");
+        }
+      })
       .catch(() => {});
   }, [previewMode, page.slug]);
 
@@ -1559,13 +1574,15 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               <div className="lp-card rounded-3xl p-6 sm:p-8">
                 <h3 className="text-lg font-bold" style={{ color: theme.primary }}>Payment Method</h3>
                 <div className="mt-4 space-y-3">
-                  <label className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${paymentMethod === "cod" ? "border-orange-300 bg-orange-50" : "border-slate-200 bg-white"}`}>
-                    <input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mt-1" />
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">Cash on delivery</div>
-                      <div className="mt-1 text-xs text-slate-500">Pay with cash upon delivery.</div>
-                    </div>
-                  </label>
+                  {codEnabled && (
+                    <label className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${paymentMethod === "cod" ? "border-orange-300 bg-orange-50" : "border-slate-200 bg-white"}`}>
+                      <input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mt-1" />
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">Cash on delivery</div>
+                        <div className="mt-1 text-xs text-slate-500">Pay with cash upon delivery.</div>
+                      </div>
+                    </label>
+                  )}
                   {/* Personal-wallet "send & verify" channels — only the ones
                       this seller actually turned on, from /payment-channels.
                       See online_payment_context.md. */}

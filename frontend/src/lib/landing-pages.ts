@@ -256,6 +256,15 @@ export type LandingPageSettings = {
   // pixel id it resolves to lives on tracking_destinations, never here
   // (tracking_capi_context.md §8.8).
   tracking_enabled?: boolean | null;
+  // Which checkout payment channels THIS page offers — subset of
+  // 'cod'/'bkash'/'nagad'/'rocket' (only the ones the seller has also
+  // turned on shop-wide in Settings → Online Payment Channels). null/unset
+  // (not an empty array) means "offer everything the shop has enabled" —
+  // the backward-compatible default for pages that predate this setting.
+  // See online_payment_context.md. Deliberately NOT part of
+  // DefaultSettingsShape below — a real default value here would behave
+  // like an explicit seller choice and break that null-means-"all" rule.
+  payment_channels?: string[] | null;
 };
 
 type DefaultSettingsShape = {
@@ -416,6 +425,9 @@ export function mergeLandingContent(
       // Not part of DefaultSettingsShape — it isn't language-dependent like
       // the fields above, just an on/off toggle defaulting to on.
       tracking_enabled: pageContent.settings?.tracking_enabled ?? templateContent.settings?.tracking_enabled ?? true,
+      // No default value here on purpose — null means "offer everything
+      // the shop enabled", see the type comment above.
+      payment_channels: pageContent.settings?.payment_channels ?? templateContent.settings?.payment_channels ?? null,
     },
     layout_order: Array.isArray(pageContent.layout_order)
       ? pageContent.layout_order

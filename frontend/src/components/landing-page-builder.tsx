@@ -285,6 +285,11 @@ const text = {
     otpFormResendText: "পুনরায় পাঠান লিংকের টেক্সট",
     trackingEnabled: "মেটা (Facebook) ট্র্যাকিং",
     trackingEnabledHint: "চালু থাকলে এই পেজে Facebook Pixel/Conversions API ইভেন্ট পাঠানো হবে (আপনার ট্র্যাকিং কনফিগার করা থাকলে)। বন্ধ করলে এই নির্দিষ্ট পেজের জন্য ট্র্যাকিং সম্পূর্ণ বন্ধ হয়ে যাবে।",
+    paymentChannelsTitle: "পেমেন্ট পদ্ধতি",
+    paymentChannelsRestrict: "এই পেজের জন্য নির্দিষ্ট পেমেন্ট পদ্ধতি বেছে নিন",
+    paymentChannelsHint: "বন্ধ থাকলে শপে যা যা চালু আছে (Settings → Online Payment Channels) সবই এই পেজের চেকআউটে দেখাবে।",
+    paymentChannelCod: "ক্যাশ অন ডেলিভারি",
+    paymentChannelNoWallet: "শপে কোনো অনলাইন পেমেন্ট চ্যানেল চালু নেই — Settings → Online Payment Channels থেকে চালু করুন।",
     save: "সংরক্ষণ করুন",
     saving: "সংরক্ষণ হচ্ছে...",
     blocksTitle: "পেজ ব্লক (ড্র্যাগ করে সাজান)",
@@ -403,6 +408,11 @@ const text = {
     otpFormResendText: "Resend link text",
     trackingEnabled: "Meta (Facebook) tracking",
     trackingEnabledHint: "When on, this page sends Facebook Pixel/Conversions API events (once you've configured tracking). Turning it off disables tracking for this specific page only.",
+    paymentChannelsTitle: "Payment Methods",
+    paymentChannelsRestrict: "Restrict payment methods for this page",
+    paymentChannelsHint: "When off, this page's checkout shows everything the shop has enabled (Settings → Online Payment Channels).",
+    paymentChannelCod: "Cash on delivery",
+    paymentChannelNoWallet: "No online payment channel is enabled shop-wide yet — turn one on in Settings → Online Payment Channels.",
     save: "Save",
     saving: "Saving...",
     blocksTitle: "Page blocks (drag to reorder)",
@@ -510,7 +520,33 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const [otpFormButtonText, setOtpFormButtonText] = useState<string>(getDefaultSettings("bn").otp_form_button_text);
   const [otpFormResendText, setOtpFormResendText] = useState<string>(getDefaultSettings("bn").otp_form_resend_text);
   const [trackingEnabled, setTrackingEnabled] = useState<boolean>(true);
+  // null = no restriction, this page offers everything the shop enabled
+  // (backward-compatible default). A non-null array is an explicit subset.
+  // See online_payment_context.md.
+  const [paymentChannels, setPaymentChannels] = useState<string[] | null>(null);
+  const [shopWalletProviders, setShopWalletProviders] = useState<string[]>([]);
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
+
+  // Which wallet channels this shop has turned on at all (Settings → Online
+  // Payment Channels) — the per-page selector below can only narrow this
+  // set, never offer a channel the shop hasn't enabled. Skipped for
+  // templates, which aren't tied to a real seller's payment settings.
+  useEffect(() => {
+    if (mode === "admin-template") return;
+    fetch(`${LANDING_API_BASE}/payment-gateway-settings`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const d = json?.data;
+        if (!d) return;
+        const providers: string[] = [];
+        if (d.bkash_personal_enabled) providers.push("bkash");
+        if (d.nagad_personal_enabled) providers.push("nagad");
+        if (d.rocket_personal_enabled) providers.push("rocket");
+        setShopWalletProviders(providers);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const isAdminTemplateMode = mode === "admin-template";
   const [templateNameBn, setTemplateNameBn] = useState("");
@@ -618,6 +654,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setOtpFormButtonText(merged.settings?.otp_form_button_text ?? loadedDefaults.otp_form_button_text);
       setOtpFormResendText(merged.settings?.otp_form_resend_text ?? loadedDefaults.otp_form_resend_text);
       setTrackingEnabled(merged.settings?.tracking_enabled ?? true);
+      setPaymentChannels(merged.settings?.payment_channels ?? null);
       if (sourceTheme) {
         setTheme({
           primary_color: sourceTheme.primary_color ?? DEFAULT_THEME.primary_color,
@@ -781,6 +818,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setOtpFormButtonText(merged.settings?.otp_form_button_text ?? loadedDefaults.otp_form_button_text);
           setOtpFormResendText(merged.settings?.otp_form_resend_text ?? loadedDefaults.otp_form_resend_text);
       setTrackingEnabled(merged.settings?.tracking_enabled ?? true);
+          setPaymentChannels(merged.settings?.payment_channels ?? null);
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
             accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
@@ -1109,6 +1147,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
         otp_form_button_text: otpFormButtonText || null,
         otp_form_resend_text: otpFormResendText || null,
         tracking_enabled: trackingEnabled,
+        payment_channels: paymentChannels,
       },
       layout_order: layoutEntries,
     };
@@ -1130,7 +1169,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -1926,6 +1965,54 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
                 {t.trackingEnabled}
               </label>
               <p className="mt-1 text-xs text-[var(--muted)]">{t.trackingEnabledHint}</p>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.paymentChannelsTitle}</h4>
+              <label className="mt-2 flex items-center gap-2 text-sm text-[var(--foreground)]">
+                <input
+                  type="checkbox"
+                  checked={paymentChannels !== null}
+                  onChange={(e) => setPaymentChannels(e.target.checked ? ["cod", ...shopWalletProviders] : null)}
+                  className="accent-[var(--accent)]"
+                />
+                {t.paymentChannelsRestrict}
+              </label>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t.paymentChannelsHint}</p>
+              {paymentChannels !== null ? (
+                <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
+                  <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                    <input
+                      type="checkbox"
+                      checked={paymentChannels.includes("cod")}
+                      onChange={(e) => setPaymentChannels((prev) => {
+                        const set = new Set(prev ?? []);
+                        if (e.target.checked) set.add("cod"); else set.delete("cod");
+                        return Array.from(set);
+                      })}
+                      className="accent-[var(--accent)]"
+                    />
+                    {t.paymentChannelCod}
+                  </label>
+                  {shopWalletProviders.length === 0 ? (
+                    <p className="text-xs text-[var(--muted)]">{t.paymentChannelNoWallet}</p>
+                  ) : shopWalletProviders.map((p) => (
+                    <label key={p} className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                      <input
+                        type="checkbox"
+                        checked={paymentChannels.includes(p)}
+                        onChange={(e) => setPaymentChannels((prev) => {
+                          const set = new Set(prev ?? []);
+                          if (e.target.checked) set.add(p); else set.delete(p);
+                          return Array.from(set);
+                        })}
+                        className="accent-[var(--accent)]"
+                      />
+                      {p === "bkash" ? "bKash" : p === "nagad" ? "Nagad" : "Rocket"}
+                    </label>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 

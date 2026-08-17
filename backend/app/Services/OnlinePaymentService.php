@@ -108,7 +108,14 @@ class OnlinePaymentService
      * auto-confirm transition (only from 'pending', never pulling a
      * further-along order backward).
      */
-    public function verifyWalletClaim(OrderOnlinePayment $claim, User $verifier, bool $approve, ?string $note = null): OrderOnlinePayment
+    /**
+     * $amount is the amount the seller actually confirms receiving —
+     * manually entered at approve time, not blindly trusted from the
+     * customer's own claim (the customer may have sent less/more than the
+     * order total, or made a mistake typing the claim). Required when
+     * $approve is true; ignored on reject.
+     */
+    public function verifyWalletClaim(OrderOnlinePayment $claim, User $verifier, bool $approve, ?string $note = null, ?float $amount = null): OrderOnlinePayment
     {
         if ($claim->isTerminal()) {
             throw ValidationException::withMessages([
@@ -116,7 +123,13 @@ class OnlinePaymentService
             ]);
         }
 
-        return DB::transaction(function () use ($claim, $verifier, $approve, $note) {
+        if ($approve && ($amount === null || $amount <= 0)) {
+            throw ValidationException::withMessages([
+                'amount' => ['কত টাকা পেয়েছেন তা লিখুন।'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($claim, $verifier, $approve, $note, $amount) {
             // Row-lock to guard against a double-click double-approving the
             // same claim — mirrors the tightened idempotency discipline
             // called for in online_payment_context.md's gateway-callback
@@ -149,16 +162,17 @@ class OnlinePaymentService
                 'created_by' => $verifier->id,
                 'purpose' => 'full_payment',
                 'method' => $claim->provider,
-                'amount' => $claim->amount,
+                'amount' => $amount,
                 'discount' => 0,
                 'screenshot_path' => $claim->screenshot_path,
-                'note' => "Online payment verified — sender {$claim->sender_number}, TrxID {$claim->customer_trx_id}.",
+                'note' => "Online payment verified — sender {$claim->sender_number}, TrxID {$claim->customer_trx_id}"
+                    . ((float) $amount !== (float) $claim->amount ? " (claimed ৳{$claim->amount}, confirmed ৳{$amount})." : '.'),
                 'collected_at' => now(),
             ]);
 
             $this->accountingService->recordManualPayment($payment, 'order_online_payment');
 
-            if ((float) $claim->amount > 0 && $order->status === 'pending') {
+            if ($amount > 0 && $order->status === 'pending') {
                 $this->orderStatusService->transition(
                     $order,
                     'confirmed',

@@ -112,6 +112,43 @@ class OnlinePaymentWalletClaimTest extends TestCase
         $this->assertSame(['bkash'], $providers);
     }
 
+    public function test_payment_channels_endpoint_respects_per_page_restriction(): void
+    {
+        // Shop has bkash AND nagad enabled, but this specific page only
+        // offers bkash (and turns COD off) — the page-level setting must
+        // narrow the shop-wide set, not just filter it out entirely.
+        [$owner, $page] = $this->shopWithPage();
+        $this->enableBkash($owner);
+        PaymentGatewaySetting::where('user_id', $owner->id)->update([
+            'nagad_personal_enabled' => true, 'nagad_personal_number' => '01711112222',
+        ]);
+        LandingPage::where('id', $page->id)->update([
+            'content' => ['settings' => ['payment_channels' => ['bkash']]],
+        ]);
+
+        $response = $this->getJson("https://shopa.{$this->apex()}/api/public/landing-pages/offer/payment-channels");
+
+        $response->assertOk();
+        $this->assertFalse($response->json('data.cod_enabled'));
+        $providers = collect($response->json('data.wallet_channels'))->pluck('provider')->all();
+        $this->assertSame(['bkash'], $providers);
+    }
+
+    public function test_payment_channels_endpoint_defaults_to_everything_when_page_has_no_restriction(): void
+    {
+        [$owner, $page] = $this->shopWithPage();
+        $this->enableBkash($owner);
+        // content has no 'payment_channels' key at all — pre-existing page.
+        LandingPage::where('id', $page->id)->update(['content' => ['settings' => []]]);
+
+        $response = $this->getJson("https://shopa.{$this->apex()}/api/public/landing-pages/offer/payment-channels");
+
+        $response->assertOk();
+        $this->assertTrue($response->json('data.cod_enabled'));
+        $providers = collect($response->json('data.wallet_channels'))->pluck('provider')->all();
+        $this->assertSame(['bkash'], $providers);
+    }
+
     public function test_submit_wallet_claim_creates_awaiting_verification_row(): void
     {
         [$owner, $page, $product] = $this->shopWithPage();
@@ -166,7 +203,7 @@ class OnlinePaymentWalletClaimTest extends TestCase
         $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
 
         Sanctum::actingAs($owner);
-        $response = $this->postJson("/api/online-payments/{$claim->id}/verify", ['approve' => true]);
+        $response = $this->postJson("/api/online-payments/{$claim->id}/verify", ['approve' => true, 'amount' => 580]);
 
         $response->assertOk();
 
@@ -209,6 +246,63 @@ class OnlinePaymentWalletClaimTest extends TestCase
 
         // Customer can submit a fresh claim (different trx id) after a rejection.
         $this->submitClaim('shopa', 'offer', $order, ['customer_trx_id' => 'TRX-SECOND'])->assertCreated();
+    }
+
+    public function test_approve_uses_the_sellers_manually_entered_amount_not_the_customers_claim(): void
+    {
+        // Customer claims the full order total, but the seller only
+        // actually received a partial amount — the seller's own entry at
+        // approve time is what gets recorded, never the claim blindly.
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableBkash($owner);
+        $order = $this->createOrder('shopa', 'offer', $product->id);
+        $this->submitClaim('shopa', 'offer', $order)->assertCreated(); // claims 580
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+
+        Sanctum::actingAs($owner);
+        $this->postJson("/api/online-payments/{$claim->id}/verify", ['approve' => true, 'amount' => 300])
+            ->assertOk();
+
+        $order->refresh();
+        $this->assertEquals(300.0, $order->paidAmount());
+        $this->assertSame('partial', $order->payment_status);
+        $this->assertDatabaseHas('order_payments', ['order_id' => $order->id, 'amount' => 300]);
+    }
+
+    public function test_approve_without_an_amount_is_rejected(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableBkash($owner);
+        $order = $this->createOrder('shopa', 'offer', $product->id);
+        $this->submitClaim('shopa', 'offer', $order)->assertCreated();
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+
+        Sanctum::actingAs($owner);
+        $this->postJson("/api/online-payments/{$claim->id}/verify", ['approve' => true])
+            ->assertStatus(422);
+
+        $this->assertDatabaseMissing('order_payments', ['order_id' => $order->id]);
+    }
+
+    public function test_otp_is_not_required_when_customer_picked_an_online_payment_channel(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableBkash($owner);
+        LandingPage::where('id', $page->id)->update([
+            'content' => ['settings' => ['otp_verification_enabled' => true]],
+        ]);
+
+        $response = $this->postJson("https://shopa.{$this->apex()}/api/public/landing-pages/offer/order", [
+            'customer_name' => 'Karim Uddin',
+            'customer_phone' => '01712345678',
+            'customer_address' => 'Dhanmondi, Dhaka',
+            'payment_method' => 'bkash',
+            'items' => [['enabled' => true, 'product_id' => $product->id, 'quantity' => 1]],
+        ]);
+        $response->assertCreated();
+
+        $order = Order::findOrFail($response->json('data.order_id'));
+        $this->assertFalse((bool) $order->otp_required);
     }
 
     public function test_pending_verification_list_does_not_leak_another_shops_claims(): void

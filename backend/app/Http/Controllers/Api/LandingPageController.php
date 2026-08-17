@@ -170,7 +170,13 @@ class LandingPageController extends Controller
             'fbc' => $request->cookie('_fbc'),
         ]);
 
-        app(CheckoutOtpService::class)->maybeSendForOrder($page->content['settings'] ?? [], $order);
+        // OTP only guards COD orders — a customer who picked an online
+        // payment channel (bkash/nagad/rocket) already proves real intent
+        // by sending real money and submitting a TrxID, so there's no
+        // second verification gate needed on top. See online_payment_context.md.
+        if ($order->payment_method === 'cod') {
+            app(CheckoutOtpService::class)->maybeSendForOrder($page->content['settings'] ?? [], $order);
+        }
         app(AbandonedCheckoutService::class)->convertMatching(
             $page,
             $order,
