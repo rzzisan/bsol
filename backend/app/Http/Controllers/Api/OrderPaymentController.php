@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderPayment;
 use App\Models\User;
 use App\Services\AccountingService;
+use App\Services\OrderStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,7 @@ class OrderPaymentController extends Controller
 {
     public function __construct(
         private readonly AccountingService $accountingService,
+        private readonly OrderStatusService $orderStatusService,
     ) {}
 
     public function index(int $orderId): JsonResponse
@@ -97,6 +99,24 @@ class OrderPaymentController extends Controller
             ]);
 
             $this->accountingService->recordManualPayment($payment);
+
+            // A real payment (not a discount-only waiver) is a strong signal
+            // the customer genuinely wants the order — auto-confirm exactly
+            // like a manual status change would, so it goes through
+            // OrderStatusService::transition()'s full side-effect chain
+            // (inventory reservation, SMS, and — the part this exists for —
+            // the Meta OrderConfirmed tracking event, ORDER_FLOW_EVENTS in
+            // OrderStatusService). Only from 'pending': an order already
+            // further along (processing/shipped/...) must never be pulled
+            // backward by a late/partial payment entry.
+            if ($amount > 0 && $order->status === 'pending') {
+                $this->orderStatusService->transition(
+                    $order,
+                    'confirmed',
+                    'Order confirmed via manual payment collection.',
+                    auth()->id(),
+                );
+            }
 
             return $payment;
         });

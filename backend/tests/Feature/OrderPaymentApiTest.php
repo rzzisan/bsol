@@ -4,10 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\Order;
 use App\Models\StaffPermission;
+use App\Models\SubscriptionPackage;
+use App\Models\TrackingDestination;
+use App\Models\TrackingEvent;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -17,6 +21,28 @@ use Tests\TestCase;
 class OrderPaymentApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Queue::fake(); // DispatchTrackingEventsJob — the Meta send itself is T2's concern, not this file's.
+    }
+
+    /** A seller with tracking quota + a configured pixel — needed only by the auto-confirm tests below. */
+    private function ownerWithTracking(): User
+    {
+        $package = SubscriptionPackage::create([
+            'name' => 'Test', 'slug' => 'test-' . uniqid(), 'price' => 0,
+            'duration_days' => 30, 'max_tracking_events_per_day' => 100,
+        ]);
+        $owner = User::factory()->create(['subscription_package_id' => $package->id]);
+
+        TrackingDestination::create([
+            'user_id' => $owner->id, 'pixel_id' => '1234567890', 'access_token' => 'token-secret', 'enabled' => true,
+        ]);
+
+        return $owner;
+    }
 
     private function makeOrder(User $owner, array $overrides = []): Order
     {
@@ -182,5 +208,53 @@ class OrderPaymentApiTest extends TestCase
         $response->assertJsonCount(1, 'data.payments');
         $response->assertJsonCount(2, 'data.collectors'); // owner + staff
         $response->assertJsonPath('data.order.due_amount', 520);
+    }
+
+    // ── Auto-confirm on real payment (goes through OrderStatusService::transition(),
+    //    which is what actually fires the Meta OrderConfirmed tracking event) ──
+
+    public function test_a_real_payment_on_a_pending_order_auto_confirms_and_fires_the_tracking_event(): void
+    {
+        $owner = $this->ownerWithTracking();
+        $order = $this->makeOrder($owner, ['status' => 'pending']);
+        Sanctum::actingAs($owner);
+
+        $this->postJson("/api/orders/{$order->id}/payments", [
+            'purpose' => 'advance', 'method' => 'cash', 'amount' => 100, 'collected_by' => $owner->id,
+        ])->assertCreated()->assertJsonPath('data.order.status', 'confirmed');
+
+        $this->assertSame('confirmed', $order->fresh()->status);
+        $this->assertSame(['OrderConfirmed'], TrackingEvent::pluck('event_name')->all());
+        $this->assertDatabaseHas('order_status_logs', [
+            'order_id' => $order->id, 'old_status' => 'pending', 'new_status' => 'confirmed',
+        ]);
+    }
+
+    public function test_a_payment_on_an_already_advanced_order_does_not_revert_its_status(): void
+    {
+        $owner = $this->ownerWithTracking();
+        $order = $this->makeOrder($owner, ['status' => 'processing']);
+        Sanctum::actingAs($owner);
+
+        $this->postJson("/api/orders/{$order->id}/payments", [
+            'purpose' => 'full_payment', 'method' => 'cash', 'amount' => 620, 'collected_by' => $owner->id,
+        ])->assertCreated()->assertJsonPath('data.order.status', 'processing');
+
+        $this->assertSame('processing', $order->fresh()->status);
+        $this->assertSame(0, TrackingEvent::count());
+    }
+
+    public function test_a_discount_only_entry_does_not_auto_confirm(): void
+    {
+        $owner = $this->ownerWithTracking();
+        $order = $this->makeOrder($owner, ['status' => 'pending']);
+        Sanctum::actingAs($owner);
+
+        $this->postJson("/api/orders/{$order->id}/payments", [
+            'purpose' => 'other', 'method' => 'other', 'discount' => 620, 'collected_by' => $owner->id,
+        ])->assertCreated()->assertJsonPath('data.order.status', 'pending');
+
+        $this->assertSame('pending', $order->fresh()->status);
+        $this->assertSame(0, TrackingEvent::count());
     }
 }
