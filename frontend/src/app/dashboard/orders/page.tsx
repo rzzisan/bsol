@@ -61,6 +61,39 @@ const t = {
     save: "সংরক্ষণ",
     cancel: "বাতিল",
     saving: "সংরক্ষণ হচ্ছে...",
+    payment: "পেমেন্ট",
+    paymentModalTitle: "পেমেন্ট কালেকশন",
+    billSummary: "বিল সামারি",
+    subtotal: "সাবটোটাল",
+    shipping: "শিপিং চার্জ",
+    orderDiscount: "অর্ডার ডিসকাউন্ট",
+    grandTotal: "সর্বমোট",
+    paidSoFar: "এ পর্যন্ত পরিশোধিত",
+    extraDiscount: "অতিরিক্ত ছাড়",
+    dueAmount: "বাকি",
+    overpaidBy: "অতিরিক্ত পরিশোধিত",
+    fullyPaid: "সম্পূর্ণ পরিশোধিত",
+    newEntry: "নতুন পেমেন্ট এন্ট্রি",
+    purpose: "পেমেন্ট ধরন",
+    purposeNames: { advance: "অগ্রিম", courier_charge: "কুরিয়ার চার্জ", full_payment: "ফুল পেমেন্ট", other: "অন্যান্য" },
+    method: "পেমেন্ট মাধ্যম",
+    methodNames: { cash: "ক্যাশ", bank: "ব্যাংক", bkash: "বিকাশ", nagad: "নগদ", rocket: "রকেট", upay: "উপায়", other: "অন্যান্য" },
+    amount: "টাকার পরিমাণ",
+    discount: "ডিসকাউন্ট",
+    collectedBy: "কে রিসিভ করলো",
+    collectedAt: "তারিখ",
+    screenshot: "স্ক্রিনশট",
+    screenshotHint: "বিকাশ/নগদ/রকেট/উপায়ে টাকা নিলে স্ক্রিনশট আবশ্যক",
+    addPayment: "পেমেন্ট যোগ করুন",
+    adding: "সংরক্ষণ হচ্ছে...",
+    history: "কালেকশন হিস্ট্রি",
+    noPayments: "এখনো কোনো পেমেন্ট এন্ট্রি নেই।",
+    receivedBy: "রিসিভার",
+    loggedBy: "এন্ট্রি করেছেন",
+    viewScreenshot: "স্ক্রিনশট দেখুন",
+    deleteEntry: "মুছুন",
+    deleteConfirm: "এই পেমেন্ট এন্ট্রি মুছে ফেলতে চান?",
+    close: "বন্ধ করুন",
   },
   en: {
     pageTitle: "Order List",
@@ -96,6 +129,39 @@ const t = {
     save: "Save",
     cancel: "Cancel",
     saving: "Saving...",
+    payment: "Payment",
+    paymentModalTitle: "Payment Collection",
+    billSummary: "Bill Summary",
+    subtotal: "Subtotal",
+    shipping: "Shipping charge",
+    orderDiscount: "Order discount",
+    grandTotal: "Grand total",
+    paidSoFar: "Paid so far",
+    extraDiscount: "Extra discount",
+    dueAmount: "Due",
+    overpaidBy: "Overpaid by",
+    fullyPaid: "Fully paid",
+    newEntry: "New Payment Entry",
+    purpose: "Payment purpose",
+    purposeNames: { advance: "Advance", courier_charge: "Courier charge", full_payment: "Full payment", other: "Other" },
+    method: "Payment method",
+    methodNames: { cash: "Cash", bank: "Bank", bkash: "bKash", nagad: "Nagad", rocket: "Rocket", upay: "Upay", other: "Other" },
+    amount: "Amount",
+    discount: "Discount",
+    collectedBy: "Received by",
+    collectedAt: "Date",
+    screenshot: "Screenshot",
+    screenshotHint: "Required for bKash/Nagad/Rocket/Upay",
+    addPayment: "Add Payment",
+    adding: "Saving...",
+    history: "Collection History",
+    noPayments: "No payment entries yet.",
+    receivedBy: "Received by",
+    loggedBy: "Logged by",
+    viewScreenshot: "View screenshot",
+    deleteEntry: "Delete",
+    deleteConfirm: "Delete this payment entry?",
+    close: "Close",
   },
 };
 
@@ -108,6 +174,23 @@ type Order = {
 };
 type Stats = { total: number; today: number; pending: number; delivered: number };
 type WpSite = { id: number; domain: string; status: string };
+
+const PURPOSES = ["advance", "courier_charge", "full_payment", "other"] as const;
+const METHODS = ["cash", "bank", "bkash", "nagad", "rocket", "upay", "other"] as const;
+const SCREENSHOT_REQUIRED_METHODS = ["bkash", "nagad", "rocket", "upay"];
+
+type OrderPaymentSummary = {
+  id: number; order_number: string; customer_name: string | null; customer_phone: string;
+  status: string; payment_method: string; payment_status: string;
+  subtotal: string; shipping_charge: string; discount: string; total: string;
+  paid_amount: number; collection_discount: number; due_amount: number;
+};
+type Collector = { id: number; name: string };
+type PaymentEntry = {
+  id: number; purpose: string; method: string; amount: string; discount: string;
+  screenshot_url: string | null; note: string | null; collected_at: string;
+  collector: Collector | null; creator: Collector | null;
+};
 
 export default function OrdersPage() {
   const [locale] = useState<Locale>(getStoredLocale);
@@ -137,6 +220,26 @@ export default function OrdersPage() {
 
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<number | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
+
+  // payment collection modal
+  const [paymentModalOrderId, setPaymentModalOrderId] = useState<number | null>(null);
+  const [paymentSummary, setPaymentSummary] = useState<OrderPaymentSummary | null>(null);
+  const [payments, setPayments] = useState<PaymentEntry[]>([]);
+  const [collectors, setCollectors] = useState<Collector[]>([]);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<number | null>(null);
+  const [paymentFormError, setPaymentFormError] = useState<string | null>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    purpose: "advance" as typeof PURPOSES[number],
+    method: "cash" as typeof METHODS[number],
+    amount: "",
+    discount: "",
+    collectedBy: "",
+    collectedAt: "",
+    note: "",
+  });
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
 
   const token = getStoredToken();
 
@@ -238,6 +341,93 @@ export default function OrdersPage() {
     const result = await openAuthenticatedPdf(`${API}/orders/${orderId}/invoice`);
     if (!result.success) setInvoiceError(result.message ?? txt.invoiceFailed);
     setDownloadingInvoiceId(null);
+  };
+
+  const loadPaymentData = useCallback(async (orderId: number) => {
+    setPaymentLoading(true);
+    try {
+      const res = await fetch(`${API}/orders/${orderId}/payments`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json();
+        setPaymentSummary(d.data?.order ?? null);
+        setPayments(d.data?.payments ?? []);
+        setCollectors(d.data?.collectors ?? []);
+      }
+    } finally {
+      setPaymentLoading(false);
+    }
+  }, [token]);
+
+  const openPaymentModal = (o: Order) => {
+    setPaymentModalOrderId(o.id);
+    setPaymentFormError(null);
+    setScreenshotFile(null);
+    setPaymentForm({ purpose: "advance", method: "cash", amount: "", discount: "", collectedBy: "", collectedAt: "", note: "" });
+    void loadPaymentData(o.id);
+  };
+  const closePaymentModal = () => {
+    setPaymentModalOrderId(null);
+    setPaymentSummary(null);
+    setPayments([]);
+  };
+
+  const submitPayment = async () => {
+    if (!paymentModalOrderId) return;
+    if (!paymentForm.collectedBy) {
+      setPaymentFormError(locale === "bn" ? "কে রিসিভ করলো তা নির্বাচন করুন।" : "Select who received the payment.");
+      return;
+    }
+    if (SCREENSHOT_REQUIRED_METHODS.includes(paymentForm.method) && !screenshotFile) {
+      setPaymentFormError(txt.screenshotHint);
+      return;
+    }
+    setPaymentSaving(true);
+    setPaymentFormError(null);
+    try {
+      const body = new FormData();
+      body.append("purpose", paymentForm.purpose);
+      body.append("method", paymentForm.method);
+      if (paymentForm.amount) body.append("amount", paymentForm.amount);
+      if (paymentForm.discount) body.append("discount", paymentForm.discount);
+      body.append("collected_by", paymentForm.collectedBy);
+      if (paymentForm.collectedAt) body.append("collected_at", paymentForm.collectedAt);
+      if (paymentForm.note) body.append("note", paymentForm.note);
+      if (screenshotFile) body.append("screenshot", screenshotFile);
+
+      const res = await fetch(`${API}/orders/${paymentModalOrderId}/payments`, {
+        method: "POST",
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+        body,
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        const firstError = d?.errors ? (Object.values(d.errors)[0] as string[])?.[0] : null;
+        setPaymentFormError(firstError ?? d?.message ?? (locale === "bn" ? "সংরক্ষণ ব্যর্থ হয়েছে।" : "Could not save the payment."));
+        return;
+      }
+      setPaymentForm({ purpose: "advance", method: "cash", amount: "", discount: "", collectedBy: "", collectedAt: "", note: "" });
+      setScreenshotFile(null);
+      await loadPaymentData(paymentModalOrderId);
+      void fetchData();
+    } finally {
+      setPaymentSaving(false);
+    }
+  };
+
+  const deletePayment = async (paymentId: number) => {
+    if (!paymentModalOrderId) return;
+    if (!window.confirm(txt.deleteConfirm)) return;
+    setDeletingPaymentId(paymentId);
+    try {
+      await fetch(`${API}/orders/${paymentModalOrderId}/payments/${paymentId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await loadPaymentData(paymentModalOrderId);
+      void fetchData();
+    } finally {
+      setDeletingPaymentId(null);
+    }
   };
 
   return (
@@ -376,6 +566,10 @@ export default function OrdersPage() {
                       className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)] disabled:opacity-50">
                       {downloadingInvoiceId === o.id ? txt.invoicePreparing : txt.invoice}
                     </button>
+                    <button onClick={() => openPaymentModal(o)}
+                      className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]">
+                      {txt.payment}
+                    </button>
                     <Link href={`/dashboard/orders/${o.id}`}
                       className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]">
                       {txt.view}
@@ -432,6 +626,159 @@ export default function OrdersPage() {
                 {statusSaving ? txt.saving : txt.save}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment collection modal */}
+      {paymentModalOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && closePaymentModal()}>
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+            <h3 className="mb-1 text-base font-bold">{txt.paymentModalTitle}</h3>
+            <p className="mb-4 text-xs text-[var(--muted)]">{paymentSummary?.order_number ?? "..."}</p>
+
+            {paymentLoading || !paymentSummary ? (
+              <p className="py-10 text-center text-sm text-[var(--muted)]">{txt.loading}</p>
+            ) : (
+              <>
+                {/* Bill summary */}
+                <div className="mb-4 rounded-xl border border-[var(--border)] p-3">
+                  <p className="mb-2 text-xs font-semibold text-[var(--muted)] uppercase">{txt.billSummary}</p>
+                  <div className="grid grid-cols-2 gap-y-1 text-sm sm:grid-cols-4">
+                    <span className="text-[var(--muted)]">{txt.subtotal}</span>
+                    <span className="text-right font-medium sm:text-left">৳{Number(paymentSummary.subtotal).toLocaleString()}</span>
+                    <span className="text-[var(--muted)]">{txt.shipping}</span>
+                    <span className="text-right font-medium sm:text-left">৳{Number(paymentSummary.shipping_charge).toLocaleString()}</span>
+                    <span className="text-[var(--muted)]">{txt.orderDiscount}</span>
+                    <span className="text-right font-medium sm:text-left">৳{Number(paymentSummary.discount).toLocaleString()}</span>
+                    <span className="text-[var(--muted)]">{txt.grandTotal}</span>
+                    <span className="text-right font-semibold sm:text-left">৳{Number(paymentSummary.total).toLocaleString()}</span>
+                    <span className="text-[var(--muted)]">{txt.paidSoFar}</span>
+                    <span className="text-right font-medium text-emerald-500 sm:text-left">৳{Number(paymentSummary.paid_amount).toLocaleString()}</span>
+                    <span className="text-[var(--muted)]">{txt.extraDiscount}</span>
+                    <span className="text-right font-medium sm:text-left">৳{Number(paymentSummary.collection_discount).toLocaleString()}</span>
+                  </div>
+                  <div className="mt-2 border-t border-[var(--border)] pt-2 text-sm font-semibold">
+                    {paymentSummary.due_amount > 0 ? (
+                      <span className="text-red-400">{txt.dueAmount}: ৳{paymentSummary.due_amount.toLocaleString()}</span>
+                    ) : paymentSummary.due_amount < 0 ? (
+                      <span className="text-yellow-500">{txt.overpaidBy}: ৳{Math.abs(paymentSummary.due_amount).toLocaleString()}</span>
+                    ) : (
+                      <span className="text-emerald-500">{txt.fullyPaid}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* History */}
+                <div className="mb-4">
+                  <p className="mb-2 text-xs font-semibold text-[var(--muted)] uppercase">{txt.history}</p>
+                  {payments.length === 0 ? (
+                    <p className="text-sm text-[var(--muted)]">{txt.noPayments}</p>
+                  ) : (
+                    <div className="grid gap-2">
+                      {payments.map(p => (
+                        <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border)] p-2.5 text-sm">
+                          <div>
+                            <p className="font-semibold">
+                              ৳{Number(p.amount).toLocaleString()}
+                              {Number(p.discount) > 0 && <span className="ml-1 text-xs font-normal text-[var(--muted)]">({txt.discount} − ৳{Number(p.discount).toLocaleString()})</span>}
+                            </p>
+                            <p className="text-xs text-[var(--muted)]">
+                              {txt.purposeNames[p.purpose as keyof typeof txt.purposeNames] ?? p.purpose} · {txt.methodNames[p.method as keyof typeof txt.methodNames] ?? p.method} · {fmtDate(p.collected_at)}
+                            </p>
+                            <p className="text-xs text-[var(--muted)]">
+                              {txt.receivedBy}: {p.collector?.name ?? "—"}
+                              {p.creator && p.creator.id !== p.collector?.id ? ` (${txt.loggedBy}: ${p.creator.name})` : ""}
+                            </p>
+                            {p.note && <p className="text-xs text-[var(--muted)]">{p.note}</p>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {p.screenshot_url && (
+                              <a href={p.screenshot_url} target="_blank" rel="noopener noreferrer"
+                                className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface-soft)]">
+                                {txt.viewScreenshot}
+                              </a>
+                            )}
+                            <button onClick={() => void deletePayment(p.id)} disabled={deletingPaymentId === p.id}
+                              className="rounded-lg border border-red-500/30 px-2 py-1 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50">
+                              {txt.deleteEntry}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* New entry form */}
+                <div className="rounded-xl border border-[var(--border)] p-3">
+                  <p className="mb-3 text-xs font-semibold text-[var(--muted)] uppercase">{txt.newEntry}</p>
+                  {paymentFormError && <p className="mb-3 text-xs text-red-400">{paymentFormError}</p>}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.purpose}</span>
+                      <select value={paymentForm.purpose} onChange={e => setPaymentForm(f => ({ ...f, purpose: e.target.value as typeof PURPOSES[number] }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                        {PURPOSES.map(p => <option key={p} value={p}>{txt.purposeNames[p]}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.method}</span>
+                      <select value={paymentForm.method} onChange={e => setPaymentForm(f => ({ ...f, method: e.target.value as typeof METHODS[number] }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                        {METHODS.map(m => <option key={m} value={m}>{txt.methodNames[m]}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.amount}</span>
+                      <input type="number" min="0" step="0.01" value={paymentForm.amount}
+                        onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.discount}</span>
+                      <input type="number" min="0" step="0.01" value={paymentForm.discount}
+                        onChange={e => setPaymentForm(f => ({ ...f, discount: e.target.value }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.collectedBy}</span>
+                      <select value={paymentForm.collectedBy} onChange={e => setPaymentForm(f => ({ ...f, collectedBy: e.target.value }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                        <option value="">—</option>
+                        {collectors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.collectedAt}</span>
+                      <input type="date" value={paymentForm.collectedAt}
+                        onChange={e => setPaymentForm(f => ({ ...f, collectedAt: e.target.value }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
+                    </label>
+                    <label className="sm:col-span-2">
+                      <span className="mb-1 block text-xs text-[var(--muted)]">{txt.note}</span>
+                      <textarea rows={2} value={paymentForm.note} onChange={e => setPaymentForm(f => ({ ...f, note: e.target.value }))}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm resize-none" />
+                    </label>
+                    <label className="sm:col-span-2">
+                      <span className="mb-1 block text-xs text-[var(--muted)]">
+                        {txt.screenshot}
+                        {SCREENSHOT_REQUIRED_METHODS.includes(paymentForm.method) && <span className="ml-1 text-red-400">({txt.screenshotHint})</span>}
+                      </span>
+                      <input type="file" accept="image/*" onChange={e => setScreenshotFile(e.target.files?.[0] ?? null)}
+                        className="w-full text-sm" />
+                    </label>
+                  </div>
+                  <div className="mt-4 flex justify-end gap-3">
+                    <button onClick={closePaymentModal} className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm hover:bg-[var(--surface-soft)]">{txt.close}</button>
+                    <button onClick={() => void submitPayment()} disabled={paymentSaving}
+                      className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                      {paymentSaving ? txt.adding : txt.addPayment}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -58,6 +58,31 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    /** Manual payment-collection log — see manual_payment_collection_context.md. */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(OrderPayment::class)->orderByDesc('collected_at');
+    }
+
+    public function paidAmount(): float
+    {
+        return (float) $this->payments()->sum('amount');
+    }
+
+    /** Extra discount granted at collection time — on top of the order-level
+     *  discount already netted into `total` at creation. */
+    public function collectionDiscountAmount(): float
+    {
+        return (float) $this->payments()->sum('discount');
+    }
+
+    /** Can go negative when overpaid — deliberately not floored, so the
+     *  caller can surface "overpaid by X" rather than a misleading zero. */
+    public function dueAmount(): float
+    {
+        return (float) $this->total - $this->paidAmount() - $this->collectionDiscountAmount();
+    }
+
     public function statusLogs(): HasMany
     {
         return $this->hasMany(OrderStatusLog::class)->orderBy('created_at', 'desc');

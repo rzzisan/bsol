@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\OrderPayment;
 use App\Models\Transaction;
 
 class AccountingService
@@ -123,6 +124,71 @@ class AccountingService
         // is left alone.
         if ($order->payment_method === 'cod' && $order->payment_status === 'paid') {
             $order->update(['payment_status' => 'due']);
+        }
+    }
+
+    /**
+     * A manual payment collection (cash/bank/bKash/etc, taken directly by
+     * the seller — not the courier's own COD remittance) is its own income
+     * event, recorded independently of the order_cod/courier_charge
+     * transactions above. See manual_payment_collection_context.md §3.
+     * discount-only entries (amount 0) book no transaction — nothing was
+     * actually collected — but still recompute payment_status below.
+     */
+    public function recordManualPayment(OrderPayment $payment): void
+    {
+        if ((float) $payment->amount > 0) {
+            Transaction::create([
+                'user_id' => $payment->user_id,
+                'type' => Transaction::TYPE_INCOME,
+                'status' => Transaction::STATUS_CONFIRMED,
+                'category' => 'order_manual_payment',
+                'reference_type' => 'order_payment',
+                'reference_id' => $payment->id,
+                'amount' => $payment->amount,
+                'note' => "Manual payment collected ({$payment->purpose}/{$payment->method}) for order {$payment->order->order_number}.",
+                'transaction_date' => $payment->collected_at->toDateString(),
+                'is_auto' => true,
+                'meta' => [
+                    'order_id' => $payment->order_id,
+                    'order_number' => $payment->order->order_number,
+                    'purpose' => $payment->purpose,
+                    'method' => $payment->method,
+                ],
+            ]);
+        }
+
+        $this->syncPaymentStatus($payment->order);
+    }
+
+    /**
+     * Deletes a manual payment entry's linked ledger transaction — used when
+     * a seller removes a bad entry. Deliberately does NOT call
+     * syncPaymentStatus() itself: the caller must delete the OrderPayment
+     * row first (dueAmount() sums live from that table), then call
+     * syncPaymentStatus() separately — doing it here would recompute due
+     * while the now-reversed payment row still exists.
+     */
+    public function reverseManualPayment(OrderPayment $payment): void
+    {
+        Transaction::where('reference_type', 'order_payment')
+            ->where('reference_id', $payment->id)
+            ->delete();
+    }
+
+    /** Recomputes payment_status from the real due amount after any manual-payment change. */
+    public function syncPaymentStatus(Order $order): void
+    {
+        $due = $order->dueAmount();
+
+        $newStatus = match (true) {
+            $due <= 0.0 => 'paid',
+            $due < (float) $order->total => 'partial',
+            default => 'due',
+        };
+
+        if ($order->payment_status !== $newStatus) {
+            $order->update(['payment_status' => $newStatus]);
         }
     }
 

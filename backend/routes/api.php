@@ -62,6 +62,7 @@ use App\Http\Controllers\Api\Admin\AdminTrackingController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\PublicTrackingController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\OrderPaymentController;
 use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -390,6 +391,9 @@ Route::middleware('active_subscription')->group(function () {
         Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
         Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
         Route::get('/orders/{order}/invoice', [OrderController::class, 'invoicePdf']);
+        Route::get('/orders/{order}/payments', [OrderPaymentController::class, 'index']);
+        Route::post('/orders/{order}/payments', [OrderPaymentController::class, 'store']);
+        Route::delete('/orders/{order}/payments/{payment}', [OrderPaymentController::class, 'destroy']);
         Route::apiResource('/orders', OrderController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
     });
 
