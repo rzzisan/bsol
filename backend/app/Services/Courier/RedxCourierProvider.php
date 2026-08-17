@@ -36,7 +36,7 @@ class RedxCourierProvider extends AbstractCourierProvider
             return ['success' => false, 'message' => 'Customer address is required for RedX booking.'];
         }
 
-        $codAmount = (float) ($data['cod_amount'] ?? $order->total);
+        $codAmount = $this->resolveCodAmount($order, $data);
         $value     = (float) ($data['value'] ?? $codAmount);
         $weightKg  = (float) ($data['parcel_weight_kg'] ?? 0.5);
 

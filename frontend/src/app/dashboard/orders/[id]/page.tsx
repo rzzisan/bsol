@@ -124,6 +124,16 @@ const t = {
     grandTotal: "সর্বমোট",
     paymentMethod: "পেমেন্ট পদ্ধতি",
     paymentStatus: "পেমেন্ট স্ট্যাটাস",
+    paidLabel: "জমা হয়েছে",
+    dueLabel: "বাকি",
+    overpaidLabel: "অতিরিক্ত পরিশোধিত",
+    extraDiscountLabel: "অতিরিক্ত ছাড়",
+    paymentHistoryTitle: "পেমেন্ট হিস্ট্রি",
+    noPaymentHistory: "এখনো কোনো ম্যানুয়াল পেমেন্ট এন্ট্রি নেই।",
+    receivedByLabel: "রিসিভার",
+    viewScreenshotLabel: "স্ক্রিনশট",
+    purposeNames: { advance: "অগ্রিম", courier_charge: "কুরিয়ার চার্জ", full_payment: "ফুল পেমেন্ট", other: "অন্যান্য" } as Record<string, string>,
+    methodNames: { cash: "ক্যাশ", bank: "ব্যাংক", bkash: "বিকাশ", nagad: "নগদ", rocket: "রকেট", upay: "উপায়", other: "অন্যান্য" } as Record<string, string>,
     courier: "কুরিয়ার",
     trackingId: "ট্র্যাকিং আইডি",
     courierStatus: "কুরিয়ার স্ট্যাটাস",
@@ -190,6 +200,16 @@ const t = {
     grandTotal: "Grand Total",
     paymentMethod: "Payment Method",
     paymentStatus: "Payment Status",
+    paidLabel: "Paid so far",
+    dueLabel: "Due",
+    overpaidLabel: "Overpaid by",
+    extraDiscountLabel: "Extra discount",
+    paymentHistoryTitle: "Payment History",
+    noPaymentHistory: "No manual payment entries yet.",
+    receivedByLabel: "Received by",
+    viewScreenshotLabel: "Screenshot",
+    purposeNames: { advance: "Advance", courier_charge: "Courier charge", full_payment: "Full payment", other: "Other" } as Record<string, string>,
+    methodNames: { cash: "Cash", bank: "Bank", bkash: "bKash", nagad: "Nagad", rocket: "Rocket", upay: "Upay", other: "Other" } as Record<string, string>,
     courier: "Courier",
     trackingId: "Tracking ID",
     courierStatus: "Courier Status",
@@ -252,6 +272,16 @@ export default function OrderDetailPage() {
   // deleting
   const [deleting, setDeleting] = useState(false);
 
+  // payment history (view-only — entries are added from the order list's Payment modal)
+  const [paymentSummary, setPaymentSummary] = useState<{
+    paid_amount: number; collection_discount: number; due_amount: number;
+  } | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<Array<{
+    id: number; purpose: string; method: string; amount: string; discount: string;
+    screenshot_url: string | null; collected_at: string;
+    collector: { id: number; name: string } | null;
+  }>>([]);
+
   const showToast = (type: "success" | "error", msg: string) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 3000);
@@ -273,6 +303,19 @@ export default function OrderDetailPage() {
   }, [orderId, token]);
 
   useEffect(() => { void fetchOrder(); }, [fetchOrder]);
+
+  const fetchPayments = useCallback(async () => {
+    const res = await fetch(`${API}/orders/${orderId}/payments`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setPaymentSummary(d.data?.order ?? null);
+      setPaymentHistory(d.data?.payments ?? []);
+    }
+  }, [orderId, token]);
+
+  useEffect(() => { void fetchPayments(); }, [fetchPayments]);
 
   const openEdit = () => {
     if (!order) return;
@@ -612,6 +655,25 @@ export default function OrderDetailPage() {
                 {order.payment_status}
               </span>
             </dd>
+
+            {paymentSummary && (
+              <>
+                <dt className="text-[var(--muted)]">{txt.paidLabel}</dt>
+                <dd className="text-right text-emerald-400">৳{Number(paymentSummary.paid_amount).toLocaleString()}</dd>
+
+                {paymentSummary.collection_discount > 0 && (
+                  <>
+                    <dt className="text-[var(--muted)]">{txt.extraDiscountLabel}</dt>
+                    <dd className="text-right text-emerald-400">-৳{Number(paymentSummary.collection_discount).toLocaleString()}</dd>
+                  </>
+                )}
+
+                <dt className="text-[var(--muted)]">{paymentSummary.due_amount < 0 ? txt.overpaidLabel : txt.dueLabel}</dt>
+                <dd className={`text-right font-semibold ${paymentSummary.due_amount > 0 ? "text-red-400" : paymentSummary.due_amount < 0 ? "text-yellow-500" : "text-emerald-400"}`}>
+                  ৳{Math.abs(paymentSummary.due_amount).toLocaleString()}
+                </dd>
+              </>
+            )}
           </dl>
         </div>
 
@@ -646,6 +708,42 @@ export default function OrderDetailPage() {
                 </>
               )}
             </dl>
+          )}
+        </div>
+
+        {/* Payment History — view-only; new entries are added from the
+            order list's Payment button/modal (dashboard/orders/page.tsx).
+            See manual_payment_collection_context.md §3খ. */}
+        <div className="catv-panel p-4 md:col-span-2">
+          <h3 className="mb-3 text-sm font-semibold">{txt.paymentHistoryTitle}</h3>
+          {paymentHistory.length === 0 ? (
+            <p className="text-xs text-[var(--muted)]">{txt.noPaymentHistory}</p>
+          ) : (
+            <div className="grid gap-2">
+              {paymentHistory.map(p => (
+                <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border)] p-2.5 text-xs">
+                  <div>
+                    <p className="font-semibold text-sm">
+                      ৳{Number(p.amount).toLocaleString()}
+                      {Number(p.discount) > 0 && (
+                        <span className="ml-1 text-xs font-normal text-[var(--muted)]">({txt.extraDiscountLabel} − ৳{Number(p.discount).toLocaleString()})</span>
+                      )}
+                    </p>
+                    <p className="text-[var(--muted)]">
+                      {txt.purposeNames[p.purpose] ?? p.purpose} · {txt.methodNames[p.method] ?? p.method} ·{" "}
+                      {new Date(p.collected_at).toLocaleDateString(locale === "bn" ? "bn-BD" : "en-US", { day: "2-digit", month: "short", year: "2-digit" })}
+                    </p>
+                    <p className="text-[var(--muted)]">{txt.receivedByLabel}: {p.collector?.name ?? "—"}</p>
+                  </div>
+                  {p.screenshot_url && (
+                    <a href={p.screenshot_url} target="_blank" rel="noopener noreferrer"
+                      className="rounded-lg border border-[var(--border)] px-2 py-1 hover:bg-[var(--surface-soft)]">
+                      {txt.viewScreenshotLabel}
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
 

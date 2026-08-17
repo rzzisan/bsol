@@ -42,7 +42,7 @@ class PaperflyCourierProvider extends AbstractCourierProvider
         }
 
         $weightKg = (float) ($data['parcel_weight_kg'] ?? 0.5);
-        $codAmount = (float) ($data['cod_amount'] ?? $order->total);
+        $codAmount = $this->resolveCodAmount($order, $data);
 
         $payload = [
             'merchantOrderReference' => $order->order_number,

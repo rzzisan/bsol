@@ -62,12 +62,37 @@ due = order.total − SUM(order_payments.amount) − SUM(order_payments.discount
 
 **পেমেন্ট এন্ট্রি ডিলিট করলে** — status ফিরিয়ে `pending` করা হয় না (courier fix-এর terminal-state নীতির মতোই, ইচ্ছাকৃতভাবে এক-দিকমুখী — একটা ভুল এন্ট্রি সংশোধনের সময় সেলারের ইতিমধ্যে কাস্টমারকে কল করা/প্রসেস শুরু করা কাজ যেন বাতিল না হয়ে যায়)।
 
+## ৩খ. Courier COD amount বাস্তবে ভুল ছিল (verify করে নিশ্চিত করা হয়েছে) + বাকি কলাম + অর্ডার ডিটেইল/ইনভয়েসে হিস্ট্রি
+
+**রিপোর্ট করা সমস্যা:** `ORD-20260816-0007` — total ৳1,000, ৳500 ম্যানুয়ালি কালেক্ট হয়েছে, বাকি ৳500। কিন্তু courier বুকিং ফর্মে COD amount দেখাচ্ছিল পুরো ৳1,000।
+
+**রুট কজ (verify করা হয়েছে):** এই ফিচারের ৩খ-এর আগ পর্যন্ত `courier_cod_amount`-এর ডিফল্ট বসতো `$order->total` থেকে — `CourierController::book()`-এ (single booking) সরাসরি, আর **প্রতিটা courier provider-এর নিজের ভেতরেও একই ডিফল্ট আলাদাভাবে ডুপ্লিকেট করা ছিল** (`PathaoCourierProvider`, `RedxCourierProvider`, `CarrybeeCourierProvider`, `PaperflyCourierProvider`, `SteadfastCourierProvider::book()`/`bookBulk()` — ৬টা জায়গায়)। ফলে `$data['cod_amount']` ফাঁকা থাকলে প্রতিটা provider নিজে থেকেই `$order->total` ফলব্যাক করতো, `due` না জেনেই। Bulk booking (`CourierController::bookBulk()`) তো `courier_cod_amount` আদৌ persist-ই করতো না — তার মানে বাল্ক-বুক করা অর্ডার ডেলিভারি হলে `AccountingService::codIncomeAmount()` আবার পুরো `total`-এ ফলব্যাক করতো (গত সেশনের [583704d](https://github.com)-এ যে ওভারস্টেটমেন্ট বাগ ফিক্স হয়েছিল, বাল্ক পাথে সেটা রয়েই গিয়েছিল)।
+
+**ফিক্স:** একটাই সোর্স-অব-ট্রুথ — `AbstractCourierProvider::resolveCodAmount(Order, array $data)` (নতুন protected helper, সব ৫টা provider এটা থেকেই extend করে): `$data['cod_amount'] ?? max(0, $order->dueAmount())`। প্রতিটা provider-এর নিজস্ব `?? $order->total` ফলব্যাক এই helper-কল দিয়ে বদলানো হয়েছে। `CourierController::book()`-এও কেন্দ্রীয়ভাবে একবার resolve করে `$data['cod_amount']`-এ বসিয়ে দেওয়া হয় (নিচে দেখুন) — তাই provider-লেয়ারের নিজস্ব ফলব্যাক শুধু defense-in-depth, ব্যবহারিকভাবে আর কখনো ট্রিগার হবে না। `bookBulk()`-এ `courier_cod_amount` persist করা যোগ হয়েছে (প্রতি অর্ডারের নিজের `dueAmount()` দিয়ে) — আগে এটা একদমই সেট হতো না।
+
+**COD amount স্টাফ পরিবর্তন করতে পারবে না:** `CourierController::book()`-এ নতুন `resolveCodAmount(Order $order, ?float $submitted)`:
+```php
+$due = max(0, $order->dueAmount());
+if (auth()->user()->isStaff()) {
+    return $due; // যা-ই পাঠানো হোক না কেন, উপেক্ষা করা হয় — স্টাফ ওভাররাইড করতে পারবে না
+}
+return $submitted ?? $due;
+```
+মালিক (owner) চাইলে এখনো ম্যানুয়ালি ভিন্ন amount দিতে পারবেন (যেমন courier partial-COD নেবে এমন বিশেষ ব্যবস্থা), স্টাফ পারবে না — ফলাফল সবসময় সিস্টেম-গণনা করা `due`। ফ্রন্টএন্ডেও (`dashboard/courier/page.tsx`) স্টাফ হলে COD input disabled/read-only দেখানো হয় (`getStoredUser()?.is_staff`)।
+
+**Order list এ নতুন কলাম:** "জমা" (paid) ও "বকেয়া" (due) — `OrderController::index()` এবং `CourierController::readyToBook()` উভয় query-তে `withSum('payments as paid_amount','amount')` + `withSum('payments as collection_discount','discount')` যোগ হয়েছে (প্রতি-রো আলাদা query না চালিয়ে, ২টা মাত্র subquery পুরো পেজের জন্য), তারপর `due_amount = total - paid_amount - collection_discount` কম্পিউট করে রেসপন্সে যোগ হয়। `readyToBook()`-ই আসলে "কুরিয়ার লিস্ট" (পার্সেল বুক করুন পেজ) — সেখানেও `due_amount` এখন আসে, ফ্রন্টএন্ড booking modal সেটাকেই COD-এর ডিফল্ট হিসেবে prefill করে (আগে `order.total` prefill হতো)।
+
+**অর্ডার ডিটেইলস-এ পেমেন্ট হিস্ট্রি:** `dashboard/orders/[id]/page.tsx`-এ নতুন প্যানেল — `GET /orders/{id}/payments` থেকে (আগে থেকেই ছিল, order list মডালে ব্যবহৃত হতো) bill summary + প্রতিটা কালেকশন এন্ট্রি (তারিখ, ধরন, মাধ্যম, amount, discount, রিসিভার, স্ক্রিনশট লিংক) দেখায়। ভিউ-অনলি — নতুন পেমেন্ট যোগ করার ফর্ম এখানে নেই (সেটা order list-এর মডালেই থাকছে), ডুপ্লিকেট UI এড়াতে।
+
+**PDF ইনভয়েসে পেমেন্ট হিস্ট্রি:** `OrderInvoicePdfService`/`order-invoice.blade.php`-এ totals-table-এর পরে "PAYMENT HISTORY" টেবিল (Date/Type/Method/Amount/Discount/Received by) + Paid/Extra Discount/Due সামারি — শুধু `amount>0` বা `discount>0` থাকা অর্ডারে দেখানো হয় (কোনো পেমেন্ট না থাকলে সেকশনটাই নেই, পুরোনো ইনভয়েসের লে-আউট অপরিবর্তিত থাকে)। Purpose/method লেবেল ইংরেজিতে (Advance/Courier Charge/Full Payment/Other, Cash/Bank/bKash/...) — ইনভয়েসের বাকি লেবেলগুলোর (Subtotal/Discount/Total) কনভেনশন অনুসরণ করে। রিসিভারের নাম বাংলা হলে matra-reorder হয় (পুরো HarfBuzz শেপিং না — item/customer-name-এর মতো ভারী নয়, ছোট রিসিপ্ট-স্টাইল সেকশন বলে সরলীকরণ)। Note ফিল্ড ইনভয়েসে দেখানো হয় না (স্পেস-সীমিত, প্রয়োজনে অর্ডার ডিটেইল পেজেই আছে)।
+
 ## ৪. স্কোপের বাইরে (ইচ্ছাকৃতভাবে এই ধাপে বাদ)
 
-- **`courier_cod_amount` স্বয়ংক্রিয় recompute** — courier বুকিং ফর্মে `cod_amount` এখনো সেলার নিজে হাতে বসান। এই ফিচার সেলারকে সঠিক বাকি টাকা (`due`) দেখিয়ে দিচ্ছে যাতে ভুল না হয়, কিন্তু বুকিং ফর্ম নিজে থেকে `due`-কে prefill করছে না — আলাদা ভবিষ্যৎ ধাপ।
-- **Invoice PDF-এ কালেকশন-হিস্ট্রি/due প্রিন্ট করা** — আজকের ইনভয়েসে শুধু payment-method ব্যাজ আছে (`resources/views/invoices/order-invoice.blade.php`), কালেকশন লিস্ট যোগ করা হয়নি।
-- **Overpayment/রিফান্ড ফ্লো** — `due` ঋণাত্মক (negative) হতে পারে (বেশি টাকা কালেক্ট হলে), কিন্তু কোনো রিফান্ড-ট্র্যাকিং তৈরি হয়নি, শুধু সংখ্যাটা দেখানো হয়।
+- ~~`courier_cod_amount` স্বয়ংক্রিয় recompute~~ ✅ ৩খ-তে ঠিক হয়ে গেছে।
+- ~~Invoice PDF-এ কালেকশন-হিস্ট্রি/due প্রিন্ট করা~~ ✅ ৩খ-তে যোগ হয়েছে।
+- **Overpayment/রিফান্ড ফ্লো** — `due` ঋণাত্মক (negative) হতে পারে (বেশি টাকা কালেক্ট হলে), কিন্তু কোনো রিফান্ড-ট্র্যাকিং তৈরি হয়নি, শুধু সংখ্যাটা দেখানো হয়। COD-এ অবশ্য `max(0, due)` — কখনো নেগেটিভ COD চাওয়া হয় না।
 - Screenshot শুধু bKash/Nagad/Rocket/Upay-তে সার্ভার-সাইড `required` — bank/cash-এ ঐচ্ছিক (ব্যাংক ট্রান্সফারের রিসিট আলাদা করে বাধ্যতামূলক করা হয়নি, প্রয়োজনে পরে যোগ করা যাবে)।
+- **Order detail পেজ থেকে সরাসরি পেমেন্ট এন্ট্রি করা** — শুধু ভিউ, এন্ট্রি এখনো order list-এর মডাল থেকেই করতে হয়।
 
 ## ৫. Backend
 

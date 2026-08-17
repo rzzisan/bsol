@@ -34,6 +34,26 @@ class CourierController extends Controller
         return $settings;
     }
 
+    /**
+     * The authoritative COD amount for a booking. Defaults to the order's
+     * real due balance (never the full total — a partially/manually-paid
+     * order must not ask the courier to collect money already in hand, see
+     * manual_payment_collection_context.md §3খ). Staff sub-accounts cannot
+     * override this at all — whatever they submit is ignored — only the
+     * shop owner may hand-set a different figure (e.g. a courier-specific
+     * partial-COD arrangement).
+     */
+    private function resolveCodAmount(Order $order, ?float $submitted): float
+    {
+        $due = max(0, $order->dueAmount());
+
+        if (auth()->user()->isStaff()) {
+            return $due;
+        }
+
+        return $submitted ?? $due;
+    }
+
     // ── Pathao Location Dropdowns ─────────────────────────────────────────────
 
     public function cities(): JsonResponse
@@ -503,6 +523,13 @@ class CourierController extends Controller
 
         $courier = $data['courier'] ?? 'steadfast';
 
+        // Resolved once, then injected back into $data so every provider's
+        // own internal fallback (AbstractCourierProvider::resolveCodAmount())
+        // sees the same, staff-safe value — see
+        // manual_payment_collection_context.md §3খ.
+        $codAmount = $this->resolveCodAmount($order, isset($data['cod_amount']) ? (float) $data['cod_amount'] : null);
+        $data['cod_amount'] = $codAmount;
+
         // Manual tracking entry
         if ($courier === 'manual' || isset($data['tracking_id'])) {
             $order->update([
@@ -510,10 +537,10 @@ class CourierController extends Controller
                 'courier_tracking_id' => $data['tracking_id'] ?? null,
                 'courier_status'      => 'booked',
                 'status'              => 'processing',
-                // Waybill/label PDFs must print the amount actually asked of
-                // the courier, not order->total (may be a partial COD) — see
-                // courier_waybill_context.md.
-                'courier_cod_amount'  => $data['cod_amount'] ?? $order->total,
+                // The amount actually asked of the courier, not order->total
+                // (may be a partial COD — see courier_waybill_context.md and
+                // manual_payment_collection_context.md §3খ).
+                'courier_cod_amount'  => $codAmount,
                 'courier_booked_at'   => now(),
             ]);
             return response()->json(['success' => true, 'data' => $order, 'message' => 'Manual tracking saved.']);
@@ -532,9 +559,8 @@ class CourierController extends Controller
                 'courier_tracking_id' => $result['consignment_id'],
                 'courier_status'      => $result['courier_status'] ?? 'booked',
                 'status'              => 'processing',
-                // Same reasoning as the manual branch above — persist the
-                // actual amount asked of the courier, not order->total.
-                'courier_cod_amount'  => $data['cod_amount'] ?? $order->total,
+                // Same reasoning as the manual branch above.
+                'courier_cod_amount'  => $codAmount,
                 'courier_weight_kg'   => $data['item_weight'] ?? $data['parcel_weight_kg'] ?? null,
                 'courier_booked_at'   => now(),
             ];
@@ -607,16 +633,21 @@ class CourierController extends Controller
             if (! $row['success'] || ! $row['consignment_id']) {
                 continue;
             }
+            $bulkOrder = $ordersById[$row['order_id']] ?? null;
             $update = [
                 'courier_name'        => $data['courier'],
                 'courier_tracking_id' => $row['consignment_id'],
                 'courier_status'      => $row['courier_status'] ?? 'booked',
                 'status'              => 'processing',
+                // Was never persisted here before (manual_payment_collection_context.md
+                // §3খ) — AccountingService::codIncomeAmount() would otherwise
+                // fall back to the full order total on delivery.
+                'courier_cod_amount'  => $bulkOrder ? max(0, $bulkOrder->dueAmount()) : null,
             ];
             if (($row['delivery_fee'] ?? null) !== null) {
                 $update['courier_charge'] = $row['delivery_fee'];
             }
-            $ordersById[$row['order_id']]?->update($update);
+            $bulkOrder?->update($update);
         }
 
         $successCount = count(array_filter($results, fn ($r) => $r['success']));
@@ -736,7 +767,8 @@ class CourierController extends Controller
         }
 
         $perPage = min((int) ($request->per_page ?? 20), 100);
-        $orders  = $query->paginate($perPage);
+        $orders  = $query->withPaymentTotals()->paginate($perPage);
+        Order::attachDueAmounts($orders->getCollection());
 
         return response()->json([
             'success' => true,

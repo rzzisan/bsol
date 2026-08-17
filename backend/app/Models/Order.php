@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -81,6 +83,30 @@ class Order extends Model
     public function dueAmount(): float
     {
         return (float) $this->total - $this->paidAmount() - $this->collectionDiscountAmount();
+    }
+
+    /**
+     * List-query scope: attaches paid_amount/collection_discount to every
+     * row via 2 subqueries total (not N+1 — see manual_payment_collection_context.md
+     * §3খ), for the order list and the courier "ready to book" list. Pair
+     * with attachDueAmounts() on the resulting collection to also get
+     * due_amount, since that's a PHP-side subtraction, not summable in SQL.
+     */
+    public function scopeWithPaymentTotals(Builder $query): Builder
+    {
+        return $query
+            ->withSum('payments as paid_amount', 'amount')
+            ->withSum('payments as collection_discount', 'discount');
+    }
+
+    /** @param Collection<int, Order> $orders */
+    public static function attachDueAmounts(Collection $orders): Collection
+    {
+        return $orders->each(function (Order $order) {
+            $order->due_amount = (float) $order->total
+                - (float) ($order->paid_amount ?? 0)
+                - (float) ($order->collection_discount ?? 0);
+        });
     }
 
     public function statusLogs(): HasMany

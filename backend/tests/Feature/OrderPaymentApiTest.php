@@ -257,4 +257,35 @@ class OrderPaymentApiTest extends TestCase
         $this->assertSame('pending', $order->fresh()->status);
         $this->assertSame(0, TrackingEvent::count());
     }
+
+    // ── Invoice PDF renders the payment history (manual_payment_collection_context.md §3খ) ──
+
+    public function test_invoice_pdf_renders_with_payment_history(): void
+    {
+        $owner = User::factory()->create();
+        $order = $this->makeOrder($owner);
+        Sanctum::actingAs($owner);
+
+        $this->postJson("/api/orders/{$order->id}/payments", [
+            'purpose' => 'advance', 'method' => 'cash', 'amount' => 100, 'collected_by' => $owner->id,
+        ])->assertCreated();
+
+        $response = $this->get("/api/orders/{$order->id}/invoice");
+
+        $response->assertOk();
+        $this->assertStringContainsString('application/pdf', $response->headers->get('Content-Type'));
+    }
+
+    /** Regression: an order with no payment history at all must still render fine. */
+    public function test_invoice_pdf_still_renders_with_no_payment_history(): void
+    {
+        $owner = User::factory()->create();
+        $order = $this->makeOrder($owner);
+        Sanctum::actingAs($owner);
+
+        $response = $this->get("/api/orders/{$order->id}/invoice");
+
+        $response->assertOk();
+        $this->assertStringContainsString('application/pdf', $response->headers->get('Content-Type'));
+    }
 }

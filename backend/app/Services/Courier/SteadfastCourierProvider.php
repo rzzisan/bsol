@@ -37,7 +37,7 @@ class SteadfastCourierProvider extends AbstractCourierProvider
             'recipient_name'    => $order->customer_name ?? $order->customer_phone,
             'recipient_phone'   => $order->customer_phone,
             'recipient_address' => $address,
-            'cod_amount'        => $data['cod_amount'] ?? $order->total,
+            'cod_amount'        => $this->resolveCodAmount($order, $data),
             'note'              => $data['note'] ?? $order->notes ?? '',
             'delivery_type'     => isset($data['delivery_type']) && in_array((int) $data['delivery_type'], [0, 1], true)
                 ? (int) $data['delivery_type']
@@ -84,7 +84,7 @@ class SteadfastCourierProvider extends AbstractCourierProvider
                 'recipient_name'    => $order->customer_name ?? $order->customer_phone,
                 'recipient_phone'   => $order->customer_phone,
                 'recipient_address' => $address !== '' ? $address : 'Address not provided',
-                'cod_amount'        => $order->total,
+                'cod_amount'        => max(0, $order->dueAmount()),
                 'note'              => $data['note'] ?? $order->notes ?? '',
                 'item_description'  => $data['item_description'] ?? null,
                 'delivery_type'     => isset($data['delivery_type']) ? (int) $data['delivery_type'] : null,

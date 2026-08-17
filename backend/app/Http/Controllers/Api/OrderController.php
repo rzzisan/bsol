@@ -75,7 +75,8 @@ class OrderController extends Controller
         }
 
         $perPage = min((int) ($request->per_page ?? 20), 100);
-        $orders  = $query->orderByDesc('created_at')->paginate($perPage);
+        $orders  = $query->withPaymentTotals()->orderByDesc('created_at')->paginate($perPage);
+        Order::attachDueAmounts($orders->getCollection());
 
         return response()->json([
             'success' => true,

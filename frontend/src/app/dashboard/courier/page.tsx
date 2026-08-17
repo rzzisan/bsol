@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
-import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
+import { getStoredLocale, getStoredToken, getStoredUser, type Locale } from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -20,6 +20,7 @@ const t = {
     booking: "বুকিং হচ্ছে...",
     booked: "বুকড ✓",
     codAmount: "COD পরিমাণ (৳)",
+    codLockedForStaff: "বাকি টাকা অনুযায়ী স্বয়ংক্রিয়ভাবে নির্ধারিত — স্টাফ পরিবর্তন করতে পারবে না",
     note: "নোট / বিশেষ নির্দেশনা",
     trackingId: "ট্র্যাকিং আইডি",
     cancel: "বাতিল",
@@ -96,6 +97,7 @@ const t = {
     booking: "Booking...",
     booked: "Booked ✓",
     codAmount: "COD Amount (৳)",
+    codLockedForStaff: "Auto-set from the amount due — staff cannot change this",
     note: "Note / Special Instruction",
     trackingId: "Tracking ID",
     cancel: "Cancel",
@@ -167,6 +169,7 @@ type Order = {
   customer_district: string | null; customer_thana: string | null; customer_area: string | null;
   pathao_city_id: number | null; pathao_zone_id: number | null; pathao_area_id: number | null;
   total: string; status: string;
+  due_amount?: number | string | null;
 };
 
 type PathaoStore = { store_id: number; store_name: string; store_address: string; is_active: number };
@@ -209,6 +212,9 @@ export default function BookParcelPage() {
   const [locale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
+  // COD amount is auto-set from the order's due balance and locked for
+  // staff sub-accounts — see manual_payment_collection_context.md §3খ.
+  const isStaff = getStoredUser()?.is_staff === true;
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -421,12 +427,16 @@ export default function BookParcelPage() {
   };
 
   const openModal = (o: Order) => {
+    // Default to what's actually still owed, not the full order total — a
+    // partially/manually-paid order must not ask the courier to collect
+    // money already in hand (manual_payment_collection_context.md §3খ).
+    const defaultCod = String(Math.max(0, Math.round(Number(o.due_amount ?? o.total))));
     setModal(o);
     setForm({
-      courier: "pathao", cod_amount: String(Math.round(Number(o.total))), note: "", tracking_id: "",
+      courier: "pathao", cod_amount: defaultCod, note: "", tracking_id: "",
       store_id: pathaoStores.length > 0 ? String(pathaoStores[0].store_id) : "",
       delivery_type: "48", item_type: "2", item_weight: "0.5", item_description: "",
-      redx_value: String(Math.round(Number(o.total))), redx_delivery_area_id: "", redx_delivery_area: "",
+      redx_value: defaultCod, redx_delivery_area_id: "", redx_delivery_area: "",
       carrybee_city_id: "", carrybee_zone_id: "", carrybee_area_id: "",
       paperfly_store_name: "", paperfly_product_brief: "",
     });
@@ -962,8 +972,10 @@ export default function BookParcelPage() {
 
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.codAmount}</span>
-                <input type="number" value={form.cod_amount} onChange={e => setForm(f => ({ ...f, cod_amount: e.target.value }))}
-                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+                <input type="number" value={form.cod_amount} disabled={isStaff}
+                  onChange={e => setForm(f => ({ ...f, cod_amount: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)] disabled:opacity-60 disabled:cursor-not-allowed" />
+                {isStaff && <p className="mt-1 text-[10px] text-[var(--muted)]">{txt.codLockedForStaff}</p>}
               </label>
 
               <label>

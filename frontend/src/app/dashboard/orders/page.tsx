@@ -40,6 +40,8 @@ const t = {
     orderNo: "অর্ডার নং",
     customer: "গ্রাহক",
     total: "মোট",
+    paidCol: "জমা",
+    dueCol: "বকেয়া",
     status: "স্ট্যাটাস",
     risk: "ঝুঁকি",
     date: "তারিখ",
@@ -109,6 +111,8 @@ const t = {
     orderNo: "Order #",
     customer: "Customer",
     total: "Total",
+    paidCol: "Paid",
+    dueCol: "Due",
     status: "Status",
     risk: "Risk",
     date: "Date",
@@ -173,6 +177,8 @@ type Order = {
   risk_level: string; created_at: string; payment_status: string;
   otp_verified_at: string | null;
   platform_api_key_id: number | null;
+  paid_amount?: number | string | null;
+  due_amount?: number | string | null;
 };
 type Stats = { total: number; today: number; pending: number; delivered: number };
 type WpSite = { id: number; domain: string; status: string };
@@ -519,6 +525,8 @@ export default function OrdersPage() {
               <th className="px-3 py-3">{txt.orderNo}</th>
               <th className="px-3 py-3">{txt.customer}</th>
               <th className="px-3 py-3 text-right">{txt.total}</th>
+              <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.paidCol}</th>
+              <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.dueCol}</th>
               <th className="px-3 py-3">{txt.status}</th>
               <th className="px-3 py-3 hidden md:table-cell">{txt.risk}</th>
               <th className="px-3 py-3 hidden md:table-cell">{txt.date}</th>
@@ -527,9 +535,9 @@ export default function OrdersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
             ) : orders.map(o => (
               <tr key={o.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-soft)]">
                 <td className="px-3 py-3">
@@ -542,6 +550,16 @@ export default function OrdersPage() {
                   <p className="text-xs text-[var(--muted)]">{o.customer_phone}</p>
                 </td>
                 <td className="px-3 py-3 text-right font-semibold">৳{Number(o.total).toLocaleString()}</td>
+                <td className="px-3 py-3 text-right hidden lg:table-cell text-emerald-500">
+                  {o.paid_amount != null ? `৳${Number(o.paid_amount).toLocaleString()}` : "—"}
+                </td>
+                <td className="px-3 py-3 text-right hidden lg:table-cell">
+                  {o.due_amount != null ? (
+                    <span className={Number(o.due_amount) > 0 ? "text-red-400" : Number(o.due_amount) < 0 ? "text-yellow-500" : "text-emerald-500"}>
+                      ৳{Number(o.due_amount).toLocaleString()}
+                    </span>
+                  ) : "—"}
+                </td>
                 <td className="px-3 py-3">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <button onClick={() => openStatusModal(o)}

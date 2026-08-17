@@ -49,7 +49,7 @@ class CarrybeeCourierProvider extends AbstractCourierProvider
             'city_id'            => (int) $cityId,
             'zone_id'            => (int) $zoneId,
             'item_weight'        => (int) round($weightKg * 1000),
-            'collectable_amount' => (int) ($data['cod_amount'] ?? $order->total),
+            'collectable_amount' => (int) $this->resolveCodAmount($order, $data),
         ];
 
         if (! empty($data['delivery_area_id'])) $payload['area_id'] = (int) $data['delivery_area_id'];

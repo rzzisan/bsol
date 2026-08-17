@@ -42,7 +42,7 @@ class PathaoCourierProvider extends AbstractCourierProvider
             'item_type'         => $data['item_type'] ?? 2,
             'item_quantity'     => 1,
             'item_weight'       => $data['item_weight'] ?? 0.5,
-            'amount_to_collect' => (int) ($data['cod_amount'] ?? $order->total),
+            'amount_to_collect' => (int) $this->resolveCodAmount($order, $data),
         ];
 
         if ($order->pathao_city_id) $payload['recipient_city'] = $order->pathao_city_id;

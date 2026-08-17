@@ -125,7 +125,7 @@ class OrderInvoicePdfService
 
     public function render(Order $order): PdfDocument
     {
-        $order->loadMissing(['user', 'items']);
+        $order->loadMissing(['user', 'items', 'payments.collector:id,name']);
         $shop = $order->user?->shopOwner();
         $profile = $shop ? ShopProfile::where('user_id', $shop->id)->first() : null;
 
@@ -173,6 +173,27 @@ class OrderInvoicePdfService
             ];
         });
 
+        // Payment history — see manual_payment_collection_context.md §3খ.
+        // Only the collector name is real-shaped (short, like a customer
+        // name); purpose/method print in English, matching this template's
+        // existing Subtotal/Discount/Total labels — no note field here,
+        // that's a receipt-style summary, not the full audit trail (which
+        // lives on the order detail page).
+        $payments = $order->payments->values()->map(function ($payment, int $i) use (&$jobs, $contentWidthMm) {
+            $rawCollector = $payment->collector->name ?? '—';
+            $collectorJob = $this->queueShapingJob($jobs, "payment{$i}_collector", $rawCollector, 10, false, $contentWidthMm * 0.3);
+
+            return [
+                'collector'    => $this->reorderBengaliMatras($rawCollector),
+                'collectorJob' => $collectorJob,
+                'purpose'      => ucfirst(str_replace('_', ' ', $payment->purpose)),
+                'method'       => $payment->method === 'bkash' ? 'bKash' : ucfirst($payment->method),
+                'amount'       => (float) $payment->amount,
+                'discount'     => (float) $payment->discount,
+                'collectedAt'  => $payment->collected_at,
+            ];
+        });
+
         // One batched Node/HarfBuzz call for the whole invoice — see
         // BengaliShapingService's doc comment for why per-field spawning
         // would be too slow. Any job it couldn't handle just has no entry
@@ -196,9 +217,19 @@ class OrderInvoicePdfService
             return $item;
         });
 
+        $payments = $payments->map(function (array $payment) use ($img) {
+            $payment['collectorImg'] = $img($payment['collectorJob']);
+            unset($payment['collectorJob']);
+            return $payment;
+        });
+
         return Pdf::loadView('invoices.order-invoice', [
             'order'        => $order,
             'items'        => $items,
+            'payments'     => $payments,
+            'paidAmount'   => $order->paidAmount(),
+            'collectionDiscount' => $order->collectionDiscountAmount(),
+            'dueAmount'    => $order->dueAmount(),
             'shopName'     => $this->reorderBengaliMatras($rawShopName),
             'shopNameImg'  => $shopNameImg,
             'shopPhone'    => $profile?->phone ?? $shop?->mobile,

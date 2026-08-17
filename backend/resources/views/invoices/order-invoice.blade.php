@@ -42,6 +42,10 @@
   .totals-table td.value { text-align: right; }
   .totals-table tr.total-row td { font-weight: bold; font-size: 15px; border-top: 2px solid #1a2233; padding-top: 10px; }
   .payment-line { margin-top: 22px; font-size: 10.5px; color: #657089; }
+  .payments-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  .payments-table th { text-align: left; background: #f3f6fb; padding: 7px 10px; font-size: 9.5px; color: #657089; border-bottom: 1px solid #dfe4ee; }
+  .payments-table th.num, .payments-table td.num { text-align: right; }
+  .payments-table td { padding: 8px 10px; border-bottom: 1px solid #eef1f7; font-size: 10.5px; vertical-align: middle; }
   .notes-box { margin-top: 18px; padding: 12px 14px; background: #f8f9fb; border-radius: 8px; font-size: 10.5px; }
   .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #eef1f7; font-size: 10px; color: #9eabc4; text-align: center; }
 </style>
@@ -158,6 +162,54 @@
       <td class="value amount">৳{{ number_format((float) $order->total, 2) }}</td>
     </tr>
   </table>
+
+  @if($payments->isNotEmpty())
+    <div class="section-label" style="margin-top:22px">PAYMENT HISTORY</div>
+    <table class="payments-table">
+      <thead><tr>
+        <th style="width:16%">DATE</th>
+        <th style="width:20%">TYPE</th>
+        <th style="width:14%">METHOD</th>
+        <th class="num amount" style="width:16%">AMOUNT</th>
+        <th class="num amount" style="width:16%">DISCOUNT</th>
+        <th style="width:18%">RECEIVED BY</th>
+      </tr></thead>
+      <tbody>
+        @foreach($payments as $p)
+        <tr>
+          <td>{{ $p['collectedAt']->format('d M Y') }}</td>
+          <td>{{ $p['purpose'] }}</td>
+          <td>{{ $p['method'] }}</td>
+          <td class="num amount">৳{{ number_format($p['amount'], 2) }}</td>
+          <td class="num amount">{{ $p['discount'] > 0 ? '−৳' . number_format($p['discount'], 2) : '—' }}</td>
+          <td>
+            @if($p['collectorImg'])
+              <img src="{{ $p['collectorImg']['dataUri'] }}" style="display:block; width:{{ $p['collectorImg']['widthMm'] }}mm; height:{{ $p['collectorImg']['heightMm'] }}mm;">
+            @else
+              <span class="i18n">{{ $p['collector'] }}</span>
+            @endif
+          </td>
+        </tr>
+        @endforeach
+      </tbody>
+    </table>
+    <table class="totals-table" style="margin-top:8px">
+      <tr>
+        <td class="label">Paid</td>
+        <td class="value amount">৳{{ number_format($paidAmount, 2) }}</td>
+      </tr>
+      @if($collectionDiscount > 0)
+      <tr>
+        <td class="label">Extra Discount</td>
+        <td class="value amount">&minus;৳{{ number_format($collectionDiscount, 2) }}</td>
+      </tr>
+      @endif
+      <tr class="total-row">
+        <td class="label">{{ $dueAmount > 0 ? 'Due' : ($dueAmount < 0 ? 'Overpaid' : 'Due') }}</td>
+        <td class="value amount">৳{{ number_format(abs($dueAmount), 2) }}</td>
+      </tr>
+    </table>
+  @endif
 
   @if($order->payment_method)
     <div class="payment-line">Payment method: <span class="strong">{{ ucfirst(str_replace('_', ' ', $order->payment_method)) }}</span></div>
