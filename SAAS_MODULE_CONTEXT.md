@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-17 — সব `*_context.md` ফাইল পড়ে এই ফাইলের ground-truth বড় sync করা হলো (§15.10-এর "সম্পূর্ণ অনুপস্থিত" টেবিলে Staff/Team ভুলভাবে রয়ে গিয়েছিল — আসলে Phase 1+2 শেষ; §15.3-এর courier status-sync row "NEEDS VERIFICATION" বলছিল, আসলে ২০২৬-০৮-১৬-এ bug ধরা পড়ে ফিক্স+scheduled হয়ে গেছে)। সাথে **তিনটা সম্পূর্ণ মডিউল যোগ হলো যেগুলো এই ফাইলে আগে কখনো ছিলই না** — WordPress/WooCommerce Connector (২০ ফেজ, `wordpress_connect_context.md`), Per-seller Subdomain/Custom Domain (`custom_domain_context.md` + `domain_security_audit.md`), এবং Tracking Platform/Facebook CAPI+Pixel (`tracking_capi_context.md`) — দেখো নতুন §15.12–§15.14। এই তিনটাই ✅ সম্পূর্ণ ও লাইভ। Manual Payment Collection + Collection History (`manual_payment_collection_context.md`) ও Invoice/Waybill payment-history addition (`courier_waybill_context.md` §৮.১) আগেই এই সেশনে অন্য জায়গায় sync করা হয়েছে। Older entries kept as-is:
+
 Last updated: 2026-08-15 — **প্রতিটি সেলার এখন নিজের সাবডোমেইন পায় (`{label}.zyrotechbd.com`) এবং সেখানেই তার ড্যাশবোর্ড ও ল্যান্ডিং পেজ চলে** — SaaS-এর URL কাঠামোর মৌলিক পরিবর্তন। রেজিস্ট্রেশনের পর শপ প্রোফাইল + ঠিকানা সেট করা বাধ্যতামূলক, তারপর সেলার নিজের ঠিকানায় চলে যায়; প্ল্যাটফর্ম ডোমেইনে লগইন করলেও handoff টোকেন দিয়ে সেখানেই পৌঁছে যায়। ল্যান্ডিং পেজের slug এখন **shop-প্রতি unique** (আগের global unique নয়), `/lp/{slug}` রুট সম্পূর্ণ সরানো হয়েছে, আর publish করতে সাবডোমেইন লাগে। সাথে: reserved-subdomain admin মডিউল, সাপোর্টের জন্য impersonation, এবং একটা নিরাপত্তা অডিট (১ High + ২ Medium, তিনটিই ফিক্সড)। **নতুন যেকোনো মডিউল লেখার আগে CONTEXT.md §৩২ পড়া বাধ্যতামূলক** — বিস্তারিত `custom_domain_context.md`, অডিট `domain_security_audit.md`। Older entries kept as-is:
 
 Last updated: 2026-08-10 — **Staff/Team sub-account role** (owner-এর অধীনে সীমিত-অনুমতির staff account) Phase 1+2 সম্পূর্ণ শেষ, সব existing module (orders/products/customers/courier/sms/accounting/analytics/landing_pages/fraud/facebook) staff-scoping-aware করা হয়েছে — বিস্তারিত `staff_team_role_context.md`। **এর ফলে §5/§6/§7-এর পুরনো "per-user = `where('user_id', auth()->id())`" checklist এখন স্টেল** — নতুন যেকোনো মডিউল/ফিচার তৈরির আগে CONTEXT.md §31 (নতুন মাস্টার rule) পড়া এখন বাধ্যতামূলক, নিচে §5/§6/§7 আপডেট করা হয়েছে pointer-সহ। Older entries kept as-is:
@@ -650,7 +652,7 @@ backend/app/
 | Carrybee | ✅ DONE — **§14.1-এ উল্লেখই ছিল না, সম্পূর্ণ নতুন 4th provider** | cities/zones/areas hierarchy, area-suggestion, stores CRUD — commit `26dc6f6` "full CarryBee booking integration" |
 | Bulk booking | ✅ DONE | `POST /courier/book/bulk` route আছে |
 | Common provider contract / `CourierFactory` abstraction | ✅ DONE (2026-08-02, commit `0fdc3ab`) | `app/Services/Courier/CourierProviderInterface.php` + `CourierFactory` + `AbstractCourierProvider` + 4 provider classes (Steadfast/Pathao/RedX/Carrybee); `CourierController::book/bookBulk/trackOrder` dispatch through `CourierFactory::make()` — controller cut 1138→692 lines. RedX now in frontend bulk-booking selector. Carrybee still excluded from bulk (needs per-order area-search UI, documented in code) and its `cancel()` method still has no route wired to it (dead capability persists) |
-| 🔧 Status sync scheduler/webhook | NEEDS VERIFICATION | Manual tracking lookup route আছে (`GET /courier/track/{order}`), কিন্তু automatic webhook/cron-based status sync হচ্ছে কিনা কোডে স্পষ্ট না — verify করা দরকার |
+| Status sync scheduler | ✅ DONE (2026-08-16) | আগে সত্যিই কোনো automatic trigger ছিল না — শুধু ম্যানুয়াল "Refresh" বাটন `courier_status` লিখত, কখনো canonical `order.status`/accounting/tracking-এ cascade হতো না (রিয়াল প্রোডাকশন অর্ডারে ধরা পড়া বাগ)। এখন `CourierStatusSyncService` + ঘণ্টায় একবার `app:sync-courier-statuses` scheduled command — বিস্তারিত `courier_status_sync_context.md` |
 
 ### 15.4 Landing Page, Checkout, Recovery — (বিস্তারিত: `landing_page_context.md`)
 
@@ -735,7 +737,7 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 |---|---|---|
 | ~~Facebook Graph API / Comment-Inbox bot / Messenger CRM~~ WhatsApp | — | WhatsApp এখনো সম্পূর্ণ অনুপস্থিত। Facebook/Messenger lead capture এখন §15.4-বহির্ভূত নতুন §15.11-এ move করা হলো — নিচে দেখুন |
 | Automated payment gateway — Nagad/SSLCommerz | `grep -rli sslcommerz\|nagad` | কোনো trace নেই। bKash-এর জন্য এখন real API integration আছে (subscription billing-এ live, §18/§18.2) — এই row-টা এখন শুধু Nagad/SSLCommerz-এর জন্য প্রযোজ্য, bKash আর এখানে গণনা হবে না |
-| Staff/Team/sub-account roles | `grep -rli staff\|team_member` + users migration পড়া | `users.role` শুধু `user`/`admin` — কোনো per-shop multi-staff concept নেই |
+| ~~Staff/Team/sub-account roles~~ | — | ✅ DONE (2026-08-10, Phase 1+2) — এই row এখন ভুল, `staff_team_role_context.md`-এ পূর্ণ বিস্তারিত। `users.owner_id` self-FK + `staff_permissions` টেবিল, Pattern A/B scoping, সব existing module coverage |
 | ~~Shop Profile Settings~~ | — | ✅ DONE (2026-08-11) — এই row এখন ভুল, নিচে §15.11-এর পরে নতুন নোট দেখুন |
 | ~~Invoice / Waybill PDF generation~~ | — | ✅ DONE — এই row এখন ভুল, §16.7 আপডেট দেখুন |
 | Bulk/CSV order import | `OrderController.php`-এ import/csv grep শূন্য | শুধু abandoned-checkout-এর export আছে, order-এর দিকে bulk import নেই |
@@ -759,11 +761,37 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 
 **Frontend (লাইভ, deploy করা হয়েছে):** `/dashboard/settings/facebook` (seller: connect/disconnect + multi-page picker), `/dashboard/leads` (seller: inbox, channel/status filter, convert-to-customer form), `/admin/settings/facebook` (super-admin: App ID/Secret/Webhook-token ফর্ম + webhook URL copy + setup checklist) — `user-shell.tsx` ও `admin-menu.ts` দুটোতেই মেনু যোগ করা হয়েছে
 
-**Go-live-এর আগে যা বাকি (external, কোড নয়) — বিস্তারিত `facebook_integration_context.md` §3:**
-1. ~~Meta App তৈরি + configure করা~~ — ✅ DONE (App ID `1900768904642203`, webhook verified)
-2. Seller OAuth connect flow-এর "Can't load URL" issue resolve/confirm করা (propagation delay সন্দেহ করা হচ্ছে, নিশ্চিত না)
-3. App Review-এর জন্য বাকি ৩টা field পূরণ করা: App icon (1024×1024), Privacy Policy URL, Category
-4. `pages_messaging` + `pages_manage_engagement` scope-এর জন্য App Review পাস করা (admin/tester অ্যাকাউন্ট দিয়ে আগে টেস্ট করা যাবে, review ছাড়া বাকি সব seller-এর জন্য কাজ করবে না)
+**Go-live-এর আগে যা বাকি — এই লিস্ট stale ছিল, ২০২৬-০৮-১৭-এ আপডেট, বিস্তারিত `facebook_integration_context.md`:**
+1. ~~Meta App তৈরি + configure করা~~ — ✅ DONE
+2. ~~Seller OAuth connect flow-এর "Can't load URL" issue~~ — ✅ RESOLVED (§3-এ পুরো ডিবাগ-চেইন, শেষে Login Configuration + Business Portfolio gotcha ফিক্স)
+3. ~~App icon/Privacy Policy/Category~~ — ✅ DONE, ~~Multi-page support~~ ✅ DONE, ~~CAPI Purchase event~~ ✅ DONE (ল্যান্ডিং-পেজ checkout-only; WooCommerce-এর জন্যও এখন আছে, `wordpress_connect_context.md` Phase ১০)
+4. **App Review — সাবমিট করা হয়েছে ২০২৬-০৮-০৭, Meta-র নিজস্ব timeline ~২০ দিন — এখনো ফলাফল কনফার্ম করা হয়নি এই ফাইলে।** পরের সেশনে `facebook_integration_context.md`-এ status চেক করে এখানে আপডেট করা উচিত — approve না হওয়া পর্যন্ত `pages_messaging`/`pages_manage_metadata`/`pages_show_list` non-admin seller-দের জন্য কাজ করবে না।
+
+---
+
+### 15.12 WordPress/WooCommerce Connector (BSOL Connect) — ✅ DONE (২০ ফেজ, `wordpress-plugin/bsol-connect/` v1.17.0)
+
+`bsol_history_and_new_context.md`-এ এটাই ছিল সবচেয়ে বড় চিহ্নিত গ্যাপ ("যাদের নিজের WooCommerce ওয়েবসাইট আছে তাদের জন্য কোনো connector নেই") — এখন সম্পূর্ণ ও লাইভ। legacy `zayroo-connect`-এর প্রমাণিত "thin client" আর্কিটেকচার (প্লাগইনে কোনো বিজনেস লজিক নেই, শুধু WooCommerce hook → BSOL API) BSOL-এর backend-এর উপর বসানো হয়েছে।
+
+**যা কভার্ড:** Connect/disconnect + domain-bound API key (Multi-site সাপোর্ট সহ, Phase ১৬), Order/Product/Variant sync (bidirectional stock push-back সহ), Courier booking (Steadfast/Paperfly/Pathao/RedX/CarryBee — শেষ ৩টার জন্য address→location-ID resolver, Phase ৮), Waybill + Order Invoice PDF print, Fraud/Customer-Health check, Checkout OTP, Facebook CAPI Purchase, Bulk/historical sync backfill, Abandoned checkout tracking, Repeat-order block, Checkout blacklist block, BSOL-vocabulary order status, wp-admin Manual SMS, self-update notice, HPOS compatibility, activity log + sync retry।
+
+**সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`wordpress_connect_context.md`](wordpress_connect_context.md) — API surface টেবিল, প্লাগইন ফাইল স্ট্রাকচার, প্রতিটা মডিউলের ডিজাইন, ১৫টা mandatory design decision, সব ২০ ফেজের কমিট লগ। **বাকি একমাত্র জিনিস:** আসল WooCommerce স্টেজিং সাইটে end-to-end QA (এই ডেভ এনভায়রনমেন্টে কোনো WordPress ইনস্টল নেই) — ব্যবহারকারীকে নিজে `SETUP.md` চেকলিস্ট ধরে করতে হবে।
+
+### 15.13 Per-seller Subdomain / Custom Domain — ✅ DONE (D1–D5, ২০২৬-০৮-১৫)
+
+প্রতিটা সেলার এখন `{label}.zyrotechbd.com`-এ নিজের ঠিকানা পায় — ড্যাশবোর্ড ও ল্যান্ডিং পেজ দুটোই সেখানে চলে। Wildcard DNS+TLS+nginx, handoff-টোকেন লগইন (auth token `localStorage`-এ origin-স্কোপড বলে ক্রস-সেলার XSS structurally impossible), reserved-subdomain admin মডিউল, tombstone (হাইজ্যাক-প্রতিরোধ), admin impersonation (সাপোর্টের জন্য, admin কখনো সরাসরি সেলার সাবডোমেইনে লগইন করে না), নতুন সেলারের বাধ্যতামূলক onboarding (শপ প্রোফাইল + ঠিকানা)।
+
+একটা পূর্ণ নিরাপত্তা অডিটও হয়েছে (১ High + ২ Medium, তিনটাই ফিক্সড) — সবচেয়ে গুরুত্বপূর্ণ ফাইন্ডিং ছিল যেকোনো অ্যাকাউন্ট (এমনকি admin) অন্য সেলারের সাবডোমেইনে লগইন করতে পারত, যেটা impersonation ফিচারকে অকেজো করে দিত যদি admin ভুল করে সরাসরি লগইন করে ফেলত।
+
+**সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`custom_domain_context.md`](custom_domain_context.md) (ডিজাইন+ইমপ্লিমেন্টেশন), [`domain_security_audit.md`](domain_security_audit.md) (অডিট)। **নতুন যেকোনো মডিউল লেখার আগে CONTEXT.md §৩২ পড়া বাধ্যতামূলক** (সাবডোমেইন-সচেতনতা চেকলিস্ট, `staff_team_role_context.md`-এর §৩১ চেকলিস্টের মতোই মান্ডেটরি)। **বাকি:** সেলারের নিজের কাস্টম ডোমেইন (T8b, শেয়ার্ড অ্যাপেক্স-এর reputation ঝুঁকি এড়াতে) — এই রাউন্ডে scope-এ নেই।
+
+### 15.14 Tracking Platform — Facebook Pixel + Conversions API — ✅ DONE (T1–T7 সব সম্পন্ন, ২০২৬-০৮-১৬)
+
+`feature_roadmap_context.md`-এ এখনো "🟡 পরিকল্পনা সম্পন্ন, implementation শুরু হয়নি" লেখা আছে — সেই এন্ট্রি এখন ভুল, আলাদাভাবে ফিক্স করা দরকার। আসলে পুরো পরিকল্পিত ট্র্যাকিং প্ল্যাটফর্ম শেষ ও লাইভ — browser Pixel + server-side CAPI, `event_id` দিয়ে dedup, order-flow ইভেন্ট (`OrderConfirmed`/`OrderShipped`/`OrderDelivered`/`OrderReturned`/`OrderCanceled`, `OrderStatusService::transition()`-এ hook করা — এটাই মূল "কে সত্যিই ডেলিভারি নিয়েছে সেই সিগন্যাল Meta-কে দেওয়া" প্রতিশ্রুতি), প্যাকেজ-ভিত্তিক দৈনিক ইভেন্ট কোটা, dashboard-এ multi-pixel ম্যানেজমেন্ট, সেলার/স্টাফ নিজের event log + match-quality দেখতে পারে, admin এক স্ক্রিনে সব সেলারের ব্যবহার দেখে, অর্ডার-ডিটেইলে ট্র্যাকিং সিগন্যাল দেখা যায়। BSOL নিজের সাবডোমেইন আর সেলারের নিজের WordPress সাইট — দুই কেসেই কাজ করে (`wordpress_connect_context.md` Phase ২০, `Bsol_Tracking` মডিউল)।
+
+⚠️ **প্রোডাকশনে এখন প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (আনলিমিটেড)** — ইচ্ছাকৃত সেফ ডিফল্ট, বাস্তব লিমিট admin-কে **Admin → Packages** থেকে হাতে বসাতে হবে (কোনো সেলারের ইভেন্ট নীরবে হারানো এড়াতে)।
+
+**সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`tracking_capi_context.md`](tracking_capi_context.md) — সমস্যা-বিবৃতি, ডোমেইন-মডেল নির্ভরতা (§৮, `custom_domain_context.md`-এর উপর দাঁড়িয়ে), ফেজ ব্রেকডাউন। রোডম্যাপে কোনো ট্র্যাকিং ফেজ বাকি নেই — বাকি যা আছে (fraud score-এ ওজন বসানো, TikTok/GA4 destination) নতুন কাজ হিসেবে আলাদা অনুরোধ লাগবে।
 
 ---
 
@@ -793,9 +821,9 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 ### 16.5 Multi-courier rate/ETA compare + bulk booking UX উন্নতি
 - **কেন:** Bulk booking backend route আগে থেকেই আছে (`/courier/book/bulk`) — কিন্তু booking-এর আগে ৪টা provider-এর rate/ETA পাশাপাশি compare করার UI আছে কিনা যাচাই করা দরকার; না থাকলে যোগ করা তুলনামূলক কম effort (backend price API সব provider-এই আছে)
 
-### 16.6 Staff/Team role (multi-user per shop)
-- **কেন:** ছোট F-commerce বিজনেসেও সাধারণত ২-৩ জন অর্ডার প্রসেস করে; বর্তমানে `users.role` শুধু `user`/`admin`, per-shop sub-account নেই
-- **কোথায় শুরু:** `shop_staff` pivot/table (owner_user_id, staff_user_id, permissions jsonb) + সব controller-এ owner-scoping যোগ করা (CONTEXT.md §25-এর `adminScopeUserIds()` pattern-এর অনুরূপ কিন্তু shop-level)
+### 16.6 Staff/Team role (multi-user per shop) — ✅ DONE (2026-08-10)
+- **যা হয়েছে:** `users.owner_id` self-FK + `staff_permissions` টেবিল, granular per-module toggle, seat limit (package-ভিত্তিক), temp-password creation flow, token revocation। সব বিদ্যমান module (orders/products/customers/courier/sms/accounting/analytics/landing_pages/fraud/facebook) staff-scoping-aware।
+- **সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`staff_team_role_context.md`](staff_team_role_context.md) — এখন থেকে **যেকোনো নতুন মডিউল বানানোর আগে এই ফাইলের শুরুর চেকলিস্ট পড়া বাধ্যতামূলক** (Pattern A/B scoping সিদ্ধান্ত, `StaffPermission::MODULE_KEYS`, middleware, মেনু ফিল্টার)।
 
 ### 16.7 Invoice/Waybill PDF generation — ✅ DONE (2026-08-11 থেকে, একাধিক সেশনে সম্প্রসারিত)
 - **যা হয়েছে:** `barryvdh/laravel-dompdf` দিয়ে দুটো আলাদা PDF — courier waybill/sticker label (৫৮/৮০mm থার্মাল + ২২টা বাছাইযোগ্য sticker template, barcode+QR, real HarfBuzz বাংলা text shaping) এবং seller→customer sales invoice (A4, itemized টেবিল, শপ লোগো/ঠিকানা, এখন **payment history টেবিল সহ** — কে/কবে/কীভাবে কত পরিশোধ করল + Paid/Discount/Due summary, ম্যানুয়াল পেমেন্ট কালেকশন ফিচারের অংশ হিসেবে ২০২৬-০৮-১৭-এ যোগ হয়েছে)। Shop Profile Settings (নাম/ফোন/ঠিকানা/লোগো, waybill-এর FROM ডেটার সোর্স) একই সময়ে তৈরি হয়েছে — উপরের §15.10-এর placeholder-row-টাও stale ছিল।
@@ -815,7 +843,10 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 3. ~~Facebook/Meta MVP (16.3)~~ — 🟡 কোড DONE (2026-08-02), Meta App setup (external) বাকি — §15.11 দেখুন
 4. ~~Payment gateway automation (16.4)~~ — ✅ subscription billing অংশ **live in production** (2026-08-09, real bKash merchant account + real transaction verified, §18/§18.2)। Customer-facing landing-page checkout online payment এখনো শুরু হয়নি — সেটা ভিন্ন, বড় স্কোপ
 5. ~~Invoice/Waybill PDF (16.7)~~ — ✅ DONE (2026-08-11 থেকে, courier_waybill_context.md-এ পূর্ণ বিস্তারিত)
-6. Staff/Team roles (16.6), CSV import (16.8), PWA (16.9) — parallel-track, lower urgency
+6. ~~Staff/Team roles (16.6)~~ — ✅ DONE (2026-08-10, staff_team_role_context.md)
+7. CSV import (16.8), PWA (16.9) — parallel-track, lower urgency
+
+**এই তালিকায় ছিল না, কিন্তু আলাদাভাবে সম্পূর্ণ হয়ে গেছে:** WordPress/WooCommerce Connector (§15.12), Per-seller Subdomain/Custom Domain (§15.13), Tracking Platform/Facebook CAPI+Pixel (§15.14) — তিনটাই মূল `feature_roadmap_context.md`/`bsol_history_and_new_context.md`-এ শুরু হয়েছিল, এই ফাইলে কখনো cross-reference করা হয়নি ২০২৬-০৮-১৭-এর আগ পর্যন্ত।
 
 **Smaller open follow-ups (not full modules, can slot in anytime):** Carrybee bulk-booking + `cancel()` route wiring, RedX/Carrybee test-connection endpoints, Paperfly provider completion or removal, `FraudController::computeScore()` ↔ courier-fraud-data merge (§17.8 items 9/10).
 

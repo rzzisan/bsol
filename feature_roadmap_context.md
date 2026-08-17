@@ -6,6 +6,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-17 — এই ফাইলের status টেবিল অনেকদিন sync হয়নি, বড় আপডেট: Tracking Platform (T1-T7, `tracking_capi_context.md`) এবং Per-seller সাবডোমেইন (D1-D5, `custom_domain_context.md`) দুটোই এখন **✅ সম্পূর্ণ**, আগে "planning/design done" লেখা ছিল যেটা এখন ভুল। WordPress/WooCommerce Connector-এর জন্য নতুন row যোগ হলো (২০ ফেজ, ✅ সম্পূর্ণ, আগে এই টেবিলেই ছিল না)। Custom domain (landing pages, #৬)-এর অর্ধেক (per-seller subdomain অংশ) এখন সম্পূর্ণ — বাকি শুধু সেলারের নিজস্ব ডোমেইন (T8b)।
+
 Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈরি। **Staff/Team sub-account role (Phase 1+2, সব মডিউল) সম্পূর্ণ শেষ** — বিস্তারিত `staff_team_role_context.md`, নিচের status টেবিলে আপডেট করা হয়েছে। নিচের বাকি আইটেমগুলোর কোনোটাতে এখনো কাজ শুরু হয়নি।
 
 ---
@@ -18,10 +20,11 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 1 | চেকআউটে অনলাইন পেমেন্ট কালেকশন | ⬜ Not started | — |
 | 2 | WhatsApp Business integration | ⬜ Not started | — |
 | 3 | Auto-top-up / usage-based billing | ⬜ Not started | — |
-| 5 | Courier waybill/label PDF | ✅ সম্পন্ন ও deployed — COD amount বাগ ফিক্স, Pathao-স্টাইল লেবেল, Sticker Template ফিচার (২২টা ডিজাইন, সেলার-সিলেক্টেবল, প্রিভিউ থাম্বনেইল সহ) সম্পূর্ণ, এবং ✅ বাংলা টেক্সট রেন্ডারিং বাগ ফাইনালি সমাধান (real HarfBuzz shaping — সবগুলো ২২টা sticker টেমপ্লেট + order invoice-এ) | `courier_waybill_context.md` §৪.৭, §৬ |
-| — | **Tracking Platform (Facebook CAPI + browser-side, প্যাকেজ-ভিত্তিক ইভেন্ট লিমিট)** | 🟡 পরিকল্পনা সম্পন্ন, implementation শুরু হয়নি | `tracking_capi_context.md` |
-| — | **Per-seller সাবডোমেইন (ড্যাশবোর্ড + ল্যান্ডিং পেজ, `*.zyrotechbd.com`)** | 🟡 ডিজাইন সম্পন্ন; DNS Cloudflare-এ সরানো হয়েছে (২০২৬-০৮-১৪), wildcard cert বাকি | `custom_domain_context.md` |
-| 6 | Custom domain সাপোর্ট (landing pages) | ⬜ Not started | — |
+| 5 | Courier waybill/label PDF | ✅ সম্পন্ন ও deployed — COD amount বাগ ফিক্স, Pathao-স্টাইল লেবেল, Sticker Template ফিচার (২২টা ডিজাইন, সেলার-সিলেক্টেবল, প্রিভিউ থাম্বনেইল সহ) সম্পূর্ণ, এবং ✅ বাংলা টেক্সট রেন্ডারিং বাগ ফাইনালি সমাধান (real HarfBuzz shaping — সবগুলো ২২টা sticker টেমপ্লেট + order invoice-এ), + Payment History টেবিল (২০২৬-০৮-১৭) | `courier_waybill_context.md` §৪.৭, §৬, §৮.১ |
+| — | **Tracking Platform (Facebook CAPI + browser-side, প্যাকেজ-ভিত্তিক ইভেন্ট লিমিট)** | ✅ সম্পন্ন (T1-T7, ২০২৬-০৮-১৬) — পরিকল্পনার সবগুলো ফেজ শেষ, browser Pixel + server CAPI + order-flow ইভেন্ট + quota + event log + admin usage view — লাইভ | `tracking_capi_context.md` |
+| — | **Per-seller সাবডোমেইন (ড্যাশবোর্ড + ল্যান্ডিং পেজ, `*.zyrotechbd.com`)** | ✅ সম্পন্ন (D1-D5, ২০২৬-০৮-১৫) — wildcard DNS/TLS/nginx লাইভ, handoff login, reserved-subdomain admin মডিউল, নিরাপত্তা অডিট সম্পন্ন (১ High+২ Medium, সব ফিক্সড) | `custom_domain_context.md`, `domain_security_audit.md` |
+| — | **WordPress/WooCommerce Connector (BSOL Connect প্লাগইন)** | ✅ সম্পন্ন (২০ ফেজ, v1.17.0) — order/product sync, courier booking (৫টাই), waybill/invoice PDF, checkout OTP, Facebook CAPI, bulk sync, abandoned checkout, repeat-order block, blacklist block, tracking Pixel — সব লাইভ; বাকি শুধু real WooCommerce staging QA (ব্যবহারকারীর নিজের সাইটে) | `wordpress_connect_context.md` |
+| 6 | Custom domain সাপোর্ট (landing pages) | 🟡 আংশিক — per-seller সাবডোমেইন অংশ ✅ সম্পন্ন (উপরে); সেলারের **নিজস্ব** ডোমেইন (T8b, `custom_domain_context.md §11` আইটেম ৩) এখনো শুরু হয়নি | `custom_domain_context.md` |
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
 | — | Bulk/CSV order import | ⬜ Not started | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
 | — | PWA | ⬜ Not started | (§16.9) |
@@ -57,10 +60,12 @@ SMS credit ও subscription infra দুটোই এখন self-service (`SmsCr
 `barryvdh/laravel-dompdf` ইতিমধ্যে কোডবেসে আছে (subscription/SMS invoice PDF-এ ব্যবহৃত, `InvoicePdfService`)। একই pattern দিয়ে 58mm/80mm প্রিন্টেবল label — বাংলাদেশি courier workflow-এ প্রায় must-have।
 **শুরুর পয়েন্ট:** নতুন Blade template + `InvoicePdfService`-এর অনুরূপ `WaybillPdfService`, courier booking response থেকে render।
 
-### 6. Custom domain সাপোর্ট (landing pages)
+### 6. Custom domain সাপোর্ট (landing pages) — 🟡 আংশিক (per-seller সাবডোমেইন অংশ ✅ সম্পন্ন)
+**আপডেট (২০২৬-০৮-১৭):** এখানে বর্ণিত সমস্যাগুলোর (`_fbc` ক্রস-সেলার দূষণ, Meta domain verification) সবচেয়ে বড় অংশ ইতিমধ্যে সমাধান হয়ে গেছে per-seller **সাবডোমেইন** ফিচারের মাধ্যমে (D1-D5, ২০২৬-০৮-১৫, `custom_domain_context.md`) — প্রতিটা সেলার এখন `{label}.zyrotechbd.com`-এ নিজের ঠিকানায় Full tracking tier পায়, exact-host কুকি ক্রস-সেলার দূষণ কাঠামোগতভাবে বন্ধ, আর `zyrotechbd.com` একবার verify করাতেই সব সেলারের সাবডোমেইন ঢেকে যায় (per-seller partner-assignment লাগে না)। **যা এখনো বাকি** নিচের মূল টেক্সট অনুযায়ী শুধু সেলারের **নিজের কেনা** ডোমেইন (T8b) — সেটার একমাত্র বাকি বাস্তব সুবিধা শেয়ার্ড-অ্যাপেক্স রেপুটেশন ঝুঁকি এড়ানো (`custom_domain_context.md §10`), AEM/verification আর ব্লকার না।
+
 এখন সব পেজ platform সাবডোমেইনে। নিজের domain কানেক্ট করার সুবিধা — premium-tier subscription-এর জন্য শক্তিশালী upsell reason (ব্র্যান্ডিং চাওয়া বড় সেলাররা higher-tier প্যাকেজ কিনবে)।
 **নতুন, আরও শক্তিশালী যুক্তি (২০২৬-০৮-১৪, `tracking_capi_context.md §8`):** শেয়ার্ড ডোমেইনে Meta domain verification/AEM সেলার নিজে করতে পারে না, `_fbc` কুকি ক্রস-সেলার দূষিত হয়, এবং একজনের পলিসি-লঙ্ঘনে পুরো ডোমেইন (ড্যাশবোর্ডসহ) ঝুঁকিতে পড়ে। কাস্টম ডোমেইন এই তিনটাই সমাধান করে — অর্থাৎ এটা শুধু ব্র্যান্ডিং নয়, **পরিমাপযোগ্য ad-performance upsell** (Full vs Basic tracking tier)।
-**শুরুর পয়েন্ট:** DNS CNAME verification flow + nginx/certbot automation (server-level কাজ, `CONTEXT.md`-এর nginx/SSL সেকশন রেফারেন্স করতে হবে) — এটা তুলনামূলক বড় ops স্কোপ, অন্যগুলোর চেয়ে ভিন্ন ধরনের কাজ।
+**শুরুর পয়েন্ট (এখন শুধু T8b-এর জন্য প্রযোজ্য):** DNS CNAME verification flow + nginx/certbot automation (server-level কাজ, `CONTEXT.md`-এর nginx/SSL সেকশন রেফারেন্স করতে হবে) — এটা তুলনামূলক বড় ops স্কোপ, অন্যগুলোর চেয়ে ভিন্ন ধরনের কাজ।
 
 ### 7. Marketing broadcast campaign (CRM-segment টার্গেটেড)
 SMS automation এখন শুধু order-status trigger। VIP/loyal/risky segment (Customer Intelligence-এ ইতিমধ্যে আছে, `AnalyticsController::customers()`) টার্গেট করে one-off marketing broadcast SMS পাঠানোর UI — সেলারদের বিক্রি বাড়ায় + SMS credit বেশি বিক্রি হয় (revenue loop)।

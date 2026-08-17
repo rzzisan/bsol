@@ -1,5 +1,7 @@
 # BSOL — History &amp; All-in-One SaaS Context
 
+> **🚨 আপডেট (২০২৬-০৮-১৭):** এই ফাইলের মূল বিষয় ছিল §৫-এ প্রস্তাবিত WordPress/WooCommerce Connector — সেটা এখন **সম্পূর্ণ তৈরি ও লাইভ** (২০ ফেজ, `wordpress_connect_context.md`)। নিচের §৩/§৪/§৫/§৮/§৯-এ যেখানে "সম্পূর্ণ absent"/"এই ডকুমেন্টের মূল ফোকাস" লেখা আছে সেগুলো এখন **ঐতিহাসিক** — তখনকার প্রস্তাবনা হিসেবে অপরিবর্তিত রাখা হয়েছে, কিন্তু বর্তমান স্ট্যাটাসের জন্য `wordpress_connect_context.md`-ই একমাত্র সত্য উৎস। §১০-এর নিজের "doc lag" সতর্কতা অনুযায়ী এই আপডেট করা হলো।
+
 এই ফাইলের উদ্দেশ্য: user-এর পুরোনো সব প্রজেক্ট (`oldproject/`, `zyro/`, `catv/`) এবং বর্তমান BSOL (`CONTEXT.md`, `SAAS_MODULE_CONTEXT.md` + সব `*_context.md`) একসাথে দেখে — "All-in-One SaaS" বানাতে (WordPress কানেক্ট সহ) আর কী কী ফিচার দরকার তার একটা সিঙ্গেল প্ল্যানিং ডকুমেন্ট তৈরি করা। এটা একটা **living roadmap/history doc** — status doc না (module-এর লাইভ স্ট্যাটাসের জন্য `SAAS_MODULE_CONTEXT.md` §15 এবং `feature_roadmap_context.md` কেই source of truth ধরতে হবে)।
 
 Master reference files: [[CONTEXT.md]], [[SAAS_MODULE_CONTEXT.md]], [[feature_roadmap_context.md]], [[landing_page_context.md]], [[facebook_integration_context.md]], [[courier_waybill_context.md]], [[staff_team_role_context.md]], [[subscription_billing_context.md]], [[zyro_sms.md]], [[redx_api_doc.md]].
@@ -68,7 +70,9 @@ bsol (Laravel 13 + Next.js 16 + PostgreSQL, বর্তমান) ← সব �
 | Facebook/Meta | Page comment+Messenger lead capture, reply, CAPI Purchase event (landing-page checkout-only) — **কোড শেষ, কিন্তু Meta App Review পেন্ডিং থাকায় সাধারণ সেলারদের জন্য এখনো লাইভ না** |
 | Admin Panel | User/Package/Billing/SMS-gateway/Email/Notification-template/Landing-template/Branding — সব আছে |
 
-**একদম শুরু হয়নি (grep-verified, §15.10):** চেকআউটে real অনলাইন পেমেন্ট (এখনো সব COD), WhatsApp, Nagad/SSLCommerz, **WordPress/WooCommerce connector**, Invoice/Waybill PDF জন্য bulk merge, Bulk/CSV import, PWA।
+**একদম শুরু হয়নি:** চেকআউটে real অনলাইন পেমেন্ট (এখনো সব COD), WhatsApp, Nagad/SSLCommerz, Bulk/CSV import, PWA।
+
+**✅ আপডেট (২০২৬-০৮-১৭) — এই টেবিলে আগে "একদম শুরু হয়নি" লেখা ছিল, এখন সম্পূর্ণ:** **WordPress/WooCommerce connector** (২০ ফেজ, `wordpress_connect_context.md`), Invoice/Waybill PDF (২২ sticker template + order invoice + payment history, `courier_waybill_context.md`), Per-seller subdomain (`custom_domain_context.md`), Tracking Platform/Facebook Pixel+CAPI (`tracking_capi_context.md`), Staff/Team roles (`staff_team_role_context.md`)।
 
 ---
 
@@ -85,6 +89,8 @@ BSOL-কে সত্যিকারের "All-in-One" করতে দুই �
 ---
 
 ## ৫. WordPress/WooCommerce Connector — মূল গ্যাপ, প্রস্তাবিত ডিজাইন
+
+> **✅ এই সম্পূর্ণ সেকশন এখন বাস্তবায়িত (২০ ফেজ, `wordpress_connect_context.md`)।** নিচের ডিজাইন-প্রস্তাবনা ঐতিহাসিক রেফারেন্স হিসেবে অপরিবর্তিত রাখা হলো (কতটা কাছাকাছি বাস্তবায়ন হয়েছে তা দেখার জন্য আকর্ষণীয়), কিন্তু বর্তমান API surface/ফাইল-লিস্ট/ডিজাইন সিদ্ধান্তের জন্য `wordpress_connect_context.md` পড়ো, এই সেকশন না।
 
 `zayroo-connect` (in `oldproject/` এবং তার হালনাগাদ সংস্করণ `zyro/wordpress_plugin/`) ইতিমধ্যে এই সমস্যাটার একটা **প্রমাণিত, লাইভ প্রোডাকশন সমাধান** — এটা নতুন করে ডিজাইন না করে, তার architecture-ই BSOL-এর existing backend-এর উপর বসিয়ে দেওয়া উচিত।
 
@@ -169,12 +175,12 @@ user-এর মূল লিস্টে ছিল "ওয়েব সাইট
 | ফিচার | সেলার-নিজের-সাইট-নেই (BSOL landing page) | সেলার-নিজের-WooCommerce-আছে (connector) | সোর্স/precedent | অবস্থা |
 |---|---|---|---|---|
 | চেকআউটে online পেমেন্ট | ⬜ Not started (highest priority, roadmap #1) | ⬜ connector-এর সাথে একসাথে ডিজাইন করা উচিত | bKash pattern already proven (subscription billing); zyro-এর ZiniPay বাড়তি অপশন | 🔴 |
-| **WordPress/WooCommerce Connector প্লাগিন** | N/A | ⬜ **সম্পূর্ণ absent** | zayroo-connect (§৫) | 🔴 এই ডকুমেন্টের মূল আইটেম |
-| Fraud check/blacklist | ✅ আছে | connector দিয়ে expose করতে হবে | `FraudController`+`CourierFraudCheckService` | 🟡 API surface বাড়াতে হবে |
-| Courier booking | ✅ আছে | connector দিয়ে expose করতে হবে | `CourierFactory` | 🟡 |
-| Facebook CAPI | 🟡 landing-page-only, App Review পেন্ডিং | connector দিয়ে generalize দরকার | `FacebookCapiClient` | 🟡 |
-| SMS automation | ✅ আছে | connector webhook দিয়ে trigger | `SmsAutomationService` | 🟡 |
-| Waybill/sticker PDF | ✅ আছে (২২ টেমপ্লেট) | connector দিয়ে expose | `WaybillPdfService` | 🟡 প্রায় ফ্রি reuse |
+| **WordPress/WooCommerce Connector প্লাগিন** | N/A | ✅ **সম্পূর্ণ, ২০ ফেজ, v1.17.0** (২০২৬-০৮-১৭ আপডেট) | zayroo-connect (§৫) → `wordpress_connect_context.md` | ⚫ done |
+| Fraud check/blacklist | ✅ আছে | ✅ connector-এ expose করা হয়েছে (checkout-time blacklist block সহ) | `FraudController`+`CourierFraudCheckService` | ⚫ done |
+| Courier booking | ✅ আছে | ✅ connector-এ expose করা হয়েছে (৫টা কুরিয়ারই, address-resolver সহ) | `CourierFactory` | ⚫ done |
+| Facebook CAPI | 🟡 App Review এখনো পেন্ডিং (landing-page + WooCommerce দুটোই কোড-সম্পূর্ণ) | ✅ connector generalize করা হয়েছে (Phase ১০) | `FacebookCapiClient` | 🟡 App Review বাকি |
+| SMS automation | ✅ আছে | ✅ status-sync দিয়ে স্বয়ংক্রিয় trigger + wp-admin থেকে Manual SMS বাটনও যোগ হয়েছে | `SmsAutomationService` | ⚫ done |
+| Waybill/sticker PDF | ✅ আছে (২২ টেমপ্লেট) | ✅ connector-এ expose করা হয়েছে (order invoice PDF-ও) | `WaybillPdfService` | ⚫ done |
 | WhatsApp integration | ⬜ Not started | ⬜ Not started | Messenger architecture reuse করা যায় | 🔴 roadmap #2 |
 | Auto-top-up billing | ⬜ Not started | N/A | SMS credit/subscription infra রেডি | 🔴 roadmap #3 |
 | Custom domain (হালকা) | ⬜ Not started | N/A | — | 🟡 roadmap #6 |
@@ -197,14 +203,16 @@ user-এর মূল লিস্টে ছিল "ওয়েব সাইট
 
 ## ৯. প্রায়োরিটাইজড পরবর্তী পদক্ষেপ (updated)
 
+> **আপডেট (২০২৬-০৮-১৭):** নিচের লিস্টের #2 (WordPress/WooCommerce Connector) সম্পূর্ণ হয়ে গেছে — `wordpress_connect_context.md`। বাকি #1/#3/#4 এখনো প্রযোজ্য, অগ্রাধিকার অপরিবর্তিত।
+
 `feature_roadmap_context.md`-এর বিদ্যমান অর্ডার এখনো ভ্যালিড, শুধু connector-কে explicit ভাবে যোগ করা হলো:
 
 1. **চেকআউটে online পেমেন্ট কালেকশন** — কোর "ফেক/অনুপস্থিত COD অর্ডার" সমস্যার সরাসরি সমাধান, bKash pattern রেডি।
-2. **WordPress/WooCommerce Connector (এই ডকুমেন্টের বিষয়)** — user স্পষ্টভাবে এটা চেয়েছেন; zayroo-connect-এর প্রমাণিত ডিজাইন আছে বলে implementation risk কম, কিন্তু scope বড় (§৫-এর পুরো API সারফেস + প্লাগিন)। প্রথম ধাপ: `PlatformApiKey` মডেল + `/api/connect/v1/connect`+`orders/sync`+`fraud/check-phone` — এই তিনটা দিয়ে MVP প্রমাণ করা, তারপর বাকি endpoint যোগ করা।
+2. ~~**WordPress/WooCommerce Connector**~~ — ✅ **সম্পূর্ণ (২০২৬-০৮-১৭)**, ২০ ফেজ, `wordpress_connect_context.md`।
 3. **Auto-top-up/usage-based billing** — প্রায় বিনামূল্যে upsell, infra রেডি।
 4. **WhatsApp Business** — Messenger architecture reuse।
 
-তারপর (গ্যাপ-অ্যানালাইসিস থেকে নতুন candidate, প্রায়োরিটি user confirm করবে): plan-usage-limit enforcement যাচাই, marketing broadcast (SMS+email), custom domain, inventory/procurement, admin audit trail।
+তারপর (গ্যাপ-অ্যানালাইসিস থেকে নতুন candidate, প্রায়োরিটি user confirm করবে): plan-usage-limit enforcement যাচাই, marketing broadcast (SMS+email), সেলারের নিজস্ব custom domain (T8b — per-seller সাবডোমেইন অংশ ইতিমধ্যে সম্পূর্ণ, `custom_domain_context.md`), inventory/procurement, admin audit trail।
 
 ---
 
@@ -222,7 +230,7 @@ user-এর মূল লিস্টে ছিল "ওয়েব সাইট
 
 ## ১১. সিদ্ধান্ত দরকার এমন প্রশ্ন (user confirm করার পর এগোনো উচিত)
 
-1. WordPress connector-এর scope — শুরুতে MVP (order sync + fraud check + SMS trigger) নাকি পূর্ণ §৫.২ লিস্ট একসাথে?
+1. ~~WordPress connector-এর scope~~ — ✅ উত্তর: MVP দিয়ে শুরু করে ধাপে ধাপে (২০ ফেজে) পূর্ণ §৫.২ লিস্ট + আরও বেশি কভার হয়ে গেছে (`wordpress_connect_context.md`)।
 2. zyro-এর কোন মডিউলগুলো সত্যিই দরকার — Finance suite? Marketing email campaign? Inventory/procurement? নাকি এগুলো ভবিষ্যতের জন্য রেখে দেওয়া?
 3. পেমেন্ট গেটওয়ে — bKash-ই যথেষ্ট, নাকি Nagad/SSLCommerz/ZiniPay-ও যোগ করা?
 4. ডোমেইন/হোস্টিং — শুধু custom-domain-connect (হালকা) নাকি পূর্ণ হোস্টিং/ডোমেইন রিসেল সার্ভিস (ভারী, নতুন ops স্কোপ)?
