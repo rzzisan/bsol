@@ -736,8 +736,8 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 | ~~Facebook Graph API / Comment-Inbox bot / Messenger CRM~~ WhatsApp | — | WhatsApp এখনো সম্পূর্ণ অনুপস্থিত। Facebook/Messenger lead capture এখন §15.4-বহির্ভূত নতুন §15.11-এ move করা হলো — নিচে দেখুন |
 | Automated payment gateway — Nagad/SSLCommerz | `grep -rli sslcommerz\|nagad` | কোনো trace নেই। bKash-এর জন্য এখন real API integration আছে (subscription billing-এ live, §18/§18.2) — এই row-টা এখন শুধু Nagad/SSLCommerz-এর জন্য প্রযোজ্য, bKash আর এখানে গণনা হবে না |
 | Staff/Team/sub-account roles | `grep -rli staff\|team_member` + users migration পড়া | `users.role` শুধু `user`/`admin` — কোনো per-shop multi-staff concept নেই |
-| Shop Profile Settings | `/dashboard/settings/shop/page.tsx` | Pure `ModulePlaceholder`, কোনো backend controller নেই |
-| Invoice / Waybill PDF generation | `composer.json`-এ dompdf/barryvdh নেই, controller grep-এ কিছু নেই | কোনো PDF export নেই — courier booking-এর পর প্রিন্টেবল label/invoice ফিচার অনুপস্থিত |
+| ~~Shop Profile Settings~~ | — | ✅ DONE (2026-08-11) — এই row এখন ভুল, নিচে §15.11-এর পরে নতুন নোট দেখুন |
+| ~~Invoice / Waybill PDF generation~~ | — | ✅ DONE — এই row এখন ভুল, §16.7 আপডেট দেখুন |
 | Bulk/CSV order import | `OrderController.php`-এ import/csv grep শূন্য | শুধু abandoned-checkout-এর export আছে, order-এর দিকে bulk import নেই |
 | PWA / mobile app manifest | `frontend/public/manifest*`, `sw.js` কিছুই নেই | Dashboard শুধু responsive web, installable PWA না |
 | WhatsApp integration | `grep -rli whatsapp` | কোনো trace নেই — এখনো সম্পূর্ণ অনুপস্থিত |
@@ -797,9 +797,9 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 - **কেন:** ছোট F-commerce বিজনেসেও সাধারণত ২-৩ জন অর্ডার প্রসেস করে; বর্তমানে `users.role` শুধু `user`/`admin`, per-shop sub-account নেই
 - **কোথায় শুরু:** `shop_staff` pivot/table (owner_user_id, staff_user_id, permissions jsonb) + সব controller-এ owner-scoping যোগ করা (CONTEXT.md §25-এর `adminScopeUserIds()` pattern-এর অনুরূপ কিন্তু shop-level)
 
-### 16.7 Invoice/Waybill PDF generation
-- **কেন:** Courier booking-এর পর printable label/invoice নেই — physical delivery workflow-এ এটা প্রায় mandatory বাংলাদেশি courier practice-এ
-- **কোথায় শুরু:** `barryvdh/laravel-dompdf` (composer) + booking response থেকে waybill template render
+### 16.7 Invoice/Waybill PDF generation — ✅ DONE (2026-08-11 থেকে, একাধিক সেশনে সম্প্রসারিত)
+- **যা হয়েছে:** `barryvdh/laravel-dompdf` দিয়ে দুটো আলাদা PDF — courier waybill/sticker label (৫৮/৮০mm থার্মাল + ২২টা বাছাইযোগ্য sticker template, barcode+QR, real HarfBuzz বাংলা text shaping) এবং seller→customer sales invoice (A4, itemized টেবিল, শপ লোগো/ঠিকানা, এখন **payment history টেবিল সহ** — কে/কবে/কীভাবে কত পরিশোধ করল + Paid/Discount/Due summary, ম্যানুয়াল পেমেন্ট কালেকশন ফিচারের অংশ হিসেবে ২০২৬-০৮-১৭-এ যোগ হয়েছে)। Shop Profile Settings (নাম/ফোন/ঠিকানা/লোগো, waybill-এর FROM ডেটার সোর্স) একই সময়ে তৈরি হয়েছে — উপরের §15.10-এর placeholder-row-টাও stale ছিল।
+- **সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`courier_waybill_context.md`](courier_waybill_context.md) — নতুন কোনো PDF/টেমপ্লেট/waybill/invoice কাজ শুরু করার আগে এটাই প্রথমে পড়ো (dompdf-এর একাধিক critical বাগ-ক্লাস, box-sizing অসাপোর্টেড, বাংলা shaping আর্কিটেকচার সব ওখানে ডকুমেন্টেড)।
 
 ### 16.8 Bulk/CSV order import
 - **কেন:** Facebook কমেন্ট থেকে কপি-পেস্ট করে bulk অর্ডার এন্ট্রির সুবিধা এখনো নেই, abandoned-checkout-এর মতো export আছে কিন্তু import নেই
@@ -814,7 +814,8 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 2. ~~Courier abstraction hardening (16.2)~~ — ✅ DONE (2026-08-02, commit `0fdc3ab`)
 3. ~~Facebook/Meta MVP (16.3)~~ — 🟡 কোড DONE (2026-08-02), Meta App setup (external) বাকি — §15.11 দেখুন
 4. ~~Payment gateway automation (16.4)~~ — ✅ subscription billing অংশ **live in production** (2026-08-09, real bKash merchant account + real transaction verified, §18/§18.2)। Customer-facing landing-page checkout online payment এখনো শুরু হয়নি — সেটা ভিন্ন, বড় স্কোপ
-5. Staff/Team roles (16.6), Invoice PDF (16.7), CSV import (16.8), PWA (16.9) — parallel-track, lower urgency
+5. ~~Invoice/Waybill PDF (16.7)~~ — ✅ DONE (2026-08-11 থেকে, courier_waybill_context.md-এ পূর্ণ বিস্তারিত)
+6. Staff/Team roles (16.6), CSV import (16.8), PWA (16.9) — parallel-track, lower urgency
 
 **Smaller open follow-ups (not full modules, can slot in anytime):** Carrybee bulk-booking + `cancel()` route wiring, RedX/Carrybee test-connection endpoints, Paperfly provider completion or removal, `FraudController::computeScore()` ↔ courier-fraud-data merge (§17.8 items 9/10).
 
