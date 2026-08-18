@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-18 — **Phase B1 লাইভ: SSLCommerz automated merchant-gateway + provider-abstraction ফাউন্ডেশন** (customer online payment)। ব্যবহারকারী ৭টা কনক্রিট provider কনফার্ম করেছেন (SSLCommerz, ShurjoPay, EPS, ZiniPay, AamarPay, bKash Merchant, Nagad Merchant) — যাদের মার্চেন্ট একাউন্ট আছে তারা কখনো Phase A-এর ম্যানুয়াল ফ্লো ব্যবহার করবে না। নতুন normalized `payment_gateway_credentials` টেবিল (প্রতি সেলার-প্রতি-provider, encrypted JSON credentials) — Phase A-এর `payment_gateway_settings`-এ reserved করা `sslcommerz_*`/`bkash_gateway_*` কলাম এখন deprecated। `App\Contracts\PaymentGatewayClient` ইন্টারফেস + `PaymentGatewayFactory` (CourierFactory-এর প্যাটার্ন) + `SslcommerzGatewayClient` রেফারেন্স ইমপ্লিমেন্টেশন। বাকি ৬টা provider ধাপে ধাপে একই abstraction-এ যোগ হবে (B2/B3/C1/C2)। বিস্তারিত §15.15 ও `online_payment_context.md §৬`। Older entries kept as-is:
+
 Last updated: 2026-08-17 (৩) — Phase A লাইভ টেস্ট করে ব্যবহারকারীর ফিডব্যাক অনুযায়ী ৩টা রিফাইনমেন্ট: OTP এখন শুধু COD-তে সক্রিয় (অনলাইন পেমেন্ট নিজেই intent প্রমাণ করে), অর্ডার লিস্টে "পেমেন্ট বাকি" ফ্ল্যাগ, অ্যাপ্রুভ-এর সময় সেলার নিজে amount হাতে বসায় (কাস্টমারের claim অন্ধভাবে ট্রাস্ট করা হয় না), আর প্রতি ল্যান্ডিং পেজে আলাদা payment-channel সিলেকশন (আগে শপ-ওয়াইড-ই ছিল)। বিস্তারিত `online_payment_context.md §৫`। Older entries kept as-is:
 
 Last updated: 2026-08-17 (২) — **Customer-facing Online Payment, Phase A (`wallet_manual`) সম্পন্ন ও deploy করা হয়েছে** — কাস্টমার এখন চেকআউটে সেলারের পার্সোনাল বিকাশ/নগদ/রকেট নম্বরে টাকা পাঠিয়ে অর্ডার পেমেন্ট করতে পারে (send & verify, মার্চেন্ট একাউন্ট ছাড়াই), সেলার Dashboard → Accounting → Online Payment Verification-এ গিয়ে অ্যাপ্রুভ করে। নতুন §15.15 দেখো। Migration production-এ apply করা হয়েছে (`payment_gateway_settings`, `order_online_payments`, `order_payments.source`), ব্যাকএন্ড+ফ্রন্টএন্ড টেস্ট/বিল্ড পাস। বিস্তারিত `online_payment_context.md`। Phase B (SSLCommerz gateway) ও Phase C (bKash merchant gateway) এখনো বাকি। Older entries kept as-is:
@@ -797,15 +799,17 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 
 **সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`tracking_capi_context.md`](tracking_capi_context.md) — সমস্যা-বিবৃতি, ডোমেইন-মডেল নির্ভরতা (§৮, `custom_domain_context.md`-এর উপর দাঁড়িয়ে), ফেজ ব্রেকডাউন। রোডম্যাপে কোনো ট্র্যাকিং ফেজ বাকি নেই — বাকি যা আছে (fraud score-এ ওজন বসানো, TikTok/GA4 destination) নতুন কাজ হিসেবে আলাদা অনুরোধ লাগবে।
 
-### 15.15 Customer-Facing Online Payment — 🟡 আংশিক (Phase A ✅ DONE, ২০২৬-০৮-১৭; Phase B/C ⬜ বাকি)
+### 15.15 Customer-Facing Online Payment — 🟡 আংশিক (Phase A ✅ + Phase B1 ✅ DONE, ২০২৬-০৮-১৮; বাকি provider-গুলো ⬜ ধাপে ধাপে)
 
-কাস্টমার এখন চেকআউটে সরাসরি সেলারের পার্সোনাল বিকাশ/নগদ/রকেট নম্বরে টাকা পাঠিয়ে অর্ডার পেমেন্ট করতে পারে — আগে শুধু COD ছিল। ChatGPT ও Gemini দুটো external review-ই independently এটাকে সবচেয়ে বড় gap বলেছিল (`OtherAI/`)। **মার্চেন্ট একাউন্ট লাগে না** ইচ্ছাকৃতভাবে — ছোট/নতুন সেলারদের বাস্তবতা মাথায় রেখে "send & verify" (কাস্টমার টাকা পাঠায়, TrxID সাবমিট করে, সেলার যাচাই করে অ্যাপ্রুভ করে) ফ্লো আগে শিপ করা হয়েছে; সত্যিকারের automated gateway (SSLCommerz/bKash Merchant API) পরের ফেজ।
+কাস্টমার এখন চেকআউটে পে করতে পারে দুইভাবে: **(Phase A)** সেলারের পার্সোনাল বিকাশ/নগদ/রকেট নম্বরে টাকা পাঠিয়ে TrxID সাবমিট, সেলার ভেরিফাই করে অ্যাপ্রুভ করে (মার্চেন্ট একাউন্ট ছাড়াই — ছোট/নতুন সেলারদের জন্য) — অথবা **(Phase B, নতুন)** সেলারের নিজের merchant gateway (এখন SSLCommerz লাইভ) দিয়ে সরাসরি অটোমেটিক পে। ChatGPT ও Gemini দুটো external review-ই independently এই পুরো ফিচারটাকে সবচেয়ে বড় gap বলেছিল (`OtherAI/`)।
 
-সেলার-সাবস্ক্রিপশন বিলিং-এর bKash কোড (§18.2) থেকে **সম্পূর্ণ আলাদা** — সেটা platform-wide singleton merchant creds দিয়ে seller→platform ফি নেয়, এটা per-seller personal-wallet দিয়ে customer→seller অর্ডার পেমেন্ট। একটা কোডও শেয়ার হয়নি, রিভিনিউ-ক্রিটিক্যাল লাইভ ফ্লো ভাঙার ঝুঁকি এড়াতে ইচ্ছাকৃতভাবে।
+সেলার-সাবস্ক্রিপশন বিলিং-এর bKash কোড (§18.2) থেকে **সম্পূর্ণ আলাদা** — সেটা platform-wide singleton merchant creds দিয়ে seller→platform ফি নেয়, এটা per-seller creds দিয়ে customer→seller অর্ডার পেমেন্ট। একটা কোডও শেয়ার হয়নি, রিভিনিউ-ক্রিটিক্যাল লাইভ ফ্লো ভাঙার ঝুঁকি এড়াতে ইচ্ছাকৃতভাবে।
 
-একটা reuse-heavy ডিজাইন: verified পেমেন্ট বিদ্যমান `order_payments` টেবিলেই যোগ হয় (নতুন `source` কলাম দিয়ে ট্যাগড) — তাই Collection History, invoice PDF payment-history, এবং `AccountingService::syncPaymentStatus()` সব বিনা পরিবর্তনে কাজ করে।
+একটা reuse-heavy ডিজাইন: verified পেমেন্ট (manual claim বা gateway callback — দুটোই) বিদ্যমান `order_payments` টেবিলেই যোগ হয় (`source` কলাম দিয়ে ট্যাগড: `online_wallet`/`online_gateway`) — তাই Collection History, invoice PDF payment-history, এবং `AccountingService::syncPaymentStatus()` সব বিনা পরিবর্তনে কাজ করে। Gateway callback verification সবসময় query-then-trust (bKash subscription callback-এর মতোই) — provider-এর নিজস্ব redirect status কখনো সরাসরি বিশ্বাস করা হয় না, প্রতিবার সার্ভার-টু-সার্ভার validate করা হয়।
 
-**সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`online_payment_context.md`](online_payment_context.md) — data model, backend/frontend ফাইল লিস্ট, ডিজাইন সিদ্ধান্ত, test coverage, Phase B/C-এর পরিকল্পনা।
+**বাকি (SSLCommerz-এর পর)**: AamarPay/ZiniPay (ভালো ডকুমেন্টেড, দ্রুত যোগ হবে) → ShurjoPay/EPS (বাস্তব sandbox লাগবে exact field confirm করতে) → bKash Merchant/Nagad Merchant (সবচেয়ে আলাদা শেপ)।
+
+**সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`online_payment_context.md`](online_payment_context.md) — data model, backend/frontend ফাইল লিস্ট, ডিজাইন সিদ্ধান্ত, test coverage, provider abstraction, build order।
 
 ---
 

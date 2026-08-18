@@ -1,5 +1,7 @@
 # Customer-Facing Online Payment — Context
 
+শেষ আপডেট: 2026-08-18 — **Phase B1 লাইভ: SSLCommerz automated gateway (মার্চেন্ট একাউন্ট) + provider-abstraction ফাউন্ডেশন।** কাস্টমার এখন চেকআউটে SSLCommerz দিয়ে সরাসরি অটোমেটিক পে করতে পারবে (redirect → hosted checkout → query-then-trust verify → auto-confirm), সেলার নিজের মার্চেন্ট ক্রেডেনশিয়াল বসায় Dashboard → Settings → Online Payment Channels-এর নতুন "Automatic Payment Gateways" সেকশনে। নতুন `payment_gateway_credentials` টেবিল (প্রতি সেলার-প্রতি-provider এক row, `credentials` JSON blob encrypted) — AamarPay/ZiniPay/ShurjoPay/EPS/bKash Merchant/Nagad Merchant একই abstraction-এ যোগ হবে ধাপে ধাপে। বিস্তারিত নিচে §৬। Older entries kept as-is:
+
 শেষ আপডেট: 2026-08-17 (২) — Phase A লাইভ টেস্ট করার পর ব্যবহারকারীর ৩টা রিয়েল-ওয়ার্ল্ড ফিডব্যাক অনুযায়ী রিফাইনমেন্ট: (১) OTP এখন শুধু COD-তে সক্রিয়, অনলাইন পেমেন্ট বেছে নিলে OTP আর লাগে না — বদলে অর্ডার লিস্টে "পেমেন্ট বাকি" ফ্ল্যাগ দেখায়, (২) অ্যাপ্রুভ করার সময় সেলার নিজে হাতে amount বসায় (কাস্টমারের claim অন্ধভাবে বিশ্বাস করা হয় না), (৩) প্রতিটা ল্যান্ডিং পেজে আলাদাভাবে কোন পেমেন্ট চ্যানেল দেখাবে তা সিলেক্ট করা যায় (আগে পুরো শপ-ওয়াইড ছিল)। দেখো নিচে §৫। Older entries kept as-is:
 
 শেষ আপডেট: 2026-08-17 — Phase A (`wallet_manual`) সম্পন্ন, deploy করা হয়েছে (migrations + backend + frontend live)।
@@ -44,12 +46,9 @@
 - `orders.payment_status` (due/partial/paid)-এর জন্য কোনো প্যারালাল ট্র্যাকিং তৈরি হয়নি — এখনো পুরোপুরি বিদ্যমান `AccountingService::syncPaymentStatus()` চালায়, `order_payments`-এর ওপর নির্ভর করে।
 - Wallet-claim স্ক্রিনশট **ঐচ্ছিক** (সেলার ড্যাশবোর্ডের ম্যানুয়াল কালেকশনের মতো বাধ্যতামূলক না) — পাবলিক unauthenticated কাস্টমার ফোন থেকে ফাইল আপলোডে বেশি friction থাকতে পারে ধরে নিয়ে।
 
-## ৩. Phase B/C — পরের ফেজ (⬜ শুরু হয়নি)
+## ৩. Phase B/C — automated merchant gateways (🟡 আংশিক, B1 লাইভ — বিস্তারিত §৬)
 
-- **Phase B**: `App\Contracts\PaymentGatewayClient` ইন্টারফেস + `SslcommerzGatewayClient` + gateway routes/callback (query-then-trust val_id validation)।
-- **Phase C**: `BkashGatewayClient` (per-seller merchant/PGW ক্রেডেনশিয়াল, subscription billing-এর ক্লাস থেকে সম্পূর্ণ আলাদা)।
-
-`payment_gateway_settings` টেবিলে ইতিমধ্যে `sslcommerz_*`/`bkash_gateway_*` কলাম আছে (Phase A migration-এই যোগ হয়েছিল যাতে পরে আবার টেবিল টাচ করতে না হয়) — শুধু client + controller + route যোগ করতে হবে।
+Phase A-এর মূল রুক্ষ sketch এখানে ছিল (শুধু SSLCommerz + bKash উল্লেখ ছিল) — বাস্তব কাজ শুরুর আগে ব্যবহারকারী পুরো তালিকা কনফার্ম করেছেন: **SSLCommerz, ShurjoPay, EPS, ZiniPay, AamarPay, bKash Merchant, Nagad Merchant** — সেলার যেটা সুবিধা মনে করে সেটাই চালু করবে, একাধিক গেটওয়ে একসাথে চালু রাখা যাবে। বিস্তারিত ডিজাইন ও build-order §৬-এ।
 
 ## ৪. Test coverage
 
@@ -82,3 +81,43 @@ Phase A প্রথমবার production-এ টেস্ট করার প
 - `public-landing-page-view.tsx` — checkout selector `cod_enabled=false` হলে COD radio লুকায়, প্রথম উপলব্ধ wallet channel-কে ডিফল্ট বানায়।
 
 **সিদ্ধান্ত**: order-submit ভ্যালিডেশন (`payment_method: cod,bkash,nagad,rocket`) পেজ-লেভেল সাবসেটের বিপরীতে strict enforce করা হয়নি — একটা customer URL manipulate করে seller-এর নিজের enable-করা অন্য কোনো চ্যানেল বেছে নিলেও সেটা নিছক UX অসঙ্গতি (সেলার এমন একটা চ্যানেলের instructions দেখাবে যেটা এই পেজে advertise করেনি), নিরাপত্তা ঝুঁকি না — তাই backend-এ আলাদা enforcement যোগ করা হয়নি, scope সীমিত রাখা হয়েছে।
+
+## ৬. Phase B — Automated Merchant Gateways (২০২৬-০৮-১৮)
+
+### ৬.১ ফ্লো (SSLCommerz দিয়ে, বাকি providers একই abstraction ব্যবহার করবে)
+1. সেলার Dashboard → Settings → Online Payment Channels-এর "Automatic Payment Gateways" সেকশনে গিয়ে SSLCommerz-এর Store ID/Password বসিয়ে চালু করে (Live/Sandbox টগল সহ)।
+2. কাস্টমার checkout-এ SSLCommerz বেছে নেয় — অর্ডার তৈরি হয় (payment_method=sslcommerz), তারপর ব্রাউজার SSLCommerz-এর hosted checkout পেজে redirect হয়ে যায় (order create-এর ঠিক পরপরই, thank-you পেজে না গিয়ে)।
+3. কাস্টমার SSLCommerz-এর পেজে পে করে — SSLCommerz আমাদের callback URL-এ redirect করে ফেরত পাঠায় (+ আলাদাভাবে IPN-ও পাঠাতে পারে)।
+4. Callback/IPN হ্যান্ডলার **কখনোই redirect-এর নিজের `status` প্যারামিটার বিশ্বাস করে না** — সবসময় SSLCommerz-এর নিজস্ব সার্ভার-টু-সার্ভার Order Validation API কল করে `val_id` দিয়ে confirm করে (query-then-trust, ঠিক bKash subscription callback-এর মতোই)।
+5. ভ্যালিড হলে: `order_payments` row (source=`online_gateway`), `Transaction`, payment_status রিক্যালকুলেট, অর্ডার `confirmed`-এ অটো-ট্রানজিশন — Phase A-এর wallet-verify cascade-ই reuse হয় (`OnlinePaymentService::applyConfirmedPayment()`)।
+6. কাস্টমারকে seller-এর নিজের thank-you পেজে ফেরত পাঠানো হয় `?payment_result=success|failed` সহ (সেলার-ফেসিং সাবস্ক্রিপশন পেজের `?bkash_status=` প্যাটার্নের মতোই)।
+
+### ৬.২ Data model
+- **`payment_gateway_credentials`** — নতুন normalized টেবিল, প্রতি সেলার-প্রতি-provider এক row (`user_id`, `provider`, `enabled`, `is_live`, `credentials` — encrypted:array JSON blob)। Phase A-তে `payment_gateway_settings`-এ যোগ করা `sslcommerz_*`/`bkash_gateway_*` কলামগুলো আর ব্যবহৃত হচ্ছে না (deprecated, কখনো কিছু লেখা হয়নি বলে মুছে ফেলার দরকারও নেই) — সাতটা provider-এর ভিন্ন ভিন্ন credential shape (store_id+password, single API key, RSA keypair) একটা fixed column set-এ আর মানানো যাচ্ছিল না।
+- `order_online_payments` টেবিলে কোনো migration লাগেনি — Phase A-তেই `provider_payment_id`/`provider_trx_id`/`gateway_response` কলাম যথেষ্ট generic ছিল।
+
+### ৬.৩ Provider abstraction
+- `App\Contracts\PaymentGatewayClient` — `isConfigured()`, `createPayment()`, `verifyPayment()`। SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS — সবগুলোই এই একই তিন-ধাপের প্যাটার্নে মানানসই (create session → redirect → server-side verify)। শুধু bKash Merchant-এর নিজস্ব bKash API shape (ইতিমধ্যে subscription billing-এ প্রমাণিত), আর Nagad Merchant সম্পূর্ণ আলাদা (RSA-signed payload, plain form POST না) — কিন্তু দুটোই একই ইন্টারফেসের ভেতরেই ফিট করবে, শুধু ক্লাসের ভেতরের ইমপ্লিমেন্টেশন আলাদা হবে।
+- `App\Services\Payment\PaymentGatewayFactory` — `CourierFactory`-এর প্যাটার্ন কপি, এখন শুধু `sslcommerz` ম্যাপড।
+- `App\Services\Payment\Gateways\SslcommerzGatewayClient` — রেফারেন্স ইমপ্লিমেন্টেশন। Amount-tampering guard: verify response-এর নিজস্ব `tran_id` আমাদের merchantTranId-এর সাথে না মিললে reject করে।
+- `OnlinePaymentService` (Phase A ক্লাসেই এক্সটেন্ড করা হয়েছে, নতুন ক্লাস তৈরি হয়নি): `applyConfirmedPayment()` (verifyWalletClaim-এর approve ব্র্যাঞ্চ থেকে extract করা shared cascade), `getEnabledGatewayChannels()`, `initiateGateway()`, `completeGatewayCallback()`।
+
+### ৬.৪ Routes
+- Public: `POST /public/landing-pages/{slug}/orders/{orderId}/online-payment/gateway/initiate` (token-guarded)।
+- Top-level (slug-scoped না, provider শুধু URL-টাই জানে): `GET|POST /online-payment/{provider}/callback/{id}` (browser redirect, আমাদের নিজের claim id path-এ embedded — provider_payment_id lookup লাগে না), `POST /online-payment/{provider}/ipn` (server-to-server, কিছু provider merchant-panel-এ একবারই সেট করে বলে path param থাকে না — payload-এর নিজস্ব ফিল্ড (tran_id/val_id/invoice_id/mer_txnid) দিয়ে `provider_payment_id` ম্যাচ করে claim খুঁজে বের করে)।
+- Dashboard: `GET/PUT /payment-gateway-credentials[/{provider}]` (`staff_permission:payments` group-এই, Phase A-এর সাথে একসাথে)।
+
+### ৬.৫ Frontend
+- `dashboard/settings/payments/page.tsx` — নতুন "Automatic Payment Gateways" সেকশন, প্রতি-provider field-schema constant দিয়ে চালিত (এখন শুধু SSLCommerz-এর ফর্ম আছে, বাকিগুলো "শীঘ্রই আসছে" ব্যাজ দেখায় যতক্ষণ না backend+frontend দুই দিকেই সাপোর্ট যোগ হয়)।
+- `public-landing-page-view.tsx` — checkout selector-এ gateway চ্যানেল যোগ (একই radio group-এ wallet চ্যানেলের পাশে), সিলেক্ট করলে অর্ডার তৈরির পর সরাসরি `gateway/initiate` কল করে `window.location.href` দিয়ে পুরো পেজ redirect করে (thank-you-তে না গিয়ে)।
+- `thank-you-view.tsx` — `?payment_result=success|failed` পড়ে success/failed banner দেখায়।
+- `dashboard/orders/page.tsx` — "পেমেন্ট বাকি" ব্যাজ এখন যেকোনো non-cod `payment_method`-এর জন্য কাজ করে (আগে শুধু bkash/nagad/rocket hardcoded ছিল)।
+
+### ৬.৬ Build order বাকি
+- **B2**: AamarPay + ZiniPay (দুটোই ভালো ডকুমেন্টেড, SSLCommerz-এর মতো একই abstraction-এ দ্রুত বসবে)।
+- **B3**: ShurjoPay + EPS (পাবলিক ডকুমেন্টেশন অসম্পূর্ণ ছিল — বাস্তব sandbox একাউন্ট লাগবে exact field name কনফার্ম করতে)।
+- **C1**: bKash Merchant (subscription billing-এর ক্লায়েন্ট শেপ reuse, per-seller credentialed নতুন sibling class)।
+- **C2**: Nagad Merchant (RSA-signed payload, সবচেয়ে আলাদা — শেষে, বাস্তব merchant sandbox credentials লাগবে)।
+
+### ৬.৭ Test coverage
+`OnlinePaymentGatewayTest` (৬টা: channel listing, misconfigured-credential exclusion, initiate, callback-success-cascade, callback-without-val_id-not-trusted, duplicate-callback-idempotent), `PaymentGatewayCredentialApiTest` (৬টা: CRUD, masking, masked-placeholder-না-overwrite, unknown-provider-404, staff permission)। Full suite ৩৭২ pass, ২টা পুরনো unrelated baseline failure অপরিবর্তিত।

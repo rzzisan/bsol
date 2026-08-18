@@ -32,6 +32,17 @@ function sanitizeCustomCss(css: string): string {
   return css.replace(/<\/\s*style/gi, "");
 }
 
+// Display labels for gateway_auto providers — see online_payment_context.md.
+const GATEWAY_PROVIDER_LABELS: Record<string, string> = {
+  sslcommerz: "SSLCommerz",
+  aamarpay: "AamarPay",
+  zinipay: "ZiniPay",
+  shurjopay: "ShurjoPay",
+  eps: "EPS",
+  bkash_merchant: "bKash",
+  nagad_merchant: "Nagad",
+};
+
 // Loose subset of App\Support\ProductVariantFormatter::format() — covers both
 // a merchant-pinned variant (item.variant) and a customer-resolved one
 // (draft.resolvedVariant), and the minimal shape reconstructed from a resumed
@@ -851,12 +862,17 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "bkash" | "nagad" | "rocket">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<string>("cod");
   // Personal-wallet "send & verify" channels the seller has turned on —
   // see online_payment_context.md. Empty until fetched; the selector only
   // ever shows COD until this resolves, so there's no flash of enabled
   // options for channels the seller hasn't actually configured.
   const [walletChannels, setWalletChannels] = useState<Array<{ provider: string; number: string }>>([]);
+  // Automated merchant-gateway channels (SSLCommerz etc, Phase B/C) — a
+  // separate list from walletChannels since they route to a different
+  // submit flow (redirect, not a post-order claim form). See
+  // online_payment_context.md.
+  const [gatewayChannels, setGatewayChannels] = useState<Array<{ provider: string }>>([]);
   // Whether this specific landing page offers COD — per-page toggle,
   // defaults true until the payment-channels call resolves. See
   // online_payment_context.md.
@@ -924,14 +940,18 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         const channels: Array<{ provider: string; number: string }> = json?.data?.wallet_channels ?? [];
+        const gateways: Array<{ provider: string }> = json?.data?.gateway_channels ?? [];
         const cod = json?.data?.cod_enabled ?? true;
         setWalletChannels(channels);
+        setGatewayChannels(gateways);
         setCodEnabled(cod);
         // If this page turned COD off, the default selection can't stay on
         // an option that isn't offered — fall back to the first enabled
-        // wallet channel instead.
-        if (!cod && channels.length > 0) {
-          setPaymentMethod(channels[0].provider as "bkash" | "nagad" | "rocket");
+        // channel (wallet or gateway) instead.
+        if (!cod && channels.length === 0 && gateways.length > 0) {
+          setPaymentMethod(gateways[0].provider);
+        } else if (!cod && channels.length > 0) {
+          setPaymentMethod(channels[0].provider);
         }
       })
       .catch(() => {});
@@ -1156,6 +1176,31 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       }
 
       if (json.data?.order_id && json.data?.public_token) {
+        // A gateway_auto selection redirects to the provider's own hosted
+        // checkout instead of going straight to the thank-you page — the
+        // provider redirects back to our callback, which then sends the
+        // browser on to thank-you itself. See online_payment_context.md.
+        const isGatewayChannel = gatewayChannels.some((ch) => ch.provider === paymentMethod);
+        if (isGatewayChannel) {
+          const initRes = await fetch(
+            `/api/public/landing-pages/${page.slug}/orders/${json.data.order_id}/online-payment/gateway/initiate`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token: json.data.public_token, provider: paymentMethod }),
+            }
+          );
+          const initJson = await initRes.json().catch(() => ({}));
+          if (initRes.ok && initJson.data?.redirect_url) {
+            window.location.href = initJson.data.redirect_url;
+            return;
+          }
+          // Gateway session couldn't be opened — the order still exists
+          // (created above), so send the customer to thank-you anyway
+          // rather than stranding them with a dead end; they can be
+          // followed up on manually, same as any other unpaid order.
+        }
+
         // The thank-you step stays on the seller's own address, where the
         // rest of the checkout already is.
         router.push(`${landingPathForSlug(page.slug)}/thank-you?order=${json.data.order_id}&token=${encodeURIComponent(json.data.public_token)}`);
@@ -1594,7 +1639,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                         <input
                           type="radio"
                           checked={selected}
-                          onChange={() => setPaymentMethod(ch.provider as "bkash" | "nagad" | "rocket")}
+                          onChange={() => setPaymentMethod(ch.provider)}
                           className="mt-1"
                         />
                         <div>
@@ -1602,6 +1647,25 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                           <div className="mt-1 text-xs text-slate-500">
                             Send money to {ch.number} after placing the order, then submit the Transaction ID.
                           </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                  {/* Automated merchant-gateway channels — redirect flow, no
+                      post-order claim form. See online_payment_context.md. */}
+                  {gatewayChannels.map((ch) => {
+                    const selected = paymentMethod === ch.provider;
+                    return (
+                      <label key={ch.provider} className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${selected ? "border-orange-300 bg-orange-50" : "border-slate-200 bg-white"}`}>
+                        <input
+                          type="radio"
+                          checked={selected}
+                          onChange={() => setPaymentMethod(ch.provider)}
+                          className="mt-1"
+                        />
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">{GATEWAY_PROVIDER_LABELS[ch.provider] ?? ch.provider}</div>
+                          <div className="mt-1 text-xs text-slate-500">Pay securely online — you&apos;ll be redirected to complete payment.</div>
                         </div>
                       </label>
                     );

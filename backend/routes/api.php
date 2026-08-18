@@ -65,6 +65,7 @@ use App\Http\Controllers\Api\PublicTrackingController;
 use App\Http\Controllers\Api\OnlinePaymentController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderPaymentController;
+use App\Http\Controllers\Api\PaymentGatewayCredentialController;
 use App\Http\Controllers\Api\PaymentGatewaySettingController;
 use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
@@ -154,14 +155,27 @@ Route::post('/public/landing-pages/{slug}/orders/{orderId}/resend-otp', [Checkou
     ->where('orderId', '[0-9]+')
     ->middleware('throttle:10,1');
 
-// Online payment (Phase A: wallet_manual only) — channel list for the
-// checkout selector, and the token-guarded wallet-claim submit. See
-// online_payment_context.md.
+// Online payment — channel list for the checkout selector, the token-
+// guarded wallet-claim submit (Phase A), and the gateway-session initiate
+// (Phase B/C). See online_payment_context.md.
 Route::get('/public/landing-pages/{slug}/payment-channels', [OnlinePaymentController::class, 'publicChannels'])
     ->middleware('throttle:60,1');
 Route::post('/public/landing-pages/{slug}/orders/{orderId}/online-payment/wallet-claim', [OnlinePaymentController::class, 'submitWalletClaim'])
     ->where('orderId', '[0-9]+')
     ->middleware('throttle:10,1');
+Route::post('/public/landing-pages/{slug}/orders/{orderId}/online-payment/gateway/initiate', [OnlinePaymentController::class, 'initiateGateway'])
+    ->where('orderId', '[0-9]+')
+    ->middleware('throttle:10,1');
+
+// Gateway callback (browser redirect) + IPN (server-to-server) — top-level,
+// not slug-scoped, since the provider only knows the URL we gave it, not
+// our slug. The callback redirects the browser back to the seller's own
+// thank-you page; the IPN returns a plain JSON ack.
+Route::match(['get', 'post'], '/online-payment/{provider}/callback/{id}', [OnlinePaymentController::class, 'gatewayCallback'])
+    ->where('id', '[0-9]+')
+    ->middleware('throttle:30,1');
+Route::post('/online-payment/{provider}/ipn', [OnlinePaymentController::class, 'gatewayIpn'])
+    ->middleware('throttle:30,1');
 
 // Abandoned checkout capture — progressive save while the customer is still
 // filling the form, and a token-guarded resume lookup. Deliberately not
@@ -421,13 +435,15 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/accounting/collections/summary', [CollectionHistoryController::class, 'summary']);
     });
 
-    // ── Online Payment (Phase A: wallet_manual only) ───────────────────────────
+    // ── Online Payment (wallet_manual + gateway_auto) ──────────────────────────
     // Own permission key — payment-gateway credentials are sensitive enough to
     // gate separately from general order/accounting access. See
     // online_payment_context.md.
     Route::middleware('staff_permission:payments')->group(function () {
         Route::get('/payment-gateway-settings', [PaymentGatewaySettingController::class, 'getSettings']);
         Route::put('/payment-gateway-settings', [PaymentGatewaySettingController::class, 'saveSettings']);
+        Route::get('/payment-gateway-credentials', [PaymentGatewayCredentialController::class, 'index']);
+        Route::put('/payment-gateway-credentials/{provider}', [PaymentGatewayCredentialController::class, 'save']);
         Route::get('/online-payments/pending-verification', [OnlinePaymentController::class, 'pendingVerification']);
         Route::post('/online-payments/{id}/verify', [OnlinePaymentController::class, 'verify'])->where('id', '[0-9]+');
     });

@@ -53,6 +53,8 @@ const THANK_YOU_UI_TEXT = {
     shippingAddress: "শিপিং ঠিকানা",
     callForHelp: "যেকোনো প্রয়োজনে কল করুন",
     orderAgain: "← আবার অর্ডার করুন",
+    paymentSuccess: "পেমেন্ট সফল হয়েছে! আপনার অর্ডার কনফার্ম করা হয়েছে।",
+    paymentFailed: "পেমেন্ট সম্পূর্ণ হয়নি। আবার চেষ্টা করুন অথবা অন্য পদ্ধতিতে পে করুন।",
   },
   en: {
     otpWrongCode: "Incorrect OTP. Please try again.",
@@ -72,6 +74,8 @@ const THANK_YOU_UI_TEXT = {
     shippingAddress: "Shipping Address",
     callForHelp: "Call us for any assistance",
     orderAgain: "← Order again",
+    paymentSuccess: "Payment successful! Your order has been confirmed.",
+    paymentFailed: "Payment could not be completed. Please try again or use a different method.",
   },
 } as const;
 
@@ -408,6 +412,20 @@ export default function ThankYouView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletProvider, page.slug]);
 
+  // Gateway_auto redirect result — the provider's callback route appends
+  // ?payment_result=success|failed before sending the browser here, same
+  // pattern as the seller-facing subscription page's ?bkash_status=. See
+  // online_payment_context.md.
+  const [paymentResult, setPaymentResult] = useState<string | null>(null);
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get("payment_result");
+    if (!result) return;
+    setPaymentResult(result);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("payment_result");
+    window.history.replaceState(null, "", url.toString());
+  }, []);
+
   const areaLine = order
     ? [order.customer_area, order.customer_thana, order.customer_district].filter((part) => (part ?? "").trim()).join(", ")
     : "";
@@ -456,6 +474,16 @@ export default function ThankYouView({
             </div>
           ) : (
             <>
+              {paymentResult ? (
+                <div
+                  className={`rounded-2xl px-4 py-3 text-sm font-semibold ${
+                    paymentResult === "success" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+                  }`}
+                >
+                  {paymentResult === "success" ? t.paymentSuccess : t.paymentFailed}
+                </div>
+              ) : null}
+
               {showOtpGate ? (
                 <OtpVerificationCard
                   slug={page.slug}

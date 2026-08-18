@@ -6,18 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Models\LandingPage;
 use App\Models\Order;
 use App\Models\OrderOnlinePayment;
+use App\Models\PaymentGatewayCredential;
 use App\Models\User;
 use App\Services\OnlinePaymentService;
+use App\Support\FrontendUrl;
 use App\Support\LandingPageResolver;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Customer-facing online payment (Phase A: wallet_manual only) — both the
- * public checkout-side endpoints and the seller-dashboard verification
- * endpoints live here since they're two ends of the same short flow. See
- * online_payment_context.md.
+ * Customer-facing online payment — both the public checkout-side endpoints
+ * and the seller-dashboard verification endpoints live here since they're
+ * two ends of the same short flow. Covers wallet_manual (Phase A) and
+ * gateway_auto (Phase B/C). See online_payment_context.md.
  */
 class OnlinePaymentController extends Controller
 {
@@ -54,13 +57,86 @@ class OnlinePaymentController extends Controller
             ));
         }
 
+        // gateway_auto channels aren't affected by the same page-level
+        // "payment_channels" narrowing yet — Phase B/C ships them shop-wide
+        // only, same as wallet channels were before that setting existed.
+        // A per-page gateway toggle can be added later the same way if a
+        // seller ever wants it.
+        $gatewayChannels = $this->onlinePaymentService->getEnabledGatewayChannels($ownerId);
+
         return response()->json([
             'success' => true,
             'data' => [
                 'cod_enabled' => $codEnabled,
                 'wallet_channels' => $walletChannels,
+                'gateway_channels' => $gatewayChannels,
             ],
         ]);
+    }
+
+    public function initiateGateway(Request $request, string $slug, int $orderId): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:64'],
+            'provider' => ['required', Rule::in(PaymentGatewayCredential::PROVIDERS)],
+        ]);
+
+        $page = $this->resolvePage($slug, $request);
+        $order = $this->resolveOrder($page, $orderId, $data['token']);
+
+        $result = $this->onlinePaymentService->initiateGateway($order, $data['provider'], url('/api'));
+
+        return response()->json(['success' => true, 'data' => $result]);
+    }
+
+    /** Browser-redirect leg — the return URL we minted at initiateGateway()
+     *  time already embeds our own claim id, so no payload-matching is
+     *  needed here (unlike the IPN leg below). Always ends in a redirect
+     *  back to the seller's own thank-you page, success or fail alike. */
+    public function gatewayCallback(Request $request, string $provider, int $id): RedirectResponse
+    {
+        $claim = OrderOnlinePayment::where('provider', $provider)->findOrFail($id);
+        $order = $claim->order()->with('user')->first();
+        $page = LandingPage::find((int) $order->source_ref);
+
+        $thankYouPath = $page ? "/{$page->slug}/thank-you?order={$order->id}&token={$order->public_token}" : '/';
+        $frontendUrl = FrontendUrl::forUserPath($order->user, ltrim($thankYouPath, '/'));
+
+        $claim = $this->onlinePaymentService->completeGatewayCallback($claim, $request->all());
+
+        $result = in_array($claim->status, [OrderOnlinePayment::STATUS_COMPLETED], true) ? 'success' : 'failed';
+
+        return redirect($frontendUrl . (str_contains($frontendUrl, '?') ? '&' : '?') . 'payment_result=' . $result);
+    }
+
+    /** Server-to-server leg — some providers configure this once per
+     *  merchant account rather than per-transaction, so it must resolve
+     *  purely from the payload's own fields, not a path param. */
+    public function gatewayIpn(Request $request, string $provider): JsonResponse
+    {
+        $payload = $request->all();
+        $candidateIds = array_filter([
+            $payload['tran_id'] ?? null,
+            $payload['val_id'] ?? null,
+            $payload['invoice_id'] ?? null,
+            $payload['mer_txnid'] ?? null,
+        ]);
+
+        $claim = OrderOnlinePayment::where('provider', $provider)
+            ->where(function ($q) use ($candidateIds) {
+                foreach ($candidateIds as $value) {
+                    $q->orWhere('provider_payment_id', $value);
+                }
+            })
+            ->first();
+
+        if (! $claim) {
+            return response()->json(['success' => false, 'message' => 'Unknown transaction.'], 404);
+        }
+
+        $this->onlinePaymentService->completeGatewayCallback($claim, $payload);
+
+        return response()->json(['success' => true]);
     }
 
     public function submitWalletClaim(Request $request, string $slug, int $orderId): JsonResponse

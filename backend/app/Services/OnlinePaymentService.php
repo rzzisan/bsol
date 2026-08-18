@@ -5,18 +5,22 @@ namespace App\Services;
 use App\Models\Order;
 use App\Models\OrderOnlinePayment;
 use App\Models\OrderPayment;
+use App\Models\PaymentGatewayCredential;
 use App\Models\PaymentGatewaySetting;
 use App\Models\User;
+use App\Services\Payment\PaymentGatewayFactory;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Orchestrates customer-facing online payment — Phase A (this class) covers
- * only wallet_manual (bKash/Nagad/Rocket personal-number send & verify).
- * Phase B/C (gateway_auto — SSLCommerz, bKash merchant) add methods here
- * without touching what's below. See online_payment_context.md.
+ * Orchestrates customer-facing online payment — wallet_manual (Phase A:
+ * bKash/Nagad/Rocket personal-number send & verify) and gateway_auto
+ * (Phase B/C: SSLCommerz and friends, per-seller merchant credentials) both
+ * live here since they share the same confirm-and-cascade logic
+ * (applyConfirmedPayment()). See online_payment_context.md.
  */
 class OnlinePaymentService
 {
@@ -107,8 +111,7 @@ class OnlinePaymentService
      * path: a real OrderPayment row, an accounting transaction, and an
      * auto-confirm transition (only from 'pending', never pulling a
      * further-along order backward).
-     */
-    /**
+     *
      * $amount is the amount the seller actually confirms receiving —
      * manually entered at approve time, not blindly trusted from the
      * customer's own claim (the customer may have sent less/more than the
@@ -154,38 +157,198 @@ class OnlinePaymentService
                 return $claim;
             }
 
-            $payment = OrderPayment::create([
-                'order_id' => $order->id,
-                'user_id' => $order->user_id,
-                'source' => 'online_wallet',
-                'collected_by' => null,
-                'created_by' => $verifier->id,
-                'purpose' => 'full_payment',
-                'method' => $claim->provider,
-                'amount' => $amount,
-                'discount' => 0,
-                'screenshot_path' => $claim->screenshot_path,
-                'note' => "Online payment verified — sender {$claim->sender_number}, TrxID {$claim->customer_trx_id}"
-                    . ((float) $amount !== (float) $claim->amount ? " (claimed ৳{$claim->amount}, confirmed ৳{$amount})." : '.'),
-                'collected_at' => now(),
-            ]);
-
-            $this->accountingService->recordManualPayment($payment, 'order_online_payment');
-
-            if ($amount > 0 && $order->status === 'pending') {
-                $this->orderStatusService->transition(
-                    $order,
-                    'confirmed',
-                    'Order confirmed via verified online wallet payment.',
-                    $verifier->id,
-                );
-            }
+            $note = "Online payment verified — sender {$claim->sender_number}, TrxID {$claim->customer_trx_id}"
+                . ((float) $amount !== (float) $claim->amount ? " (claimed ৳{$claim->amount}, confirmed ৳{$amount})." : '.');
+            $payment = $this->applyConfirmedPayment($claim, $order, $amount, $verifier->id, $note);
 
             $claim->update([
                 'status' => OrderOnlinePayment::STATUS_VERIFIED,
                 'verified_by' => $verifier->id,
                 'verified_at' => now(),
                 'note' => $note,
+                'order_payment_id' => $payment->id,
+            ]);
+
+            return $claim;
+        });
+    }
+
+    /**
+     * The shared "money confirmed, cascade it" logic — extracted from
+     * verifyWalletClaim()'s approve branch so the gateway_auto path below
+     * doesn't duplicate it. Creates the ledger row, books it in accounting,
+     * and auto-confirms the order (only from 'pending', matching every
+     * other payment-confirmation path in this codebase).
+     */
+    private function applyConfirmedPayment(OrderOnlinePayment $claim, Order $order, float $amount, ?int $verifiedBy, string $note): OrderPayment
+    {
+        $payment = OrderPayment::create([
+            'order_id' => $order->id,
+            'user_id' => $order->user_id,
+            'source' => $claim->channel_type === OrderOnlinePayment::CHANNEL_WALLET_MANUAL ? 'online_wallet' : 'online_gateway',
+            'collected_by' => null,
+            'created_by' => $verifiedBy,
+            'purpose' => 'full_payment',
+            'method' => $claim->provider,
+            'amount' => $amount,
+            'discount' => 0,
+            'screenshot_path' => $claim->screenshot_path,
+            'note' => $note,
+            'collected_at' => now(),
+        ]);
+
+        $this->accountingService->recordManualPayment($payment, 'order_online_payment');
+
+        if ($amount > 0 && $order->status === 'pending') {
+            $this->orderStatusService->transition(
+                $order,
+                'confirmed',
+                $claim->channel_type === OrderOnlinePayment::CHANNEL_WALLET_MANUAL
+                    ? 'Order confirmed via verified online wallet payment.'
+                    : 'Order confirmed via automated online payment gateway.',
+                $verifiedBy,
+            );
+        }
+
+        return $payment;
+    }
+
+    // ── gateway_auto (Phase B/C) ────────────────────────────────────────
+
+    /** Gateways a seller has enabled AND whose credentials are actually
+     *  complete (isConfigured()) — a half-filled credential set shouldn't
+     *  appear as a live checkout option. */
+    public function getEnabledGatewayChannels(int $shopOwnerId): array
+    {
+        return PaymentGatewayCredential::where('user_id', $shopOwnerId)
+            ->where('enabled', true)
+            ->get()
+            ->filter(fn (PaymentGatewayCredential $cred) => PaymentGatewayFactory::supports($cred->provider)
+                && PaymentGatewayFactory::make($cred->provider, $cred)->isConfigured())
+            ->map(fn (PaymentGatewayCredential $cred) => ['provider' => $cred->provider])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Opens a hosted checkout session with the given provider. $callbackBaseUrl
+     * is the platform's own API base (never the seller's subdomain — the
+     * gateway calls this URL directly, and it must be reachable/stable
+     * regardless of which subdomain the customer started the checkout on).
+     */
+    public function initiateGateway(Order $order, string $provider, string $callbackBaseUrl): array
+    {
+        $credential = PaymentGatewayCredential::where('user_id', $order->user_id)
+            ->where('provider', $provider)
+            ->where('enabled', true)
+            ->first();
+
+        if (! $credential || ! PaymentGatewayFactory::supports($provider)) {
+            throw ValidationException::withMessages([
+                'provider' => ['এই পেমেন্ট গেটওয়েটি এই শপে চালু নেই।'],
+            ]);
+        }
+
+        $client = PaymentGatewayFactory::make($provider, $credential);
+        if (! $client->isConfigured()) {
+            throw ValidationException::withMessages([
+                'provider' => ['এই পেমেন্ট গেটওয়ের সেটিং সম্পূর্ণ নয়।'],
+            ]);
+        }
+
+        $due = $order->dueAmount();
+        if ($due <= 0) {
+            throw ValidationException::withMessages([
+                'order' => ['এই অর্ডারে আর কোনো বকেয়া নেই।'],
+            ]);
+        }
+
+        $claim = OrderOnlinePayment::create([
+            'order_id' => $order->id,
+            'user_id' => $order->user_id,
+            'channel_type' => OrderOnlinePayment::CHANNEL_GATEWAY_AUTO,
+            'provider' => $provider,
+            'amount' => $due,
+            'status' => OrderOnlinePayment::STATUS_INITIATED,
+            // Gateway checkout sessions expire fast (typically ~15-30 min on
+            // the provider's own side) — much shorter than a wallet claim's
+            // 24h window, where the customer sends money on their own time.
+            'expires_at' => now()->addMinutes(30),
+        ]);
+
+        // Ours from the start — the return URL is keyed by our own claim id
+        // (path param), so the redirect leg never needs provider_payment_id
+        // lookup at all; only the IPN leg (no path param available) does.
+        $merchantTranId = 'OOP-' . $claim->id . '-' . Str::random(8);
+        $returnUrl = rtrim($callbackBaseUrl, '/') . "/online-payment/{$provider}/callback/{$claim->id}";
+
+        $result = $client->createPayment($merchantTranId, $due, $returnUrl, [
+            'name' => $order->customer_name,
+            'phone' => $order->customer_phone,
+            'address' => $order->customer_address,
+        ]);
+
+        $claim->update([
+            'provider_payment_id' => $result['provider_payment_id'],
+            // merchant_tran_id kept alongside the raw response — not every
+            // provider's provider_payment_id equals what we minted (some
+            // mint their own opaque id instead), so verifyPayment() needs
+            // both values later and gateway_response is the only place to
+            // keep the one that isn't already a dedicated column.
+            'gateway_response' => ['merchant_tran_id' => $merchantTranId],
+        ]);
+
+        return ['redirect_url' => $result['redirect_url']];
+    }
+
+    /**
+     * Confirms (or fails) a gateway_auto claim after a browser-redirect
+     * callback or a server-to-server IPN — the caller resolves which
+     * OrderOnlinePayment row this is (by path param for the redirect leg,
+     * by payload-matching provider_payment_id for the IPN leg) and hands it
+     * here. Idempotent: a second call for an already-terminal claim is a
+     * no-op, guarding the redirect and IPN legs racing each other.
+     */
+    public function completeGatewayCallback(OrderOnlinePayment $claim, array $callbackData): OrderOnlinePayment
+    {
+        if ($claim->isTerminal()) {
+            return $claim;
+        }
+
+        return DB::transaction(function () use ($claim, $callbackData) {
+            $claim = OrderOnlinePayment::whereKey($claim->id)->lockForUpdate()->firstOrFail();
+            if ($claim->isTerminal()) {
+                return $claim;
+            }
+
+            $order = $claim->order()->lockForUpdate()->first();
+            $credential = PaymentGatewayCredential::where('user_id', $claim->user_id)
+                ->where('provider', $claim->provider)
+                ->firstOrFail();
+            $client = PaymentGatewayFactory::make($claim->provider, $credential);
+
+            $merchantTranId = $claim->gateway_response['merchant_tran_id'] ?? (string) $claim->provider_payment_id;
+            $result = $client->verifyPayment($merchantTranId, (string) $claim->provider_payment_id, $callbackData);
+
+            $claim->update([
+                'gateway_response' => array_merge($claim->gateway_response ?? [], [
+                    'last_callback' => $callbackData,
+                    'verify_result' => $result['raw'] ?? [],
+                ]),
+                'provider_trx_id' => $result['trx_id'] ?? $claim->provider_trx_id,
+            ]);
+
+            if (! ($result['success'] ?? false)) {
+                $claim->update(['status' => OrderOnlinePayment::STATUS_FAILED]);
+                return $claim;
+            }
+
+            $amount = $result['amount'] ?? (float) $claim->amount;
+            $note = "Online payment via {$claim->provider} — TrxID " . ($result['trx_id'] ?? 'N/A') . '.';
+            $payment = $this->applyConfirmedPayment($claim, $order, $amount, null, $note);
+
+            $claim->update([
+                'status' => OrderOnlinePayment::STATUS_COMPLETED,
                 'order_payment_id' => $payment->id,
             ]);
 

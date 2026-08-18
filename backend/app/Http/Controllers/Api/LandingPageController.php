@@ -15,6 +15,7 @@ use App\Models\LandingPageProduct;
 use App\Models\Order;
 use App\Models\ShopProfile;
 use App\Models\LandingTemplate;
+use App\Models\PaymentGatewayCredential;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\TrackingDestination;
@@ -125,11 +126,11 @@ class LandingPageController extends Controller
             CheckoutFieldResolver::buildRules($resolvedFields, $phoneValidationEnabled),
             [
                 'shipping_charge' => ['nullable', 'numeric', 'min:0'],
-                // Wallet-manual channels only for now — gateway_auto
-                // providers (sslcommerz/bkash gateway) join this list in
-                // Phase B/C once they have a real client to redirect to.
-                // See online_payment_context.md.
-                'payment_method' => ['nullable', 'in:cod,bkash,nagad,rocket'],
+                // cod/bkash/nagad/rocket = wallet_manual (Phase A); the rest
+                // are gateway_auto providers (Phase B/C) — both just record
+                // the customer's checkout choice on the order, same as
+                // before. See online_payment_context.md.
+                'payment_method' => ['nullable', Rule::in(array_merge(['cod', 'bkash', 'nagad', 'rocket'], PaymentGatewayCredential::PROVIDERS))],
                 'items' => ['required', 'array', 'min:1'],
                 'items.*.enabled' => ['nullable', 'boolean'],
                 'items.*.product_id' => ['required', 'integer'],

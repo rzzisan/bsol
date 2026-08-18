@@ -7,6 +7,14 @@ import { getStoredLocale, getStoredToken, openAuthenticatedPdf, type Locale } fr
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
+// Display labels for non-COD payment_method values — wallet_manual (Phase A)
+// + gateway_auto (Phase B/C) providers. See online_payment_context.md.
+const ONLINE_PAYMENT_METHOD_LABELS: Record<string, string> = {
+  bkash: "bKash", nagad: "Nagad", rocket: "Rocket",
+  sslcommerz: "SSLCommerz", aamarpay: "AamarPay", zinipay: "ZiniPay",
+  shurjopay: "ShurjoPay", eps: "EPS", bkash_merchant: "bKash", nagad_merchant: "Nagad",
+};
+
 const STATUSES = ["pending","confirmed","processing","shipped","delivered","cancelled","returned"] as const;
 type Status = typeof STATUSES[number];
 
@@ -577,12 +585,12 @@ export default function OrdersPage() {
                         OTP
                       </span>
                     ) : null}
-                    {["bkash", "nagad", "rocket"].includes(o.payment_method) && o.payment_status !== "paid" ? (
+                    {o.payment_method !== "cod" && o.payment_status !== "paid" ? (
                       <span
-                        title={txt.onlinePaymentPendingBadge(o.payment_method)}
+                        title={txt.onlinePaymentPendingBadge(ONLINE_PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method)}
                         className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-500"
                       >
-                        {o.payment_method === "bkash" ? "bKash" : o.payment_method === "nagad" ? "Nagad" : "Rocket"} ⏳
+                        {ONLINE_PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method} ⏳
                       </span>
                     ) : null}
                     {o.platform_api_key_id && siteDomainById.get(o.platform_api_key_id) ? (
