@@ -100,6 +100,32 @@ class OnlinePaymentGatewayTest extends TestCase
         $this->assertSame(['sslcommerz'], $providers);
     }
 
+    public function test_page_level_payment_channels_restriction_also_narrows_gateway_channels(): void
+    {
+        // Shop has SSLCommerz enabled, but this page's payment_channels
+        // setting doesn't include it — the per-page restriction (already
+        // proven for wallet channels) must apply symmetrically here too.
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableSslcommerz($owner);
+        LandingPage::where('id', $page->id)->update([
+            'content' => ['settings' => ['payment_channels' => ['cod']]],
+        ]);
+
+        $response = $this->getJson("https://shopa.{$this->apex()}/api/public/landing-pages/offer/payment-channels");
+
+        $response->assertOk();
+        $this->assertSame([], $response->json('data.gateway_channels'));
+
+        // Now include it explicitly — it should appear.
+        LandingPage::where('id', $page->id)->update([
+            'content' => ['settings' => ['payment_channels' => ['cod', 'sslcommerz']]],
+        ]);
+
+        $response = $this->getJson("https://shopa.{$this->apex()}/api/public/landing-pages/offer/payment-channels");
+        $providers = collect($response->json('data.gateway_channels'))->pluck('provider')->all();
+        $this->assertSame(['sslcommerz'], $providers);
+    }
+
     public function test_a_credential_row_with_no_store_id_does_not_appear_as_available(): void
     {
         [$owner, $page, $product] = $this->shopWithPage();

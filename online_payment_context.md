@@ -102,6 +102,11 @@ Phase A প্রথমবার production-এ টেস্ট করার প
 - `App\Services\Payment\Gateways\SslcommerzGatewayClient` — রেফারেন্স ইমপ্লিমেন্টেশন। Amount-tampering guard: verify response-এর নিজস্ব `tran_id` আমাদের merchantTranId-এর সাথে না মিললে reject করে।
 - `OnlinePaymentService` (Phase A ক্লাসেই এক্সটেন্ড করা হয়েছে, নতুন ক্লাস তৈরি হয়নি): `applyConfirmedPayment()` (verifyWalletClaim-এর approve ব্র্যাঞ্চ থেকে extract করা shared cascade), `getEnabledGatewayChannels()`, `initiateGateway()`, `completeGatewayCallback()`।
 
+### ৬.৩.১ ফিক্স (২০২৬-০৮-১৮, লাইভ টেস্টিং ফিডব্যাক)
+প্রথম দিকে landing page-এর per-page "Payment Methods" সিলেক্টরে (§৫.৪) শুধু COD + wallet channel-এর চেকবক্স ছিল — gateway channel (SSLCommerz) সিলেক্ট করার কোনো উপায়ই ছিল না, অথচ `publicChannels()`-এর `gateway_channels` সবসময় শপ-ওয়াইড দেখাতো (page-level filter মানতো না)। এখন দুটোই সিমেট্রিক্যাল:
+- `OnlinePaymentController::publicChannels()` — `payment_channels` সেটিং এখন `wallet_channels`-এর মতোই `gateway_channels`ও narrow করে।
+- `landing-page-builder.tsx` — Payment Methods কার্ডে নতুন "Automatic Payment Gateways" সাব-সেকশন, শপে যা যা গেটওয়ে enabled (নতুন `GET /payment-gateway-credentials` কল) তার চেকবক্স দেখায়, একই `payment_channels` array-তে যোগ হয়।
+
 ### ৬.৪ Routes
 - Public: `POST /public/landing-pages/{slug}/orders/{orderId}/online-payment/gateway/initiate` (token-guarded)।
 - Top-level (slug-scoped না, provider শুধু URL-টাই জানে): `GET|POST /online-payment/{provider}/callback/{id}` (browser redirect, আমাদের নিজের claim id path-এ embedded — provider_payment_id lookup লাগে না), `POST /online-payment/{provider}/ipn` (server-to-server, কিছু provider merchant-panel-এ একবারই সেট করে বলে path param থাকে না — payload-এর নিজস্ব ফিল্ড (tran_id/val_id/invoice_id/mer_txnid) দিয়ে `provider_payment_id` ম্যাচ করে claim খুঁজে বের করে)।

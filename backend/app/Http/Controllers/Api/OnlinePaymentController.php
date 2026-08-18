@@ -38,31 +38,32 @@ class OnlinePaymentController extends Controller
         // LandingPage::resolveOwnerId() does internally (private there).
         $ownerId = User::find($page->user_id)?->shopOwnerId() ?? $page->user_id;
 
-        $shopWideChannels = $this->onlinePaymentService->getEnabledWalletChannels($ownerId);
+        $shopWideWalletChannels = $this->onlinePaymentService->getEnabledWalletChannels($ownerId);
+        $shopWideGatewayChannels = $this->onlinePaymentService->getEnabledGatewayChannels($ownerId);
 
         // Per-page selection (content.settings.payment_channels — an array
-        // of 'cod'/'bkash'/'nagad'/'rocket') narrows the shop-wide-enabled
-        // set down to what THIS page actually offers. Unset entirely
-        // (older pages, before this setting existed) means "offer
+        // of provider strings, wallet_manual and gateway_auto alike, e.g.
+        // 'cod'/'bkash'/'sslcommerz') narrows the shop-wide-enabled set
+        // down to what THIS page actually offers — same list, same
+        // checkbox UI in the builder for both channel types. Unset
+        // entirely (older pages, before this setting existed) means "offer
         // everything the shop has enabled" — the pre-existing default
         // behavior, unchanged. See online_payment_context.md.
         $pageSelection = $page->content['settings']['payment_channels'] ?? null;
         $codEnabled = true;
-        $walletChannels = $shopWideChannels;
+        $walletChannels = $shopWideWalletChannels;
+        $gatewayChannels = $shopWideGatewayChannels;
         if (is_array($pageSelection)) {
             $codEnabled = in_array('cod', $pageSelection, true);
             $walletChannels = array_values(array_filter(
-                $shopWideChannels,
+                $shopWideWalletChannels,
+                fn (array $c) => in_array($c['provider'], $pageSelection, true)
+            ));
+            $gatewayChannels = array_values(array_filter(
+                $shopWideGatewayChannels,
                 fn (array $c) => in_array($c['provider'], $pageSelection, true)
             ));
         }
-
-        // gateway_auto channels aren't affected by the same page-level
-        // "payment_channels" narrowing yet — Phase B/C ships them shop-wide
-        // only, same as wallet channels were before that setting existed.
-        // A per-page gateway toggle can be added later the same way if a
-        // seller ever wants it.
-        $gatewayChannels = $this->onlinePaymentService->getEnabledGatewayChannels($ownerId);
 
         return response()->json([
             'success' => true,

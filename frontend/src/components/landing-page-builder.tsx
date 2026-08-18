@@ -183,6 +183,17 @@ const TAB_ICONS: Record<TabKey, React.ComponentType<{ size?: number }>> = {
   settings: SettingsIcon,
 };
 
+// Display labels for gateway_auto providers — see online_payment_context.md.
+const GATEWAY_PROVIDER_LABELS: Record<string, string> = {
+  sslcommerz: "SSLCommerz",
+  aamarpay: "AamarPay",
+  zinipay: "ZiniPay",
+  shurjopay: "ShurjoPay",
+  eps: "EPS",
+  bkash_merchant: "bKash (Merchant)",
+  nagad_merchant: "Nagad (Merchant)",
+};
+
 function defaultItemFor(type: BlockType): Record<string, unknown> {
   switch (type) {
     case "rich_text_blocks":
@@ -290,6 +301,7 @@ const text = {
     paymentChannelsHint: "বন্ধ থাকলে শপে যা যা চালু আছে (Settings → Online Payment Channels) সবই এই পেজের চেকআউটে দেখাবে।",
     paymentChannelCod: "ক্যাশ অন ডেলিভারি",
     paymentChannelNoWallet: "শপে কোনো অনলাইন পেমেন্ট চ্যানেল চালু নেই — Settings → Online Payment Channels থেকে চালু করুন।",
+    paymentChannelsGatewaySection: "অটোমেটিক পেমেন্ট গেটওয়ে",
     save: "সংরক্ষণ করুন",
     saving: "সংরক্ষণ হচ্ছে...",
     blocksTitle: "পেজ ব্লক (ড্র্যাগ করে সাজান)",
@@ -413,6 +425,7 @@ const text = {
     paymentChannelsHint: "When off, this page's checkout shows everything the shop has enabled (Settings → Online Payment Channels).",
     paymentChannelCod: "Cash on delivery",
     paymentChannelNoWallet: "No online payment channel is enabled shop-wide yet — turn one on in Settings → Online Payment Channels.",
+    paymentChannelsGatewaySection: "Automatic Payment Gateways",
     save: "Save",
     saving: "Saving...",
     blocksTitle: "Page blocks (drag to reorder)",
@@ -525,6 +538,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   // See online_payment_context.md.
   const [paymentChannels, setPaymentChannels] = useState<string[] | null>(null);
   const [shopWalletProviders, setShopWalletProviders] = useState<string[]>([]);
+  const [shopGatewayProviders, setShopGatewayProviders] = useState<string[]>([]);
   const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   // Which wallet channels this shop has turned on at all (Settings → Online
@@ -543,6 +557,19 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
         if (d.nagad_personal_enabled) providers.push("nagad");
         if (d.rocket_personal_enabled) providers.push("rocket");
         setShopWalletProviders(providers);
+      })
+      .catch(() => {});
+
+    // Same idea for automated merchant gateways (SSLCommerz etc, Phase B/C)
+    // — enabled here just means "seller turned it on"; the public checkout
+    // endpoint (OnlinePaymentController::publicChannels) is the real
+    // authority and additionally checks isConfigured(), so an incompletely
+    // set-up gateway simply won't appear at checkout even if listed here.
+    fetch(`${LANDING_API_BASE}/payment-gateway-credentials`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const rows: Array<{ provider: string; enabled: boolean }> = json?.data?.credentials ?? [];
+        setShopGatewayProviders(rows.filter((r) => r.enabled).map((r) => r.provider));
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1973,7 +2000,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
                 <input
                   type="checkbox"
                   checked={paymentChannels !== null}
-                  onChange={(e) => setPaymentChannels(e.target.checked ? ["cod", ...shopWalletProviders] : null)}
+                  onChange={(e) => setPaymentChannels(e.target.checked ? ["cod", ...shopWalletProviders, ...shopGatewayProviders] : null)}
                   className="accent-[var(--accent)]"
                 />
                 {t.paymentChannelsRestrict}
@@ -2011,6 +2038,26 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
                       {p === "bkash" ? "bKash" : p === "nagad" ? "Nagad" : "Rocket"}
                     </label>
                   ))}
+                  {shopGatewayProviders.length > 0 && (
+                    <>
+                      <p className="pt-1 text-xs font-semibold text-[var(--muted)]">{t.paymentChannelsGatewaySection}</p>
+                      {shopGatewayProviders.map((p) => (
+                        <label key={p} className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                          <input
+                            type="checkbox"
+                            checked={paymentChannels.includes(p)}
+                            onChange={(e) => setPaymentChannels((prev) => {
+                              const set = new Set(prev ?? []);
+                              if (e.target.checked) set.add(p); else set.delete(p);
+                              return Array.from(set);
+                            })}
+                            className="accent-[var(--accent)]"
+                          />
+                          {GATEWAY_PROVIDER_LABELS[p] ?? p}
+                        </label>
+                      ))}
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>
