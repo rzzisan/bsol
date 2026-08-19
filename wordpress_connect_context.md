@@ -1,5 +1,7 @@
 # WordPress/WooCommerce Connector — BSOL Connect (Context)
 
+শেষ আপডেট: ২০২৬-০৮-১৯ (৫) — **v1.19.4 — আসল ফিক্স, সরাসরি লাইভ সার্ভারে SSH দিয়ে (`wp eval`) verify করে।** ১৯.৩-এর status panel-ই আসল প্রমাণ দিল: BSOL-এ ৬টা channel ঠিকভাবে enabled, কিন্তু `class_exists('Bsol_Payment_Gateway')` = false — মডিউলই কখনো লোড হয়নি। **আসল কারণ**: `did_action('woocommerce_loaded')` ইতিমধ্যেই `1` — আমাদের `add_action()` register করার আগেই fire হয়ে গিয়েছিল, প্রতিবার, যেকোনো প্লাগিন অর্ডারেই (WooCommerce নিজের বুটস্ট্র্যাপ তার নিজের ফাইল-লোড সময়েই সিনক্রোনাসলি চলে, যেটা সব প্লাগিনের জন্যই `plugins_loaded` fire হওয়ার আগে ঘটে)। ১৯.১-এর ফিক্স ঠিক উল্টো সমস্যা তৈরি করেছিল যেটা এড়াতে চেয়েছিল। ফিক্স: `did_action()` আগে চেক করে, আগে থেকেই fired হলে সাথে সাথে init করে। রিলিজের আগেই সেলারের আসল সার্ভারে প্যাচ করে verify করা হয়েছে — ৬টা চ্যানেলই এখন সঠিকভাবে register হয়। বিস্তারিত §১২-এর নিচে।
+
 শেষ আপডেট: ২০২৬-০৮-১৯ (৪) — **v1.19.3 — wp-admin-এ "Payment Gateways" স্ট্যাটাস প্যানেল যোগ।** কনফিগ এখনো BSOL dashboard-এই থাকে, কিন্তু এখন wp-admin থেকেই লাইভ দেখা যায় এই সাইট কোন কোন channel দেখছে, checkout classic না block-based সেটাও detect করে দেখায়, আর এক ক্লিকে cache (payment-channel + update-notice দুটোই) রিফ্রেশ করা যায়। বিস্তারিত §১২-এর নিচে।
 
 শেষ আপডেট: ২০২৬-০৮-১৯ (৩) — **v1.19.2 — WooCommerce Blocks checkout compatibility।** ১৯.১ ফিক্সের পরও কোনো payment method দেখাচ্ছিল না — কারণ সেলারের checkout পেজ **block-based Checkout** ব্যবহার করে (classic shortcode না), আর plain `WC_Payment_Gateway` শুধু classic checkout-এ দেখা যায়, block checkout-এর জন্য আলাদা Store API integration লাগে। নতুন `Bsol_Gateway_Blocks_Support` + `bsol-gateway-blocks.js` (কোনো build step ছাড়াই, plain `wp.element.createElement()`) যোগ করা হয়েছে, `class_exists()` দিয়ে গার্ডেড। বিস্তারিত §১২-এর নিচে।
@@ -308,6 +310,26 @@ BSOL-এর ৭টা payment channel-ই (`online_payment_context.md`) এখ�
 - সরাসরি BSOL কল করে (cache bypass করে, যেহেতু এটা low-traffic admin পেজ) এবং এই সাইট বর্তমানে কোন কোন channel দেখছে সেটা লিস্ট করে দেখায় — API call fail করলে আসল error message-ও দেখায়।
 - এই সাইটের Checkout পেজ **classic** না **block-based** সেটা detect করে দেখায় (`has_block('woocommerce/checkout', ...)` বনাম `has_shortcode(..., 'woocommerce_checkout')`) — ঠিক যে ambiguity-টা ১৯.২-এর ফিক্সে একটা পুরো live-test round-trip লেগেছিল বের করতে।
 - একটা **Refresh now** বাটন — payment-channel cache আর update-notice cache দুটোই এক ক্লিকে ক্লিয়ার করে, কোনো transient/DB access লাগে না।
+
+### ফিক্স (v1.19.4, একই দিন — চতুর্থ round, এইবার সরাসরি SSH দিয়ে verify করে)
+
+সেলার ১৯.৩-এর "Payment Gateways" প্যানেল দেখে জানালেন এখনো কোনো payment method দেখা যাচ্ছে না, আর WooCommerce → Settings → Payments-এও BSOL-এর কোনো গেটওয়ে নেই — এবার তিনি নিজের WordPress সার্ভারের root SSH access দিয়ে দেন সরাসরি investigate করার জন্য।
+
+**সরাসরি লাইভ সার্ভারে (SSH + `wp eval`, PHP 8.4 — CLI-এর ডিফল্ট PHP 8.5-এ mysqli extension নেই, তাই আলাদাভাবে `php8.4 /usr/local/bin/wp` দিয়ে চালাতে হয়েছে) দেখা গেল**:
+```
+is_connected: yes
+Bsol_Payment_Gateway: no       ← মডিউলই কখনো লোড হয়নি!
+registered_gateway_ids: bacs,cheque,cod
+did_action(woocommerce_loaded): 1   ← আমাদের listener register করার আগেই fire হয়ে গেছে
+```
+
+**আসল কারণ**: WooCommerce নিজের `WC_Payment_Gateway` ক্লাস define করে আর `woocommerce_loaded` ফায়ার করে তার নিজের প্লাগিন ফাইলের **টপ-লেভেল এক্সিকিউশনেই** (সিনক্রোনাসলি) — যেটা *সব* active প্লাগিনের জন্যই `plugins_loaded` ফায়ার হওয়ার **আগে** ঘটে। মানে `Bsol_Master::define_hooks()` (যেটা আমাদের নিজের `plugins_loaded` callback-এর ভেতরে চলে) যখন `add_action('woocommerce_loaded', ...)` কল করে, ততক্ষণে সেই hook **ইতিমধ্যেই fire হয়ে গেছে** — plugin activation order যাই হোক না কেন। একটা event যেটা আগেই ঘটে গেছে তার জন্য listener register করলে সেই callback কখনোই চলে না। এটাই ১৯.১-এর ফিক্স যে সমস্যা এড়াতে চেয়েছিল তার ঠিক উল্টো — সেই ভয়টা (fatal error, WC_Payment_Gateway define হওয়ার আগেই extend) তাত্ত্বিকভাবে বাস্তব ছিল, কিন্তু বাস্তবে কখনোই ঘটে না (ক্লাসটা `plugins_loaded`-এরও অনেক আগেই রেডি থাকে)।
+
+**ফিক্স**: `Bsol_Master::define_hooks()` এখন প্রথমে `did_action('woocommerce_loaded')` চেক করে — আগে থেকেই fired থাকলে (যেটা লাইভ ভেরিফিকেশনে সবসময় true পাওয়া গেছে) সাথে সাথেই `init_payment_gateway_module()` কল করে, নাহলে (ভবিষ্যতে ভিন্ন কোনো WooCommerce version/setup-এর জন্য defensive fallback হিসেবে) আগের মতোই `add_action()` listener রাখে।
+
+**Release-এর আগেই সেলারের আসল সার্ভারে সরাসরি ভেরিফাই করা হয়েছে**: `class-bsol-master.php` ফাইলটা সরাসরি scp করে বসিয়ে `wp eval` দিয়ে কনফার্ম করা হয়েছে — `Bsol_Payment_Gateway: yes`, এবং `registered_gateway_ids`-এ তার সবগুলো enabled channel (SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS, bKash Merchant) সঠিকভাবে দেখা গেছে, `bacs`/`cheque`/`cod`-এর পাশাপাশি।
+
+**শেখা**: এই পুরো bug hunt-টা (১৯.১ → ১৯.৪) দেখায় কেন "সম্ভাব্য রেস কন্ডিশন" থিওরি দিয়ে ফিক্স করা এক জিনিস, আর real production-এ real WordPress bootstrap order দিয়ে verify করা সম্পূর্ণ ভিন্ন জিনিস — এই dev environment-এ কোনো real WordPress install না থাকায় (§৬ দ্রষ্টব্য) কোনোটাই আগে থেকে টেস্ট করা সম্ভব ছিল না; সেলারের root SSH access ছাড়া এটা আরও কয়েক রাউন্ড গেস-অ্যান্ড-চেক লাগত।
 
 ---
 

@@ -87,19 +87,29 @@ class Bsol_Master {
 		// class-bsol-gateway.php declares `class Bsol_Gateway extends
 		// WC_Payment_Gateway` — that parent class must already exist at the
 		// moment PHP parses the require()'d file (class inheritance
-		// resolves immediately, not lazily), and WooCommerce is NOT
-		// guaranteed to have defined it yet by the time *this* plugin's own
-		// plugins_loaded callback runs (hook-callback ordering across
-		// different plugins registered at the same priority is not something
-		// to rely on — this is a well-documented WooCommerce extension
-		// pitfall). `woocommerce_loaded` is WooCommerce's own action, fired
-		// only once its core classes (including WC_Payment_Gateway) are
-		// guaranteed to exist, regardless of plugin load order — so the
-		// require + registration for this one module are deferred there
-		// instead of running unconditionally in load_dependencies() like
-		// every other module (none of which extend a WooCommerce core class
-		// at file-parse time, so they don't have this problem).
-		add_action( 'woocommerce_loaded', array( $this, 'init_payment_gateway_module' ) );
+		// resolves immediately, not lazily). `woocommerce_loaded` is
+		// WooCommerce's own action, fired once its core classes are
+		// guaranteed to exist — but confirmed live on a real production
+		// site (2026-08-19) that WooCommerce's own bootstrap runs
+		// synchronously at its plugin file's top-level execution, which for
+		// *every* active plugin happens before `plugins_loaded` fires for
+		// *any* of them — meaning `woocommerce_loaded` has ALWAYS already
+		// fired (`did_action('woocommerce_loaded')` was 1) by the time this
+		// method runs, regardless of plugin activation order. A plain
+		// `add_action('woocommerce_loaded', ...)` here registers for an
+		// event that already happened and so never fires the callback at
+		// all — the exact opposite failure from the one 1.19.1 was trying
+		// to prevent (that fatal-error risk was real in principle, but this
+		// real server never actually hit it: WC_Payment_Gateway was already
+		// defined by plugins_loaded time). Check did_action() first and
+		// initialize immediately if it already fired; keep the add_action()
+		// listener as a defensive fallback for whichever ordering doesn't
+		// hold on some other server/WooCommerce version.
+		if ( did_action( 'woocommerce_loaded' ) ) {
+			$this->init_payment_gateway_module();
+		} else {
+			add_action( 'woocommerce_loaded', array( $this, 'init_payment_gateway_module' ) );
+		}
 	}
 
 	public function init_payment_gateway_module() {

@@ -1,5 +1,45 @@
 # BSOL Connect — Changelog
 
+## 1.19.4 — 2026-08-19
+
+The real fix — found by directly inspecting the live PHP process on a
+real seller's server (SSH + `wp eval`) rather than guessing again.
+1.19.3's new "Payment Gateways" status panel showed the honest answer:
+BSOL dashboard had 6 channels correctly enabled, but this site's
+WooCommerce registered exactly `bacs,cheque,cod` — none of ours.
+`class_exists('Bsol_Payment_Gateway')` was `false`. The module had never
+loaded at all.
+
+**Root cause, confirmed live**: `did_action('woocommerce_loaded')`
+returned `1` — already fired — *before* `Bsol_Master::define_hooks()`
+(itself running inside this plugin's own `plugins_loaded` callback) ever
+got a chance to `add_action('woocommerce_loaded', ...)`. WooCommerce's
+own bootstrap (which defines `WC_Payment_Gateway` and fires
+`woocommerce_loaded`) runs synchronously at its plugin file's top-level
+execution — which, for *every* active plugin, happens before
+`plugins_loaded` fires for *any* of them. So `woocommerce_loaded` had
+*always* already fired by the time our listener registered, on every
+site, regardless of plugin activation order — registering for an event
+that already happened means the callback never runs at all. This is the
+exact opposite failure from the one 1.19.1 was written to prevent (that
+fatal-error risk — extending `WC_Payment_Gateway` before it's defined —
+was real in principle, but never actually happens in practice: the class
+is already available well before `plugins_loaded`).
+
+**Fix**: `Bsol_Master::define_hooks()` now checks `did_action('woocommerce_loaded')`
+first. If it already fired (which live verification confirms is always
+the case), initialize the payment-gateway module immediately instead of
+waiting for an event that already passed. The `add_action()` listener is
+kept as a defensive fallback for whichever WooCommerce version/setup
+doesn't hold to this ordering.
+
+**Verified live** on the reporting seller's actual server before this
+release: patched `class-bsol-master.php` directly, confirmed
+`Bsol_Payment_Gateway` now loads and `WC()->payment_gateways()->payment_gateways()`
+lists all 6 of their enabled channels (`bsol_sslcommerz`, `bsol_aamarpay`,
+`bsol_zinipay`, `bsol_shurjopay`, `bsol_eps`, `bsol_bkash_merchant`)
+alongside the native `bacs`/`cheque`/`cod`.
+
 ## 1.19.3 — 2026-08-19
 
 Third live-test round, same day. Two issues surfaced:
