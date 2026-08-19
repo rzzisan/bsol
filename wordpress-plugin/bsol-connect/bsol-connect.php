@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       BSOL Connect
  * Description:       Connects your WooCommerce store to BSOL for order sync, product sync, courier booking + waybill printing, phone fraud checking, online payment gateways, and marketing tools.
- * Version:           1.19.0
+ * Version:           1.19.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Requires Plugins:  woocommerce
