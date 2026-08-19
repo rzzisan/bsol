@@ -1,5 +1,39 @@
 # BSOL Connect — Changelog
 
+## 1.19.2 — 2026-08-19
+
+Second live-test fix, same day: after 1.19.1, the seller reported no
+payment method showed at checkout at all, and no enable/disable setting
+was findable anywhere — even though BSOL dashboard confirmed the channels
+were correctly enabled/configured server-side.
+
+- **Root cause**: this site's checkout page uses WooCommerce's **block-based
+  Checkout** (the Cart & Checkout block, WooCommerce's default on
+  new/updated sites since 8.3) rather than the classic `[woocommerce_checkout]`
+  shortcode. A plain `WC_Payment_Gateway` (what `class-bsol-gateway.php`
+  registers) is only visible on the *classic* checkout — the block
+  checkout requires a *separate* Store API integration
+  (`AbstractPaymentMethodType`) to make a payment method selectable there
+  at all. Without it, the gateway is silently invisible — no error, no
+  log entry, it just never renders. (This plugin's other checkout-time
+  modules — repeat-order-block, checkout-block — already special-cased
+  block checkout for their own hooks; the new payment-gateway module
+  hadn't yet.)
+- **Fix**: new `Bsol_Gateway_Blocks_Support` (one instance per enabled
+  channel, mirroring `Bsol_Gateway`'s own per-channel instantiation) +
+  `assets/js/bsol-gateway-blocks.js` (no build step — plain
+  `wp.element.createElement()` calls against WooCommerce's own exposed
+  globals, same approach lightweight non-bundled Blocks-compatible gateway
+  plugins use). Registered via `woocommerce_blocks_payment_method_type_registration`,
+  guarded behind `class_exists()` so older WooCommerce/Blocks versions
+  simply fall back to classic-checkout-only support instead of erroring.
+  `process_payment()` itself needed no changes — the Store API still calls
+  the same `WC_Payment_Gateway::process_payment()` server-side; this
+  addition only makes the option selectable in the block checkout's UI.
+- If your checkout page still uses the classic shortcode (WooCommerce →
+  Settings → Advanced → Checkout page), you were never affected by this —
+  block-only issue.
+
 ## 1.19.1 — 2026-08-19
 
 Live-test fix, same day as 1.19.0's release, reported by the first seller

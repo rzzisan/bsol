@@ -399,12 +399,21 @@ genuine merge for whatever this doesn't already cover.
    syncs fine with `fbp`/`fbc` simply absent — this must never block order
    creation.
 
-## Online payment gateways (1.19.0)
+## Online payment gateways (1.19.0, block-checkout fix in 1.19.2)
 
 Every channel enabled on the connected BSOL account should appear as a
 WooCommerce payment method automatically — nothing to configure on the
 WordPress side beyond connecting.
 
+0. Test on **both** checkout types if the store uses (or might switch to)
+   either: WooCommerce → Settings → Advanced → Checkout page tells you
+   which — a page using the `[woocommerce_checkout]` shortcode is
+   "classic"; one built with the Checkout block (edit the page, look for
+   a "Checkout" block in the block editor) is "block-based". 1.19.0's
+   registration only covered classic; 1.19.2 added block support
+   separately (`Bsol_Gateway_Blocks_Support` + `bsol-gateway-blocks.js`) —
+   confirm payment methods actually appear on whichever type(s) this
+   store's real checkout page uses.
 1. On BSOL dashboard → Settings → Online Payment Channels, enable at
    least one wallet_manual channel (e.g. bKash personal, with a receiving
    number) and one gateway_auto channel (e.g. SSLCommerz sandbox).

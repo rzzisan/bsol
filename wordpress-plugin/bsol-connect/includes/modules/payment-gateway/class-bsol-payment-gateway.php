@@ -56,6 +56,66 @@ class Bsol_Payment_Gateway {
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_assets' ) );
 		add_action( 'wp_ajax_bsol_wallet_claim', array( $this, 'ajax_wallet_claim' ) );
 		add_action( 'wp_ajax_nopriv_bsol_wallet_claim', array( $this, 'ajax_wallet_claim' ) );
+		$this->maybe_register_blocks_support();
+	}
+
+	/**
+	 * Registers each BSOL gateway with the WooCommerce Blocks (Cart &
+	 * Checkout block) Store API — without this, a plain WC_Payment_Gateway
+	 * is invisible on the block-based checkout (WooCommerce's default on
+	 * new/updated sites since 8.3), with no error, it just never shows.
+	 * Guarded behind class_exists() — older WooCommerce/Blocks versions
+	 * simply skip this and fall back to classic-checkout-only support.
+	 */
+	private function maybe_register_blocks_support() {
+		if ( ! class_exists( '\Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType' ) ) {
+			return;
+		}
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/payment-gateway/class-bsol-gateway-blocks-support.php';
+
+		add_action(
+			'woocommerce_blocks_payment_method_type_registration',
+			array( $this, 'register_blocks_payment_methods' )
+		);
+	}
+
+	public function register_blocks_payment_methods( $registry ) {
+		$channels = $this->get_channels();
+		$ids      = array();
+
+		foreach ( array_merge( $channels['wallet_channels'], $channels['gateway_channels'] ) as $channel ) {
+			$ids[] = 'bsol_' . $channel['provider'];
+		}
+
+		if ( empty( $ids ) ) {
+			return;
+		}
+
+		// Throwaway lookup purely to read each gateway's title/description/
+		// enabled state via the normal WC_Payment_Gateway API — the actual
+		// process_payment() call always goes through WooCommerce's own
+		// payment_gateways() registry (register_gateways() above), never
+		// through anything built here.
+		$all_gateways = WC()->payment_gateways()->payment_gateways();
+
+		foreach ( $ids as $gateway_id ) {
+			if ( isset( $all_gateways[ $gateway_id ] ) ) {
+				$registry->register( new Bsol_Gateway_Blocks_Support( $all_gateways[ $gateway_id ] ) );
+			}
+		}
+
+		wp_register_script(
+			'bsol-gateway-blocks',
+			BSOL_PLUGIN_URL . 'assets/js/bsol-gateway-blocks.js',
+			array( 'wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities' ),
+			BSOL_PLUGIN_VERSION,
+			true
+		);
+		wp_add_inline_script(
+			'bsol-gateway-blocks',
+			'window.bsol_gateway_blocks_ids = ' . wp_json_encode( $ids ) . ';',
+			'before'
+		);
 	}
 
 	public function register_gateways( $gateways ) {
