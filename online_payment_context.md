@@ -1,5 +1,9 @@
 # Customer-Facing Online Payment — Context
 
+শেষ আপডেট: 2026-08-19 (২) — **Phase B সম্পূর্ণ: EPS (Easy Payment System) automated gateway লাইভ — শেষ SSLCommerz-স্টাইল provider।** `EpsGatewayClient` (`/v1/Auth/GetToken` Bearer auth + `/v1/EPSEngine/InitializeEPS` + `/v1/EPSEngine/CheckMerchantTransactionStatus` server verification, HMAC-SHA512 request signing) `PaymentGatewayFactory`-তে রেজিস্টার করা হয়েছে। eps.com.bd-এর কোনো পাবলিক REST ডকুমেন্টেশন নেই — তাই EPS-এর নিজস্ব official reference code (github.com/EPS-PG/EPS_PHP) থেকে সরাসরি real endpoint/field শেপ নিশ্চিত করা হয়েছে, অনুমান করে না। ড্যাশবোর্ডে (Merchant ID, Store ID, Username, Password, Hash Key) ফর্ম লাইভ। বিস্তারিত নিচে §৯।
+
+Phase B-এর পরিকল্পিত ৫টা provider-ই (SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS) এখন লাইভ। বাকি C1 (bKash Merchant) ও C2 (Nagad Merchant) — build-order অনুযায়ী পরবর্তী ধাপ, এখনো শুরু হয়নি। Older entries kept as-is:
+
 শেষ আপডেট: 2026-08-19 — **সিকিউরিটি রিভিউ ফিক্স (B2/B3 AamarPay/ZiniPay/ShurjoPay কোড, অন্য একটা AI agent দিয়ে করানো হয়েছিল)।** দুইটা আসল বাগ পাওয়া গেছে ও ফিক্স করা হয়েছে:
 1. **`ZinipayGatewayClient::verifyPayment()`** callback query string থেকে আসা `invoice_id` (কাস্টমার-controllable) দিয়ে ভেরিফাই করত, আর tampering guard (`metadata.merchant_tran_id` match) conditional ছিল (`isset` না থাকলে skip) — ফলে একই সেলারের কোনো real completed invoice (নিজের ছোট আরেকটা অর্ডারের) replay করে অন্য একটা বড় অর্ডারের callback URL-এ বসিয়ে দিলে সেটাও ভেরিফাই পাস করে confirmed হয়ে যেত। **ফিক্স**: verify সবসময় আমাদের নিজের stored `provider_payment_id` (ZiniPay-র createPayment() রেসপন্স থেকে initiate-এর সময় capture করা, কাস্টমার-influenced না) দিয়ে হয় — callback-এর `invoice_id` আর trust করা হয় না, metadata match এখন শুধু belt-and-suspenders।
 2. **`OnlinePaymentController::gatewayIpn()`**-এর candidate-id list-এ ShurjoPay-র নিজের `order_id`/`sp_order_id` ফিল্ড ছিল না (শুধু SSLCommerz/AamarPay/ZiniPay-এর ফিল্ড নাম ছিল) — ফলে ShurjoPay-র server-to-server IPN কখনো claim resolve করতে পারত না (404), শুধু browser-redirect leg-ই কাজ করত। **ফিক্স**: candidate list-এ `order_id`/`sp_order_id` যোগ করা হয়েছে।
@@ -136,6 +140,22 @@ Phase A প্রথমবার production-এ টেস্ট করার প
 
 ### ৬.৭ Test coverage
 `OnlinePaymentGatewayTest` (১৩টা: channel listing, misconfigured-credential exclusion, initiate, callback-success-cascade, callback-without-val_id-not-trusted, duplicate-callback-idempotent, AamarPay initiate+verify, AamarPay tampering rejection, ZiniPay initiate+verify, ZiniPay failure handling, ShurjoPay initiate+verify, ShurjoPay tampering rejection), `PaymentGatewayCredentialApiTest` (৬টা: CRUD, masking, masked-placeholder-না-overwrite, unknown-provider-404, staff permission, SSLCommerz/AamarPay/ZiniPay/ShurjoPay credentials roundtrip)।
+
+## ৯. Phase B — EPS Integration (২০২৬-০৮-১৯)
+
+**গবেষণা**: eps.com.bd-এর কোনো পাবলিক REST API রেফারেন্স নেই। EPS-এর নিজস্ব official GitHub org (`github.com/EPS-PG`)-এর `EPS_PHP` রিপোর প্রকৃত রেফারেন্স ফাইল (`Sandbox&ProductionPhP.php`) থেকে সরাসরি real base URL, endpoint path, header/hash scheme আর field name নিশ্চিত করা হয়েছে — অন্য কোনো provider-এর মতো অনুমান করে বসানো হয়নি।
+
+- **`EpsGatewayClient`**:
+  - Base URL: sandbox `https://sandboxpgapi.eps.com.bd`, live `https://pgapi.eps.com.bd`।
+  - Request signing: প্রতিটা কলে `x-hash` হেডার — `base64(HMAC-SHA512(data, hash_key))` (EPS-এর নিজস্ব স্কিম, তাদের official sample থেকে হুবহু কপি করা)।
+  - Auth: `POST /v1/Auth/GetToken` (`x-hash` = sign(username), body `{userName, password}`) → Bearer token।
+  - Session creation: `POST /v1/EPSEngine/InitializeEPS` (Bearer + `x-hash` = sign(merchantTranId)) → `{RedirectURL}`।
+  - Server-to-server verification: `GET /v1/EPSEngine/CheckMerchantTransactionStatus?merchantTransactionId=...` (Bearer + `x-hash` = sign(providerPaymentId))। রেসপন্সে status টপ-লেভেল অথবা `data` object-এর ভেতরে থাকতে পারে (`transactionStatus`/`status`) — দুটোই চেক করা হয়, `SUCCESS`/`COMPLETED`/`SUCCESSFUL` হলে valid।
+  - **Tampering guard — অন্য providers-এর চেয়ে ভিন্ন ডিজাইন**: EPS-এর status API কোনো independent id ফেরত দেয় না যেটা দিয়ে পরে match করা যায় (SSLCommerz/AamarPay/ShurjoPay-র মতো verify-then-match সম্ভব না)। তাই `verifyPayment()` callback query string-এর কোনো ফিল্ডই ব্যবহার করে না — সবসময় আমাদের নিজের stored `provider_payment_id` দিয়েই status চেক করে। এই "সবসময় নিজের stored id ব্যবহার করো" নীতিটাই এখানে tampering guard — আগের দিনের ZiniPay বাগের শিক্ষা এখানে শুরু থেকেই প্রয়োগ করা হয়েছে (§৬.৩.২ দ্রষ্টব্য)।
+  - Credential shape: `merchant_id`, `store_id`, `username`, `password`, `hash_key` (৫টা ফিল্ড — এই ব্যাচের মধ্যে সবচেয়ে বেশি)।
+- **Frontend Settings**: `GATEWAY_PROVIDERS`-এ EPS-এর "Coming soon" ব্যাজ সরিয়ে বাকিদের মতোই field-schema ফর্ম যোগ হয়েছে।
+- **Test coverage**: `test_eps_initiate_and_successful_callback_verification`, `test_eps_verify_always_uses_our_own_stored_transaction_id` (স্পুফিং-প্রতিরোধ প্রমাণ করে — callback-এ ভুল transaction id দিলেও client সবসময় সত্যিকারের stored id-ই query করে), `PaymentGatewayCredentialApiTest`-এ EPS roundtrip।
+- Full suite: বেসলাইনের ২টা unrelated failure (AuthApiTest, CourierFraudCheckApiTest) ছাড়া সব পাস (৩৮২ passed)।
 
 ## ৭. Phase B2 — AamarPay & ZiniPay Integration (২০২৬-০৮-১৮)
 

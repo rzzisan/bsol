@@ -182,10 +182,17 @@ const GATEWAY_PROVIDERS: GatewayConfig[] = [
     badgeColor: "text-cyan-400",
     badgeBg: "bg-cyan-500/10 border-cyan-500/20",
     description: {
-      bn: "ইলেকট্রনিক পেমেন্ট সেটেলমেন্ট গেটওয়ে।",
-      en: "Electronic Payment Settlement gateway.",
+      bn: "বিকাশ, নগদ, রকেট, কার্ড ও ব্যাংক ট্রান্সফার — সবগুলো একসাথে সাপোর্ট করা অ্যাগ্রিগেটর গেটওয়ে।",
+      en: "Aggregator gateway supporting bKash, Nagad, Rocket, cards & bank transfers in one integration.",
     },
-    fields: [],
+    guideUrl: "https://eps.com.bd",
+    fields: [
+      { key: "merchant_id", label: "Merchant ID", type: "text", placeholder: "e.g. 29e86e70-0ac6-..." },
+      { key: "store_id", label: "Store ID", type: "text", placeholder: "e.g. d44e705f-9e3a-..." },
+      { key: "username", label: "Username", type: "text", placeholder: "e.g. your_eps_username" },
+      { key: "password", label: "Password", type: "password", placeholder: "e.g. your_eps_password" },
+      { key: "hash_key", label: "Hash Key", type: "password", placeholder: "e.g. your_eps_hash_key" },
+    ],
   },
   {
     provider: "bkash_merchant",

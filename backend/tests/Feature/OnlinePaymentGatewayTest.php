@@ -712,6 +712,119 @@ class OnlinePaymentGatewayTest extends TestCase
         $this->assertSame('confirmed', $order->status);
         $this->assertEquals(580.0, $order->paidAmount());
     }
+
+    private function enableEps(User $owner): void
+    {
+        PaymentGatewayCredential::create([
+            'user_id' => $owner->id,
+            'provider' => 'eps',
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => [
+                'merchant_id' => 'EPS_MERCHANT_TEST',
+                'store_id' => 'EPS_STORE_TEST',
+                'username' => 'eps_sandbox_user',
+                'password' => 'eps_sandbox_pass',
+                'hash_key' => 'eps_test_hash_key_123',
+            ],
+        ]);
+    }
+
+    public function test_eps_initiate_and_successful_callback_verification(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableEps($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://sandboxpgapi.eps.com.bd/v1/Auth/GetToken' => Http::response(['token' => 'EPS_BEARER_TOKEN']),
+            'https://sandboxpgapi.eps.com.bd/v1/EPSEngine/InitializeEPS' => Http::response([
+                'RedirectURL' => 'https://sandboxpgapi.eps.com.bd/pay/EPS_SESSION_1',
+            ]),
+        ]);
+
+        $response = $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'eps']
+        );
+
+        $response->assertOk();
+        $this->assertStringContainsString('sandboxpgapi.eps.com.bd', $response->json('data.redirect_url'));
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('gateway_auto', $claim->channel_type);
+        $this->assertSame('eps', $claim->provider);
+        $merchantTranId = $claim->provider_payment_id;
+
+        Http::fake([
+            'https://sandboxpgapi.eps.com.bd/v1/Auth/GetToken' => Http::response(['token' => 'EPS_BEARER_TOKEN']),
+            'https://sandboxpgapi.eps.com.bd/v1/EPSEngine/CheckMerchantTransactionStatus*' => Http::response([
+                'data' => ['status' => 'SUCCESS', 'amount' => '580.00', 'transactionId' => 'EPS_TXN_1'],
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/eps/callback/{$claim->id}?merchantTransactionId={$merchantTranId}");
+        $callback->assertRedirect();
+        $this->assertStringContainsString('payment_result=success', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('confirmed', $order->status);
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertEquals(580.0, $order->paidAmount());
+        $this->assertDatabaseHas('order_payments', [
+            'order_id' => $order->id, 'source' => 'online_gateway', 'method' => 'eps',
+        ]);
+    }
+
+    public function test_eps_verify_always_uses_our_own_stored_transaction_id(): void
+    {
+        // Built in from day one (the same lesson the ZiniPay tampering fix
+        // taught — see online_payment_context.md): prove a customer can't
+        // influence which transaction id gets checked via the callback
+        // query string. EPS's status API has no independent id to
+        // cross-check after the fact, so this always-verify-our-own-id
+        // discipline IS the tampering guard for this client.
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableEps($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://sandboxpgapi.eps.com.bd/v1/Auth/GetToken' => Http::response(['token' => 'EPS_BEARER_TOKEN']),
+            'https://sandboxpgapi.eps.com.bd/v1/EPSEngine/InitializeEPS' => Http::response([
+                'RedirectURL' => 'https://sandboxpgapi.eps.com.bd/pay/EPS_SESSION_1',
+            ]),
+        ]);
+
+        $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'eps']
+        )->assertOk();
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        $realTranId = $claim->provider_payment_id;
+
+        Http::fake([
+            'https://sandboxpgapi.eps.com.bd/v1/Auth/GetToken' => Http::response(['token' => 'EPS_BEARER_TOKEN']),
+            'https://sandboxpgapi.eps.com.bd/v1/EPSEngine/CheckMerchantTransactionStatus*' => function ($request) use ($realTranId) {
+                // Only the REAL stored transaction (still pending) exists
+                // on EPS's side; a spoofed id would only look SUCCESS if
+                // the client actually queried it, which it must not.
+                if (str_contains((string) $request->url(), urlencode($realTranId))) {
+                    return Http::response(['data' => ['status' => 'PENDING']]);
+                }
+                return Http::response(['data' => ['status' => 'SUCCESS', 'amount' => '580.00']]);
+            },
+        ]);
+
+        // Attacker supplies a bogus transaction id in the callback query string.
+        $callback = $this->get("/api/online-payment/eps/callback/{$claim->id}?merchantTransactionId=SPOOFED_OTHER_ID");
+        $this->assertStringContainsString('payment_result=failed', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('pending', $order->status);
+        $this->assertSame('due', $order->payment_status);
+        $this->assertDatabaseMissing('order_payments', ['order_id' => $order->id]);
+    }
 }
 
 

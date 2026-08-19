@@ -29,6 +29,7 @@ class PaymentGatewayCredentialApiTest extends TestCase
         $this->assertContains('aamarpay', $response->json('data.supported_providers'));
         $this->assertContains('zinipay', $response->json('data.supported_providers'));
         $this->assertContains('shurjopay', $response->json('data.supported_providers'));
+        $this->assertContains('eps', $response->json('data.supported_providers'));
         $this->assertSame([], $response->json('data.credentials'));
     }
 
@@ -79,6 +80,19 @@ class PaymentGatewayCredentialApiTest extends TestCase
         $shurjoRow = PaymentGatewayCredential::where('user_id', $owner->id)->where('provider', 'shurjopay')->firstOrFail();
         $this->assertSame('sp_secret_pass', $shurjoRow->credentials['password']);
         $this->assertSame('NOK', $shurjoRow->credentials['prefix']);
+
+        // Test EPS saving
+        $this->putJson('/api/payment-gateway-credentials/eps', [
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => [
+                'merchant_id' => 'eps_merchant_1', 'store_id' => 'eps_store_1',
+                'username' => 'eps_user', 'password' => 'eps_secret_pass', 'hash_key' => 'eps_hash_secret',
+            ],
+        ])->assertOk();
+        $epsRow = PaymentGatewayCredential::where('user_id', $owner->id)->where('provider', 'eps')->firstOrFail();
+        $this->assertSame('eps_secret_pass', $epsRow->credentials['password']);
+        $this->assertSame('eps_hash_secret', $epsRow->credentials['hash_key']);
     }
 
     public function test_saving_a_masked_placeholder_does_not_overwrite_the_real_secret(): void

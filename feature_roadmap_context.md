@@ -19,7 +19,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | # | ফিচার | স্ট্যাটাস | ডিটেইল ফাইল |
 |---|---|---|---|
 | — | **Staff/Team sub-account role** | ✅ **সম্পন্ন** (Phase 1 + Phase 2, সব মডিউল কভার করা হয়েছে, deployed+verified) | `staff_team_role_context.md` |
-| 1 | চেকআউটে অনলাইন পেমেন্ট কালেকশন | 🟡 আংশিক — Phase A (personal wallet), Phase B1 (SSLCommerz), Phase B2 (AamarPay, ZiniPay) এবং Phase B3 (ShurjoPay) ✅ সম্পন্ন ও লাইভ (২০২৬-০৮-১৮); বাকি ৩টা gateway (EPS/bKash Merchant/Nagad Merchant) ধাপে ধাপে বাকি | `online_payment_context.md` |
+| 1 | চেকআউটে অনলাইন পেমেন্ট কালেকশন | 🟡 আংশিক — Phase A (personal wallet) ও পরিকল্পিত সবগুলো Phase B automated gateway (SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS) ✅ সম্পন্ন ও লাইভ (২০২৬-০৮-১৯); বাকি bKash Merchant/Nagad Merchant (Phase C) ধাপে ধাপে বাকি | `online_payment_context.md` |
 | 2 | WhatsApp Business integration | ⬜ Not started | — |
 | 3 | Auto-top-up / usage-based billing | ⬜ Not started | — |
 | 5 | Courier waybill/label PDF | ✅ সম্পন্ন ও deployed — COD amount বাগ ফিক্স, Pathao-স্টাইল লেবেল, Sticker Template ফিচার (২২টা ডিজাইন, সেলার-সিলেক্টেবল, প্রিভিউ থাম্বনেইল সহ) সম্পূর্ণ, এবং ✅ বাংলা টেক্সট রেন্ডারিং বাগ ফাইনালি সমাধান (real HarfBuzz shaping — সবগুলো ২২টা sticker টেমপ্লেট + order invoice-এ), + Payment History টেবিল (২০২৬-০৮-১৭) | `courier_waybill_context.md` §৪.৭, §৬, §৮.১ |
