@@ -1,0 +1,63 @@
+/* Storefront-side wallet-claim form + payment result banner — order-received page only. */
+
+.bsol-payment-banner {
+	max-width: 480px;
+	margin: 0 0 24px;
+	padding: 16px 20px;
+	border-radius: 8px;
+	font-weight: 600;
+}
+
+.bsol-payment-success {
+	border: 1px solid #1a7f37;
+	background: #f0fff4;
+	color: #1a7f37;
+}
+
+.bsol-payment-failed {
+	border: 1px solid #b32d2e;
+	background: #fff5f5;
+	color: #b32d2e;
+}
+
+.bsol-wallet-claim {
+	max-width: 480px;
+	margin: 0 0 24px;
+	padding: 20px;
+	border: 1px solid #f0b429;
+	background: #fffaf0;
+	border-radius: 8px;
+}
+
+.bsol-wallet-claim h2 {
+	margin: 0 0 8px;
+	font-size: 18px;
+}
+
+.bsol-wallet-claim p {
+	margin: 0 0 12px;
+}
+
+.bsol-wallet-claim-number {
+	font-size: 20px;
+	font-weight: 700;
+	letter-spacing: 1px;
+}
+
+.bsol-wallet-claim label {
+	display: block;
+	font-size: 13px;
+	margin-bottom: 4px;
+}
+
+.bsol-wallet-claim input[type="text"] {
+	width: 100%;
+	max-width: 280px;
+	padding: 8px 10px;
+	font-size: 15px;
+}
+
+.bsol-wallet-claim-message {
+	margin-top: 10px;
+	font-size: 13px;
+}

@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-19 (৪) — **WordPress/WooCommerce connector-এও সব ৭টা payment গেটওয়ে লাইভ** (`wordpress-plugin/bsol-connect` v1.19.0)। নতুন `Bsol_Gateway`/`Bsol_Payment_Gateway` মডিউল `OnlinePaymentService`-কে সরাসরি delegate করে — landing-page checkout-এর একই ইঞ্জিন, নতুন কোনো payment logic লেখা হয়নি। বিস্তারিত §১৫.১৫ ও `wordpress_connect_context.md §১২`, `online_payment_context.md`। Older entries kept as-is:
+
 Last updated: 2026-08-19 (৩) — **Phase C সম্পূর্ণ: bKash Merchant ও Nagad Merchant automated gateways লাইভ — পরিকল্পিত সবগুলো (৭টা) provider এখন সম্পূর্ণ।** `PaymentGatewayFactory`-তে `bkash_merchant`/`nagad_merchant` রেজিস্টার করা হয়েছে। `BkashMerchantGatewayClient` এই রিপোর subscription-billing bKash ক্লায়েন্ট (লাইভ প্রমাণিত) থেকে মেকানিক্স কপি করে বানানো (কম রিস্ক)। `NagadMerchantGatewayClient` RSA-signed checkout — real community SDK থেকে গ্রাউন্ডেড, real RSA keypair দিয়ে crypto round-trip টেস্ট করা হয়েছে। **⚠️ Nagad-এর verify endpoint-এর response shape কনফার্ম করা যায়নি (EPS-এর মতোই সতর্কতা, live sandbox test লাগবে)।** বিস্তারিত §15.15 ও `online_payment_context.md §১০-১১`। Older entries kept as-is:
 
 Last updated: 2026-08-19 (২) — **Phase B সম্পূর্ণ: EPS automated merchant gateway লাইভ** (customer online payment)। `PaymentGatewayFactory`-তে `eps` রেজিস্টার করা হয়েছে, `EpsGatewayClient` ইমপ্লিমেন্টেড (EPS-এর official GitHub reference code থেকে real endpoint/field শেপ নিশ্চিত করে, পাবলিক ডকস না থাকায়) এবং ড্যাশবোর্ড ফর্ম চালু। Phase B-এর পরিকল্পিত সবগুলো provider (SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS) এখন লাইভ — বাকি শুধু C1 (bKash Merchant), C2 (Nagad Merchant)। বিস্তারিত §15.15 ও `online_payment_context.md §৯`। Older entries kept as-is:
@@ -810,6 +812,8 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 ### 15.15 Customer-Facing Online Payment — 🟢 সম্পূর্ণ (Phase A + B + C সবগুলো DONE, ২০২৬-০৮-১৯)
 
 কাস্টমার এখন চেকআউটে পে করতে পারে দুইভাবে: **(Phase A)** সেলারের পার্সোনাল বিকাশ/নগদ/রকেট নম্বরে টাকা পাঠিয়ে TrxID সাবমিট, সেলার ভেরিফাই করে অ্যাপ্রুভ করে (মার্চেন্ট একাউন্ট ছাড়াই — ছোট/নতুন সেলারদের জন্য) — অথবা **(Phase B/C)** সেলারের নিজের merchant gateway (**SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS, bKash Merchant, Nagad Merchant** — পরিকল্পিত সবগুলো লাইভ) দিয়ে সরাসরি অটোমেটিক পে। ChatGPT ও Gemini দুটো external review-ই independently এই পুরো ফিচারটাকে সবচেয়ে বড় gap বলেছিল (`OtherAI/`)।
+
+সেলারের নিজের **WooCommerce সাইট**-এও (নিজের `bsol-connect` প্লাগিন দিয়ে কানেক্টেড) এই একই ৭টা channel-ই payment method হিসেবে পাওয়া যায় — `wordpress_connect_context.md §১২`।
 
 **⚠️ Nagad Merchant-এর একটা caveat আছে**: verify endpoint-এর response shape কোনো public SDK-তেই parse করা নেই বলে confirmed না (EPS-এর মতোই — সেটাও প্রথমবার live test করার পরই ধরা পড়েছিল একটা field-shape bug)। Production-এ পুরোপুরি নির্ভরযোগ্য ধরার আগে বাস্তব Nagad sandbox দিয়ে একবার live test জরুরি।
 

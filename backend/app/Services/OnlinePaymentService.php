@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\PushWooCommercePaymentStatusJob;
 use App\Models\Order;
 use App\Models\OrderOnlinePayment;
 use App\Models\OrderPayment;
@@ -208,6 +209,20 @@ class OnlinePaymentService
                     : 'Order confirmed via automated online payment gateway.',
                 $verifiedBy,
             );
+        }
+
+        // WooCommerce never sees this confirmation happen on its own —
+        // the gateway/IPN callback that triggers it lands on BSOL
+        // directly, never on WordPress — so it needs telling separately.
+        // Single dispatch point covers both wallet-claim approve and
+        // gateway_auto callback identically, since both call this same
+        // method. See wordpress_connect_context.md.
+        if ($order->source === 'woocommerce') {
+            // provider_trx_id is gateway_auto-only (set in
+            // completeGatewayCallback()) — a wallet_manual claim's real
+            // reference is customer_trx_id (what the customer typed in).
+            $trxId = $claim->provider_trx_id ?? $claim->customer_trx_id;
+            PushWooCommercePaymentStatusJob::dispatch($order->id, $claim->provider, $trxId, $amount);
         }
 
         return $payment;

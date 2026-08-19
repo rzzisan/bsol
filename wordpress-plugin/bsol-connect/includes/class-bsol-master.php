@@ -45,6 +45,8 @@ class Bsol_Master {
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/order-status/class-bsol-order-status.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/manual-sms/class-bsol-manual-sms.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/tracking/class-bsol-tracking.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/payment-gateway/class-bsol-gateway.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/payment-gateway/class-bsol-payment-gateway.php';
 
 		// Admin menu must render even when not connected (that's where the
 		// Settings/connect form lives), so this is always instantiated.
@@ -82,6 +84,7 @@ class Bsol_Master {
 		new Bsol_Order_Status();
 		new Bsol_Manual_Sms();
 		new Bsol_Tracking();
+		new Bsol_Payment_Gateway();
 	}
 
 	public function maybe_render_woocommerce_missing_notice() {

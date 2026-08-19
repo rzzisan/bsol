@@ -1,14 +1,14 @@
 === BSOL Connect ===
 Contributors: zyrotechbd
-Tags: woocommerce, order management, courier, sms otp, facebook conversions api
+Tags: woocommerce, order management, courier, sms otp, facebook conversions api, payment gateway
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.18.0
+Stable tag: 1.19.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Connects your WooCommerce store to BSOL — order/product sync, courier booking, waybill and invoice printing, checkout OTP, phone fraud checking, and Facebook Conversions API.
+Connects your WooCommerce store to BSOL — order/product sync, courier booking, waybill and invoice printing, checkout OTP, phone fraud checking, online payment gateways, and Facebook Conversions API.
 
 == Description ==
 
@@ -29,6 +29,7 @@ BSOL Connect is a thin client: it collects data from WooCommerce and sends it to
 * **Checkout blacklist block** (optional, off by default) — stop checkout for a phone number you've blacklisted on your BSOL dashboard.
 * **BSOL order statuses** — two extra WooCommerce order statuses ("BSOL: Confirmed", "BSOL: Shipped") for BSOL vocabulary that has no native WooCommerce equivalent, selectable from the order edit screen and as a bulk action.
 * **Manual SMS** — send an ad-hoc SMS to any order's phone number directly from the orders list, no need to switch to the BSOL dashboard.
+* **Online payment gateways** — every payment channel enabled on your BSOL account (bKash/Nagad/Rocket personal send-and-verify, or SSLCommerz/AamarPay/ZiniPay/ShurjoPay/EPS/bKash Merchant/Nagad Merchant automated checkout) appears as a WooCommerce payment method automatically — configure credentials once in BSOL, nothing to set up here.
 
 = Requirements =
 

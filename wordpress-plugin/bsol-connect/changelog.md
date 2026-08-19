@@ -1,5 +1,42 @@
 # BSOL Connect — Changelog
 
+## 1.19.0 — 2026-08-19
+
+- **Online payment gateways** — every channel enabled on the seller's BSOL
+  account now shows up as a WooCommerce payment method automatically:
+  personal-wallet send-and-verify (bKash/Nagad/Rocket, no merchant account
+  needed) and automated checkout (SSLCommerz, AamarPay, ZiniPay, ShurjoPay,
+  EPS, bKash Merchant, Nagad Merchant). New `payment-gateway` module:
+  `Bsol_Gateway` (one `WC_Payment_Gateway` class, instantiated once per
+  enabled channel — WooCommerce accepts pre-built objects from the
+  `woocommerce_payment_gateways` filter, so no per-provider subclass was
+  needed) + `Bsol_Payment_Gateway` (registration, channel-list caching, and
+  two new endpoints this feature required beyond the existing
+  `/connect/v1/*` surface):
+  - `GET /wp-json/bsol-connect/v1/payment-return` — a browser-redirect
+    bridge. BSOL's gateway callback confirms a payment server-to-server (it
+    never talks to WordPress at all during that step) and then needs to
+    send the customer's browser back to *this site's own* order-received
+    page — but BSOL has no `wc_get_order()` to build that URL correctly
+    (needs the order `key`, and "checkout" isn't a guaranteed permalink
+    slug), so it redirects here instead and this route builds the real URL
+    via `get_checkout_order_received_url()`.
+  - `POST /wp-json/bsol-connect/v1/payment-status` — inbound webhook (same
+    `X-BSOL-Webhook-Secret` auth as the existing `/stock-update` route),
+    BSOL → here, telling WooCommerce a payment was confirmed
+    (`$order->payment_complete()`), since nothing in WooCommerce's own
+    request cycle would otherwise learn that.
+  - Order-received page also gets a small send-money-and-submit-TrxID form
+    for wallet_manual channels (mirrors the BSOL landing-page checkout's
+    own claim card), and a success/failed banner for gateway_auto channels.
+  - No credential fields added to WooCommerce's payment-gateway settings
+    screens — configuration stays in the BSOL dashboard only, same as
+    courier credentials and the checkout-OTP toggle elsewhere in this
+    plugin.
+  - Known limitation: the wallet-claim form doesn't support the optional
+    screenshot upload the BSOL dashboard/landing-page flow offers —
+    TrxID + sender number only, for now.
+
 ## 1.18.0 — 2026-08-16
 
 - **Purchase event match-quality fix**: `build_order_payload()` now

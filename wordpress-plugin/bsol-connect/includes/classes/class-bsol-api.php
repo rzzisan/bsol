@@ -241,6 +241,70 @@ class Bsol_Api {
 	}
 
 	/**
+	 * Which online payment channels this seller has enabled (shop-wide,
+	 * same credentials landing-page checkout uses) — the payment-gateway
+	 * module uses this to decide which WooCommerce payment methods to
+	 * register at all. Cached by the caller (Bsol_Payment_Gateway), not
+	 * called on every checkout page load.
+	 *
+	 * @return array{success:bool,data?:array{wallet_channels:array,gateway_channels:array}}
+	 */
+	public function get_payment_channels() {
+		$url = BSOL_API_URL . 'payment/channels';
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'X-API-KEY'       => $this->get_api_key(),
+					'X-Client-Domain' => Bsol_Helpers::site_domain(),
+				),
+				'timeout' => 10,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array( 'success' => false, 'message' => $response->get_error_message() );
+		}
+
+		$decoded = json_decode( wp_remote_retrieve_body( $response ), true );
+		return is_array( $decoded ) ? $decoded : array( 'success' => false, 'message' => 'Unexpected server response.' );
+	}
+
+	/**
+	 * $provider one of PaymentGatewayCredential::PROVIDERS (sslcommerz,
+	 * aamarpay, zinipay, shurjopay, eps, bkash_merchant, nagad_merchant).
+	 *
+	 * @return array{success:bool,data?:array{redirect_url:string},message?:string}
+	 */
+	public function initiate_gateway_payment( $wc_order_id, $provider ) {
+		return $this->remote_post(
+			'payment/gateway/initiate',
+			array(
+				'wc_order_id' => (string) $wc_order_id,
+				'provider'    => $provider,
+			)
+		);
+	}
+
+	/**
+	 * $provider one of bkash|nagad|rocket (personal-wallet send & verify —
+	 * no merchant account needed). Screenshot is optional, same as landing
+	 * page checkout.
+	 */
+	public function submit_wallet_claim( $wc_order_id, $provider, $sender_number, $customer_trx_id ) {
+		return $this->remote_post(
+			'payment/wallet-claim',
+			array(
+				'wc_order_id'      => (string) $wc_order_id,
+				'provider'         => $provider,
+				'sender_number'    => $sender_number,
+				'customer_trx_id'  => $customer_trx_id,
+			)
+		);
+	}
+
+	/**
 	 * Returns the raw waybill PDF bytes (not JSON) — a browser needs to
 	 * open this, and the plugin's API key never reaches the browser, so
 	 * class-bsol-courier.php proxies it through an admin-post handler

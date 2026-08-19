@@ -97,17 +97,40 @@ class OnlinePaymentController extends Controller
     public function gatewayCallback(Request $request, string $provider, int $id): RedirectResponse
     {
         $claim = OrderOnlinePayment::where('provider', $provider)->findOrFail($id);
-        $order = $claim->order()->with('user')->first();
-        $page = LandingPage::find((int) $order->source_ref);
-
-        $thankYouPath = $page ? "/{$page->slug}/thank-you?order={$order->id}&token={$order->public_token}" : '/';
-        $frontendUrl = FrontendUrl::forUserPath($order->user, ltrim($thankYouPath, '/'));
+        $order = $claim->order()->with('user', 'platformApiKey')->first();
+        $frontendUrl = $this->resolveRedirectUrl($order);
 
         $claim = $this->onlinePaymentService->completeGatewayCallback($claim, $request->all());
 
         $result = in_array($claim->status, [OrderOnlinePayment::STATUS_COMPLETED], true) ? 'success' : 'failed';
 
         return redirect($frontendUrl . (str_contains($frontendUrl, '?') ? '&' : '?') . 'payment_result=' . $result);
+    }
+
+    /**
+     * Where to send the customer's browser back after a gateway checkout —
+     * source-aware, since "the seller's own address" means something
+     * different per source. Landing-page orders go to the seller's own
+     * BSOL subdomain thank-you page (unchanged). WooCommerce orders route
+     * through a small plugin-side bridge (/wp-json/bsol-connect/v1/
+     * payment-return) instead of a URL built here directly — BSOL never
+     * learned the WooCommerce order's `key` (needed for
+     * get_checkout_order_received_url() to actually resolve, and WC's
+     * "checkout" permalink slug isn't guaranteed either), but the plugin
+     * has both via wc_get_order() and can build the correct native URL
+     * itself. See wordpress_connect_context.md.
+     */
+    private function resolveRedirectUrl(Order $order): string
+    {
+        if ($order->source === 'woocommerce' && $order->platformApiKey) {
+            return 'https://' . $order->platformApiKey->domain
+                . '/wp-json/bsol-connect/v1/payment-return?wc_order_id=' . urlencode((string) $order->source_ref);
+        }
+
+        $page = LandingPage::find((int) $order->source_ref);
+        $thankYouPath = $page ? "/{$page->slug}/thank-you?order={$order->id}&token={$order->public_token}" : '/';
+
+        return FrontendUrl::forUserPath($order->user, ltrim($thankYouPath, '/'));
     }
 
     /** Server-to-server leg — some providers configure this once per

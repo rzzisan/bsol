@@ -1,5 +1,7 @@
 # WordPress/WooCommerce Connector — BSOL Connect (Context)
 
+শেষ আপডেট: ২০২৬-০৮-১৯ — **Phase ২১: Online Payment Gateways (v1.19.0)।** BSOL-এর ৭টা payment গেটওয়েই (bKash/Nagad/Rocket personal + SSLCommerz/AamarPay/ZiniPay/ShurjoPay/EPS/bKash Merchant/Nagad Merchant) এখন WooCommerce checkout-এ পাওয়া যায় — `Bsol_Gateway`/`Bsol_Payment_Gateway` মডিউল, `OnlinePaymentService`-কেই সরাসরি delegate করে (নতুন কোনো payment logic নেই)। বিস্তারিত নিচে §১২।
+
 এই ফাইলে BSOL-এর WordPress/WooCommerce কানেক্টর (backend API surface + `wordpress-plugin/bsol-connect/` প্লাগিন) নিয়ে সবকিছু একসাথে — কেন শুরু হলো, কীভাবে বানানো হলো, এখন কী কী কাজ করে, আর কী বাকি। নতুন কোনো ফিচার এখানে যোগ করার আগে এই ফাইলটা পড়ে নেওয়া উচিত।
 
 Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ডিজাইন প্রথম প্রস্তাব হয় এখানে), `CONTEXT.md`, `SAAS_MODULE_CONTEXT.md`।
@@ -34,6 +36,7 @@ Master/related context: [[bsol_history_and_new_context.md]] §৫ (মূল ড
 | ১৮ | Repeat order block (WooCommerce) — একই ফোন নম্বর দিয়ে X ঘণ্টার মধ্যে repeat checkout ব্লক, ক্লাসিক + block-based checkout দুটোতেই, সম্পূর্ণ WP-লোকাল (v1.15.0) | `6e28935` |
 | ১৯ | চেকআউট ব্ল্যাকলিস্ট ব্লক + BSOL order status (Confirmed/Shipped) + wp-admin থেকে Manual SMS (v1.16.0) | `d8d5cd6` |
 | ২০ | Facebook/Meta ট্র্যাকিং (`Bsol_Tracking` মডিউল) — Pixel base code, PageView/ViewContent/AddToCart/InitiateCheckout/Lead/Purchase, `admin-ajax.php` রিলে (v1.17.0)। বিস্তারিত ডিজাইন `tracking_capi_context.md` §7-এ (এই ডকের চেয়ে ভালো read order সেখানে) | `6bdf9e6` |
+| ২১ | Online Payment Gateways — BSOL-এর ৭টা payment channel-ই (personal wallet + ৭টা automated gateway) WooCommerce checkout-এ payment method হিসেবে যোগ (v1.19.0) | (এই সেশন) |
 
 ---
 
@@ -239,6 +242,33 @@ Repeat-order-block-এরই দুই-হুক প্যাটার্ন (cl
   **`phpunit.xml`-এ `DB_CONNECTION=sqlite`/`DB_DATABASE=:memory:` হার্ডকোড করা আছে** — শুধু `DB_SCHEMA` শেল-এ export করলে যথেষ্ট না, `DB_CONNECTION=pgsql` আর `DB_DATABASE=hybrid_platform`-ও একসাথে override করতে হয় (Phase ৭-এ প্রথমবার এই পুরো তিনটা লাগল, courier_settings-এর মতো migration-এ raw `ALTER COLUMN ... TYPE` থাকায় sqlite-এ সবসময় fail করে)।
 - প্রতিটা নতুন migration-এর পর **`php artisan migrate --force` প্রোডাকশনে আলাদাভাবে রান করতে হয়** — Phase ১-এ একবার ভুলে যাওয়ায় লাইভ সাইটে 500 হয়েছিল (দেখুন memory: `deploy-checklist-bsol`)।
 - Plugin ফাইল: `php -l` সব ফাইলে + hook-name/nonce-action/AJAX-action name cross-check (`grep` দিয়ে PHP আর JS-এর মধ্যে মিল যাচাই) — কোনো WordPress ইনস্টল এই ডেভ এনভায়রনমেন্টে নেই, তাই real end-to-end QA-এর জন্য `SETUP.md`-এর চেকলিস্ট ব্যবহার করতে হয় আসল WooCommerce স্টাজিং সাইটে।
+
+---
+
+## ১২. Phase ২১ — Online Payment Gateways (v1.19.0, ২০২৬-০৮-১৯)
+
+BSOL-এর ৭টা payment channel-ই (`online_payment_context.md`) এখন WooCommerce checkout-এ payment method হিসেবে পাওয়া যায় — landing-page checkout যে একই `OnlinePaymentService` ইঞ্জিন ব্যবহার করে, এটাও সরাসরি সেটাকেই delegate করে, নতুন কোনো payment logic লেখা হয়নি।
+
+### ফ্লো
+1. সেলার BSOL dashboard → Settings → Online Payment Channels-এ যা যা চালু করেছে (personal wallet বা automated gateway), সবই WooCommerce → Settings → Payments-এ "BSOL: {Provider}" নামে আলাদা payment method হিসেবে দেখা যায় — কোনো credential ফিল্ড WordPress-সাইডে নেই, সবই BSOL dashboard-এ কনফিগার হয়।
+2. **gateway_auto** (SSLCommerz ইত্যাদি): checkout-এ সিলেক্ট করলে `process_payment()` সার্ভার-টু-সার্ভার `/connect/v1/payment/gateway/initiate` কল করে, রিটার্ন করা `redirect_url`-এ ব্রাউজার সরাসরি গেটওয়ের নিজস্ব হোস্টেড পেজে চলে যায় (WooCommerce-এর standard off-site-redirect শেপ — `['result'=>'success','redirect'=>$url]`, ঠিক অফিসিয়াল SSLCommerz/PayPal WooCommerce প্লাগিনের মতোই)।
+3. **wallet_manual** (bKash personal ইত্যাদি): অর্ডার "On hold"-এ থাকে, order-received পেজে একটা "এই নম্বরে টাকা পাঠান, TrxID দিন" ফর্ম দেখায় (landing page-এর `WalletClaimCard`-এর মতোই), `wp_ajax_nopriv_bsol_wallet_claim` দিয়ে সার্ভার-সাইড relay হয়ে `/connect/v1/payment/wallet-claim`-এ যায়।
+4. গেটওয়ে/IPN callback সবসময় BSOL-এই সরাসরি হিট করে (bKash/SSLCommerz কখনো WordPress-এর সাথে কথা বলে না) — তাই দুটো নতুন জিনিস দরকার হলো যেটা বাকি `/connect/v1/*` surface দিয়ে কভার হয় না:
+   - **`GET /wp-json/bsol-connect/v1/payment-return`** (browser bridge) — BSOL-এর callback শেষে কাস্টমারের ব্রাউজারকে এখানে redirect করে, কারণ BSOL-এর কাছে `wc_get_order()` নেই সঠিক order-received URL বানানোর জন্য (order `key` লাগে guest checkout-এর জন্য, "checkout" slug-ও guaranteed না) — এই route সেটা WooCommerce-এর নিজস্ব `get_checkout_order_received_url()` দিয়ে বানায়।
+   - **`POST /wp-json/bsol-connect/v1/payment-status`** (inbound webhook, `/stock-update`-এর মতোই `X-BSOL-Webhook-Secret` auth) — BSOL থেকে WordPress-কে বলে "এই অর্ডার পেইড হয়েছে", `$order->payment_complete()` কল করে। এটা ছাড়া WooCommerce কখনোই জানতে পারত না যে পেমেন্ট confirm হয়েছে, যেহেতু callback নিজে WordPress-কে টাচ করে না।
+
+### Backend (`backend/app/...`)
+- নতুন `ConnectPaymentController` (`channels()`, `initiateGateway()`, `walletClaim()`) — অন্য সব Connect controller-এর মতোই `OnlinePaymentService`-কে delegate করে, নিজে কোনো business logic লেখে না।
+- `OnlinePaymentController::gatewayCallback()`-এ নতুন `resolveRedirectUrl()` — `source`-aware: `woocommerce` হলে উপরের bridge URL-এ পাঠায় (আগে `LandingPage::find((int) $order->source_ref)` ব্যবহার হতো, যেটা WooCommerce অর্ডারের জন্য হয় miss করত, বা কাকতালীয়ভাবে একই integer id-র একটা ভুল landing page-কে ধরে ফেলতে পারত)।
+- নতুন `WooCommercePaymentPushService` + `PushWooCommercePaymentStatusJob` — `WooCommerceStockPushService`/`PushWooCommerceStockJob`-এর হুবহু কপি (একই header, একই never-throws শেপ)। `OnlinePaymentService::applyConfirmedPayment()`-এর একটামাত্র dispatch পয়েন্ট থেকে ফায়ার হয় — যেহেতু সেই মেথডটাই wallet-claim approve আর gateway_auto callback দুটোরই shared cascade, একটা hook-ই দুটো পথ কভার করে।
+- **কোনো নতুন migration লাগেনি** — `orders`/`order_online_payments`/`payment_gateway_credentials`/`payment_gateway_settings` সবই as-is reuse হয়েছে।
+- Test: `ConnectPaymentTest.php` (৬টা — channel listing, initiate+claim creation, unsynced-order clean error, wallet claim, callback bridge redirect + webhook push end-to-end, আর একটা sanity check যে landing-page অর্ডারের জন্য webhook কখনো fire হয় না)।
+
+### Plugin (`wordpress-plugin/bsol-connect/`)
+- নতুন মডিউল `includes/modules/payment-gateway/`: `Bsol_Gateway` (একটাই `WC_Payment_Gateway` ক্লাস, প্রতিটা enabled channel-এর জন্য আলাদা instance — WooCommerce-এর `woocommerce_payment_gateways` ফিল্টার pre-instantiated object accept করে বলে provider-প্রতি আলাদা subclass লাগেনি) + `Bsol_Payment_Gateway` (রেজিস্ট্রেশন, ১৫ মিনিটের transient-cached channel-list ফেচ, দুটো নতুন REST route, wallet-claim ফর্ম + AJAX relay)।
+- `Bsol_Api`-তে ৩টা নতুন মেথড: `get_payment_channels()`, `initiate_gateway_payment()`, `submit_wallet_claim()`।
+- **সীমাবদ্ধতা**: wallet-claim ফর্মে ঐচ্ছিক screenshot আপলোড সাপোর্ট নেই (landing page/BSOL dashboard flow-তে যা আছে) — শুধু TrxID + sender number।
+- v1.19.0, `SETUP.md`-এ নতুন টেস্ট চেকলিস্ট যোগ হয়েছে।
 
 ---
 

@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\Connect\ConnectCheckoutOtpController;
 use App\Http\Controllers\Api\Connect\ConnectCourierController;
 use App\Http\Controllers\Api\Connect\ConnectFraudController;
 use App\Http\Controllers\Api\Connect\ConnectOrderController;
+use App\Http\Controllers\Api\Connect\ConnectPaymentController;
 use App\Http\Controllers\Api\Connect\ConnectProductController;
 use App\Http\Controllers\Api\Connect\ConnectSmsController;
 use App\Http\Controllers\Api\Connect\ConnectTrackingController;
@@ -253,6 +254,12 @@ Route::prefix('connect/v1')->middleware('connect_api_key')->group(function () {
             ->middleware('throttle:20,1');
         Route::post('/sms/send', [ConnectSmsController::class, 'send'])
             ->middleware('throttle:20,1');
+        // Online payment — mirrors landing-page checkout's endpoints,
+        // delegates entirely to OnlinePaymentService. See
+        // wordpress_connect_context.md.
+        Route::get('/payment/channels', [ConnectPaymentController::class, 'channels']);
+        Route::post('/payment/gateway/initiate', [ConnectPaymentController::class, 'initiateGateway']);
+        Route::post('/payment/wallet-claim', [ConnectPaymentController::class, 'walletClaim']);
         Route::post('/tracking/events', [ConnectTrackingController::class, 'ingest'])
             ->middleware('throttle:600,1');
         Route::get('/tracking/config', [ConnectTrackingController::class, 'config'])

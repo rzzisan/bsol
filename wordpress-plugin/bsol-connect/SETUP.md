@@ -398,3 +398,39 @@ genuine merge for whatever this doesn't already cover.
 4. Confirm a historical/bulk-synced order (no live checkout request) still
    syncs fine with `fbp`/`fbc` simply absent — this must never block order
    creation.
+
+## Online payment gateways (1.19.0)
+
+Every channel enabled on the connected BSOL account should appear as a
+WooCommerce payment method automatically — nothing to configure on the
+WordPress side beyond connecting.
+
+1. On BSOL dashboard → Settings → Online Payment Channels, enable at
+   least one wallet_manual channel (e.g. bKash personal, with a receiving
+   number) and one gateway_auto channel (e.g. SSLCommerz sandbox).
+2. On WooCommerce → Settings → Payments, confirm both show up as
+   "BSOL: {Provider}" (may take up to 15 minutes — the channel list is
+   cached in a transient; deleting the `bsol_payment_channels` transient
+   forces an immediate refresh). Confirm each one's own settings screen
+   shows the "Credentials are managed in your BSOL dashboard" notice and
+   has no credential fields of its own.
+3. **Wallet flow**: place an order choosing the bKash-personal method.
+   Confirm the order goes to "On hold" and the order-received page shows
+   a "Send X to this bKash number" card with sender-number/TrxID fields.
+   Submit it — confirm the pending claim appears in BSOL dashboard →
+   Accounting → Online Payment Verification. Approve it there — confirm
+   the WooCommerce order flips to "Processing"/"Completed" within a few
+   seconds (via the payment-status webhook) without reloading the page.
+4. **Gateway flow**: place an order choosing SSLCommerz. Confirm the
+   browser goes straight to SSLCommerz's sandbox checkout page (order
+   status "Pending payment" in the meantime). Complete a sandbox payment —
+   confirm you land back on *this site's own* order-received page (not a
+   BSOL subdomain) with a green "Payment successful!" banner, and the
+   order is "Processing"/"Completed".
+5. Deliberately cancel/fail a sandbox payment — confirm you still land
+   back on this site's order-received page (not stuck on SSLCommerz or a
+   BSOL error page), with a red "Payment failed" banner, and the order
+   stays unpaid.
+6. Disable a channel in BSOL dashboard — confirm it disappears from
+   WooCommerce → Settings → Payments within 15 minutes (or immediately
+   after deleting the `bsol_payment_channels` transient).
