@@ -17,10 +17,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // doctrine/dbal isn't installed in this project, so Blueprint::change()
-        // isn't available — raw ALTER for the nullability flip, matching the
-        // convention already used for courier_settings' column-type widening.
-        DB::statement('ALTER TABLE abandoned_checkouts ALTER COLUMN landing_page_id DROP NOT NULL');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE abandoned_checkouts ALTER COLUMN landing_page_id DROP NOT NULL');
+        }
 
         Schema::table('abandoned_checkouts', function (Blueprint $table) {
             $table->string('source', 20)->default('landing_page')->after('landing_page_id');
@@ -52,6 +51,8 @@ return new class extends Migration
             $table->dropColumn('source');
         });
 
-        DB::statement('ALTER TABLE abandoned_checkouts ALTER COLUMN landing_page_id SET NOT NULL');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE abandoned_checkouts ALTER COLUMN landing_page_id SET NOT NULL');
+        }
     }
 };

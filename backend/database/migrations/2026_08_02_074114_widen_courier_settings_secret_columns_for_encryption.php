@@ -32,9 +32,12 @@ return new class extends Migration
 
     public function up(): void
     {
-        foreach (self::COLUMNS as $column) {
-            DB::statement("ALTER TABLE courier_settings ALTER COLUMN {$column} TYPE text");
+        if (DB::getDriverName() === 'pgsql') {
+            foreach (self::COLUMNS as $column) {
+                DB::statement("ALTER TABLE courier_settings ALTER COLUMN {$column} TYPE text");
+            }
         }
+        // SQLite (used by the test suite) has no fixed-length varchar limit to widen.
     }
 
     /**
@@ -42,8 +45,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        foreach (self::COLUMNS as $column) {
-            DB::statement("ALTER TABLE courier_settings ALTER COLUMN {$column} TYPE varchar(255)");
+        if (DB::getDriverName() === 'pgsql') {
+            foreach (self::COLUMNS as $column) {
+                DB::statement("ALTER TABLE courier_settings ALTER COLUMN {$column} TYPE varchar(255)");
+            }
         }
     }
 };

@@ -29,7 +29,9 @@ return new class extends Migration
         // Dropping the constraint takes its backing index with it. A partial
         // unique index cannot be expressed as a constraint at all, which is
         // why the replacement is an index.
-        DB::statement('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_unique');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_unique');
+        }
         DB::statement('DROP INDEX IF EXISTS users_email_unique');
         DB::statement('CREATE UNIQUE INDEX users_email_unique ON users (email) WHERE deleted_at IS NULL');
     }
@@ -39,6 +41,8 @@ return new class extends Migration
         // Fails loudly if a trashed row now shares an email with a live one,
         // rather than silently dropping either.
         DB::statement('DROP INDEX IF EXISTS users_email_unique');
-        DB::statement('ALTER TABLE users ADD CONSTRAINT users_email_unique UNIQUE (email)');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE users ADD CONSTRAINT users_email_unique UNIQUE (email)');
+        }
     }
 };

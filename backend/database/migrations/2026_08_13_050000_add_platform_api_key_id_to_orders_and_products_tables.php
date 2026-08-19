@@ -34,16 +34,18 @@ return new class extends Migration
                 ->constrained('platform_api_keys')->nullOnDelete();
         });
 
-        DB::statement(
-            "UPDATE orders o SET platform_api_key_id = pak.id
-             FROM platform_api_keys pak
-             WHERE o.source = 'woocommerce' AND pak.user_id = o.user_id"
-        );
-        DB::statement(
-            "UPDATE products p SET platform_api_key_id = pak.id
-             FROM platform_api_keys pak
-             WHERE p.source = 'woocommerce' AND pak.user_id = p.user_id"
-        );
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement(
+                "UPDATE orders o SET platform_api_key_id = pak.id
+                 FROM platform_api_keys pak
+                 WHERE o.source = 'woocommerce' AND pak.user_id = o.user_id"
+            );
+            DB::statement(
+                "UPDATE products p SET platform_api_key_id = pak.id
+                 FROM platform_api_keys pak
+                 WHERE p.source = 'woocommerce' AND pak.user_id = p.user_id"
+            );
+        }
 
         DB::statement('DROP INDEX IF EXISTS orders_woocommerce_source_ref_unique');
         DB::statement(
