@@ -1,5 +1,41 @@
 # BSOL Connect — Changelog
 
+## 1.19.3 — 2026-08-19
+
+Third live-test round, same day. Two issues surfaced:
+
+1. Even on 1.19.2, the seller's checkout still hadn't shown a payment
+   method yet at the time of reporting (most likely just hadn't
+   re-downloaded/reinstalled yet, but there was no way for them to check
+   this from wp-admin without asking us).
+2. The self-update notice, which used to appear, stopped showing after
+   1.19.1. Root cause: 1.19.1's `BSOL_PLUGIN_VERSION` constant bump wasn't
+   matched by the plugin header's `Version:` comment at first (fixed in a
+   follow-up commit the same day) — but `Bsol_Update_Checker` caches the
+   version-check result in a transient for up to 12 hours on success, so a
+   site that happened to check during that mismatched window kept showing
+   a stale "you're up to date" result even after the header was corrected
+   server-side.
+3. No settings screen existed anywhere for payment gateways — provider
+   enable/credentials correctly live on the BSOL dashboard only (by
+   design), but there was nothing in wp-admin to confirm *this site*
+   actually sees what's enabled, or to force a cache refresh without SSH/
+   WP-CLI access to delete a transient by hand.
+
+**Fix**: new "Payment Gateways" panel on the plugin's own Settings tab
+(BSOL Connect → Settings) — not a config form (config still lives on
+BSOL), a live status panel:
+- Calls BSOL directly (bypasses the 15-min cache — this is a low-traffic
+  admin page, not checkout, so always-fresh is fine) and lists exactly
+  which channels this site currently sees as enabled, or a clear error if
+  the call itself fails.
+- Detects and displays whether this site's Checkout page uses **classic**
+  (shortcode) or **block-based** Checkout (`has_block('woocommerce/checkout', ...)`
+  vs `has_shortcode(..., 'woocommerce_checkout')`) — the exact ambiguity
+  that took a live-test round-trip to pin down in 1.19.2's fix.
+- A **Refresh now** button that clears both the payment-channel cache and
+  the update-notice cache in one click — no transient/DB access needed.
+
 ## 1.19.2 — 2026-08-19
 
 Second live-test fix, same day: after 1.19.1, the seller reported no

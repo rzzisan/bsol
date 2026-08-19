@@ -40,6 +40,15 @@ class Bsol_Admin {
 			$this->handle_repeat_block_settings_save();
 		} elseif ( isset( $_POST['bsol_save_checkout_block'] ) && check_admin_referer( 'bsol_checkout_block_settings_action' ) ) {
 			$this->handle_checkout_block_settings_save();
+		} elseif ( isset( $_POST['bsol_refresh_payment_channels'] ) && check_admin_referer( 'bsol_refresh_payment_channels_action' ) ) {
+			// Hardcoded transient keys rather than referencing
+			// Bsol_Payment_Gateway::CHANNELS_TRANSIENT — that class's file
+			// is only require_once'd on woocommerce_loaded (see
+			// class-bsol-master.php's docblock for why), so it isn't
+			// guaranteed loaded here even when WooCommerce is active.
+			delete_transient( 'bsol_payment_channels' );
+			delete_transient( 'bsol_update_check' );
+			add_settings_error( 'bsol_messages', 'bsol_message', __( 'Cleared — the checkout page and update notice will pick up fresh data on next load.', 'bsol-connect' ), 'success' );
 		}
 
 		$balance_result = null;
@@ -133,6 +142,7 @@ class Bsol_Admin {
 
 			<?php $this->render_repeat_block_settings(); ?>
 			<?php $this->render_checkout_block_settings(); ?>
+			<?php $this->render_payment_gateway_status(); ?>
 
 			<form method="post" action="" onsubmit="return confirm('<?php echo esc_js( __( 'Disconnect this site from BSOL? New orders will stop syncing until you reconnect.', 'bsol-connect' ) ); ?>');">
 				<?php wp_nonce_field( 'bsol_disconnect_action' ); ?>
@@ -292,6 +302,95 @@ class Bsol_Admin {
 			</form>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Diagnostic status panel, not a config form — actual provider
+	 * enable/credentials always live on the BSOL dashboard (Settings →
+	 * Online Payment Channels), same as courier credentials and the
+	 * checkout-OTP toggle. This just answers, live, "does this site
+	 * currently see any channel, and which checkout type is it using" —
+	 * exactly the two questions that took a live-test round-trip to answer
+	 * before this existed. Calls BSOL directly (bypasses the 15-min
+	 * transient the checkout-time registration uses) since this is a
+	 * low-traffic admin page, not checkout — always show current truth.
+	 */
+	private function render_payment_gateway_status() {
+		$api      = new Bsol_Api();
+		$response = $api->get_payment_channels();
+		?>
+		<div class="bsol-section">
+			<h3 class="bsol-section-title"><?php esc_html_e( 'Payment Gateways', 'bsol-connect' ); ?></h3>
+			<p class="description">
+				<?php esc_html_e( 'Enable and configure providers on your BSOL dashboard → Settings → Online Payment Channels — this panel just shows what this site currently sees from here, live.', 'bsol-connect' ); ?>
+			</p>
+
+			<?php if ( empty( $response['success'] ) ) : ?>
+				<div class="bsol-result bsol-result-error">
+					<?php echo esc_html( isset( $response['message'] ) ? $response['message'] : __( 'Could not reach BSOL.', 'bsol-connect' ) ); ?>
+				</div>
+			<?php else :
+				$wallet_channels  = isset( $response['data']['wallet_channels'] ) ? $response['data']['wallet_channels'] : array();
+				$gateway_channels = isset( $response['data']['gateway_channels'] ) ? $response['data']['gateway_channels'] : array();
+				$providers        = array_merge(
+					wp_list_pluck( $wallet_channels, 'provider' ),
+					wp_list_pluck( $gateway_channels, 'provider' )
+				);
+				?>
+				<?php if ( empty( $providers ) ) : ?>
+					<div class="bsol-result bsol-result-error">
+						<?php esc_html_e( 'No payment channel is enabled on your BSOL account yet. Go to BSOL dashboard → Settings → Online Payment Channels, enable at least one, then click Refresh below.', 'bsol-connect' ); ?>
+					</div>
+				<?php else : ?>
+					<div class="bsol-result bsol-result-ok">
+						<strong><?php esc_html_e( 'Currently enabled:', 'bsol-connect' ); ?></strong>
+						<?php echo esc_html( implode( ', ', $providers ) ); ?>
+					</div>
+				<?php endif; ?>
+			<?php endif; ?>
+
+			<p class="description">
+				<?php
+				printf(
+					/* translators: %s: detected checkout type, e.g. "block-based Checkout" */
+					esc_html__( "This site's Checkout page appears to use: %s", 'bsol-connect' ),
+					'<strong>' . esc_html( $this->detect_checkout_type() ) . '</strong>'
+				);
+				?>
+			</p>
+
+			<form method="post" action="?page=bsol_connect&tab=settings">
+				<?php wp_nonce_field( 'bsol_refresh_payment_channels_action' ); ?>
+				<button type="submit" name="bsol_refresh_payment_channels" class="button">
+					<?php esc_html_e( 'Refresh now', 'bsol-connect' ); ?>
+				</button>
+				<p class="description"><?php esc_html_e( 'Clears the cached channel list (checkout page normally refreshes it every 15 minutes on its own) and the update-notice cache.', 'bsol-connect' ); ?></p>
+			</form>
+		</div>
+		<?php
+	}
+
+	private function detect_checkout_type() {
+		if ( ! function_exists( 'wc_get_page_id' ) ) {
+			return __( 'unknown', 'bsol-connect' );
+		}
+
+		$checkout_page_id = wc_get_page_id( 'checkout' );
+		$page              = $checkout_page_id > 0 ? get_post( $checkout_page_id ) : null;
+
+		if ( ! $page ) {
+			return __( 'unknown (no Checkout page set)', 'bsol-connect' );
+		}
+
+		if ( function_exists( 'has_block' ) && has_block( 'woocommerce/checkout', $page ) ) {
+			return __( 'block-based Checkout', 'bsol-connect' );
+		}
+
+		if ( has_shortcode( (string) $page->post_content, 'woocommerce_checkout' ) ) {
+			return __( 'classic (shortcode) Checkout', 'bsol-connect' );
+		}
+
+		return __( 'unrecognized', 'bsol-connect' );
 	}
 
 	private function handle_checkout_block_settings_save() {

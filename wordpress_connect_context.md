@@ -1,5 +1,7 @@
 # WordPress/WooCommerce Connector — BSOL Connect (Context)
 
+শেষ আপডেট: ২০২৬-০৮-১৯ (৪) — **v1.19.3 — wp-admin-এ "Payment Gateways" স্ট্যাটাস প্যানেল যোগ।** কনফিগ এখনো BSOL dashboard-এই থাকে, কিন্তু এখন wp-admin থেকেই লাইভ দেখা যায় এই সাইট কোন কোন channel দেখছে, checkout classic না block-based সেটাও detect করে দেখায়, আর এক ক্লিকে cache (payment-channel + update-notice দুটোই) রিফ্রেশ করা যায়। বিস্তারিত §১২-এর নিচে।
+
 শেষ আপডেট: ২০২৬-০৮-১৯ (৩) — **v1.19.2 — WooCommerce Blocks checkout compatibility।** ১৯.১ ফিক্সের পরও কোনো payment method দেখাচ্ছিল না — কারণ সেলারের checkout পেজ **block-based Checkout** ব্যবহার করে (classic shortcode না), আর plain `WC_Payment_Gateway` শুধু classic checkout-এ দেখা যায়, block checkout-এর জন্য আলাদা Store API integration লাগে। নতুন `Bsol_Gateway_Blocks_Support` + `bsol-gateway-blocks.js` (কোনো build step ছাড়াই, plain `wp.element.createElement()`) যোগ করা হয়েছে, `class_exists()` দিয়ে গার্ডেড। বিস্তারিত §১২-এর নিচে।
 
 শেষ আপডেট: ২০২৬-০৮-১৯ (২) — **v1.19.1 লাইভ বাগ ফিক্স: প্রথম live test-এই ধরা পড়ল BSOL-এর কোনো payment method-ই দেখাচ্ছিল না, এমনকি native Cash on Delivery-ও checkout থেকে হারিয়ে গিয়েছিল।** কারণ: `class-bsol-gateway.php` `class Bsol_Gateway extends WC_Payment_Gateway` ঘোষণা করে, আর সেটা এই প্লাগিনের নিজের `plugins_loaded`-এই unconditionally require হতো — কিন্তু PHP parent class immediately resolve করে (lazily না), আর WooCommerce তখনও নিজের `WC_Payment_Gateway` ডিফাইন করে ফেলেছে কিনা তার কোনো গ্যারান্টি নেই (দুইটা আলাদা প্লাগিনের একই-priority `plugins_loaded` callback-এর মধ্যে ordering নির্ভরযোগ্য না — এটা একটা সুপরিচিত WooCommerce extension pitfall)। না থাকলে এটা প্রতি পেজ-লোডে একটা PHP fatal error, যেটা সেই request-এর বাকি সব hook execution-ই থামিয়ে দেয় — তাই native COD-ও হারিয়ে যাওয়াটা এক্সপ্লেইনড হয়। **ফিক্স**: শুধু এই একটা মডিউলের require+registration এখন `woocommerce_loaded`-এ deferred (WooCommerce নিজের action, core class গ্যারান্টিসহ ready থাকা অবস্থায়ই ফায়ার করে)। একই সাথে "No synced order found" এররও হার্ডেন করা হয়েছে — `process_payment()` এখন payment initiate করার ঠিক আগে proactively order-sync কল করে (idempotent), classic checkout-এর টাইমিং গ্যারান্টি নিয়ে ভরসা না করে (WooCommerce Blocks/Store API checkout draft order আলাদা earlier request-এ তৈরি হতে পারে)। বিস্তারিত §১২-এর নিচে।
@@ -295,6 +297,17 @@ BSOL-এর ৭টা payment channel-ই (`online_payment_context.md`) এখ�
 **ফিক্স**: নতুন `Bsol_Gateway_Blocks_Support` (প্রতিটা enabled channel-এর জন্য একটা instance, `Bsol_Gateway`-এর মতোই) + `assets/js/bsol-gateway-blocks.js` (কোনো build step/JSX ছাড়াই — WooCommerce-এর নিজের এক্সপোজ করা global (`wc.wcBlocksRegistry`, `wp.element`) ব্যবহার করে plain `createElement()` কল, lightweight non-bundled Blocks-compatible গেটওয়ে প্লাগিনগুলো যেভাবে লেখে ঠিক সেভাবেই)। `woocommerce_blocks_payment_method_type_registration`-এ রেজিস্টার হয়, `class_exists()` দিয়ে গার্ডেড (পুরনো WooCommerce/Blocks ভার্সনে থাকলে চুপচাপ classic-checkout-only fallback হয়ে যায়)। **`process_payment()`-এ কোনো পরিবর্তন লাগেনি** — Store API-ও একই `WC_Payment_Gateway::process_payment()` সার্ভার-সাইড কল করে; এই সংযোজনটা শুধু block checkout-এর UI-তে অপশনটা সিলেক্টেবল বানায়।
 
 সেলারের checkout পেজ যদি এখনো classic shortcode ব্যবহার করে (WooCommerce → Settings → Advanced → Checkout page), তাহলে এই সমস্যাটা তাকে প্রভাবিত করার কথাই না — এটা purely block-checkout-specific।
+
+### ফিক্স (v1.19.3, একই দিন — তৃতীয় live test রিপোর্ট)
+
+দুটো জিনিস সামনে এলো: (১) সেলার প্রশ্ন করলেন WooCommerce → Settings → Payments-এ কোনো BSOL গেটওয়ে নেই কেন, ওয়াক wp-admin-এ কোনো enable/disable সেটিং নেই কেন; (২) plugin update notification আগে দেখাতো, ১৯.১-এর পর থেকে দেখাচ্ছে না।
+
+**কারণ #২**: `Bsol_Update_Checker` version-check রেসপন্স ১২ ঘণ্টার transient-এ cache করে। ১৯.১-এর হেডার/কনস্ট্যান্ট mismatch-এর সময় (§আগের সাবসেকশন) যদি কেউ সেই মুহূর্তে check করে থাকে, "up to date" রেজাল্টটা ১২ ঘণ্টা পর্যন্ত stale-cached থেকে যেত, হেডার পরে ঠিক করার পরও।
+
+**ফিক্স**: প্লাগিনের নিজের Settings ট্যাবে নতুন "Payment Gateways" প্যানেল যোগ (`Bsol_Admin::render_payment_gateway_status()`) — এটা config ফর্ম না (config এখনো BSOL dashboard-এই), একটা লাইভ স্ট্যাটাস প্যানেল:
+- সরাসরি BSOL কল করে (cache bypass করে, যেহেতু এটা low-traffic admin পেজ) এবং এই সাইট বর্তমানে কোন কোন channel দেখছে সেটা লিস্ট করে দেখায় — API call fail করলে আসল error message-ও দেখায়।
+- এই সাইটের Checkout পেজ **classic** না **block-based** সেটা detect করে দেখায় (`has_block('woocommerce/checkout', ...)` বনাম `has_shortcode(..., 'woocommerce_checkout')`) — ঠিক যে ambiguity-টা ১৯.২-এর ফিক্সে একটা পুরো live-test round-trip লেগেছিল বের করতে।
+- একটা **Refresh now** বাটন — payment-channel cache আর update-notice cache দুটোই এক ক্লিকে ক্লিয়ার করে, কোনো transient/DB access লাগে না।
 
 ---
 
