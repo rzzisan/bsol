@@ -45,8 +45,7 @@ class Bsol_Master {
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/order-status/class-bsol-order-status.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/manual-sms/class-bsol-manual-sms.php';
 		require_once BSOL_PLUGIN_PATH . 'includes/modules/tracking/class-bsol-tracking.php';
-		require_once BSOL_PLUGIN_PATH . 'includes/modules/payment-gateway/class-bsol-gateway.php';
-		require_once BSOL_PLUGIN_PATH . 'includes/modules/payment-gateway/class-bsol-payment-gateway.php';
+		// NOT required here, deliberately — see init_payment_gateway_module().
 
 		// Admin menu must render even when not connected (that's where the
 		// Settings/connect form lives), so this is always instantiated.
@@ -84,7 +83,34 @@ class Bsol_Master {
 		new Bsol_Order_Status();
 		new Bsol_Manual_Sms();
 		new Bsol_Tracking();
-		new Bsol_Payment_Gateway();
+
+		// class-bsol-gateway.php declares `class Bsol_Gateway extends
+		// WC_Payment_Gateway` — that parent class must already exist at the
+		// moment PHP parses the require()'d file (class inheritance
+		// resolves immediately, not lazily), and WooCommerce is NOT
+		// guaranteed to have defined it yet by the time *this* plugin's own
+		// plugins_loaded callback runs (hook-callback ordering across
+		// different plugins registered at the same priority is not something
+		// to rely on — this is a well-documented WooCommerce extension
+		// pitfall). `woocommerce_loaded` is WooCommerce's own action, fired
+		// only once its core classes (including WC_Payment_Gateway) are
+		// guaranteed to exist, regardless of plugin load order — so the
+		// require + registration for this one module are deferred there
+		// instead of running unconditionally in load_dependencies() like
+		// every other module (none of which extend a WooCommerce core class
+		// at file-parse time, so they don't have this problem).
+		add_action( 'woocommerce_loaded', array( $this, 'init_payment_gateway_module' ) );
+	}
+
+	public function init_payment_gateway_module() {
+		if ( ! class_exists( 'WC_Payment_Gateway' ) ) {
+			return; // shouldn't happen on woocommerce_loaded, but never fatal if it does
+		}
+
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/payment-gateway/class-bsol-gateway.php';
+		require_once BSOL_PLUGIN_PATH . 'includes/modules/payment-gateway/class-bsol-payment-gateway.php';
+
+		new Bsol_Payment_Gateway( $this->order_sync );
 	}
 
 	public function maybe_render_woocommerce_missing_notice() {

@@ -1,5 +1,7 @@
 # WordPress/WooCommerce Connector — BSOL Connect (Context)
 
+শেষ আপডেট: ২০২৬-০৮-১৯ (২) — **v1.19.1 লাইভ বাগ ফিক্স: প্রথম live test-এই ধরা পড়ল BSOL-এর কোনো payment method-ই দেখাচ্ছিল না, এমনকি native Cash on Delivery-ও checkout থেকে হারিয়ে গিয়েছিল।** কারণ: `class-bsol-gateway.php` `class Bsol_Gateway extends WC_Payment_Gateway` ঘোষণা করে, আর সেটা এই প্লাগিনের নিজের `plugins_loaded`-এই unconditionally require হতো — কিন্তু PHP parent class immediately resolve করে (lazily না), আর WooCommerce তখনও নিজের `WC_Payment_Gateway` ডিফাইন করে ফেলেছে কিনা তার কোনো গ্যারান্টি নেই (দুইটা আলাদা প্লাগিনের একই-priority `plugins_loaded` callback-এর মধ্যে ordering নির্ভরযোগ্য না — এটা একটা সুপরিচিত WooCommerce extension pitfall)। না থাকলে এটা প্রতি পেজ-লোডে একটা PHP fatal error, যেটা সেই request-এর বাকি সব hook execution-ই থামিয়ে দেয় — তাই native COD-ও হারিয়ে যাওয়াটা এক্সপ্লেইনড হয়। **ফিক্স**: শুধু এই একটা মডিউলের require+registration এখন `woocommerce_loaded`-এ deferred (WooCommerce নিজের action, core class গ্যারান্টিসহ ready থাকা অবস্থায়ই ফায়ার করে)। একই সাথে "No synced order found" এররও হার্ডেন করা হয়েছে — `process_payment()` এখন payment initiate করার ঠিক আগে proactively order-sync কল করে (idempotent), classic checkout-এর টাইমিং গ্যারান্টি নিয়ে ভরসা না করে (WooCommerce Blocks/Store API checkout draft order আলাদা earlier request-এ তৈরি হতে পারে)। বিস্তারিত §১২-এর নিচে।
+
 শেষ আপডেট: ২০২৬-০৮-১৯ — **Phase ২১: Online Payment Gateways (v1.19.0)।** BSOL-এর ৭টা payment গেটওয়েই (bKash/Nagad/Rocket personal + SSLCommerz/AamarPay/ZiniPay/ShurjoPay/EPS/bKash Merchant/Nagad Merchant) এখন WooCommerce checkout-এ পাওয়া যায় — `Bsol_Gateway`/`Bsol_Payment_Gateway` মডিউল, `OnlinePaymentService`-কেই সরাসরি delegate করে (নতুন কোনো payment logic নেই)। বিস্তারিত নিচে §১২।
 
 এই ফাইলে BSOL-এর WordPress/WooCommerce কানেক্টর (backend API surface + `wordpress-plugin/bsol-connect/` প্লাগিন) নিয়ে সবকিছু একসাথে — কেন শুরু হলো, কীভাবে বানানো হলো, এখন কী কী কাজ করে, আর কী বাকি। নতুন কোনো ফিচার এখানে যোগ করার আগে এই ফাইলটা পড়ে নেওয়া উচিত।
@@ -269,6 +271,18 @@ BSOL-এর ৭টা payment channel-ই (`online_payment_context.md`) এখ�
 - `Bsol_Api`-তে ৩টা নতুন মেথড: `get_payment_channels()`, `initiate_gateway_payment()`, `submit_wallet_claim()`।
 - **সীমাবদ্ধতা**: wallet-claim ফর্মে ঐচ্ছিক screenshot আপলোড সাপোর্ট নেই (landing page/BSOL dashboard flow-তে যা আছে) — শুধু TrxID + sender number।
 - v1.19.0, `SETUP.md`-এ নতুন টেস্ট চেকলিস্ট যোগ হয়েছে।
+
+### ফিক্স (v1.19.1, একই দিন — প্রথম live test-এর রিপোর্ট)
+
+সেলার প্লাগিন activate করার পর রিপোর্ট করলেন: BSOL-এর কোনো payment method-ই checkout-এ দেখাচ্ছে না, gateway-এর কোনো enable/disable সেটিংও কোথাও নেই, এমনকি **native Cash on Delivery-ও checkout থেকে হারিয়ে গেছে**, আর payment initiate করলে "No synced order found for this wc_order_id yet" এরর।
+
+**Root cause**: `Bsol_Gateway extends WC_Payment_Gateway` — এই ঘোষণাটা `class-bsol-gateway.php`-তে ছিল, যেটা `Bsol_Master::load_dependencies()`-এ unconditionally `require_once` হতো (এই প্লাগিনের নিজের `plugins_loaded` callback-এর ভেতরে)। PHP-তে parent class immediately resolve হয় (file parse হওয়ার মুহূর্তেই, lazily না) — কিন্তু WooCommerce নিজে তখনও তার `WC_Payment_Gateway` ক্লাস ডিফাইন করে ফেলেছে কিনা তার কোনো গ্যারান্টি নেই, যেহেতু দুইটা আলাদা প্লাগিনের একই-priority `plugins_loaded` callback-এর মধ্যে execution order নির্ভরযোগ্য না (এটা WooCommerce extension development-এর একটা সুপরিচিত pitfall)। না থাকলে এটা একটা PHP fatal error — আর fatal error সেই request-এর বাকি সব hook execution-ই থামিয়ে দেয়, তাই native COD-ও হারিয়ে যাওয়াটা এক্সপ্লেইনড হয় (এই প্লাগিনের বাকি সব মডিউল নিরাপদ ছিল কারণ তাদের কেউই file-parse সময়ে কোনো WooCommerce core class extend করে না)।
+
+**ফিক্স**: শুধু payment-gateway মডিউলের require+registration এখন `woocommerce_loaded`-এ deferred (`Bsol_Master::init_payment_gateway_module()`) — এটা WooCommerce-এর নিজস্ব action, যেটা core class-গুলো guaranteed ready থাকা অবস্থাতেই ফায়ার করে, প্লাগিন লোড অর্ডার নির্বিশেষে।
+
+**"No synced order found" এররও হার্ডেন করা হয়েছে**: `Bsol_Gateway::process_payment()` এখন payment initiate করার ঠিক আগে proactively `Bsol_Order_Sync::handle_new_order()` কল করে (idempotent — `ConnectOrderController::sync()` create-or-update upsert, update-এ OTP/CAPI redispatch হয় না)। Classic checkout-এ `woocommerce_new_order` সবসময় `process_payment()`-এর আগেই ফায়ার করে (একই request), কিন্তু WooCommerce Blocks-এর Store API checkout draft order আলাদা earlier request-এ তৈরি/আপডেট করতে পারে — সেই টাইমিং গ্যারান্টির উপর নির্ভর না করে এখন সবসময় নিজে থেকেই sync guarantee করে।
+
+`Bsol_Gateway`/`Bsol_Payment_Gateway`-এর constructor এখন `$order_sync` (injected — `Bsol_Bulk_Sync`-এর মতোই, দ্বিতীয়বার `new Bsol_Order_Sync()` করা হয়নি) নেয়।
 
 ---
 

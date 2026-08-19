@@ -1,5 +1,48 @@
 # BSOL Connect — Changelog
 
+## 1.19.1 — 2026-08-19
+
+Live-test fix, same day as 1.19.0's release, reported by the first seller
+who actually activated it: **BSOL: {Provider} payment methods never
+appeared at all, and Cash on Delivery vanished from checkout too.**
+
+- **Root cause**: `class-bsol-gateway.php` declared `class Bsol_Gateway
+  extends WC_Payment_Gateway` and was `require_once`'d unconditionally
+  inside `Bsol_Master::load_dependencies()`, which runs on this plugin's
+  own `plugins_loaded` callback. PHP resolves a class's parent
+  *immediately* when the file is parsed — but WooCommerce is not
+  guaranteed to have defined `WC_Payment_Gateway` yet at that exact point;
+  hook-callback ordering between two *different* plugins registered on the
+  same `plugins_loaded` priority isn't something to rely on (a
+  well-documented WooCommerce extension pitfall). If WooCommerce's own
+  gateway classes hadn't loaded yet, this was a PHP fatal error on every
+  page load — which would abort the rest of that request's plugin/hook
+  execution entirely, plausibly explaining why even *native* WooCommerce
+  payment methods (Cash on Delivery) stopped showing at checkout, not just
+  BSOL's own.
+- **Fix**: the require + registration for the payment-gateway module alone
+  is now deferred to `woocommerce_loaded` — WooCommerce's own action,
+  fired only once its core classes are guaranteed to exist, regardless of
+  plugin load order. Every other module in this plugin was already safe
+  from this specific problem (none of them extend a WooCommerce core class
+  at file-parse time), so only this one module needed to move.
+- **Also hardened**: `Bsol_Gateway::process_payment()` now proactively
+  calls the existing order-sync method right before asking BSOL to
+  initiate a payment, instead of assuming `woocommerce_new_order` already
+  synced the order in every checkout flow. Classic checkout's ordering
+  (order created, then `process_payment()` runs, same request) was already
+  safe; WooCommerce Blocks' Store API checkout builds/updates a draft
+  order across separate earlier requests, which is a looser guarantee.
+  This call is a safe, idempotent no-op when the order was already synced
+  (`ConnectOrderController::sync()` is a create-or-update upsert and
+  doesn't redispatch OTP/CAPI on update) — it fixes the "No synced order
+  found for this wc_order_id yet" error some checkouts hit.
+
+If you already have 1.19.0 installed, re-download the plugin from your
+BSOL dashboard and reinstall — this isn't a WordPress.org-distributed
+update, so the self-update notice is informational only, it won't install
+this for you.
+
 ## 1.19.0 — 2026-08-19
 
 - **Online payment gateways** — every channel enabled on the seller's BSOL

@@ -45,7 +45,11 @@ class Bsol_Payment_Gateway {
 		'nagad_merchant' => 'Nagad',
 	);
 
-	public function __construct() {
+	/** @var Bsol_Order_Sync */
+	private $order_sync;
+
+	public function __construct( $order_sync ) {
+		$this->order_sync = $order_sync;
 		add_filter( 'woocommerce_payment_gateways', array( $this, 'register_gateways' ) );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'woocommerce_before_thankyou', array( $this, 'maybe_render_wallet_claim_form' ) );
@@ -59,12 +63,12 @@ class Bsol_Payment_Gateway {
 
 		foreach ( $channels['wallet_channels'] as $channel ) {
 			$provider  = $channel['provider'];
-			$gateways[] = new Bsol_Gateway( $provider, $this->label( self::WALLET_LABELS, $provider ), 'wallet_manual' );
+			$gateways[] = new Bsol_Gateway( $provider, $this->label( self::WALLET_LABELS, $provider ), 'wallet_manual', $this->order_sync );
 		}
 
 		foreach ( $channels['gateway_channels'] as $channel ) {
 			$provider  = $channel['provider'];
-			$gateways[] = new Bsol_Gateway( $provider, $this->label( self::GATEWAY_LABELS, $provider ), 'gateway_auto' );
+			$gateways[] = new Bsol_Gateway( $provider, $this->label( self::GATEWAY_LABELS, $provider ), 'gateway_auto', $this->order_sync );
 		}
 
 		return $gateways;

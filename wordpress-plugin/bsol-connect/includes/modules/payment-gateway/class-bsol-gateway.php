@@ -22,9 +22,13 @@ class Bsol_Gateway extends WC_Payment_Gateway {
 	/** @var string 'wallet_manual' | 'gateway_auto' */
 	private $channel_type;
 
-	public function __construct( $provider, $label, $channel_type ) {
+	/** @var Bsol_Order_Sync */
+	private $order_sync;
+
+	public function __construct( $provider, $label, $channel_type, $order_sync ) {
 		$this->id           = 'bsol_' . $provider;
 		$this->channel_type = $channel_type;
+		$this->order_sync   = $order_sync;
 		$this->icon         = '';
 		$this->has_fields   = false; // gateway_auto redirects off-site; wallet_manual's claim form lives on order-received, not the checkout payment box
 		$this->method_title = 'BSOL: ' . $label;
@@ -77,6 +81,20 @@ class Bsol_Gateway extends WC_Payment_Gateway {
 		if ( ! $order ) {
 			wc_add_notice( __( 'Order not found.', 'bsol-connect' ), 'error' );
 			return array( 'result' => 'failure' );
+		}
+
+		// Ensure BSOL already has this order before asking it to initiate a
+		// payment against it. woocommerce_new_order (which normally does
+		// this sync) should always fire before process_payment() runs —
+		// true for classic checkout — but WooCommerce Blocks' Store API
+		// checkout creates/updates the draft order across earlier separate
+		// requests, and that ordering guarantee is less firm there. This
+		// call is idempotent (ConnectOrderController::sync() is a create-
+		// or-update upsert, and doesn't redispatch OTP/CAPI on update — see
+		// wordpress_connect_context.md), so calling it again here even when
+		// the order was already synced is a safe, cheap no-op.
+		if ( $this->order_sync ) {
+			$this->order_sync->handle_new_order( $order_id );
 		}
 
 		$provider = substr( $this->id, strlen( 'bsol_' ) );
