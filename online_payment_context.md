@@ -1,5 +1,7 @@
 # Customer-Facing Online Payment — Context
 
+শেষ আপডেট: 2026-08-19 (৩) — **EPS লাইভ বাগ ফিক্স: verify() রেসপন্স parse করতে পারছিল না।** ব্যবহারকারী sandbox test card দিয়ে EPS-এ পে করে জানান পেমেন্ট "সফল" হয়েও অর্ডার unpaid থেকে যাচ্ছে। কারণ: EPS-এর official PHP sample-এর prose-এ ইঙ্গিত ছিল রেসপন্স নেস্টেড/lowercase (`data.status`) হবে, কিন্তু আসল sandbox রেসপন্স flat + PascalCase (`Status`, `MerchantTransactionId`, `TotalAmount`, `EPSTransactionId`) — কোনো key-ই match করছিল না বলে `verifyPayment()` সবসময় `false` রিটার্ন করছিল (প্রোডাকশন লগে ধরা পড়েছে)। **ফিক্স**: `EpsGatewayClient::verifyPayment()` এখন real PascalCase ফিল্ড primary হিসেবে চেক করে (পুরনো ফলব্যাকও রাখা হয়েছে); `MerchantTransactionId` echo-ব্যাক এখন secondary tampering cross-check হিসেবেও ব্যবহার হচ্ছে; `amount` এখন `TotalAmount` (কাস্টমার যা পেমেন্ট করেছে) থেকে নেয়, `StoreAmount` (ফি-কাটা নেট) থেকে না। আসল captured প্রোডাকশন রেসপন্স দিয়ে regression test যোগ হয়েছে (`test_eps_verify_parses_the_real_captured_production_response`)। ব্যবহারকারীর ২টা আটকে থাকা টেস্ট অর্ডার (৪২৫৮০ ও ৪২৬২০ টাকা) ফিক্সের পর re-verify করে সঠিকভাবে `confirmed`/`paid`-এ reconcile করা হয়েছে। বিস্তারিত §৯.১।
+
 শেষ আপডেট: 2026-08-19 (২) — **Phase B সম্পূর্ণ: EPS (Easy Payment System) automated gateway লাইভ — শেষ SSLCommerz-স্টাইল provider।** `EpsGatewayClient` (`/v1/Auth/GetToken` Bearer auth + `/v1/EPSEngine/InitializeEPS` + `/v1/EPSEngine/CheckMerchantTransactionStatus` server verification, HMAC-SHA512 request signing) `PaymentGatewayFactory`-তে রেজিস্টার করা হয়েছে। eps.com.bd-এর কোনো পাবলিক REST ডকুমেন্টেশন নেই — তাই EPS-এর নিজস্ব official reference code (github.com/EPS-PG/EPS_PHP) থেকে সরাসরি real endpoint/field শেপ নিশ্চিত করা হয়েছে, অনুমান করে না। ড্যাশবোর্ডে (Merchant ID, Store ID, Username, Password, Hash Key) ফর্ম লাইভ। বিস্তারিত নিচে §৯।
 
 Phase B-এর পরিকল্পিত ৫টা provider-ই (SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS) এখন লাইভ। বাকি C1 (bKash Merchant) ও C2 (Nagad Merchant) — build-order অনুযায়ী পরবর্তী ধাপ, এখনো শুরু হয়নি। Older entries kept as-is:
@@ -156,6 +158,32 @@ Phase A প্রথমবার production-এ টেস্ট করার প
 - **Frontend Settings**: `GATEWAY_PROVIDERS`-এ EPS-এর "Coming soon" ব্যাজ সরিয়ে বাকিদের মতোই field-schema ফর্ম যোগ হয়েছে।
 - **Test coverage**: `test_eps_initiate_and_successful_callback_verification`, `test_eps_verify_always_uses_our_own_stored_transaction_id` (স্পুফিং-প্রতিরোধ প্রমাণ করে — callback-এ ভুল transaction id দিলেও client সবসময় সত্যিকারের stored id-ই query করে), `PaymentGatewayCredentialApiTest`-এ EPS roundtrip।
 - Full suite: বেসলাইনের ২টা unrelated failure (AuthApiTest, CourierFraudCheckApiTest) ছাড়া সব পাস (৩৮২ passed)।
+
+### ৯.১ লাইভ বাগ ফিক্স (২০২৬-০৮-১৯) — verify() রেসপন্স parse হচ্ছিল না
+
+ব্যবহারকারী নিজের sandbox test card দিয়ে EPS-এ পে করে দেখেন EPS-এর পেজে "successful" দেখানোর পরও অর্ডার আমাদের সিস্টেমে unpaid থেকে গেছে। প্রোডাকশন লগে (`storage/logs/laravel.log`) আসল কারণ ধরা পড়ে — EPS-এর `CheckMerchantTransactionStatus` রেসপন্স যেই শেপ ধরে নেওয়া হয়েছিল (`{"data":{"status":"..."}}`, official PHP sample-এর প্রোজ থেকে অনুমান করা) তার সাথে বাস্তবের মিল নেই। আসল রেসপন্স:
+
+```json
+{
+  "MerchantTransactionId": "OOP-12-kkS4sSRa",
+  "EPSTransactionId": "8265839150819E",
+  "Status": "Success",
+  "TotalAmount": "42580.00",
+  "StoreAmount": "41856.14",
+  "TransactionType": "Purchase",
+  "FinancialEntity": "BKash"
+}
+```
+
+সম্পূর্ণ **flat, PascalCase** — `data`-এর ভেতরে নেস্টেড না, key-ও lowercase না। ফলে `$data['status']`/`$data['transactionStatus']` কখনোই ম্যাচ করেনি, `verifyPayment()` সবসময় `success: false` রিটার্ন করেছে।
+
+**ফিক্স** (`EpsGatewayClient::verifyPayment()`):
+- এখন `Status`/`MerchantTransactionId`/`TotalAmount`/`EPSTransactionId` (real PascalCase) primary হিসেবে চেক করে, পুরনো camelCase/nested ফলব্যাকও রাখা হয়েছে (sandbox vs live আলাদা হলে সেফটি নেটের জন্য)।
+- `MerchantTransactionId` echo-ব্যাক এখন secondary tampering cross-check হিসেবেও ব্যবহার হচ্ছে (§৯-এর primary guard — সবসময় নিজের stored id দিয়ে query — অপরিবর্তিত থাকে)।
+- `amount` এখন `TotalAmount` (কাস্টমার যা পেমেন্ট করেছে) থেকে নেয় — `StoreAmount` (EPS-এর ফি বাদে সেলারের নেট) থেকে না, যেটা আগে ভুলবশত fallback-এর মধ্যে থাকতে পারত।
+- Regression test `test_eps_verify_parses_the_real_captured_production_response()` — প্রোডাকশন লগ থেকে ধরা আসল রেসপন্স (trimmed) দিয়ে লক করা।
+
+**Reconciliation**: ব্যবহারকারীর ২টা আটকে থাকা টেস্ট অর্ডার (Order #113 — ৳৪২৫৮০, Order #114 — ৳৪২৬২০, দুটোই `failed` status-এ terminal ছিল) ফিক্সের পর manually re-triggered করে EPS-এর live sandbox status আবার query করা হয়েছে (তখনও `Success` — মূল সমস্যা শুধু আমাদের parsing-এ ছিল, EPS-এর দিকে না) এবং সঠিকভাবে `confirmed`/`paid`-এ cascade করা হয়েছে।
 
 ## ৭. Phase B2 — AamarPay & ZiniPay Integration (২০২৬-০৮-১৮)
 

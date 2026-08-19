@@ -28,11 +28,15 @@ use Illuminate\Support\Facades\Log;
  *    ?merchantTransactionId=... — always queried with OUR OWN stored
  *    provider_payment_id, never a customer-suppliable callback param (the
  *    same discipline the ZiniPay tampering fix established — see
- *    online_payment_context.md). Same x-hash/Bearer scheme; checks
- *    transactionStatus/status (top-level or nested under data) for
- *    SUCCESS/COMPLETED — EPS's official sample doesn't expose an
- *    independent id to cross-check, so always-verify-our-own-id IS the
- *    tampering guard here, not a secondary check on top of one.
+ *    online_payment_context.md). Same x-hash/Bearer scheme; response is a
+ *    FLAT object with PascalCase keys (Status, MerchantTransactionId,
+ *    EPSTransactionId, TotalAmount) — confirmed against a real sandbox
+ *    card-test response 2026-08-19, NOT the nested/lowercase shape the
+ *    official PHP sample's prose implied (that mismatch was this
+ *    integration's first live bug — sandbox payments succeeded on EPS's
+ *    side but our verify() never recognized them). Always-verify-our-own-id
+ *    is the primary tampering guard; MerchantTransactionId is also echoed
+ *    back and cross-checked as a secondary one.
  */
 class EpsGatewayClient implements PaymentGatewayClient
 {
@@ -171,13 +175,29 @@ class EpsGatewayClient implements PaymentGatewayClient
         ]);
 
         $data = $response->json() ?? [];
+        // Confirmed against EPS's real sandbox response (2026-08-19 live
+        // test): a FLAT object with PascalCase keys — Status,
+        // MerchantTransactionId, EPSTransactionId, TotalAmount,
+        // StoreAmount — not the nested/lowercase shape the official PHP
+        // sample's prose implied. Old camelCase/nested fallbacks kept in
+        // case live differs from sandbox, but PascalCase is now primary.
         $nested = $data['data'] ?? $data['Data'] ?? [];
         $status = strtoupper((string) (
-            $data['transactionStatus'] ?? $data['status']
-            ?? $nested['transactionStatus'] ?? $nested['status'] ?? ''
+            $data['Status'] ?? $data['status'] ?? $data['transactionStatus']
+            ?? $nested['Status'] ?? $nested['status'] ?? $nested['transactionStatus'] ?? ''
         ));
 
         $valid = in_array($status, ['SUCCESS', 'COMPLETED', 'SUCCESSFUL'], true);
+
+        // Belt-and-suspenders: EPS's real response does echo back
+        // MerchantTransactionId, so cross-check it too — even though the
+        // primary guard is already "we only ever query our own stored id"
+        // (see class docblock; $providerPaymentId never comes from
+        // $callbackData).
+        $echoedTranId = $data['MerchantTransactionId'] ?? $nested['MerchantTransactionId'] ?? null;
+        if ($valid && $echoedTranId !== null && (string) $echoedTranId !== $providerPaymentId) {
+            $valid = false;
+        }
 
         if (! $valid) {
             Log::warning('EPS verifyPayment did not validate', [
@@ -187,9 +207,14 @@ class EpsGatewayClient implements PaymentGatewayClient
 
         return [
             'success' => $valid,
-            'trx_id' => $nested['transactionId'] ?? $data['transactionId'] ?? $providerPaymentId,
-            'amount' => isset($nested['amount']) ? (float) $nested['amount']
-                : (isset($data['amount']) ? (float) $data['amount'] : null),
+            'trx_id' => $data['EPSTransactionId'] ?? $nested['EPSTransactionId']
+                ?? $data['transactionId'] ?? $nested['transactionId'] ?? $providerPaymentId,
+            // TotalAmount is what the customer paid (order total); StoreAmount
+            // is the seller's net after EPS's fee — not what we track.
+            'amount' => isset($data['TotalAmount']) ? (float) $data['TotalAmount']
+                : (isset($nested['TotalAmount']) ? (float) $nested['TotalAmount']
+                : (isset($nested['amount']) ? (float) $nested['amount']
+                : (isset($data['amount']) ? (float) $data['amount'] : null))),
             'raw' => $data,
         ];
     }
