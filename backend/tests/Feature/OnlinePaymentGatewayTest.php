@@ -287,4 +287,431 @@ class OnlinePaymentGatewayTest extends TestCase
         $this->assertEquals(580.0, $order->fresh()->paidAmount());
         $this->assertSame(1, \App\Models\OrderPayment::where('order_id', $order->id)->count());
     }
+
+    private function enableAamarpay(User $owner): void
+    {
+        PaymentGatewayCredential::create([
+            'user_id' => $owner->id,
+            'provider' => 'aamarpay',
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => ['store_id' => 'aamarpaytest', 'signature_key' => 'dbb74894e82415a2f7ff0ec3a97e4183'],
+        ]);
+    }
+
+    private function enableZinipay(User $owner): void
+    {
+        PaymentGatewayCredential::create([
+            'user_id' => $owner->id,
+            'provider' => 'zinipay',
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => ['api_key' => 'zini_test_api_key_12345'],
+        ]);
+    }
+
+    public function test_aamarpay_initiate_and_successful_callback_verification(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableAamarpay($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            '*/jsonpost.php' => Http::response([
+                'result' => 'true',
+                'payment_url' => 'https://sandbox.aamarpay.com/paynow.php?track=TRK123',
+            ]),
+        ]);
+
+        $response = $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'aamarpay']
+        );
+
+        $response->assertOk();
+        $this->assertStringContainsString('sandbox.aamarpay.com', $response->json('data.redirect_url'));
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('gateway_auto', $claim->channel_type);
+        $this->assertSame('aamarpay', $claim->provider);
+        $merchantTranId = $claim->provider_payment_id;
+
+        Http::fake([
+            '*/api/v1/trxcheck/request.php*' => Http::response([
+                'status_code' => 2,
+                'pay_status' => 'Successful',
+                'mer_txnid' => $merchantTranId,
+                'pg_txnid' => 'AAMAR_PG_12345',
+                'amount' => '580.00',
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/aamarpay/callback/{$claim->id}?mer_txnid={$merchantTranId}&pg_txnid=AAMAR_PG_12345");
+        $callback->assertRedirect();
+        $this->assertStringContainsString('payment_result=success', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('confirmed', $order->status);
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertEquals(580.0, $order->paidAmount());
+        $this->assertDatabaseHas('order_payments', [
+            'order_id' => $order->id, 'source' => 'online_gateway', 'method' => 'aamarpay',
+        ]);
+    }
+
+    public function test_aamarpay_callback_tampered_mer_txnid_is_rejected(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableAamarpay($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            '*/jsonpost.php' => Http::response([
+                'result' => 'true',
+                'payment_url' => 'https://sandbox.aamarpay.com/paynow.php?track=TRK123',
+            ]),
+        ]);
+
+        $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'aamarpay']
+        )->assertOk();
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+
+        // Verification response returns a mismatched mer_txnid
+        Http::fake([
+            '*/api/v1/trxcheck/request.php*' => Http::response([
+                'status_code' => 2,
+                'pay_status' => 'Successful',
+                'mer_txnid' => 'OTHER_TRAN_ID',
+                'pg_txnid' => 'AAMAR_PG_12345',
+                'amount' => '580.00',
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/aamarpay/callback/{$claim->id}?mer_txnid=OTHER_TRAN_ID");
+        $callback->assertRedirect();
+        $this->assertStringContainsString('payment_result=failed', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('pending', $order->status);
+        $this->assertSame('due', $order->payment_status);
+    }
+
+    public function test_zinipay_initiate_and_successful_callback_verification(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableZinipay($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://api.zinipay.com/v1/payment/create' => Http::response([
+                'status' => 'success',
+                'payment_url' => 'https://api.zinipay.com/checkout/INV_98765',
+                'invoice_id' => 'INV_98765',
+            ]),
+        ]);
+
+        $response = $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'zinipay']
+        );
+
+        $response->assertOk();
+        $this->assertStringContainsString('zinipay.com', $response->json('data.redirect_url'));
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('gateway_auto', $claim->channel_type);
+        $this->assertSame('zinipay', $claim->provider);
+        $this->assertSame('INV_98765', $claim->provider_payment_id);
+
+        Http::fake([
+            'https://api.zinipay.com/v1/payment/verify' => Http::response([
+                'status' => 'COMPLETED',
+                'invoice_id' => 'INV_98765',
+                'transaction_id' => 'ZINI_TXN_5555',
+                'amount' => 580.0,
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/zinipay/callback/{$claim->id}?invoice_id=INV_98765");
+        $callback->assertRedirect();
+        $this->assertStringContainsString('payment_result=success', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('confirmed', $order->status);
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertEquals(580.0, $order->paidAmount());
+        $this->assertDatabaseHas('order_payments', [
+            'order_id' => $order->id, 'source' => 'online_gateway', 'method' => 'zinipay',
+        ]);
+    }
+
+    public function test_zinipay_callback_cannot_be_spoofed_with_a_different_completed_invoice_id(): void
+    {
+        // Regression for a real gap: verifyPayment() used to trust
+        // $callbackData's invoice_id (customer-suppliable query string on
+        // the GET redirect) instead of our own stored provider_payment_id.
+        // A customer could replay a DIFFERENT invoice_id they'd genuinely
+        // completed (e.g. a cheap unrelated order on this same seller) to
+        // fraudulently confirm this costlier, still-unpaid order.
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableZinipay($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://api.zinipay.com/v1/payment/create' => Http::response([
+                'status' => 'success',
+                'payment_url' => 'https://api.zinipay.com/checkout/INV_REAL',
+                'invoice_id' => 'INV_REAL',
+            ]),
+        ]);
+
+        $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'zinipay']
+        )->assertOk();
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('INV_REAL', $claim->provider_payment_id);
+
+        // The verify endpoint reflects each invoice's real, independent
+        // status — SOME_OTHER_COMPLETED_INVOICE really is COMPLETED (it's
+        // a genuine transaction, just for a different order), INV_REAL is
+        // still PENDING. If the client used the query-string invoice_id,
+        // this order would wrongly confirm.
+        Http::fake([
+            'https://api.zinipay.com/v1/payment/verify' => function ($request) {
+                $body = $request->data();
+                if (($body['invoiceId'] ?? null) === 'SOME_OTHER_COMPLETED_INVOICE') {
+                    return Http::response(['status' => 'COMPLETED', 'invoice_id' => 'SOME_OTHER_COMPLETED_INVOICE', 'amount' => 10]);
+                }
+                return Http::response(['status' => 'PENDING', 'invoice_id' => $body['invoiceId'] ?? null]);
+            },
+        ]);
+
+        $callback = $this->get("/api/online-payment/zinipay/callback/{$claim->id}?invoice_id=SOME_OTHER_COMPLETED_INVOICE");
+        $this->assertStringContainsString('payment_result=failed', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('pending', $order->status);
+        $this->assertSame('due', $order->payment_status);
+        $this->assertDatabaseMissing('order_payments', ['order_id' => $order->id]);
+    }
+
+    public function test_zinipay_callback_status_failure_is_handled(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableZinipay($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://api.zinipay.com/v1/payment/create' => Http::response([
+                'status' => 'success',
+                'payment_url' => 'https://api.zinipay.com/checkout/INV_98765',
+                'invoice_id' => 'INV_98765',
+            ]),
+        ]);
+
+        $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'zinipay']
+        )->assertOk();
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+
+        Http::fake([
+            'https://api.zinipay.com/v1/payment/verify' => Http::response([
+                'status' => 'FAILED',
+                'invoice_id' => 'INV_98765',
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/zinipay/callback/{$claim->id}?invoice_id=INV_98765");
+        $callback->assertRedirect();
+        $this->assertStringContainsString('payment_result=failed', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('pending', $order->status);
+        $this->assertSame('due', $order->payment_status);
+        $this->assertSame('failed', $claim->fresh()->status);
+    }
+
+    private function enableShurjopay(User $owner): void
+    {
+        PaymentGatewayCredential::create([
+            'user_id' => $owner->id,
+            'provider' => 'shurjopay',
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => [
+                'username' => 'sp_sandbox_user',
+                'password' => 'sp_sandbox_pass',
+                'prefix' => 'NOK',
+            ],
+        ]);
+    }
+
+    public function test_shurjopay_initiate_and_successful_callback_verification(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableShurjopay($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://sandbox.shurjopayment.com/api/get_token' => Http::response([
+                'token' => 'SP_BEARER_TOKEN_123',
+                'store_id' => 'SP_STORE_999',
+                'sp_code' => '200',
+            ]),
+            'https://sandbox.shurjopayment.com/api/secret-pay' => Http::response([
+                'checkout_url' => 'https://sandbox.shurjopayment.com/pay/SP_ORD_777',
+                'sp_order_id' => 'SP_ORD_777',
+            ]),
+        ]);
+
+        $response = $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'shurjopay']
+        );
+
+        $response->assertOk();
+        $this->assertStringContainsString('shurjopayment.com', $response->json('data.redirect_url'));
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('gateway_auto', $claim->channel_type);
+        $this->assertSame('shurjopay', $claim->provider);
+        $merchantTranId = $claim->gateway_response['merchant_tran_id'] ?? (string) $claim->provider_payment_id;
+
+        Http::fake([
+            'https://sandbox.shurjopayment.com/api/get_token' => Http::response([
+                'token' => 'SP_BEARER_TOKEN_123',
+                'store_id' => 'SP_STORE_999',
+            ]),
+            'https://sandbox.shurjopayment.com/api/verification' => Http::response([
+                [
+                    'sp_code' => 1000,
+                    'sp_message' => 'Success',
+                    'order_id' => 'SP_ORD_777',
+                    'customer_order_id' => $merchantTranId,
+                    'bank_trx_id' => 'SP_BANK_TXN_888',
+                    'amount' => '580.00',
+                    'transaction_status' => 'Completed',
+                ],
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/shurjopay/callback/{$claim->id}?order_id=SP_ORD_777");
+        $callback->assertRedirect();
+        $this->assertStringContainsString('payment_result=success', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('confirmed', $order->status);
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertEquals(580.0, $order->paidAmount());
+        $this->assertDatabaseHas('order_payments', [
+            'order_id' => $order->id, 'source' => 'online_gateway', 'method' => 'shurjopay',
+        ]);
+    }
+
+    public function test_shurjopay_callback_tampered_order_id_is_rejected(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableShurjopay($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://sandbox.shurjopayment.com/api/get_token' => Http::response([
+                'token' => 'SP_BEARER_TOKEN_123',
+                'store_id' => 'SP_STORE_999',
+            ]),
+            'https://sandbox.shurjopayment.com/api/secret-pay' => Http::response([
+                'checkout_url' => 'https://sandbox.shurjopayment.com/pay/SP_ORD_777',
+                'sp_order_id' => 'SP_ORD_777',
+            ]),
+        ]);
+
+        $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'shurjopay']
+        )->assertOk();
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+
+        Http::fake([
+            'https://sandbox.shurjopayment.com/api/get_token' => Http::response([
+                'token' => 'SP_BEARER_TOKEN_123',
+                'store_id' => 'SP_STORE_999',
+            ]),
+            'https://sandbox.shurjopayment.com/api/verification' => Http::response([
+                [
+                    'sp_code' => 1000,
+                    'sp_message' => 'Success',
+                    'order_id' => 'SP_ORD_777',
+                    'customer_order_id' => 'TAMPERED_TRAN_ID',
+                    'amount' => '580.00',
+                ],
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/shurjopay/callback/{$claim->id}?order_id=SP_ORD_777");
+        $callback->assertRedirect();
+        $this->assertStringContainsString('payment_result=failed', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('pending', $order->status);
+        $this->assertSame('due', $order->payment_status);
+        $this->assertSame('failed', $claim->fresh()->status);
+    }
+
+    public function test_shurjopay_ipn_resolves_claim_by_order_id(): void
+    {
+        // Regression: gatewayIpn()'s candidate-id list only knew about
+        // tran_id/val_id/invoice_id/mer_txnid — ShurjoPay's own order_id/
+        // sp_order_id weren't in it, so its server-to-server IPN leg
+        // 404'd and only the browser-redirect leg ever worked.
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableShurjopay($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://sandbox.shurjopayment.com/api/get_token' => Http::response([
+                'token' => 'SP_BEARER_TOKEN_123', 'store_id' => 'SP_STORE_999',
+            ]),
+            'https://sandbox.shurjopayment.com/api/secret-pay' => Http::response([
+                'checkout_url' => 'https://sandbox.shurjopayment.com/pay/SP_ORD_777', 'sp_order_id' => 'SP_ORD_777',
+            ]),
+        ]);
+
+        $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'shurjopay']
+        )->assertOk();
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        $merchantTranId = $claim->gateway_response['merchant_tran_id'] ?? (string) $claim->provider_payment_id;
+
+        Http::fake([
+            'https://sandbox.shurjopayment.com/api/get_token' => Http::response([
+                'token' => 'SP_BEARER_TOKEN_123', 'store_id' => 'SP_STORE_999',
+            ]),
+            'https://sandbox.shurjopayment.com/api/verification' => Http::response([[
+                'sp_code' => 1000, 'sp_message' => 'Success', 'order_id' => 'SP_ORD_777',
+                'customer_order_id' => $merchantTranId, 'bank_trx_id' => 'SP_BANK_TXN_1',
+                'amount' => '580.00', 'transaction_status' => 'Completed',
+            ]]),
+        ]);
+
+        // Server-to-server IPN — no path id, must resolve purely from payload.
+        $this->postJson('/api/online-payment/shurjopay/ipn', ['order_id' => 'SP_ORD_777'])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $order->refresh();
+        $this->assertSame('confirmed', $order->status);
+        $this->assertEquals(580.0, $order->paidAmount());
+    }
 }
+
+

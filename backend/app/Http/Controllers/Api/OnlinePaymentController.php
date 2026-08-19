@@ -121,6 +121,10 @@ class OnlinePaymentController extends Controller
             $payload['val_id'] ?? null,
             $payload['invoice_id'] ?? null,
             $payload['mer_txnid'] ?? null,
+            // ShurjoPay's own correlation fields — missing before, so its
+            // IPN leg 404'd and only the browser-redirect leg ever worked.
+            $payload['order_id'] ?? null,
+            $payload['sp_order_id'] ?? null,
         ]);
 
         $claim = OrderOnlinePayment::where('provider', $provider)

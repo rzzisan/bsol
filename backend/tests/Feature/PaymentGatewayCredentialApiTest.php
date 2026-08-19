@@ -26,6 +26,9 @@ class PaymentGatewayCredentialApiTest extends TestCase
 
         $response->assertOk();
         $this->assertContains('sslcommerz', $response->json('data.supported_providers'));
+        $this->assertContains('aamarpay', $response->json('data.supported_providers'));
+        $this->assertContains('zinipay', $response->json('data.supported_providers'));
+        $this->assertContains('shurjopay', $response->json('data.supported_providers'));
         $this->assertSame([], $response->json('data.credentials'));
     }
 
@@ -49,6 +52,33 @@ class PaymentGatewayCredentialApiTest extends TestCase
         $response = $this->getJson('/api/payment-gateway-credentials');
         $masked = collect($response->json('data.credentials'))->firstWhere('provider', 'sslcommerz');
         $this->assertStringContainsString('*', $masked['credentials']['store_password']);
+
+        // Test AamarPay and ZiniPay saving
+        $this->putJson('/api/payment-gateway-credentials/aamarpay', [
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => ['store_id' => 'aamartest', 'signature_key' => 'sigsecret123'],
+        ])->assertOk();
+        $aamarRow = PaymentGatewayCredential::where('user_id', $owner->id)->where('provider', 'aamarpay')->firstOrFail();
+        $this->assertSame('sigsecret123', $aamarRow->credentials['signature_key']);
+
+        $this->putJson('/api/payment-gateway-credentials/zinipay', [
+            'enabled' => true,
+            'is_live' => true,
+            'credentials' => ['api_key' => 'zini_live_secret_456'],
+        ])->assertOk();
+        $ziniRow = PaymentGatewayCredential::where('user_id', $owner->id)->where('provider', 'zinipay')->firstOrFail();
+        $this->assertSame('zini_live_secret_456', $ziniRow->credentials['api_key']);
+
+        // Test ShurjoPay saving
+        $this->putJson('/api/payment-gateway-credentials/shurjopay', [
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => ['username' => 'sp_user', 'password' => 'sp_secret_pass', 'prefix' => 'NOK'],
+        ])->assertOk();
+        $shurjoRow = PaymentGatewayCredential::where('user_id', $owner->id)->where('provider', 'shurjopay')->firstOrFail();
+        $this->assertSame('sp_secret_pass', $shurjoRow->credentials['password']);
+        $this->assertSame('NOK', $shurjoRow->credentials['prefix']);
     }
 
     public function test_saving_a_masked_placeholder_does_not_overwrite_the_real_secret(): void

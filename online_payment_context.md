@@ -1,5 +1,15 @@
 # Customer-Facing Online Payment — Context
 
+শেষ আপডেট: 2026-08-19 — **সিকিউরিটি রিভিউ ফিক্স (B2/B3 AamarPay/ZiniPay/ShurjoPay কোড, অন্য একটা AI agent দিয়ে করানো হয়েছিল)।** দুইটা আসল বাগ পাওয়া গেছে ও ফিক্স করা হয়েছে:
+1. **`ZinipayGatewayClient::verifyPayment()`** callback query string থেকে আসা `invoice_id` (কাস্টমার-controllable) দিয়ে ভেরিফাই করত, আর tampering guard (`metadata.merchant_tran_id` match) conditional ছিল (`isset` না থাকলে skip) — ফলে একই সেলারের কোনো real completed invoice (নিজের ছোট আরেকটা অর্ডারের) replay করে অন্য একটা বড় অর্ডারের callback URL-এ বসিয়ে দিলে সেটাও ভেরিফাই পাস করে confirmed হয়ে যেত। **ফিক্স**: verify সবসময় আমাদের নিজের stored `provider_payment_id` (ZiniPay-র createPayment() রেসপন্স থেকে initiate-এর সময় capture করা, কাস্টমার-influenced না) দিয়ে হয় — callback-এর `invoice_id` আর trust করা হয় না, metadata match এখন শুধু belt-and-suspenders।
+2. **`OnlinePaymentController::gatewayIpn()`**-এর candidate-id list-এ ShurjoPay-র নিজের `order_id`/`sp_order_id` ফিল্ড ছিল না (শুধু SSLCommerz/AamarPay/ZiniPay-এর ফিল্ড নাম ছিল) — ফলে ShurjoPay-র server-to-server IPN কখনো claim resolve করতে পারত না (404), শুধু browser-redirect leg-ই কাজ করত। **ফিক্স**: candidate list-এ `order_id`/`sp_order_id` যোগ করা হয়েছে।
+
+দুটোরই regression test যোগ হয়েছে (`test_zinipay_callback_cannot_be_spoofed_with_a_different_completed_invoice_id`, `test_shurjopay_ipn_resolves_claim_by_order_id`)। Full suite: বেসলাইনের ২টা unrelated failure (AuthApiTest, CourierFraudCheckApiTest) ছাড়া সব পাস। Older entries kept as-is:
+
+শেষ আপডেট: 2026-08-18 (৩) — **Phase B3 লাইভ: ShurjoPay automated gateway ইন্টিগ্রেশন সম্পন্ন।** `ShurjopayGatewayClient` (Bearer token auth via `/get_token` + `/secret-pay` + `/verification` server verification) `PaymentGatewayFactory`-তে রেজিস্টার করা হয়েছে। ড্যাশবোর্ডে (`Settings → Online Payment Channels`) ShurjoPay (Username, Password, Prefix)-এর জন্য ক্রেডেনশিয়াল ফর্ম লাইভ। বিস্তারিত নিচে §৮। Older entries kept as-is:
+
+শেষ আপডেট: 2026-08-18 (২) — **Phase B2 লাইভ: AamarPay ও ZiniPay automated gateway ইন্টিগ্রেশন সম্পন্ন।** `AamarpayGatewayClient` (JSON API + `/api/v1/trxcheck` server verification) এবং `ZinipayGatewayClient` (v1 create + `v1/payment/verify` server verification) `PaymentGatewayFactory`-তে রেজিস্টার করা হয়েছে। ড্যাশবোর্ডে (`Settings → Online Payment Channels`) AamarPay (Store ID, Signature Key) ও ZiniPay (API Key)-এর জন্য ক্রেডেনশিয়াল ফর্ম লাইভ। বিস্তারিত নিচে §৬ ও §৭। Older entries kept as-is:
+
 শেষ আপডেট: 2026-08-18 — **Phase B1 লাইভ: SSLCommerz automated gateway (মার্চেন্ট একাউন্ট) + provider-abstraction ফাউন্ডেশন।** কাস্টমার এখন চেকআউটে SSLCommerz দিয়ে সরাসরি অটোমেটিক পে করতে পারবে (redirect → hosted checkout → query-then-trust verify → auto-confirm), সেলার নিজের মার্চেন্ট ক্রেডেনশিয়াল বসায় Dashboard → Settings → Online Payment Channels-এর নতুন "Automatic Payment Gateways" সেকশনে। নতুন `payment_gateway_credentials` টেবিল (প্রতি সেলার-প্রতি-provider এক row, `credentials` JSON blob encrypted) — AamarPay/ZiniPay/ShurjoPay/EPS/bKash Merchant/Nagad Merchant একই abstraction-এ যোগ হবে ধাপে ধাপে। বিস্তারিত নিচে §৬। Older entries kept as-is:
 
 শেষ আপডেট: 2026-08-17 (২) — Phase A লাইভ টেস্ট করার পর ব্যবহারকারীর ৩টা রিয়েল-ওয়ার্ল্ড ফিডব্যাক অনুযায়ী রিফাইনমেন্ট: (১) OTP এখন শুধু COD-তে সক্রিয়, অনলাইন পেমেন্ট বেছে নিলে OTP আর লাগে না — বদলে অর্ডার লিস্টে "পেমেন্ট বাকি" ফ্ল্যাগ দেখায়, (২) অ্যাপ্রুভ করার সময় সেলার নিজে হাতে amount বসায় (কাস্টমারের claim অন্ধভাবে বিশ্বাস করা হয় না), (৩) প্রতিটা ল্যান্ডিং পেজে আলাদাভাবে কোন পেমেন্ট চ্যানেল দেখাবে তা সিলেক্ট করা যায় (আগে পুরো শপ-ওয়াইড ছিল)। দেখো নিচে §৫। Older entries kept as-is:
@@ -119,10 +129,35 @@ Phase A প্রথমবার production-এ টেস্ট করার প
 - `dashboard/orders/page.tsx` — "পেমেন্ট বাকি" ব্যাজ এখন যেকোনো non-cod `payment_method`-এর জন্য কাজ করে (আগে শুধু bkash/nagad/rocket hardcoded ছিল)।
 
 ### ৬.৬ Build order বাকি
-- **B2**: AamarPay + ZiniPay (দুটোই ভালো ডকুমেন্টেড, SSLCommerz-এর মতো একই abstraction-এ দ্রুত বসবে)।
-- **B3**: ShurjoPay + EPS (পাবলিক ডকুমেন্টেশন অসম্পূর্ণ ছিল — বাস্তব sandbox একাউন্ট লাগবে exact field name কনফার্ম করতে)।
+- **B2**: AamarPay + ZiniPay (✅ সম্পন্ন — ২০২৬-০৮-১৮)।
+- **B3**: ShurjoPay (✅ সম্পন্ন — ২০২৬-০৮-১৮) + EPS (পরবর্তী)।
 - **C1**: bKash Merchant (subscription billing-এর ক্লায়েন্ট শেপ reuse, per-seller credentialed নতুন sibling class)।
 - **C2**: Nagad Merchant (RSA-signed payload, সবচেয়ে আলাদা — শেষে, বাস্তব merchant sandbox credentials লাগবে)।
 
 ### ৬.৭ Test coverage
-`OnlinePaymentGatewayTest` (৬টা: channel listing, misconfigured-credential exclusion, initiate, callback-success-cascade, callback-without-val_id-not-trusted, duplicate-callback-idempotent), `PaymentGatewayCredentialApiTest` (৬টা: CRUD, masking, masked-placeholder-না-overwrite, unknown-provider-404, staff permission)। Full suite ৩৭২ pass, ২টা পুরনো unrelated baseline failure অপরিবর্তিত।
+`OnlinePaymentGatewayTest` (১৩টা: channel listing, misconfigured-credential exclusion, initiate, callback-success-cascade, callback-without-val_id-not-trusted, duplicate-callback-idempotent, AamarPay initiate+verify, AamarPay tampering rejection, ZiniPay initiate+verify, ZiniPay failure handling, ShurjoPay initiate+verify, ShurjoPay tampering rejection), `PaymentGatewayCredentialApiTest` (৬টা: CRUD, masking, masked-placeholder-না-overwrite, unknown-provider-404, staff permission, SSLCommerz/AamarPay/ZiniPay/ShurjoPay credentials roundtrip)।
+
+## ৭. Phase B2 — AamarPay & ZiniPay Integration (২০২৬-০৮-১৮)
+
+- **`AamarpayGatewayClient`**:
+  - Hosted JSON session (`/jsonpost.php`), redirects to `payment_url`.
+  - Server-side verification via `/api/v1/trxcheck/request.php` (GET `request_id`, `store_id`, `signature_key`).
+  - Strict tampering check: `mer_txnid` matching our minted `merchantTranId`.
+- **`ZinipayGatewayClient`**:
+  - Unified JSON API (`/v1/payment/create`) with `zini-api-key` header.
+  - Server-side verification via `/v1/payment/verify` (`invoiceId`, `apiKey`).
+  - Confirms `status === 'COMPLETED'` and returns transaction ID / amount.
+- **Frontend Settings**:
+  - `GATEWAY_PROVIDERS` updated with AamarPay (`store_id`, `signature_key`) and ZiniPay (`api_key`) fields.
+
+## ৮. Phase B3 — ShurjoPay Integration (২০২৬-০৮-১৮)
+
+- **`ShurjopayGatewayClient`**:
+  - Token-based Authentication: `POST /api/get_token` with `username` & `password` to obtain 15-min Bearer token & `store_id`.
+  - Session Creation: `POST /api/secret-pay` with token, `prefix`, `order_id` (`merchantTranId`), `amount`, and returns `checkout_url`.
+  - Server-to-Server Verification: `POST /api/verification` with `order_id` (`sp_order_id`), confirms `sp_code === 1000` or `status === 'Completed'`.
+  - Strict Anti-Tampering Check: Verifies `customer_order_id` in response matches our `merchantTranId`.
+- **Frontend Settings**:
+  - Tab-based Settings UI updated with ShurjoPay credentials (`username`, `password`, `prefix`) and secure password toggle.
+
+

@@ -4,20 +4,25 @@ namespace App\Services\Payment;
 
 use App\Contracts\PaymentGatewayClient;
 use App\Models\PaymentGatewayCredential;
+use App\Services\Payment\Gateways\AamarpayGatewayClient;
+use App\Services\Payment\Gateways\ShurjopayGatewayClient;
 use App\Services\Payment\Gateways\SslcommerzGatewayClient;
+use App\Services\Payment\Gateways\ZinipayGatewayClient;
 use InvalidArgumentException;
 
 /**
  * Mirrors CourierFactory's shape (app/Services/Courier/CourierFactory.php).
- * Phase B1 ships SSLCommerz only — AamarPay/ZiniPay (B2), ShurjoPay/EPS
- * (B3), bKash Merchant/Nagad Merchant (C1/C2) join this map as each is
- * built, per online_payment_context.md's build order.
+ * Phase B1 (SSLCommerz), Phase B2 (AamarPay, ZiniPay) and Phase B3 (ShurjoPay) supported.
+ * EPS, bKash Merchant, Nagad Merchant join this map as each is built, per online_payment_context.md.
  */
 class PaymentGatewayFactory
 {
     /** @var array<string, class-string<PaymentGatewayClient>> */
     private const PROVIDERS = [
         'sslcommerz' => SslcommerzGatewayClient::class,
+        'aamarpay' => AamarpayGatewayClient::class,
+        'zinipay' => ZinipayGatewayClient::class,
+        'shurjopay' => ShurjopayGatewayClient::class,
     ];
 
     public static function make(string $provider, PaymentGatewayCredential $credential): PaymentGatewayClient
