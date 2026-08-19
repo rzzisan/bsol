@@ -2,3 +2,6 @@ Flash Cards – Goofi World_files/
 /.env
 /.env.local
 /oldproject/
+
+.gemini/
+gha-creds-*.json
