@@ -30,6 +30,8 @@ class PaymentGatewayCredentialApiTest extends TestCase
         $this->assertContains('zinipay', $response->json('data.supported_providers'));
         $this->assertContains('shurjopay', $response->json('data.supported_providers'));
         $this->assertContains('eps', $response->json('data.supported_providers'));
+        $this->assertContains('bkash_merchant', $response->json('data.supported_providers'));
+        $this->assertContains('nagad_merchant', $response->json('data.supported_providers'));
         $this->assertSame([], $response->json('data.credentials'));
     }
 
@@ -93,6 +95,30 @@ class PaymentGatewayCredentialApiTest extends TestCase
         $epsRow = PaymentGatewayCredential::where('user_id', $owner->id)->where('provider', 'eps')->firstOrFail();
         $this->assertSame('eps_secret_pass', $epsRow->credentials['password']);
         $this->assertSame('eps_hash_secret', $epsRow->credentials['hash_key']);
+
+        // Test bKash Merchant saving
+        $this->putJson('/api/payment-gateway-credentials/bkash_merchant', [
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => [
+                'app_key' => 'bkash_app_key_1', 'app_secret' => 'bkash_app_secret_1',
+                'username' => 'bkash_user_1', 'password' => 'bkash_pass_1',
+            ],
+        ])->assertOk();
+        $bkashRow = PaymentGatewayCredential::where('user_id', $owner->id)->where('provider', 'bkash_merchant')->firstOrFail();
+        $this->assertSame('bkash_app_secret_1', $bkashRow->credentials['app_secret']);
+
+        // Test Nagad Merchant saving
+        $this->putJson('/api/payment-gateway-credentials/nagad_merchant', [
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => [
+                'merchant_id' => 'nagad_merchant_1', 'account_number' => '01700000000',
+                'merchant_private_key' => 'FAKEPRIVATEKEYBODY', 'pg_public_key' => 'FAKEPGPUBLICKEYBODY',
+            ],
+        ])->assertOk();
+        $nagadRow = PaymentGatewayCredential::where('user_id', $owner->id)->where('provider', 'nagad_merchant')->firstOrFail();
+        $this->assertSame('FAKEPRIVATEKEYBODY', $nagadRow->credentials['merchant_private_key']);
     }
 
     public function test_saving_a_masked_placeholder_does_not_overwrite_the_real_secret(): void

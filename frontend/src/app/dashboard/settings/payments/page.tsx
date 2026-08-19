@@ -200,10 +200,15 @@ const GATEWAY_PROVIDERS: GatewayConfig[] = [
     badgeColor: "text-pink-400",
     badgeBg: "bg-pink-500/10 border-pink-500/20",
     description: {
-      bn: "বিকাশ মার্চেন্ট ডিরেক্ট চেকআউট গেটওয়ে।",
-      en: "Direct bKash merchant checkout integration.",
+      bn: "বিকাশ মার্চেন্ট টোকেনাইজড চেকআউট — কাস্টমার সরাসরি বিকাশ অ্যাপ/ওয়েবসাইটে পে করে অটো-কনফার্ম।",
+      en: "bKash merchant tokenized checkout — customer pays directly via bKash, auto-confirmed.",
     },
-    fields: [],
+    fields: [
+      { key: "app_key", label: "App Key", type: "text", placeholder: "e.g. your_bkash_app_key" },
+      { key: "app_secret", label: "App Secret", type: "password", placeholder: "e.g. your_bkash_app_secret" },
+      { key: "username", label: "Username", type: "text", placeholder: "e.g. your_bkash_username" },
+      { key: "password", label: "Password", type: "password", placeholder: "e.g. your_bkash_password" },
+    ],
   },
   {
     provider: "nagad_merchant",
@@ -211,12 +216,18 @@ const GATEWAY_PROVIDERS: GatewayConfig[] = [
     badgeColor: "text-rose-400",
     badgeBg: "bg-rose-500/10 border-rose-500/20",
     description: {
-      bn: "নগদ মার্চেন্ট ডিরেক্ট চেকআউট গেটওয়ে।",
-      en: "Direct Nagad merchant checkout integration.",
+      bn: "নগদ মার্চেন্ট চেকআউট — RSA কি-পেয়ার লাগে (Nagad মার্চেন্ট প্যানেল থেকে Key Generate করে নিন)।",
+      en: "Nagad merchant checkout — requires an RSA key pair (generate from your Nagad merchant panel).",
     },
-    fields: [],
+    fields: [
+      { key: "merchant_id", label: "Merchant ID", type: "text", placeholder: "e.g. your_nagad_merchant_id" },
+      { key: "account_number", label: "Merchant Account Number", type: "text", placeholder: "e.g. 01700000000" },
+      { key: "merchant_private_key", label: "Merchant Private Key (শুধু base64 body, header/footer ছাড়া)", type: "password", placeholder: "MIIEvQ..." },
+      { key: "pg_public_key", label: "Nagad PG Public Key (শুধু base64 body, header/footer ছাড়া)", type: "password", placeholder: "MIIBIjAN..." },
+    ],
   },
 ];
+
 
 type GatewayCredentialForm = {
   enabled: boolean;

@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-19 (৩) — **Phase C সম্পূর্ণ: bKash Merchant ও Nagad Merchant automated gateways লাইভ — পরিকল্পিত সবগুলো (৭টা) provider এখন সম্পূর্ণ।** `PaymentGatewayFactory`-তে `bkash_merchant`/`nagad_merchant` রেজিস্টার করা হয়েছে। `BkashMerchantGatewayClient` এই রিপোর subscription-billing bKash ক্লায়েন্ট (লাইভ প্রমাণিত) থেকে মেকানিক্স কপি করে বানানো (কম রিস্ক)। `NagadMerchantGatewayClient` RSA-signed checkout — real community SDK থেকে গ্রাউন্ডেড, real RSA keypair দিয়ে crypto round-trip টেস্ট করা হয়েছে। **⚠️ Nagad-এর verify endpoint-এর response shape কনফার্ম করা যায়নি (EPS-এর মতোই সতর্কতা, live sandbox test লাগবে)।** বিস্তারিত §15.15 ও `online_payment_context.md §১০-১১`। Older entries kept as-is:
+
 Last updated: 2026-08-19 (২) — **Phase B সম্পূর্ণ: EPS automated merchant gateway লাইভ** (customer online payment)। `PaymentGatewayFactory`-তে `eps` রেজিস্টার করা হয়েছে, `EpsGatewayClient` ইমপ্লিমেন্টেড (EPS-এর official GitHub reference code থেকে real endpoint/field শেপ নিশ্চিত করে, পাবলিক ডকস না থাকায়) এবং ড্যাশবোর্ড ফর্ম চালু। Phase B-এর পরিকল্পিত সবগুলো provider (SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS) এখন লাইভ — বাকি শুধু C1 (bKash Merchant), C2 (Nagad Merchant)। বিস্তারিত §15.15 ও `online_payment_context.md §৯`। Older entries kept as-is:
 
 Last updated: 2026-08-18 (৩) — **Phase B3 লাইভ: ShurjoPay automated merchant gateway** (customer online payment)। `PaymentGatewayFactory`-তে `shurjopay` রেজিস্টার করা হয়েছে, `ShurjopayGatewayClient` ইমপ্লিমেন্টেড এবং ড্যাশবোর্ড ফর্ম চালু। বিস্তারিত §15.15 ও `online_payment_context.md`। Older entries kept as-is:
@@ -805,15 +807,15 @@ Floating "Support" chat button on every seller dashboard page (bottom-right, ren
 
 **সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`tracking_capi_context.md`](tracking_capi_context.md) — সমস্যা-বিবৃতি, ডোমেইন-মডেল নির্ভরতা (§৮, `custom_domain_context.md`-এর উপর দাঁড়িয়ে), ফেজ ব্রেকডাউন। রোডম্যাপে কোনো ট্র্যাকিং ফেজ বাকি নেই — বাকি যা আছে (fraud score-এ ওজন বসানো, TikTok/GA4 destination) নতুন কাজ হিসেবে আলাদা অনুরোধ লাগবে।
 
-### 15.15 Customer-Facing Online Payment — 🟡 আংশিক (Phase A ✅ + Phase B সম্পূর্ণ ✅ DONE, ২০২৬-০৮-১৯; বাকি C1/C2 ⬜)
+### 15.15 Customer-Facing Online Payment — 🟢 সম্পূর্ণ (Phase A + B + C সবগুলো DONE, ২০২৬-০৮-১৯)
 
-কাস্টমার এখন চেকআউটে পে করতে পারে দুইভাবে: **(Phase A)** সেলারের পার্সোনাল বিকাশ/নগদ/রকেট নম্বরে টাকা পাঠিয়ে TrxID সাবমিট, সেলার ভেরিফাই করে অ্যাপ্রুভ করে (মার্চেন্ট একাউন্ট ছাড়াই — ছোট/নতুন সেলারদের জন্য) — অথবা **(Phase B)** সেলারের নিজের merchant gateway (**SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS** — পরিকল্পিত ৫টাই লাইভ) দিয়ে সরাসরি অটোমেটিক পে। ChatGPT ও Gemini দুটো external review-ই independently এই পুরো ফিচারটাকে সবচেয়ে বড় gap বলেছিল (`OtherAI/`)।
+কাস্টমার এখন চেকআউটে পে করতে পারে দুইভাবে: **(Phase A)** সেলারের পার্সোনাল বিকাশ/নগদ/রকেট নম্বরে টাকা পাঠিয়ে TrxID সাবমিট, সেলার ভেরিফাই করে অ্যাপ্রুভ করে (মার্চেন্ট একাউন্ট ছাড়াই — ছোট/নতুন সেলারদের জন্য) — অথবা **(Phase B/C)** সেলারের নিজের merchant gateway (**SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS, bKash Merchant, Nagad Merchant** — পরিকল্পিত সবগুলো লাইভ) দিয়ে সরাসরি অটোমেটিক পে। ChatGPT ও Gemini দুটো external review-ই independently এই পুরো ফিচারটাকে সবচেয়ে বড় gap বলেছিল (`OtherAI/`)।
+
+**⚠️ Nagad Merchant-এর একটা caveat আছে**: verify endpoint-এর response shape কোনো public SDK-তেই parse করা নেই বলে confirmed না (EPS-এর মতোই — সেটাও প্রথমবার live test করার পরই ধরা পড়েছিল একটা field-shape bug)। Production-এ পুরোপুরি নির্ভরযোগ্য ধরার আগে বাস্তব Nagad sandbox দিয়ে একবার live test জরুরি।
 
 সেলার-সাবস্ক্রিপশন বিলিং-এর bKash কোড (§18.2) থেকে **সম্পূর্ণ আলাদা** — সেটা platform-wide singleton merchant creds দিয়ে seller→platform ফি নেয়, এটা per-seller creds দিয়ে customer→seller অর্ডার পেমেন্ট। একটা কোডও শেয়ার হয়নি, রিভিনিউ-ক্রিটিক্যাল লাইভ ফ্লো ভাঙার ঝুঁকি এড়াতে ইচ্ছাকৃতভাবে।
 
 একটা reuse-heavy ডিজাইন: verified পেমেন্ট (manual claim বা gateway callback — দুটোই) বিদ্যমান `order_payments` টেবিলেই যোগ হয় (`source` কলাম দিয়ে ট্যাগড: `online_wallet`/`online_gateway`) — তাই Collection History, invoice PDF payment-history, এবং `AccountingService::syncPaymentStatus()` সব বিনা পরিবর্তনে কাজ করে। Gateway callback verification সবসময় query-then-trust (bKash subscription callback-এর মতোই) — provider-এর নিজস্ব redirect status কখনো সরাসরি বিশ্বাস করা হয় না, প্রতিবার সার্ভার-টু-সার্ভার validate করা হয়।
-
-**বাকি**: bKash Merchant → Nagad Merchant (সবচেয়ে আলাদা শেপ — RSA-signed payload)।
 
 **সম্পূর্ণ বিস্তারিত রেফারেন্স:** [`online_payment_context.md`](online_payment_context.md) — data model, backend/frontend ফাইল লিস্ট, ডিজাইন সিদ্ধান্ত, test coverage, provider abstraction, build order।
 

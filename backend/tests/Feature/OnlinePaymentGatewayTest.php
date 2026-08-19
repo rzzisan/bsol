@@ -894,6 +894,269 @@ class OnlinePaymentGatewayTest extends TestCase
             'order_id' => $order->id, 'source' => 'online_gateway', 'method' => 'eps',
         ]);
     }
+
+    private function enableBkashMerchant(User $owner): void
+    {
+        PaymentGatewayCredential::create([
+            'user_id' => $owner->id,
+            'provider' => 'bkash_merchant',
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => [
+                'app_key' => 'bkash_test_app_key',
+                'app_secret' => 'bkash_test_app_secret',
+                'username' => 'bkash_sandbox_user',
+                'password' => 'bkash_sandbox_pass',
+            ],
+        ]);
+    }
+
+    public function test_bkash_merchant_initiate_and_successful_callback_verification(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableBkashMerchant($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout/token/grant' => Http::response([
+                'id_token' => 'BKASH_ID_TOKEN', 'expires_in' => 3600,
+            ]),
+            'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout/create' => Http::response([
+                'paymentID' => 'BKASH_PAY_ID_1', 'bkashURL' => 'https://tokenized.sandbox.bka.sh/pay/BKASH_PAY_ID_1',
+            ]),
+        ]);
+
+        $response = $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'bkash_merchant']
+        );
+
+        $response->assertOk();
+        $this->assertStringContainsString('tokenized.sandbox.bka.sh', $response->json('data.redirect_url'));
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('gateway_auto', $claim->channel_type);
+        $this->assertSame('bkash_merchant', $claim->provider);
+        $this->assertSame('BKASH_PAY_ID_1', $claim->provider_payment_id);
+
+        Http::fake([
+            'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout/token/grant' => Http::response([
+                'id_token' => 'BKASH_ID_TOKEN', 'expires_in' => 3600,
+            ]),
+            'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout/execute' => Http::response([
+                'paymentID' => 'BKASH_PAY_ID_1', 'trxID' => 'BKASH_TRX_1', 'transactionStatus' => 'Completed', 'amount' => '580.00',
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/bkash_merchant/callback/{$claim->id}?paymentID=BKASH_PAY_ID_1&status=success");
+        $callback->assertRedirect();
+        $this->assertStringContainsString('payment_result=success', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('confirmed', $order->status);
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertEquals(580.0, $order->paidAmount());
+        $this->assertDatabaseHas('order_payments', [
+            'order_id' => $order->id, 'source' => 'online_gateway', 'method' => 'bkash_merchant',
+        ]);
+    }
+
+    public function test_bkash_merchant_callback_where_execute_does_not_complete_is_rejected(): void
+    {
+        // Even if the redirect claims status=success, bKash's own execute()
+        // response is the sole authority (it both finalizes and reports the
+        // real outcome in one call) — a non-Completed transactionStatus
+        // must fail regardless of the redirect's own hint.
+        [$owner, $page, $product] = $this->shopWithPage();
+        $this->enableBkashMerchant($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout/token/grant' => Http::response([
+                'id_token' => 'BKASH_ID_TOKEN', 'expires_in' => 3600,
+            ]),
+            'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout/create' => Http::response([
+                'paymentID' => 'BKASH_PAY_ID_2', 'bkashURL' => 'https://tokenized.sandbox.bka.sh/pay/BKASH_PAY_ID_2',
+            ]),
+        ]);
+
+        $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'bkash_merchant']
+        )->assertOk();
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+
+        Http::fake([
+            'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout/token/grant' => Http::response([
+                'id_token' => 'BKASH_ID_TOKEN', 'expires_in' => 3600,
+            ]),
+            'https://tokenized.sandbox.bka.sh/v1.2.0-beta/tokenized/checkout/execute' => Http::response([
+                'paymentID' => 'BKASH_PAY_ID_2', 'transactionStatus' => 'Failed', 'statusMessage' => 'Cancelled by user',
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/bkash_merchant/callback/{$claim->id}?paymentID=BKASH_PAY_ID_2&status=success");
+        $this->assertStringContainsString('payment_result=failed', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('pending', $order->status);
+        $this->assertSame('due', $order->payment_status);
+    }
+
+    /**
+     * Two separate keypairs, matching Nagad's real design: our own merchant
+     * keypair (we hold the private key; Nagad holds our public key) and a
+     * stand-in for Nagad's PG keypair (we hold their public key; this test
+     * plays Nagad's part using the matching private key to build fake
+     * responses). Returns the merchant public PEM (to encrypt fake
+     * responses as Nagad would) after storing the credential row.
+     */
+    private function enableNagadMerchant(User $owner): string
+    {
+        $merchantKeyRes = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        openssl_pkey_export($merchantKeyRes, $merchantPrivatePem);
+        $merchantPublicPem = openssl_pkey_get_details($merchantKeyRes)['key'];
+
+        $pgKeyRes = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        openssl_pkey_export($pgKeyRes, $pgPrivatePem);
+        $pgPublicPem = openssl_pkey_get_details($pgKeyRes)['key'];
+
+        PaymentGatewayCredential::create([
+            'user_id' => $owner->id,
+            'provider' => 'nagad_merchant',
+            'enabled' => true,
+            'is_live' => false,
+            'credentials' => [
+                'merchant_id' => 'NAGAD_MERCHANT_TEST',
+                'account_number' => '01700000000',
+                'merchant_private_key' => $this->pemBody($merchantPrivatePem),
+                'pg_public_key' => $this->pemBody($pgPublicPem),
+            ],
+        ]);
+
+        return $merchantPublicPem;
+    }
+
+    private function pemBody(string $pem): string
+    {
+        $lines = array_filter(explode("\n", trim($pem)), fn (string $l) => ! str_starts_with(trim($l), '-----'));
+
+        return implode('', $lines);
+    }
+
+    /** Simulates Nagad's own server encrypting a response payload for us —
+     *  the exact inverse of what NagadMerchantGatewayClient::decrypt() does. */
+    private function nagadEncryptForUs(string $merchantPublicPem, array $data): string
+    {
+        $key = openssl_pkey_get_public($merchantPublicPem);
+        openssl_public_encrypt(json_encode($data), $encrypted, $key);
+
+        return base64_encode($encrypted);
+    }
+
+    public function test_nagad_merchant_initiate_and_successful_callback_verification(): void
+    {
+        [$owner, $page, $product] = $this->shopWithPage();
+        $merchantPublicPem = $this->enableNagadMerchant($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            '*check-out/initialize/*' => function ($request) use ($merchantPublicPem) {
+                return Http::response([
+                    'sensitiveData' => $this->nagadEncryptForUs($merchantPublicPem, [
+                        'paymentReferenceId' => 'NAGAD_REF_1',
+                        'challenge' => 'server_returned_challenge_123',
+                    ]),
+                    'signature' => 'not-verified-by-this-client',
+                ]);
+            },
+            '*check-out/complete/*' => Http::response([
+                'callBackUrl' => 'http://sandbox.mynagad.com:10080/check-out/pay/NAGAD_REF_1',
+            ]),
+        ]);
+
+        $response = $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'nagad_merchant']
+        );
+
+        $response->assertOk();
+        $this->assertStringContainsString('sandbox.mynagad.com', $response->json('data.redirect_url'));
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        $this->assertSame('gateway_auto', $claim->channel_type);
+        $this->assertSame('nagad_merchant', $claim->provider);
+        $this->assertSame('NAGAD_REF_1', $claim->provider_payment_id);
+
+        Http::fake([
+            '*verify/payment/*' => Http::response([
+                'status' => 'Success', 'amount' => '580.00', 'issuerPaymentRefNo' => 'NAGAD_ISSUER_1',
+            ]),
+        ]);
+
+        $callback = $this->get("/api/online-payment/nagad_merchant/callback/{$claim->id}?payment_ref_id=NAGAD_REF_1&status=Success");
+        $callback->assertRedirect();
+        $this->assertStringContainsString('payment_result=success', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('confirmed', $order->status);
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertEquals(580.0, $order->paidAmount());
+        $this->assertDatabaseHas('order_payments', [
+            'order_id' => $order->id, 'source' => 'online_gateway', 'method' => 'nagad_merchant',
+        ]);
+    }
+
+    public function test_nagad_merchant_verify_always_uses_our_own_stored_payment_reference(): void
+    {
+        // Same discipline built into every other client fixed/built this
+        // way in this batch: verifyPayment() never reads a customer-
+        // suppliable callback param to decide what to check.
+        [$owner, $page, $product] = $this->shopWithPage();
+        $merchantPublicPem = $this->enableNagadMerchant($owner);
+        $order = $this->createOrder($product->id);
+
+        Http::fake([
+            '*check-out/initialize/*' => function ($request) use ($merchantPublicPem) {
+                return Http::response([
+                    'sensitiveData' => $this->nagadEncryptForUs($merchantPublicPem, [
+                        'paymentReferenceId' => 'NAGAD_REF_2', 'challenge' => 'chal2',
+                    ]),
+                    'signature' => 'x',
+                ]);
+            },
+            '*check-out/complete/*' => Http::response([
+                'callBackUrl' => 'http://sandbox.mynagad.com:10080/check-out/pay/NAGAD_REF_2',
+            ]),
+        ]);
+
+        $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/gateway/initiate",
+            ['token' => $order->public_token, 'provider' => 'nagad_merchant']
+        )->assertOk();
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+
+        Http::fake([
+            '*verify/payment/*' => function ($request) {
+                // Only the REAL stored reference (still pending) exists on
+                // Nagad's side; a spoofed reference must never be queried.
+                if (str_contains((string) $request->url(), 'NAGAD_REF_2')) {
+                    return Http::response(['status' => 'Pending']);
+                }
+                return Http::response(['status' => 'Success', 'amount' => '580.00']);
+            },
+        ]);
+
+        $callback = $this->get("/api/online-payment/nagad_merchant/callback/{$claim->id}?payment_ref_id=SPOOFED_OTHER_REF&status=Success");
+        $this->assertStringContainsString('payment_result=failed', $callback->headers->get('Location'));
+
+        $order->refresh();
+        $this->assertSame('pending', $order->status);
+        $this->assertSame('due', $order->payment_status);
+        $this->assertDatabaseMissing('order_payments', ['order_id' => $order->id]);
+    }
 }
 
 
