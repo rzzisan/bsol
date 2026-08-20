@@ -1,5 +1,38 @@
 # BSOL Connect — Changelog
 
+## 1.19.6 — 2026-08-20
+
+Requested after 1.19.5: an admin asked why enabling/disabling a payment
+method and setting its checkout title required going to
+**WooCommerce → Settings → Payments → [gateway]** — one screen per
+gateway — instead of BSOL Connect's own admin page.
+
+**Not moved, just given a shortcut.** Channel existence/credentials still
+live on the BSOL dashboard only (unchanged, matches courier credentials
+and every other BSOL-side config in this plugin). But enable/disable and
+title *are* WooCommerce-native per-gateway fields — `Bsol_Gateway` reads
+them via the standard `WC_Settings_API::get_option()`, backed by the
+`woocommerce_bsol_{provider}_settings` option, exactly like every other
+WooCommerce gateway plugin's own settings screen would write. So the new
+`Bsol_Admin::render_gateway_shortcut_form()` (BSOL Connect → Settings →
+Payment Gateways panel) is a single-page table — one row per
+currently-visible channel, an Enabled checkbox and a Title field — that
+writes straight into that same option via `handle_gateway_shortcut_save()`.
+No new data model, no second source of truth: editing here or on
+WooCommerce's own screen changes the exact same stored value, either one
+takes effect on the very next checkout page load (no 15-minute cache
+delay, unlike the channel *list* — that part still needs Refresh/waits
+on BSOL's own enable/disable, since it decides which channels are
+registered as gateways at all, not just their title/enabled flag).
+
+An empty submitted title falls back to the plain provider name rather
+than saving blank — the "Cash on delivery" blank-title report right
+before this made clear what an empty title looks like at checkout.
+
+Provider names are validated against a fixed whitelist
+(`Bsol_Admin::PROVIDER_LABELS`) before any option is written — never
+builds a `wp_options` key from raw POST input.
+
 ## 1.19.5 — 2026-08-20
 
 Two fixes reported after 1.19.4 got the gateways actually registering on

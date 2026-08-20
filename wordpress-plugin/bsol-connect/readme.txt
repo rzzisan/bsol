@@ -4,7 +4,7 @@ Tags: woocommerce, order management, courier, sms otp, facebook conversions api,
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.19.5
+Stable tag: 1.19.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,9 @@ Steadfast, Paperfly, Pathao, RedX, and CarryBee. For Pathao/RedX/CarryBee, BSOL 
 3. Checkout OTP verification card on the order-received page.
 
 == Changelog ==
+
+= 1.19.6 =
+BSOL Connect → Settings → Payment Gateways panel now has an enable/title shortcut form — flip a channel on/off or rename it at checkout without leaving this page (still writes to the same WooCommerce gateway settings WooCommerce → Settings → Payments would; nothing new is stored). Channel existence/credentials still stay on the BSOL dashboard only.
 
 = 1.19.5 =
 Checkout payment-method list now gets real styling (card layout, selected-state highlight) instead of the theme's bare default list — on both classic and block checkout. Fix: a gateway's Title field defaulted to two different values depending on whether the admin had opened its settings screen ("BSOL: SSLCommerz") or not ("SSLCommerz"), showing an inconsistent mix at checkout — now always defaults to the plain provider name.

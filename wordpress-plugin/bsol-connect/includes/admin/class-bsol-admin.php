@@ -49,6 +49,8 @@ class Bsol_Admin {
 			delete_transient( 'bsol_payment_channels' );
 			delete_transient( 'bsol_update_check' );
 			add_settings_error( 'bsol_messages', 'bsol_message', __( 'Cleared — the checkout page and update notice will pick up fresh data on next load.', 'bsol-connect' ), 'success' );
+		} elseif ( isset( $_POST['bsol_save_gateway_shortcut'] ) && check_admin_referer( 'bsol_gateway_shortcut_action' ) ) {
+			$this->handle_gateway_shortcut_save();
 		}
 
 		$balance_result = null;
@@ -305,15 +307,134 @@ class Bsol_Admin {
 	}
 
 	/**
-	 * Diagnostic status panel, not a config form — actual provider
-	 * enable/credentials always live on the BSOL dashboard (Settings →
-	 * Online Payment Channels), same as courier credentials and the
-	 * checkout-OTP toggle. This just answers, live, "does this site
-	 * currently see any channel, and which checkout type is it using" —
-	 * exactly the two questions that took a live-test round-trip to answer
-	 * before this existed. Calls BSOL directly (bypasses the 15-min
-	 * transient the checkout-time registration uses) since this is a
-	 * low-traffic admin page, not checkout — always show current truth.
+	 * A provider being available at all (which channels exist, their
+	 * credentials) still always lives on the BSOL dashboard (Settings →
+	 * Online Payment Channels) — never duplicated here. What IS a
+	 * WooCommerce-native concept per gateway — enable/disable *on this
+	 * site* and the checkout-facing title — normally lives on
+	 * WooCommerce → Settings → Payments → [gateway], one screen per
+	 * gateway. render_gateway_shortcut_form() below is a single-page
+	 * shortcut for exactly those two fields, writing straight into the
+	 * same `woocommerce_bsol_{provider}_settings` option WooCommerce's own
+	 * screen would — Bsol_Gateway reads it with the standard
+	 * WC_Settings_API get_option() either way, so there's no third source
+	 * of truth here, just a faster way to edit the same one.
+	 */
+	const PROVIDER_LABELS = array(
+		// Keep in sync with Bsol_Payment_Gateway::WALLET_LABELS/GATEWAY_LABELS
+		// (includes/modules/payment-gateway/class-bsol-payment-gateway.php) —
+		// duplicated rather than referenced because that class's file is
+		// only require_once'd on woocommerce_loaded (see
+		// class-bsol-master.php's docblock), so it isn't guaranteed loaded
+		// on this admin page even when WooCommerce is active.
+		'bkash'          => 'bKash (Personal)',
+		'nagad'          => 'Nagad (Personal)',
+		'rocket'         => 'Rocket (Personal)',
+		'sslcommerz'     => 'SSLCommerz',
+		'aamarpay'       => 'AamarPay',
+		'zinipay'        => 'ZiniPay',
+		'shurjopay'      => 'ShurjoPay',
+		'eps'            => 'EPS',
+		'bkash_merchant' => 'bKash',
+		'nagad_merchant' => 'Nagad',
+	);
+
+	/**
+	 * Reads/writes woocommerce_bsol_{provider}_settings directly — only for
+	 * providers in PROVIDER_LABELS (never build an option name from raw
+	 * POST input) — same 'manage_options' capability gate as the rest of
+	 * this admin page already provides.
+	 */
+	private function handle_gateway_shortcut_save() {
+		$submitted = isset( $_POST['bsol_gw'] ) && is_array( $_POST['bsol_gw'] ) ? wp_unslash( $_POST['bsol_gw'] ) : array();
+
+		foreach ( $submitted as $provider => $fields ) {
+			if ( ! array_key_exists( $provider, self::PROVIDER_LABELS ) ) {
+				continue; // not a real BSOL provider — ignore rather than trust
+			}
+
+			$option_key = 'woocommerce_bsol_' . $provider . '_settings';
+			$existing   = get_option( $option_key, array() );
+			if ( ! is_array( $existing ) ) {
+				$existing = array();
+			}
+
+			$title = sanitize_text_field( isset( $fields['title'] ) ? (string) $fields['title'] : '' );
+			// An empty title is exactly the "Cash on delivery" bug this
+			// site hit before (a blank checkout label) — fall back to the
+			// plain provider name rather than let that happen again here.
+			$existing['title']   = '' !== $title ? $title : self::PROVIDER_LABELS[ $provider ];
+			$existing['enabled'] = ! empty( $fields['enabled'] ) ? 'yes' : 'no';
+
+			update_option( $option_key, $existing );
+		}
+
+		add_settings_error( 'bsol_messages', 'bsol_message', __( 'Payment method settings saved.', 'bsol-connect' ), 'success' );
+	}
+
+	/**
+	 * One row per currently-visible channel — checkbox + title, posting to
+	 * handle_gateway_shortcut_save() above. Shown only for channels BSOL
+	 * currently reports as enabled (same $providers list as the status
+	 * block above) — a channel BSOL doesn't report isn't registered as a
+	 * WooCommerce gateway at all, so there'd be nothing here to edit yet.
+	 */
+	private function render_gateway_shortcut_form( $providers ) {
+		if ( empty( $providers ) ) {
+			return;
+		}
+		?>
+		<form method="post" action="?page=bsol_connect&tab=settings">
+			<?php wp_nonce_field( 'bsol_gateway_shortcut_action' ); ?>
+			<table class="form-table" role="presentation">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Method', 'bsol-connect' ); ?></th>
+						<th><?php esc_html_e( 'Enabled', 'bsol-connect' ); ?></th>
+						<th><?php esc_html_e( 'Title shown at checkout', 'bsol-connect' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php foreach ( $providers as $provider ) :
+					$label      = isset( self::PROVIDER_LABELS[ $provider ] ) ? self::PROVIDER_LABELS[ $provider ] : ucfirst( str_replace( '_', ' ', $provider ) );
+					$option_key = 'woocommerce_bsol_' . $provider . '_settings';
+					$settings   = get_option( $option_key, array() );
+					$enabled    = ! isset( $settings['enabled'] ) || 'yes' === $settings['enabled'];
+					$title      = isset( $settings['title'] ) && '' !== $settings['title'] ? $settings['title'] : $label;
+					?>
+					<tr>
+						<td><?php echo esc_html( $label ); ?></td>
+						<td>
+							<input type="checkbox" name="bsol_gw[<?php echo esc_attr( $provider ); ?>][enabled]" value="1" <?php checked( $enabled ); ?> />
+						</td>
+						<td>
+							<input type="text" class="regular-text" name="bsol_gw[<?php echo esc_attr( $provider ); ?>][title]" value="<?php echo esc_attr( $title ); ?>" />
+						</td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<button type="submit" name="bsol_save_gateway_shortcut" class="button button-primary">
+				<?php esc_html_e( 'Save payment method settings', 'bsol-connect' ); ?>
+			</button>
+			<p class="description"><?php esc_html_e( 'Takes effect immediately — no cache delay, unlike the channel list above.', 'bsol-connect' ); ?></p>
+		</form>
+		<?php
+	}
+
+	/**
+	 * Diagnostic status panel, not a config form for the channel list
+	 * itself — actual provider existence/credentials always live on the
+	 * BSOL dashboard (Settings → Online Payment Channels), same as
+	 * courier credentials and the checkout-OTP toggle. This just answers,
+	 * live, "does this site currently see any channel, and which checkout
+	 * type is it using" — exactly the two questions that took a live-test
+	 * round-trip to answer before this existed. Calls BSOL directly
+	 * (bypasses the 15-min transient the checkout-time registration uses)
+	 * since this is a low-traffic admin page, not checkout — always show
+	 * current truth. The enable/title shortcut form below IS a config
+	 * form, for the WooCommerce-native per-site fields only (see
+	 * render_gateway_shortcut_form()'s docblock).
 	 */
 	private function render_payment_gateway_status() {
 		$api      = new Bsol_Api();
@@ -347,6 +468,8 @@ class Bsol_Admin {
 						<?php echo esc_html( implode( ', ', $providers ) ); ?>
 					</div>
 				<?php endif; ?>
+
+				<?php $this->render_gateway_shortcut_form( $providers ); ?>
 			<?php endif; ?>
 
 			<p class="description">
