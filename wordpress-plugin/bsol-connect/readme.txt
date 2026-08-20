@@ -4,7 +4,7 @@ Tags: woocommerce, order management, courier, sms otp, facebook conversions api,
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.19.4
+Stable tag: 1.19.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,6 +74,9 @@ Steadfast, Paperfly, Pathao, RedX, and CarryBee. For Pathao/RedX/CarryBee, BSOL 
 3. Checkout OTP verification card on the order-received page.
 
 == Changelog ==
+
+= 1.19.5 =
+Checkout payment-method list now gets real styling (card layout, selected-state highlight) instead of the theme's bare default list — on both classic and block checkout. Fix: a gateway's Title field defaulted to two different values depending on whether the admin had opened its settings screen ("BSOL: SSLCommerz") or not ("SSLCommerz"), showing an inconsistent mix at checkout — now always defaults to the plain provider name.
 
 = 1.17.0 =
 Facebook/Meta tracking: Pixel base code, PageView/ViewContent/AddToCart/InitiateCheckout/Lead/Purchase events, all relayed through your own site (your BSOL API key never reaches the browser). Order outcome events (Confirmed/Delivered/Returned etc.) are sent by BSOL itself, not this plugin.

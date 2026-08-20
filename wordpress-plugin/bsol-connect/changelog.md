@@ -1,5 +1,42 @@
 # BSOL Connect — Changelog
 
+## 1.19.5 — 2026-08-20
+
+Two fixes reported after 1.19.4 got the gateways actually registering on
+a live site: the checkout payment-method list looked like a bare,
+unstyled default list, and one gateway's title showed inconsistently.
+
+**Checkout payment-method list had zero styling.** `bsol-payment-gateway.css`
+was only ever enqueued via `maybe_enqueue_assets()`'s `is_order_received_page()`
+check — the checkout page itself never got the stylesheet at all, so the
+BSOL payment methods sat there as whatever the theme's bare default
+`<ul>`/block-radio markup looked like. Fixed: `maybe_enqueue_assets()` now
+also loads on `is_checkout()`, and the CSS gained a real payment-method-list
+section — card layout, spacing, a highlighted selected state — covering
+both classic checkout (`ul.wc_payment_methods`) and the block-based
+Cart & Checkout (`.wc-block-components-radio-control__option`), since a
+site can use either.
+
+**Inconsistent gateway titles** ("BSOL: SSLCommerz" next to plain
+"ZiniPay"): `Bsol_Gateway::init_form_fields()`'s `title` field defaulted
+to `$this->method_title` ("BSOL: " + label — meant for the wp-admin
+gateway list only), while the constructor's own `get_option('title', $label)`
+fallback used the plain label. Any gateway whose settings screen an admin
+had opened and saved (even without editing) got the "BSOL: " prefix
+baked into its saved option; any gateway never opened kept the plain
+fallback — same code, two different checkout-facing results depending on
+admin click history. Fixed: the form field's default now matches the
+constructor's, `$label`, not `$this->method_title`. Note: a gateway that
+already has "BSOL: X" saved in its WooCommerce settings keeps showing
+that until the Title field is manually cleared/retyped there — this fix
+only stops new inconsistency, it doesn't rewrite already-saved settings.
+
+Also confirmed, not a plugin bug: a blank "Cash on delivery" option at
+checkout is WooCommerce's own native `cod` gateway with an empty `Title`
+saved in **WooCommerce → Settings → Payments → Cash on delivery** on that
+site — this plugin never touches that gateway's settings. Fix is a
+one-line edit on that settings screen, not a code change here.
+
 ## 1.19.4 — 2026-08-19
 
 The real fix — found by directly inspecting the live PHP process on a

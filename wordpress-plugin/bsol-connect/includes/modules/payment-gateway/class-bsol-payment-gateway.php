@@ -319,11 +319,23 @@ class Bsol_Payment_Gateway {
 	}
 
 	public function maybe_enqueue_assets() {
-		if ( ! function_exists( 'is_order_received_page' ) || ! is_order_received_page() ) {
+		$on_order_received = function_exists( 'is_order_received_page' ) && is_order_received_page();
+		$on_checkout       = function_exists( 'is_checkout' ) && is_checkout() && ! $on_order_received;
+
+		if ( ! $on_order_received && ! $on_checkout ) {
 			return;
 		}
 
+		// Same stylesheet on both pages — the checkout-page rules (payment
+		// method list layout) and the order-received-page rules (wallet-
+		// claim form, result banner) are disjoint selectors, so loading it
+		// on both costs nothing and keeps this to one enqueue call.
 		wp_enqueue_style( 'bsol-payment-gateway', BSOL_PLUGIN_URL . 'assets/css/bsol-payment-gateway.css', array(), BSOL_PLUGIN_VERSION );
+
+		if ( ! $on_order_received ) {
+			return; // checkout page needs no JS, only the payment-list CSS above
+		}
+
 		wp_enqueue_script( 'bsol-payment-gateway', BSOL_PLUGIN_URL . 'assets/js/bsol-payment-gateway.js', array( 'jquery' ), BSOL_PLUGIN_VERSION, true );
 		wp_localize_script(
 			'bsol-payment-gateway',

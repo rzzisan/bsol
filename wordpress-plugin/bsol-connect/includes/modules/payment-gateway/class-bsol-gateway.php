@@ -25,10 +25,14 @@ class Bsol_Gateway extends WC_Payment_Gateway {
 	/** @var Bsol_Order_Sync */
 	private $order_sync;
 
+	/** @var string plain provider label, e.g. "SSLCommerz" — used as the title form field's default */
+	private $label;
+
 	public function __construct( $provider, $label, $channel_type, $order_sync ) {
 		$this->id           = 'bsol_' . $provider;
 		$this->channel_type = $channel_type;
 		$this->order_sync   = $order_sync;
+		$this->label        = $label;
 		$this->icon         = '';
 		$this->has_fields   = false; // gateway_auto redirects off-site; wallet_manual's claim form lives on order-received, not the checkout payment box
 		$this->method_title = 'BSOL: ' . $label;
@@ -60,7 +64,14 @@ class Bsol_Gateway extends WC_Payment_Gateway {
 				'title'       => __( 'Title', 'bsol-connect' ),
 				'type'        => 'text',
 				'description' => __( 'Shown to the customer at checkout.', 'bsol-connect' ),
-				'default'     => $this->method_title,
+				// Plain provider label, not method_title's "BSOL: " prefix
+				// (that prefix is only useful for telling channels apart
+				// in the wp-admin gateway list — a shopper doesn't need
+				// to see BSOL's own brand name at checkout). Must match
+				// the constructor's own get_option() fallback below, or
+				// gateways an admin has opened-and-saved without editing
+				// end up with a different title than ones never opened.
+				'default'     => $this->label,
 				'desc_tip'    => true,
 			),
 			'description' => array(

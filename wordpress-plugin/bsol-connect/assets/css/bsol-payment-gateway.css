@@ -1,4 +1,72 @@
-/* Storefront-side wallet-claim form + payment result banner — order-received page only. */
+/*
+ * Storefront-side: (1) payment method list layout on the checkout page —
+ * covers both classic/shortcode checkout markup (ul.wc_payment_methods)
+ * and the block-based Cart & Checkout markup
+ * (.wc-block-components-radio-control), since a site can use either; and
+ * (2) wallet-claim form + payment result banner on the order-received page.
+ * Loaded on both pages by Bsol_Payment_Gateway::maybe_enqueue_assets().
+ */
+
+/* ── Payment method list — classic (shortcode) checkout ────────────────── */
+
+ul.wc_payment_methods {
+	padding: 0;
+}
+
+ul.wc_payment_methods li.wc_payment_method {
+	list-style: none;
+	margin: 0 0 8px;
+	padding: 12px 14px;
+	border: 1px solid #ddd;
+	border-radius: 8px;
+	background: #fff;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+ul.wc_payment_methods li.wc_payment_method:has(input.input-radio:checked) {
+	border-color: #cc302b;
+	background: #fff8f7;
+}
+
+ul.wc_payment_methods li.wc_payment_method label {
+	font-weight: 600;
+	cursor: pointer;
+}
+
+ul.wc_payment_methods li.wc_payment_method .payment_box {
+	margin-top: 10px;
+	padding: 10px 12px;
+	background: #f8f8f8;
+	border-radius: 6px;
+	font-size: 13px;
+}
+
+/* ── Payment method list — block-based (Cart & Checkout block) checkout ── */
+
+.wc-block-components-radio-control__option {
+	margin: 0 0 8px;
+	padding: 12px 14px !important;
+	border: 1px solid #ddd !important;
+	border-radius: 8px !important;
+	background: #fff;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.wc-block-components-radio-control__option.wc-block-components-radio-control__option-checked {
+	border-color: #cc302b !important;
+	background: #fff8f7;
+}
+
+.wc-block-components-radio-control__option .wc-block-components-payment-method-label {
+	font-weight: 600;
+}
+
+.bsol-blocks-payment-description {
+	display: block;
+	margin-top: 4px;
+	font-size: 13px;
+	color: #757575;
+}
 
 .bsol-payment-banner {
 	max-width: 480px;
@@ -60,9 +128,4 @@
 .bsol-wallet-claim-message {
 	margin-top: 10px;
 	font-size: 13px;
-}
-
-.bsol-blocks-payment-description {
-	font-size: 13px;
-	color: #757575;
 }

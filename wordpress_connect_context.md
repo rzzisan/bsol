@@ -1,5 +1,7 @@
 # WordPress/WooCommerce Connector — BSOL Connect (Context)
 
+শেষ আপডেট: ২০২৬-০৮-২০ — **v1.19.5 — checkout payment-method list-এর ডিজাইন + title/COD ফিডব্যাক ফিক্স।** গেটওয়েগুলো ১৯.৪-এ register হচ্ছিল ঠিকই, কিন্তু `bsol-payment-gateway.css` checkout পেজে আদৌ enqueue-ই হতো না (শুধু order-received পেজে) — এখন checkout-এও লোড হয়, আর card layout/selected-state হাইলাইট (classic + block দুই checkout-ই) যোগ হয়েছে। সাথে একটা real bug ফিক্স: gateway title field-এর default constructor-এর fallback-এর সাথে না মেলায় "BSOL: SSLCommerz" এর পাশে প্লেইন "ZiniPay" — এমন ইনকনসিস্টেন্ট দেখাচ্ছিল, এখন সব সময় প্লেইন label। "Cash on delivery"-তে কোনো টেক্সট না থাকাটা প্লাগিনের বাগ না — সেই সাইটের নিজের WooCommerce COD সেটিংসে Title খালি সেভ করা ছিল। বিস্তারিত §১২-এর নিচে।
+
 শেষ আপডেট: ২০২৬-০৮-১৯ (৫) — **v1.19.4 — আসল ফিক্স, সরাসরি লাইভ সার্ভারে SSH দিয়ে (`wp eval`) verify করে।** ১৯.৩-এর status panel-ই আসল প্রমাণ দিল: BSOL-এ ৬টা channel ঠিকভাবে enabled, কিন্তু `class_exists('Bsol_Payment_Gateway')` = false — মডিউলই কখনো লোড হয়নি। **আসল কারণ**: `did_action('woocommerce_loaded')` ইতিমধ্যেই `1` — আমাদের `add_action()` register করার আগেই fire হয়ে গিয়েছিল, প্রতিবার, যেকোনো প্লাগিন অর্ডারেই (WooCommerce নিজের বুটস্ট্র্যাপ তার নিজের ফাইল-লোড সময়েই সিনক্রোনাসলি চলে, যেটা সব প্লাগিনের জন্যই `plugins_loaded` fire হওয়ার আগে ঘটে)। ১৯.১-এর ফিক্স ঠিক উল্টো সমস্যা তৈরি করেছিল যেটা এড়াতে চেয়েছিল। ফিক্স: `did_action()` আগে চেক করে, আগে থেকেই fired হলে সাথে সাথে init করে। রিলিজের আগেই সেলারের আসল সার্ভারে প্যাচ করে verify করা হয়েছে — ৬টা চ্যানেলই এখন সঠিকভাবে register হয়। বিস্তারিত §১২-এর নিচে।
 
 শেষ আপডেট: ২০২৬-০৮-১৯ (৪) — **v1.19.3 — wp-admin-এ "Payment Gateways" স্ট্যাটাস প্যানেল যোগ।** কনফিগ এখনো BSOL dashboard-এই থাকে, কিন্তু এখন wp-admin থেকেই লাইভ দেখা যায় এই সাইট কোন কোন channel দেখছে, checkout classic না block-based সেটাও detect করে দেখায়, আর এক ক্লিকে cache (payment-channel + update-notice দুটোই) রিফ্রেশ করা যায়। বিস্তারিত §১২-এর নিচে।
@@ -330,6 +332,18 @@ did_action(woocommerce_loaded): 1   ← আমাদের listener register ক
 **Release-এর আগেই সেলারের আসল সার্ভারে সরাসরি ভেরিফাই করা হয়েছে**: `class-bsol-master.php` ফাইলটা সরাসরি scp করে বসিয়ে `wp eval` দিয়ে কনফার্ম করা হয়েছে — `Bsol_Payment_Gateway: yes`, এবং `registered_gateway_ids`-এ তার সবগুলো enabled channel (SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS, bKash Merchant) সঠিকভাবে দেখা গেছে, `bacs`/`cheque`/`cod`-এর পাশাপাশি।
 
 **শেখা**: এই পুরো bug hunt-টা (১৯.১ → ১৯.৪) দেখায় কেন "সম্ভাব্য রেস কন্ডিশন" থিওরি দিয়ে ফিক্স করা এক জিনিস, আর real production-এ real WordPress bootstrap order দিয়ে verify করা সম্পূর্ণ ভিন্ন জিনিস — এই dev environment-এ কোনো real WordPress install না থাকায় (§৬ দ্রষ্টব্য) কোনোটাই আগে থেকে টেস্ট করা সম্ভব ছিল না; সেলারের root SSH access ছাড়া এটা আরও কয়েক রাউন্ড গেস-অ্যান্ড-চেক লাগত।
+
+### ফিক্স (v1.19.5, পরের দিন — গেটওয়ে register হওয়ার পর প্রথম UI ফিডব্যাক)
+
+১৯.৪-এ গেটওয়েগুলো সত্যিই checkout-এ দেখা যাচ্ছিল, কিন্তু সেলার জানালেন লিস্টের ডিজাইন খুবই সাধারণ, আর "Cash On Delivery" অপশনের কোনো টেক্সট দেখা যাচ্ছে না (স্ক্রিনশট: একটা খালি radio, তারপর ৬টা BSOL চ্যানেল, তার মধ্যে "ZiniPay"-এর আগে "BSOL: " prefix নেই যেখানে বাকি সব-এ আছে)।
+
+`wp eval`-এ সরাসরি লাইভ সাইট চেক করে দুটো আলাদা কারণ পাওয়া গেল:
+
+**CSS আদৌ checkout পেজে লোডই হতো না** — `maybe_enqueue_assets()`-এর একমাত্র শর্ত ছিল `is_order_received_page()`, checkout পেজের জন্য আলাদা কোনো enqueue-ই ছিল না। ফিক্স: `is_checkout()`-এও একই স্টাইলশিট লোড হয় এখন (JS ছাড়া, শুধু CSS — checkout-এ কোনো AJAX দরকার নেই), আর CSS-এ payment-method-list-এর জন্য নতুন সেকশন যোগ হয়েছে — card layout, spacing, selected-state হাইলাইট — classic (`ul.wc_payment_methods`) আর block (`.wc-block-components-radio-control__option`) দুই checkout-ই কভার করে।
+
+**"BSOL: " prefix ইনকনসিস্টেন্সি** — `Bsol_Gateway::init_form_fields()`-এর `title` ফিল্ডের default ছিল `$this->method_title` ("BSOL: " + label, শুধু wp-admin গেটওয়ে লিস্টে আলাদা করে চেনার জন্য বানানো), কিন্তু constructor-এর নিজের `get_option('title', $label)` fallback প্লেইন label ব্যবহার করত। যে গেটওয়ের সেটিংস পেজ অ্যাডমিন কখনো খুলে Save করেছেন (এডিট না করলেও), সেটার সেভড অপশনে "BSOL: " prefix বসে গেছে; যেটা কখনো খোলা হয়নি সেটা প্লেইন label-ই রয়ে গেছে — একই কোড, অ্যাডমিনের ক্লিক-হিস্ট্রি অনুযায়ী দুই রকম রেজাল্ট। ফিক্স: form field-এর default এখন constructor-এর মতোই প্লেইন `$label`। **নোট**: যেসব গেটওয়েতে ইতিমধ্যে "BSOL: X" সেভ হয়ে আছে, সেগুলোতে এই ফিক্স নিজে থেকে কিছু বদলাবে না (already-saved option সবসময় জেতে) — সেটা ঠিক করতে হলে ওই গেটওয়ের WooCommerce সেটিংসে গিয়ে Title ফিল্ড ম্যানুয়ালি খালি/পুনরায় লিখতে হবে।
+
+**"Cash On Delivery"-তে কোনো টেক্সট নেই — এটা প্লাগিনের বাগ না।** `wp eval` করে `get_option('woocommerce_cod_settings')` দেখা গেল ওই সাইটের নিজের COD গেটওয়ের `title` সেভড খালি স্ট্রিং — WooCommerce নিজের নেটিভ `cod` গেটওয়ে, এই প্লাগিন কখনো তার সেটিংসে হাত দেয় না। সমাধান: **WooCommerce → Settings → Payments → Cash on delivery**-তে গিয়ে Title ফিল্ডে টেক্সট বসিয়ে Save করা, কোড পরিবর্তন না।
 
 ---
 
