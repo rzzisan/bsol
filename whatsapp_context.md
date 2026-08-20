@@ -1,5 +1,7 @@
 # WhatsApp Business Integration — Context
 
+শেষ আপডেট: 2026-08-20 (৩) — **⏸️ ফিচারটা পজড।** Meta-সাইড setup (System User App-এ WhatsApp product/use-case যোগ করা, Business Verification, ইত্যাদি — §১/§১ক দ্রষ্টব্য) সেলারকে নিজে Meta Business Suite-এ গিয়ে ধাপে ধাপে করতে হয়, আর এটা এই dev environment থেকে production-এ সরাসরি end-to-end টেস্ট করার কোনো উপায় নেই। User সিদ্ধান্ত নিয়েছেন আপাতত অন্য ফিচারে সময় দেওয়া হবে। কোড, টেস্ট (`WhatsappTest.php`, ১৬টা), migration — সব ইতিমধ্যে production-এ deployed। Meta-সাইড setup (WhatsApp product যোগ + token generate + subscribe verify) কেউ শেষ করলে এখান থেকেই আবার শুরু করা যাবে — নতুন করে ডিজাইন/কোড লেখার দরকার নেই।
+
 শেষ আপডেট: 2026-08-20 (২) — **§১ সংশোধন করা হলো — আগের এন্ট্রি ভুলভাবে "BSOL-এর App Review" বলছিল, আসলে per-seller।** সেলারের প্রশ্নে ধরা পড়ল যে "app review কার করতে হবে" এই প্রশ্নের আগের উত্তরটা Facebook Pixel/CAPI-র মডেলের সাথে ভুলভাবে মিলিয়ে ফেলা হয়েছিল। WebSearch করে confirm করা হয়েছে: System User token generate করার সময় সেলার **নিজের** কোন App-এর আন্ডারে সেটা বানাচ্ছে বেছে নেয় — এই credential-paste আর্কিটেকচারে সেটা স্বাভাবিকভাবেই সেলারের **নিজের** Meta App/Business Manager হবে, BSOL-এর App না। তার মানে ৫-নম্বর cap কাটানোর জন্য **প্রতিটা সেলারকে নিজে** তার Business Manager verify করাতে হবে — BSOL-এর একটামাত্র App Review দিয়ে সবার জন্য unlock হয় না। এই ভুল সংশোধনের সময় আরেকটা **real কোড গ্যাপ** পাওয়া গেছে ও ফিক্স করা হয়েছে (§১ক)। বিস্তারিত নিচে।
 
 ## ১. Real customer-দের জন্য কী কী লাগবে — সংশোধিত ব্যাখ্যা
