@@ -1,10 +1,24 @@
 # SMS Credit Auto-Recharge (Auto-top-up) — Context
 
+শেষ আপডেট: 2026-08-20 (২) — **🔴 লাইভ ব্লকার পাওয়া গেছে প্রথম টেস্টেই**: platform-এর real bKash credential Tokenized Checkout-এর জন্য না, PGW-এর জন্য (`bkash_api_type='pgw'`) — token grant `9999 Invalid app key and secret combination` দিয়ে রিজেক্ট করছে। Agreement/tokenization শুধু Tokenized Checkout প্রোডাক্টেই আছে, PGW-তে নেই — তাই এটা কোড বাগ না, business/credential সিদ্ধান্ত লাগবে। বিস্তারিত §২ক।
+
 শেষ আপডেট: 2026-08-20 — **Phase 1 সম্পূর্ণ: SMS credit auto-recharge লাইভ।** `feature_roadmap_context.md` আইটেম #৩। সেলার একবার একটা bKash Agreement কানেক্ট করে থ্রেশহোল্ড + প্রতিবার কত ক্রেডিট কেনা হবে সেট করে দিলে, ব্যালেন্স ওই থ্রেশহোল্ডের নিচে নামলেই সেভ করা bKash দিয়ে নিজে থেকে রিচার্জ হয়ে যায় — ম্যানুয়াল চেকআউট রিপিট করার দরকার নেই। Subscription auto-renew ইচ্ছাকৃতভাবে এই ফেজে বাদ (user confirm করেছেন — বড় blast radius, পরে দরকার হলে একই `saved_payment_methods` টেবিল দিয়েই বানানো যাবে)।
 
 ## ১. কেন
 
 আগে SMS credit ব্যালেন্স শেষ হলে automation (SMS trigger) চুপচাপ থেমে যেত, সেলার নিজে খেয়াল না করলে বুঝতেই পারত না। Manual/bKash one-time checkout (`SmsCreditPurchaseController`, `subscription_billing_context.md §৩`) এখনো আছে, কিন্তু প্রতিবার রিপিট করতে হয়। Auto-recharge এই friction সরায়।
+
+## ২ক. 🔴 লাইভ ব্লকার (২০২৬-০৮-২০, প্রথম লাইভ টেস্টেই ধরা পড়েছে) — platform-এর real bKash credential আসলে PGW-র জন্য, Tokenized Checkout-এর জন্য না
+
+"Connect bKash" চাপলেই `bKash token grant rejected {"statusCode":"9999","statusMessage":"Invalid app key and secret combination"}` — কোড বাগ না, **সত্যিকারের credential mismatch**। `PlatformBillingSetting::bkash_api_type` এখন `'pgw'` — মানে platform-এর লাইভ bKash merchant account **classic Checkout API (PGW)**-এর জন্য ইস্যু করা, Tokenized Checkout-এর জন্য না (ঠিক `SAAS_MODULE_CONTEXT.md §18`-এ ডকুমেন্টেড পুরনো ইনসিডেন্টের মতোই — একই ৪টা ফিল্ড শেপ (`app_key`/`app_secret`/`username`/`password`) হলেও bKash-এর কাছে দুটো সম্পূর্ণ আলাদা product, credential interchange হয় না)।
+
+**এটা fundamentally গুরুত্বপূর্ণ, শুধু একটা wrong-credential bug না**: bKash-এর Agreement (saved-token recurring charge) সুবিধা **শুধু Tokenized Checkout প্রোডাক্টেই আছে** — classic PGW-এর কোনো সমতুল্য saved-token মেকানিজম নেই। মানে platform-এর বর্তমান merchant relationship (PGW-only) দিয়ে auto-recharge আদৌ সম্ভব না, যতক্ষণ না বিজনেস আসলেই bKash থেকে Tokenized Checkout প্রোডাক্ট অ্যাক্সেস নেয়।
+
+**পরবর্তী পদক্ষেপ (কোড না, business/account-level)**:
+1. bKash-কে Tokenized Checkout-এর জন্য আলাদা credential ইস্যু করতে অনুরোধ করা (PGW-র পাশাপাশি বা বদলে), অথবা
+2. আপাতত bKash-এর পাবলিক sandbox Tokenized Checkout credential দিয়ে (`bkash_sandbox=true`, একটা টেস্ট `PlatformBillingSetting` রো) Agreement flow-এর কোড আসলেই সঠিক কিনা যাচাই করা — এটাই §২-এ উল্লেখিত "unconfirmed shape" সতর্কতার real sandbox verification, এখনো বাকি।
+
+Real production credential PGW-only থাকা অবস্থায় সেলারদের কাছে auto-recharge অফার করা উচিত না — feature কোডে আছে, deployed, কিন্তু **সেলার-ফেসিং ব্যবহারযোগ্য না যতক্ষণ #১ বা #২ সমাধান না হয়**।
 
 ## ২. ⚠️ গুরুত্বপূর্ণ সতর্কতা — bKash Agreement API shape unconfirmed
 
