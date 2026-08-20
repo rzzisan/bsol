@@ -8,6 +8,7 @@ use App\Models\OrderStatusLog;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Tracking\TrackingIngestService;
+use App\Services\Whatsapp\WhatsappAutomationService;
 use App\Support\PhoneIntelCache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +31,7 @@ class OrderStatusService
 
     public function __construct(
         private readonly SmsAutomationService $smsAutomationService,
+        private readonly WhatsappAutomationService $whatsappAutomationService,
         private readonly AccountingService $accountingService,
         private readonly TrackingIngestService $trackingIngest,
     ) {}
@@ -71,6 +73,7 @@ class OrderStatusService
         ]);
 
         $this->smsAutomationService->handleOrderStatusChanged($order, $oldStatus, $newStatus);
+        $this->whatsappAutomationService->handleOrderStatusChanged($order, $oldStatus, $newStatus);
 
         if ($newStatus === 'delivered') {
             $this->accountingService->onOrderDelivered($order);

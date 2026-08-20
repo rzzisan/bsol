@@ -82,6 +82,9 @@ const menuText = {
     landingPages: "ল্যান্ডিং পেজ",
     abandonedCheckouts: "অসম্পূর্ণ অর্ডার",
     facebookLeads: "ফেসবুক লিডস",
+    whatsappInbox: "হোয়াটসঅ্যাপ ইনবক্স",
+    whatsappAutomation: "হোয়াটসঅ্যাপ অটোমেশন",
+    whatsappConnect: "হোয়াটসঅ্যাপ",
 
     marketing: "মার্কেটিং",
     facebookCapi: "Facebook CAPI",
@@ -163,6 +166,9 @@ const menuText = {
     landingPages: "Landing Pages",
     abandonedCheckouts: "Abandoned Checkouts",
     facebookLeads: "Facebook Leads",
+    whatsappInbox: "WhatsApp Inbox",
+    whatsappAutomation: "WhatsApp Automation",
+    whatsappConnect: "WhatsApp",
 
     marketing: "Marketing",
     facebookCapi: "Facebook CAPI",
@@ -194,7 +200,7 @@ const menuText = {
 
 // ─── Build menu from labels ───────────────────────────────────────────────────
 
-function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMenuItem[] {
+function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number, whatsappUnread: number): ShellMenuItem[] {
   return [
     {
       key: "dashboard",
@@ -253,6 +259,13 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
       badge: facebookLeadsUnread,
     },
     {
+      key: "whatsapp-inbox",
+      label: (t as any).whatsappInbox ?? "হোয়াটসঅ্যাপ ইনবক্স",
+      icon: "💬",
+      href: "/dashboard/whatsapp/inbox",
+      badge: whatsappUnread,
+    },
+    {
       key: "courier",
       label: t.courier,
       icon: "🚚",
@@ -271,6 +284,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
         { key: "sms-history", label: t.smsHistory, href: "/dashboard/sms/history" },
         { key: "sms-automation", label: t.smsAutomation, href: "/dashboard/sms/automation" },
         { key: "sms-credit", label: t.smsCredit, href: "/dashboard/sms/credit" },
+        { key: "whatsapp-automation", label: (t as any).whatsappAutomation ?? "হোয়াটসঅ্যাপ অটোমেশন", href: "/dashboard/whatsapp/automation" },
       ],
     },
     {
@@ -315,6 +329,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number): ShellMen
         { key: "courier-accounts", label: t.courierAccounts, href: "/dashboard/settings/courier" },
         { key: "online-payment-settings", label: t.onlinePaymentSettings, href: "/dashboard/settings/payments" },
         { key: "facebook-connect", label: (t as any).facebookConnect ?? "ফেসবুক পেজ", href: "/dashboard/settings/facebook" },
+        { key: "whatsapp-connect", label: (t as any).whatsappConnect ?? "হোয়াটসঅ্যাপ", href: "/dashboard/settings/whatsapp" },
         { key: "wordpress-connect", label: (t as any).wordpressConnect ?? "ওয়ার্ডপ্রেস কানেক্ট", href: "/dashboard/settings/wordpress" },
         { key: "subscription", label: t.subscription, href: "/dashboard/settings/subscription" },
         { key: "staff-management", label: t.staffManagement, href: "/dashboard/settings/staff" },
@@ -344,6 +359,8 @@ const MODULE_KEY_BY_MENU_ITEM: Record<string, StaffModuleKey> = {
   "landing-pages": "landing_pages",
   "abandoned-checkouts": "landing_pages",
   "facebook-leads": "facebook",
+  "whatsapp-inbox": "whatsapp",
+  "whatsapp-automation": "whatsapp",
 
   "all-orders": "orders",
   "create-order": "orders",
@@ -451,6 +468,7 @@ export default function UserShell({
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
   const [subscription, setSubscription] = useState<{ status: string; days_left: number | null; is_expired: boolean } | null>(null);
   const [facebookLeadsUnread, setFacebookLeadsUnread] = useState(0);
+  const [whatsappUnread, setWhatsappUnread] = useState(0);
 
   useEffect(() => {
     setLocale(getStoredLocale());
@@ -564,10 +582,34 @@ export default function UserShell({
     return () => clearInterval(interval);
   }, []);
 
+  // WhatsApp inbox sidebar badge — same light-poll pattern as the Facebook
+  // Leads badge above.
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/whatsapp/messages/unread-count", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setWhatsappUnread(data.count ?? 0);
+      } catch {
+        // silent — badge just stays at its last known value
+      }
+    };
+
+    void poll();
+    const interval = setInterval(poll, 20000);
+    return () => clearInterval(interval);
+  }, []);
+
   const t = useMemo(() => menuText[locale], [locale]);
   const menu = useMemo(
-    () => filterMenuForStaff(buildMenu(t, facebookLeadsUnread), user),
-    [t, facebookLeadsUnread, user],
+    () => filterMenuForStaff(buildMenu(t, facebookLeadsUnread, whatsappUnread), user),
+    [t, facebookLeadsUnread, whatsappUnread, user],
   );
 
   const title = pageTitle ? pageTitle[locale] : t.sidebarTitle;

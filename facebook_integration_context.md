@@ -2,7 +2,11 @@
 
 এই ফাইল `SAAS_MODULE_CONTEXT.md` §15.11 / §16.3-এর deep-reference — Facebook Page comment/inbox lead-capture ফিচারের সব বিস্তারিত টেকনিক্যাল তথ্য, Meta App setup log, এবং known issue এখানে। `landing_page_context.md`-এর মতোই একটা module-specific deep-dive ফাইল, `SAAS_MODULE_CONTEXT.md` শুধু summary + link রাখে।
 
-**Last updated:** 2026-08-08 — §4 queue-worker-gap note corrected (fixed), §5 stale uncommitted-changes note corrected (already committed), added §6 prioritized recommendations for future work, then implemented §6 items 9 and 5 (see §7), items 1 and 4 (see §8), and items 10/11/12 (see §9) — all of §6 now done except #2, #3, #7, #8 (real-traffic/demand-gated or bigger scope, left for later). Sections 1-3, 3.2, 3.3 kept as-is (2026-08-02/07 work log).
+**Last updated:** 2026-08-20 (২) — **WhatsApp Business integration built on this same Meta App** (`whatsapp_context.md`) — shares the app_id/app_secret/webhook_verify_token (`PlatformFacebookSetting`) and the single `/facebook/webhook` callback URL (Meta apps have one callback per app, not per product — `object` field in the payload distinguishes `page` from `whatsapp_business_account` deliveries). Its own permission, `whatsapp_business_messaging`, is separate from the `pages_*` ones tracked in §10 below and has **not** been submitted for App Review yet — a distinct blocker, not resolved by the partial approval below.
+
+**Last updated:** 2026-08-20 — App Review decision came back **partial**: 5/8 permissions approved, 3 rejected on screencast grounds only (not functionality). See §10 for the rejection detail + re-record/resubmit plan. Prior 2026-08-08 note kept below.
+
+**Last updated (2026-08-08):** §4 queue-worker-gap note corrected (fixed), §5 stale uncommitted-changes note corrected (already committed), added §6 prioritized recommendations for future work, then implemented §6 items 9 and 5 (see §7), items 1 and 4 (see §8), and items 10/11/12 (see §9) — all of §6 now done except #2, #3, #7, #8 (real-traffic/demand-gated or bigger scope, left for later). Sections 1-3, 3.2, 3.3 kept as-is (2026-08-02/07 work log).
 
 **Unrelated regression found + fixed same session:** seller's landing-pages list (`/dashboard/landing-pages`) was returning empty — a pre-existing bug from an earlier landing-page cleanup commit (`36fab21`), not caused by any Facebook work here. Full writeup + fix in `landing_page_context.md` §22.
 
@@ -316,3 +320,46 @@ New `facebook_reply_templates` table (per-user `title` + `message`), `FacebookRe
 ### Item 12 — Lead priority badge
 
 Leads with `detected_phone` set but no linked `customer` yet now get a distinct blue "Phone detected" badge next to the status pill — the previously-invisible distinction the doc called out (`detected_phone` existed in the data since the original MVP, just never surfaced visually). Once a lead is converted to a customer the existing green "Customer:" line already covers that state, so the phone badge only shows for the in-between "actionable but not yet converted" case — that's the one a seller actually needs a nudge to notice.
+
+---
+
+## 10. App Review decision — partial rejection 2026-08-20 (screencast-only, no code/functionality issue)
+
+Submitted 2026-08-07 (§3 above), decision arrived 2026-08-20.
+
+**Approved (5):** `pages_read_user_content`, `pages_show_list`, `business_management`, `pages_read_engagement`, `public_profile`.
+
+**Rejected (3) — all under Developer Policy 1.6, same boilerplate reason ("screencast fails to demonstrate the end-to-end experience"), each with a specific reviewer note:**
+
+| Permission | Reviewer's specific gap |
+|---|---|
+| `pages_manage_metadata` | Screencast didn't show (1) the app subscribing to Page events/updating Page settings, and (2) a sample webhook event (e.g. new-comment notification) arriving in the app, tied to the same Page shown during setup. |
+| `pages_manage_engagement` | Screencast never showed the app actually engaging with content — reviewer wants each UI state change visible, same Page/post throughout. |
+| `pages_messaging` | Screencast showed a message sent from our dashboard but never verified arriving in the actual Messenger/Instagram/WhatsApp client for that account/number. |
+
+**Important:** rejection is explicitly about the *recording*, not the underlying feature — Meta's own text says "your app's use case is allowed." Nothing here implicates the code:
+- Webhook subscribe (§1 architecture, `subscribeAppToPage()`) and comment/message capture (`FacebookLeadCaptureService`) are live-verified since 2026-08-04 (§3, "Fourth issue" + "Fifth issue").
+- Comment/message reply ("engaging with content") is live-verified end-to-end since 2026-08-04 (§3, "Reply-from-dashboard feature").
+- Message delivery to the real Messenger client was never actually re-verified on camera — worth double-checking it still lands (24h messaging-window rule, §3) before recording, but no reason to expect it doesn't.
+
+### Re-record checklist per permission
+
+Record fresh, in English UI, with captions/tooltips explaining each button (per Meta's Screen Recording Guide) — reviewer explicitly flagged missing captions as a best-practice ask, not just the content gaps. One continuous take per permission is safest; all three can reuse the same login+Page.
+
+1. **Meta login flow** (start of every clip) — click Login with Facebook, complete the dialog, land back on BSOL.
+2. **Grant screen** — show the permission being requested/granted in Meta's consent screen (the `config_id` Login Configuration screen, §3).
+3. **`pages_manage_metadata`:**
+   - Show `/dashboard/settings/facebook` → Connect Page → webhook auto-subscribes (point out `webhook_subscribed_at`/status in UI, or narrate it if not surfaced).
+   - Trigger a real event on the connected Page (post a comment, or send a Messenger message) from a second window/phone.
+   - Cut back to `/dashboard/leads` and show the new lead land — same Page, same session, so the reviewer can trace cause→effect.
+4. **`pages_manage_engagement`:**
+   - From `/dashboard/leads`, open a captured comment lead, click Reply, type a reply, send.
+   - Show the reply appear in-thread in our UI (chat-bubble view, §3.3), **then** cut to the actual Facebook Page/post in a browser tab and show the same reply live under the comment — the state change must be visible on both ends.
+5. **`pages_messaging`:**
+   - Same as above but for a Messenger lead: reply from `/dashboard/leads`, then cut to the Messenger app/web client logged into the *same test account* and show the message arrived there.
+6. **Server-to-server note:** N/A here — this app does use the frontend Meta login flow (not a system-user token), so item 5 of Meta's instructions doesn't apply; no need to flag that in the resubmission notes.
+
+### Resubmission steps
+1. Record the 3 clips above (user records own screen — not something this session can do).
+2. Re-upload under each permission's "Allowed usage" section in the App Review submission (same justification text can stay; only the screencast needs replacing).
+3. Resubmit for review. No code changes required unless the Messenger-delivery re-check in step 3 above turns up a regression.

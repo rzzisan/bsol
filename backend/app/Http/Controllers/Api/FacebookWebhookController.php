@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PlatformFacebookSetting;
 use App\Services\Facebook\FacebookGraphClient;
 use App\Services\Facebook\FacebookLeadCaptureService;
+use App\Services\Whatsapp\WhatsappMessageCaptureService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -14,12 +15,20 @@ use Illuminate\Http\Response;
  * verify-token handshake (GET) and the X-Hub-Signature-256 HMAC (POST), not
  * Sanctum. See CourierWebhook-equivalent none exists yet; this is the first
  * public-facing webhook receiver in the codebase.
+ *
+ * One shared callback URL for every subscribed product on this Meta App
+ * (Page/Messenger AND WhatsApp Cloud API both deliver here) — Meta Apps
+ * have a single Webhooks callback URL + verify token per app, not one per
+ * subscribed object; deliveries are distinguished by the payload's own
+ * top-level `object` field (`page` vs `whatsapp_business_account`). See
+ * whatsapp_context.md.
  */
 class FacebookWebhookController extends Controller
 {
     public function __construct(
         private readonly FacebookGraphClient $graphClient,
         private readonly FacebookLeadCaptureService $captureService,
+        private readonly WhatsappMessageCaptureService $whatsappCaptureService,
     ) {}
 
     public function verify(Request $request): Response
@@ -54,6 +63,7 @@ class FacebookWebhookController extends Controller
         // synchronously is fast enough to stay well within Meta's webhook
         // response-time budget.
         $this->captureService->handle($payload);
+        $this->whatsappCaptureService->handle($payload);
 
         return response('EVENT_RECEIVED', 200);
     }

@@ -6,6 +6,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-20 (২) — **আইটেম #২ (WhatsApp Business)-এর Phase 1 ✅ সম্পন্ন ও লাইভ** — order-status automation (Meta-approved টেমপ্লেট) + ২-way ইনবক্স, দুটোই deploy করা হয়েছে। ⚠️ `whatsapp_business_messaging` App Review এখনো সাবমিট করা হয়নি — Meta-সাইড Standard Access cap (৫টা verified tester নম্বর) না কাটা পর্যন্ত real কাস্টমারদের জন্য ব্যবহারযোগ্য না। বিস্তারিত `whatsapp_context.md`।
+
 Last updated: 2026-08-20 — **আইটেম #৩ (Auto-top-up)-এর Phase 1 ✅ সম্পন্ন ও লাইভ** — SMS credit auto-recharge: bKash Agreement (saved payment method) কানেক্ট করে থ্রেশহোল্ড সেট করলে balance কমে গেলেই নিজে থেকে রিচার্জ হয়। Subscription auto-renew ইচ্ছাকৃতভাবে বাদ (deferred)। বিস্তারিত `auto_top_up_context.md`।
 
 Last updated: 2026-08-17 (২) — **আইটেম #১ (checkout online payment)-এর Phase A এখন ✅ সম্পন্ন ও লাইভ** — personal bKash/Nagad/Rocket "send & verify" (মার্চেন্ট একাউন্ট ছাড়াই)। বিস্তারিত `online_payment_context.md`, `SAAS_MODULE_CONTEXT.md §15.15`। নিচের §১-এর বিস্তারিত অংশও দ্রষ্টব্য — Phase B/C (SSLCommerz/bKash merchant gateway) এখনো বাকি।
@@ -22,7 +24,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 |---|---|---|---|
 | — | **Staff/Team sub-account role** | ✅ **সম্পন্ন** (Phase 1 + Phase 2, সব মডিউল কভার করা হয়েছে, deployed+verified) | `staff_team_role_context.md` |
 | 1 | চেকআউটে অনলাইন পেমেন্ট কালেকশন | ✅ সম্পূর্ণ — Phase A (personal wallet) + Phase B/C-এর পরিকল্পিত সবগুলো (৭টা) automated gateway (SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS, bKash Merchant, Nagad Merchant) লাইভ (২০২৬-০৮-১৯), landing page ও WooCommerce (`bsol-connect` v1.19.0) দুই জায়গাতেই। Nagad Merchant-এর verify shape unconfirmed — live sandbox test প্রয়োজন | `online_payment_context.md`, `wordpress_connect_context.md §১২` |
-| 2 | WhatsApp Business integration | ⬜ Not started | — |
+| 2 | WhatsApp Business integration | 🟡 Phase 1 (automation + inbox) ✅ সম্পন্ন, কোড deploy করা হয়েছে — App Review (`whatsapp_business_messaging`) বাকি, real কাস্টমার-দের জন্য এখনো ব্লকড | `whatsapp_context.md` |
 | 3 | Auto-top-up / usage-based billing | 🟡 আংশিক — Phase 1 (SMS credit auto-recharge, bKash Agreement) ✅ সম্পন্ন (২০২৬-০৮-২০); subscription auto-renew ইচ্ছাকৃতভাবে deferred | `auto_top_up_context.md` |
 | 5 | Courier waybill/label PDF | ✅ সম্পন্ন ও deployed — COD amount বাগ ফিক্স, Pathao-স্টাইল লেবেল, Sticker Template ফিচার (২২টা ডিজাইন, সেলার-সিলেক্টেবল, প্রিভিউ থাম্বনেইল সহ) সম্পূর্ণ, এবং ✅ বাংলা টেক্সট রেন্ডারিং বাগ ফাইনালি সমাধান (real HarfBuzz shaping — সবগুলো ২২টা sticker টেমপ্লেট + order invoice-এ), + Payment History টেবিল (২০২৬-০৮-১৭) | `courier_waybill_context.md` §৪.৭, §৬, §৮.১ |
 | — | **Tracking Platform (Facebook CAPI + browser-side, প্যাকেজ-ভিত্তিক ইভেন্ট লিমিট)** | ✅ সম্পন্ন (T1-T7, ২০২৬-০৮-১৬) — পরিকল্পনার সবগুলো ফেজ শেষ, browser Pixel + server CAPI + order-flow ইভেন্ট + quota + event log + admin usage view — লাইভ | `tracking_capi_context.md` |
@@ -49,9 +51,9 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 
 **বাকি (Phase B/C):** সত্যিকারের automated gateway — SSLCommerz (মার্চেন্ট একাউন্ট থাকা সেলারদের জন্য) ও bKash Merchant/PGW (subscription billing-এর bKash কোড থেকে সম্পূর্ণ আলাদা, ইচ্ছাকৃতভাবে touch করা হয়নি — platform-wide vs per-seller creds mismatch)। Provider abstraction ইন্টারফেস (`PaymentGatewayClient`) ডিজাইন করা আছে, `payment_gateway_settings` টেবিলে sslcommerz/bkash_gateway কলামও রেডি — শুধু client+controller+route যোগ করতে হবে।
 
-### 2. WhatsApp Business integration
-Facebook Messenger lead-capture-এর architecture (webhook + phone auto-link, `FacebookLeadCaptureService`) প্রায় হুবহু reuse করা যাবে। Order confirm/broadcast/CRM follow-up চ্যানেল হিসেবে দ্রুত বাড়ছে বাংলাদেশে।
-**শুরুর পয়েন্ট:** WhatsApp Cloud API credential (Meta Business), নতুন `WhatsappMessageService` — `FacebookGraphClient`-এর প্যাটার্ন অনুসরণ করে।
+### 2. WhatsApp Business integration — 🟡 Phase 1 ✅ সম্পন্ন (২০২৬-০৮-২০)
+Facebook Messenger lead-capture-এর architecture (webhook + phone auto-link) সরাসরি reuse হয়েছে — `WhatsappMessageCaptureService`, `WhatsappCloudApiClient` (`FacebookGraphClient`-এর প্যাটার্ন)। Order-status automation (`SmsAutomationService`-এর হুবহু কাঠামো, Meta-approved টেমপ্লেট রেফারেন্স করে) + ২-way ইনবক্স (`FacebookLeadController`-এর প্যাটার্ন, wa_id দিয়ে exact customer auto-link) — দুটোই লাইভ।
+**বাকি**: `whatsapp_business_messaging` App Review সাবমিট করা (business/Meta-side, কোড না) — এটা ছাড়া শুধু ৫টা verified-tester নম্বরেই মেসেজ যাবে। বিস্তারিত `whatsapp_context.md`।
 
 ### 3. Auto-top-up / usage-based billing — 🟡 আংশিক (Phase 1 ✅ সম্পন্ন, ২০২৬-০৮-২০)
 **Phase 1 লাইভ**: SMS credit auto-recharge — সেলার একবার bKash Agreement কানেক্ট করে থ্রেশহোল্ড + top-up amount সেট করলে balance কমে গেলে নিজে থেকেই রিচার্জ হয় (নতুন `saved_payment_methods` টেবিল, `BkashPaymentGatewayClient`-এ Agreement মেথড, `AutoRechargeSmsCreditJob`, circuit-breaker ৩ বার ব্যর্থে auto-disable)। ⚠️ bKash-এর real Agreement API shape sandbox-এ verify করা হয়নি এখনো (EPS/Nagad Merchant-এর মতোই সতর্কতা)। বিস্তারিত `auto_top_up_context.md`।

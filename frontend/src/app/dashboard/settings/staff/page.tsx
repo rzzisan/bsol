@@ -34,6 +34,7 @@ const MODULE_KEYS = [
   "facebook",
   "tracking",
   "payments",
+  "whatsapp",
 ] as const;
 type ModuleKey = (typeof MODULE_KEYS)[number];
 
@@ -51,6 +52,7 @@ const moduleLabels: Record<Locale, Record<ModuleKey, string>> = {
     facebook: "ফেসবুক লিডস",
     tracking: "ট্র্যাকিং লগ",
     payments: "অনলাইন পেমেন্ট",
+    whatsapp: "হোয়াটসঅ্যাপ",
   },
   en: {
     orders: "Orders",
@@ -65,6 +67,7 @@ const moduleLabels: Record<Locale, Record<ModuleKey, string>> = {
     facebook: "Facebook Leads",
     tracking: "Tracking Log",
     payments: "Online Payments",
+    whatsapp: "WhatsApp",
   },
 };
 

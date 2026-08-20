@@ -40,6 +40,9 @@ use App\Http\Controllers\Api\FacebookLeadController;
 use App\Http\Controllers\Api\FacebookPixelSettingController;
 use App\Http\Controllers\Api\FacebookReplyTemplateController;
 use App\Http\Controllers\Api\FacebookWebhookController;
+use App\Http\Controllers\Api\WhatsappAutomationController;
+use App\Http\Controllers\Api\WhatsappConnectionController;
+use App\Http\Controllers\Api\WhatsappMessageController;
 use App\Http\Controllers\Api\FraudController;
 use App\Http\Controllers\Api\LandingPageController;
 use App\Http\Controllers\Api\LandingMediaLibraryController;
@@ -634,6 +637,32 @@ Route::middleware('active_subscription')->group(function () {
             Route::post('/', [FacebookReplyTemplateController::class, 'store']);
             Route::put('/{id}', [FacebookReplyTemplateController::class, 'update'])->where('id', '[0-9]+');
             Route::delete('/{id}', [FacebookReplyTemplateController::class, 'destroy'])->where('id', '[0-9]+');
+        });
+    });
+
+    // ── WhatsApp Business (Cloud API, credential-paste — whatsapp_context.md) ──
+    // Same owner-only-connection vs shared-inbox split as Facebook above.
+    Route::middleware('owner_only')->prefix('whatsapp/connection')->group(function () {
+        Route::get('/', [WhatsappConnectionController::class, 'show']);
+        Route::put('/', [WhatsappConnectionController::class, 'update']);
+        Route::post('/test-send', [WhatsappConnectionController::class, 'testSend']);
+        Route::delete('/', [WhatsappConnectionController::class, 'destroy']);
+    });
+
+    Route::middleware('staff_permission:whatsapp')->group(function () {
+        Route::prefix('whatsapp/automation')->group(function () {
+            Route::get('/rules', [WhatsappAutomationController::class, 'index']);
+            Route::post('/rules', [WhatsappAutomationController::class, 'store']);
+            Route::put('/rules/{id}', [WhatsappAutomationController::class, 'update'])->where('id', '[0-9]+');
+            Route::delete('/rules/{id}', [WhatsappAutomationController::class, 'destroy'])->where('id', '[0-9]+');
+            Route::get('/logs', [WhatsappAutomationController::class, 'logs']);
+        });
+        Route::prefix('whatsapp/messages')->group(function () {
+            Route::get('/', [WhatsappMessageController::class, 'index']);
+            Route::get('/unread-count', [WhatsappMessageController::class, 'unreadCount']);
+            Route::get('/thread/{waId}', [WhatsappMessageController::class, 'thread']);
+            Route::put('/{id}/read', [WhatsappMessageController::class, 'markRead'])->where('id', '[0-9]+');
+            Route::post('/thread/{waId}/reply', [WhatsappMessageController::class, 'reply']);
         });
     });
 
