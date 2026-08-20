@@ -9,6 +9,7 @@ import {
   FileText,
   Loader2,
   MessageSquare,
+  RefreshCw,
   Wallet,
 } from "lucide-react";
 import UserShell from "@/components/user-shell";
@@ -47,6 +48,17 @@ interface Purchase {
   status: "pending" | "approved" | "rejected";
   trx_id: string | null;
   created_at: string;
+}
+
+// See auto_top_up_context.md / SmsCreditAutoRechargeController::status().
+interface AutoRechargeInfo {
+  enabled: boolean;
+  threshold: number;
+  credits: number;
+  failure_count: number;
+  last_attempted_at: string | null;
+  connected: boolean;
+  status: string | null;
 }
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
@@ -92,6 +104,24 @@ const text = {
     downloadInvoice: "ইনভয়েস ডাউনলোড",
     downloadFailed: "ইনভয়েস ডাউনলোড ব্যর্থ হয়েছে।",
     paymentStatus: { pending: "পেন্ডিং", approved: "পরিশোধিত", rejected: "বাতিল" } as Record<string, string>,
+    autoTitle: "অটো-রিচার্জ",
+    autoDesc: "ব্যালেন্স একটা নির্দিষ্ট পরিমাণের নিচে নামলে সেভ করা bKash দিয়ে নিজে থেকেই রিচার্জ হয়ে যাবে।",
+    autoNotConnected: "কোনো bKash সেভ করা নেই।",
+    autoConnect: "bKash কানেক্ট করুন",
+    autoConnecting: "কানেক্ট হচ্ছে...",
+    autoConnected: "bKash কানেক্টেড",
+    autoDisconnect: "ডিসকানেক্ট",
+    autoEnable: "অটো-রিচার্জ চালু করুন",
+    autoThreshold: "থ্রেশহোল্ড (এর নিচে নামলে রিচার্জ হবে)",
+    autoTopupCredits: "কত ক্রেডিট কেনা হবে প্রতিবার",
+    autoSave: "সেভ করুন",
+    autoSaving: "সেভ হচ্ছে...",
+    autoSaved: "অটো-রিচার্জ সেটিংস সেভ হয়েছে।",
+    autoFailures: (n: number) => `শেষ ${n} বার ব্যর্থ হয়েছে।`,
+    autoDisabledWarning: "বারবার ব্যর্থ হওয়ায় অটো-রিচার্জ বন্ধ হয়ে গেছে — bKash অ্যাকাউন্ট চেক করে আবার চালু করুন।",
+    autoAgreementSuccess: "bKash কানেক্ট হয়েছে — এখন অটো-রিচার্জ চালু করতে পারো।",
+    autoAgreementFailed: "bKash কানেক্ট করা যায়নি। আবার চেষ্টা করো।",
+    autoAgreementCancelled: "bKash কানেক্ট বাতিল করা হয়েছে।",
   },
   en: {
     title: "Buy SMS Credit",
@@ -132,6 +162,24 @@ const text = {
     downloadInvoice: "Download invoice",
     downloadFailed: "Could not download the invoice.",
     paymentStatus: { pending: "Pending", approved: "Paid", rejected: "Rejected" } as Record<string, string>,
+    autoTitle: "Auto-recharge",
+    autoDesc: "Automatically top up using a saved bKash payment method once your balance drops below a threshold.",
+    autoNotConnected: "No saved bKash payment method.",
+    autoConnect: "Connect bKash",
+    autoConnecting: "Connecting...",
+    autoConnected: "bKash connected",
+    autoDisconnect: "Disconnect",
+    autoEnable: "Enable auto-recharge",
+    autoThreshold: "Threshold (recharge once balance drops to/under this)",
+    autoTopupCredits: "Credits to buy each time",
+    autoSave: "Save",
+    autoSaving: "Saving...",
+    autoSaved: "Auto-recharge settings saved.",
+    autoFailures: (n: number) => `Failed the last ${n} time(s).`,
+    autoDisabledWarning: "Auto-recharge was turned off after repeated failures — check your bKash account and re-enable.",
+    autoAgreementSuccess: "bKash connected — you can now enable auto-recharge.",
+    autoAgreementFailed: "Could not connect bKash. Please try again.",
+    autoAgreementCancelled: "bKash connection was cancelled.",
   },
 };
 
@@ -153,6 +201,13 @@ export default function Page() {
   const [showManualForm, setShowManualForm] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
+  const [autoRecharge, setAutoRecharge] = useState<AutoRechargeInfo | null>(null);
+  const [autoThreshold, setAutoThreshold] = useState("");
+  const [autoTopupCredits, setAutoTopupCredits] = useState("");
+  const [autoEnabled, setAutoEnabled] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [autoConnecting, setAutoConnecting] = useState(false);
+
   const credits = Math.max(0, parseInt(creditsInput || "0", 10) || 0);
   const isValidAmount = credits >= MIN_CREDITS;
   const totalPrice = rateInfo ? Math.round(credits * rateInfo.rate_per_credit * 100) / 100 : 0;
@@ -168,12 +223,14 @@ export default function Page() {
     setError(null);
     try {
       const headers = { Accept: "application/json", Authorization: `Bearer ${token}` };
-      const [rateRes, purchasesRes] = await Promise.all([
+      const [rateRes, purchasesRes, autoRes] = await Promise.all([
         fetch(`${API}/sms/credit/rate`, { headers }),
         fetch(`${API}/sms/credit/purchases`, { headers }),
+        fetch(`${API}/sms/credit/auto-recharge/settings`, { headers }),
       ]);
       const rateData = await rateRes.json();
       const purchasesData = await purchasesRes.json();
+      const autoData = await autoRes.json();
 
       if (!rateRes.ok || !purchasesRes.ok) {
         setError(rateData?.message ?? purchasesData?.message ?? t.error);
@@ -182,6 +239,14 @@ export default function Page() {
 
       setRateInfo(rateData?.data as RateInfo);
       setPurchases((purchasesData?.data ?? []) as Purchase[]);
+
+      if (autoRes.ok) {
+        const info = autoData?.data as AutoRechargeInfo;
+        setAutoRecharge(info);
+        setAutoThreshold(String(info.threshold || ""));
+        setAutoTopupCredits(String(info.credits || ""));
+        setAutoEnabled(info.enabled);
+      }
     } catch {
       setError(t.error);
     } finally {
@@ -202,6 +267,21 @@ export default function Page() {
     if (bkashStatus === "success") setSuccess(t.bkashSuccess);
     else if (bkashStatus === "cancelled") setError(t.bkashCancelled);
     else setError(t.bkashFailed);
+
+    window.history.replaceState(null, "", window.location.pathname);
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Returning from the bKash Agreement (auto-recharge connect) redirect —
+  // see SmsCreditAutoRechargeController::callback().
+  useEffect(() => {
+    const agreementStatus = new URLSearchParams(window.location.search).get("bkash_agreement");
+    if (!agreementStatus) return;
+
+    if (agreementStatus === "success") setSuccess(t.autoAgreementSuccess);
+    else if (agreementStatus === "cancelled") setError(t.autoAgreementCancelled);
+    else setError(t.autoAgreementFailed);
 
     window.history.replaceState(null, "", window.location.pathname);
     void load();
@@ -375,6 +455,86 @@ export default function Page() {
     const result = await openAuthenticatedPdf(`${API}/sms/credit/purchases/${purchaseId}/invoice`);
     if (!result.success) setError(result.message ?? t.downloadFailed);
     setDownloadingId(null);
+  };
+
+  const connectAutoRechargeBkash = async () => {
+    const token = getStoredToken();
+    if (!token) return;
+
+    setAutoConnecting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`${API}/sms/credit/auto-recharge/agreement/create`, {
+        method: "POST",
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.data?.bkash_url) {
+        setError(data?.message ?? t.bkashError);
+        setAutoConnecting(false);
+        return;
+      }
+      window.location.href = data.data.bkash_url;
+    } catch {
+      setError(t.bkashError);
+      setAutoConnecting(false);
+    }
+  };
+
+  const disconnectAutoRechargeBkash = async () => {
+    const token = getStoredToken();
+    if (!token) return;
+
+    setAutoSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/sms/credit/auto-recharge/agreement`, {
+        method: "DELETE",
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data?.message ?? t.error);
+        return;
+      }
+      await load();
+    } catch {
+      setError(t.error);
+    } finally {
+      setAutoSaving(false);
+    }
+  };
+
+  const saveAutoRechargeSettings = async () => {
+    const token = getStoredToken();
+    if (!token) return;
+
+    setAutoSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`${API}/sms/credit/auto-recharge/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          enabled: autoEnabled,
+          threshold: Math.max(0, parseInt(autoThreshold || "0", 10) || 0),
+          credits: Math.max(0, parseInt(autoTopupCredits || "0", 10) || 0),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.message ?? t.error);
+        return;
+      }
+      setSuccess(t.autoSaved);
+      await load();
+    } catch {
+      setError(t.error);
+    } finally {
+      setAutoSaving(false);
+    }
   };
 
   const bkashNumber = rateInfo?.payment_instructions?.bkash_number ?? "";
@@ -562,6 +722,98 @@ export default function Page() {
             {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
             {success ? <p className="mt-3 text-sm text-emerald-600">{success}</p> : null}
           </section>
+
+          {/* Auto-recharge — only offered when the platform's bKash gateway
+              is configured at all (same flag the Bill Payment section
+              above already gates on) and the setting loaded successfully
+              (staff accounts get a 403 from this owner-only endpoint and
+              autoRecharge stays null, so the panel is simply omitted). */}
+          {rateInfo?.bkash_gateway_enabled && autoRecharge ? (
+            <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
+              <SectionHeader icon={RefreshCw}>{t.autoTitle}</SectionHeader>
+              <p className="mb-3 text-xs text-[var(--muted)]">{t.autoDesc}</p>
+
+              {!autoRecharge.connected ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--border)] px-3 py-3">
+                  <span className="text-sm text-[var(--muted)]">{t.autoNotConnected}</span>
+                  <button
+                    type="button"
+                    onClick={() => void connectAutoRechargeBkash()}
+                    disabled={autoConnecting}
+                    className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
+                    style={{ background: "linear-gradient(135deg, #E2136E, #b90f59)" }}
+                  >
+                    {autoConnecting ? t.autoConnecting : t.autoConnect}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5" style={{ background: "var(--surface-soft)" }}>
+                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600">
+                      <CheckCircle2 size={14} /> {t.autoConnected}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void disconnectAutoRechargeBkash()}
+                      disabled={autoSaving}
+                      className="text-xs font-semibold text-[var(--muted)] underline-offset-2 hover:underline disabled:opacity-60"
+                    >
+                      {t.autoDisconnect}
+                    </button>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={autoEnabled}
+                      onChange={(e) => setAutoEnabled(e.target.checked)}
+                      className="h-4 w-4 rounded border-[var(--border)]"
+                    />
+                    {t.autoEnable}
+                  </label>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--muted)]">{t.autoThreshold}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={autoThreshold}
+                        onChange={(e) => setAutoThreshold(e.target.value)}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-[var(--muted)]">{t.autoTopupCredits}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={autoTopupCredits}
+                        onChange={(e) => setAutoTopupCredits(e.target.value)}
+                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {autoRecharge.failure_count > 0 ? (
+                    <p className="text-xs text-amber-600">{t.autoFailures(autoRecharge.failure_count)}</p>
+                  ) : null}
+                  {!autoRecharge.enabled && autoRecharge.failure_count >= 3 ? (
+                    <p className="text-xs text-rose-600">{t.autoDisabledWarning}</p>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => void saveAutoRechargeSettings()}
+                    disabled={autoSaving}
+                    className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-105 disabled:opacity-70"
+                  >
+                    {autoSaving ? t.autoSaving : t.autoSave}
+                  </button>
+                </div>
+              )}
+            </section>
+          ) : null}
 
           {/* History */}
           <section className="catv-panel mx-4 mb-6 overflow-hidden">

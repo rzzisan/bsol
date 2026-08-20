@@ -154,6 +154,14 @@ class NotificationUseCaseBindingController extends Controller
                 'email_verification',
                 'bill_notification',
                 'forgot_password',
+                // auto_top_up_context.md — without an entry here, a seller
+                // can never create an active binding for these keys and
+                // NotificationDispatchService::dispatch() silently no-ops
+                // forever (the same latent gap 'subscription_expiry_reminder'
+                // has — not fixed here, just not repeated for these new keys).
+                'sms_auto_recharge_success',
+                'sms_auto_recharge_failed',
+                'sms_auto_recharge_disabled',
             ])],
             'sms_template_id' => ['nullable', 'integer', 'exists:notification_templates,id'],
             'email_template_id' => ['nullable', 'integer', 'exists:notification_templates,id'],

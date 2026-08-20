@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\AutoRechargeSmsCreditJob;
 use App\Models\SmsCredit;
 use App\Models\SmsCreditHistory;
 use App\Models\SmsCreditSetting;
@@ -68,7 +69,7 @@ class SmsCreditService
      */
     public function deduct(int $userId, int $credits, ?string $note = null): bool
     {
-        return DB::transaction(function () use ($userId, $credits, $note) {
+        $wallet = DB::transaction(function () use ($userId, $credits, $note) {
             $wallet = SmsCredit::where('user_id', $userId)->lockForUpdate()->first();
 
             if (! $wallet || $wallet->balance < $credits) {
@@ -89,8 +90,48 @@ class SmsCreditService
                 'recharged_by' => null,
             ]);
 
-            return true;
+            return $wallet;
         });
+
+        if (! $wallet) {
+            return false;
+        }
+
+        // Fail-open: auto-recharge is a fire-and-forget side effect of a
+        // deduction that has already succeeded — nothing here can turn
+        // this deduct() call itself into a failure. See
+        // auto_top_up_context.md.
+        $this->maybeTriggerAutoRecharge($wallet);
+
+        return true;
+    }
+
+    /**
+     * Dispatches the auto-recharge job at most once per cooldown window —
+     * cheap enough to call after every deduction (single in-memory model,
+     * no extra query) without needing its own scheduled sweep.
+     */
+    private function maybeTriggerAutoRecharge(SmsCredit $wallet): void
+    {
+        if (! $wallet->auto_recharge_enabled || $wallet->auto_recharge_credits <= 0) {
+            return;
+        }
+
+        if ($wallet->balance > $wallet->auto_recharge_threshold) {
+            return;
+        }
+
+        $cooldownUntil = $wallet->auto_recharge_last_attempted_at?->addMinutes(10);
+        if ($cooldownUntil && $cooldownUntil->isFuture()) {
+            return;
+        }
+
+        try {
+            AutoRechargeSmsCreditJob::dispatch($wallet->user_id);
+        } catch (\Throwable) {
+            // Queue connection hiccup shouldn't affect the SMS that was
+            // just sent/deducted for — this is best-effort only.
+        }
     }
 
     /**

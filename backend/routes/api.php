@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\BkashPaymentController;
 use App\Http\Controllers\Api\BkashPgwPaymentController;
+use App\Http\Controllers\Api\SmsCreditAutoRechargeController;
 use App\Http\Controllers\Api\SmsCreditBkashPaymentController;
 use App\Http\Controllers\Api\SmsCreditBkashPgwPaymentController;
 use App\Http\Controllers\Api\SmsCreditPurchaseController;
@@ -223,6 +224,12 @@ Route::get('/subscription/pay/bkash/callback', [BkashPaymentController::class, '
 Route::get('/sms/credit/pay/bkash/callback', [SmsCreditBkashPaymentController::class, 'callback'])
     ->middleware('throttle:20,1');
 
+// Same rationale again — the bKash Agreement consent flow's browser
+// redirect, no Sanctum token. See SmsCreditAutoRechargeController,
+// auto_top_up_context.md.
+Route::get('/sms/credit/auto-recharge/agreement/callback', [SmsCreditAutoRechargeController::class, 'callback'])
+    ->middleware('throttle:20,1');
+
 // ── WordPress/WooCommerce Connector (plugin-facing) ─────────────────────────
 // A different trust boundary from the auth:sanctum group below — authenticated
 // by a domain-bound PlatformApiKey (X-API-KEY + X-Client-Domain), not a
@@ -301,6 +308,14 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::post('/sms/credit/pay/bkash/initiate', [SmsCreditBkashPaymentController::class, 'initiate']);
         Route::post('/sms/credit/pay/bkash-pgw/create', [SmsCreditBkashPgwPaymentController::class, 'create']);
         Route::post('/sms/credit/pay/bkash-pgw/execute/{paymentId}', [SmsCreditBkashPgwPaymentController::class, 'execute']);
+
+        // Auto-recharge (auto_top_up_context.md) — same owner-only gate,
+        // same reasoning: a saved recurring-charge authorization is
+        // credential-equivalent, never staff-delegable.
+        Route::get('/sms/credit/auto-recharge/settings', [SmsCreditAutoRechargeController::class, 'status']);
+        Route::put('/sms/credit/auto-recharge/settings', [SmsCreditAutoRechargeController::class, 'updateSettings']);
+        Route::post('/sms/credit/auto-recharge/agreement/create', [SmsCreditAutoRechargeController::class, 'createAgreement']);
+        Route::delete('/sms/credit/auto-recharge/agreement', [SmsCreditAutoRechargeController::class, 'disconnect']);
     });
 
     // ── Subscription (self-service — must stay reachable even when expired) ───

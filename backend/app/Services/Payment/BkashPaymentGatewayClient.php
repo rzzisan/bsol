@@ -167,6 +167,118 @@ class BkashPaymentGatewayClient
         return ['trxID' => $result->json('trxID'), 'transactionStatus' => $result->json('transactionStatus')];
     }
 
+    // ── Agreement (saved payment method / recurring charge) ──────────────
+    //
+    // ⚠️ Best-effort against bKash's publicly documented Tokenized Checkout
+    // Agreement shape — nothing in this codebase has exercised this flow
+    // against a real bKash sandbox yet (unlike createPayment()/
+    // executePayment() above, which are live-proven via subscription
+    // billing). Same caveat as NagadMerchantGatewayClient's verify()
+    // shape (online_payment_context.md §11) — needs a live sandbox test
+    // before relying on it in production. Endpoints/field names below
+    // follow the same /tokenized/checkout/* base and create+execute
+    // two-step shape the one-time flow above already uses successfully;
+    // the difference is `mode: "0000"` (Agreement) instead of `"0011"`
+    // and no amount at creation time (an agreement is consent, not a
+    // charge).
+
+    /**
+     * Starts the one-time customer consent flow. Like createPayment(),
+     * returns a bkashURL to redirect the browser to; the customer approves
+     * on bKash's own page, no amount is charged here.
+     *
+     * @return array{paymentID:string, bkashURL:string}|null
+     */
+    public function createAgreement(string $payerReference, string $callbackUrl): ?array
+    {
+        $result = $this->withAuthRetry(function (string $idToken) use ($payerReference, $callbackUrl) {
+            return Http::asJson()->timeout(15)
+                ->withHeaders($this->authHeaders($idToken))
+                ->post($this->baseUrl() . '/tokenized/checkout/create', [
+                    'mode' => '0000',
+                    'payerReference' => $payerReference,
+                    'callbackURL' => $callbackUrl,
+                ]);
+        });
+
+        if (! $result || ! $result->json('paymentID') || ! $result->json('bkashURL')) {
+            Log::warning('bKash create-agreement failed', ['body' => $result?->json()]);
+
+            return null;
+        }
+
+        return ['paymentID' => $result->json('paymentID'), 'bkashURL' => $result->json('bkashURL')];
+    }
+
+    /**
+     * Finalizes the agreement after the customer approves on bKash's page
+     * — same /tokenized/checkout/execute endpoint the one-time flow uses,
+     * bKash distinguishes by the paymentID's own mode.
+     *
+     * @return array{agreementID:?string, agreementStatus:?string}|null
+     */
+    public function executeAgreement(string $paymentId): ?array
+    {
+        $result = $this->withAuthRetry(function (string $idToken) use ($paymentId) {
+            return Http::asJson()->timeout(15)
+                ->withHeaders($this->authHeaders($idToken))
+                ->post($this->baseUrl() . '/tokenized/checkout/execute', ['paymentID' => $paymentId]);
+        });
+
+        if (! $result) {
+            return null;
+        }
+
+        return [
+            'agreementID' => $result->json('agreementID'),
+            'agreementStatus' => $result->json('agreementStatus'),
+        ];
+    }
+
+    /**
+     * Charges an already-active agreement — server-to-server, no browser
+     * redirect. Still a create+execute pair (executePayment() above
+     * finalizes it), just with agreementID+amount at creation instead of
+     * a bare consent request.
+     *
+     * @return array{paymentID:string}|null
+     */
+    public function chargeAgreement(string $agreementId, string $amount, string $merchantInvoiceNumber): ?array
+    {
+        $result = $this->withAuthRetry(function (string $idToken) use ($agreementId, $amount, $merchantInvoiceNumber) {
+            return Http::asJson()->timeout(15)
+                ->withHeaders($this->authHeaders($idToken))
+                ->post($this->baseUrl() . '/tokenized/checkout/create', [
+                    'mode' => '0000',
+                    'agreementID' => $agreementId,
+                    'amount' => $amount,
+                    'currency' => 'BDT',
+                    'intent' => 'sale',
+                    'merchantInvoiceNumber' => $merchantInvoiceNumber,
+                ]);
+        });
+
+        if (! $result || ! $result->json('paymentID')) {
+            Log::warning('bKash charge-agreement (create) failed', ['body' => $result?->json()]);
+
+            return null;
+        }
+
+        return ['paymentID' => $result->json('paymentID')];
+    }
+
+    /** Revokes an agreement — bKash-side, so a future charge attempt fails cleanly instead of silently. */
+    public function cancelAgreement(string $agreementId): bool
+    {
+        $result = $this->withAuthRetry(function (string $idToken) use ($agreementId) {
+            return Http::asJson()->timeout(15)
+                ->withHeaders($this->authHeaders($idToken))
+                ->post($this->baseUrl() . '/tokenized/checkout/agreement/cancel', ['agreementID' => $agreementId]);
+        });
+
+        return (bool) $result?->successful();
+    }
+
     /**
      * Runs an authenticated call; on a 401 (expired/invalid cached token)
      * forces one fresh grant + retry before giving up.

@@ -6,12 +6,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class SmsCredit extends Model
 {
-    protected $fillable = ['user_id', 'balance'];
+    protected $fillable = [
+        'user_id', 'balance',
+        'auto_recharge_enabled', 'auto_recharge_threshold', 'auto_recharge_credits',
+        'auto_recharge_failure_count', 'auto_recharge_last_attempted_at',
+    ];
 
     protected function casts(): array
     {
         return [
             'balance' => 'integer',
+            'auto_recharge_enabled' => 'boolean',
+            'auto_recharge_threshold' => 'integer',
+            'auto_recharge_credits' => 'integer',
+            'auto_recharge_failure_count' => 'integer',
+            'auto_recharge_last_attempted_at' => 'datetime',
         ];
     }
 
