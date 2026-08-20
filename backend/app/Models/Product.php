@@ -14,10 +14,18 @@ class Product extends Model
 {
     use SoftDeletes, HasFactory;
 
+    public const TYPE_PHYSICAL = 'physical';
+    public const TYPE_DIGITAL = 'digital';
+
+    public const DIGITAL_DELIVERY_HOSTED_FILE = 'hosted_file';
+    public const DIGITAL_DELIVERY_EXTERNAL_URL = 'external_url';
+
     protected $fillable = [
         'user_id', 'category_id', 'name', 'sku', 'source', 'source_ref', 'platform_api_key_id', 'description',
         'regular_price', 'discount', 'discount_type', 'selling_price', 'cost_price', 'stock', 'low_stock_alert',
         'track_stock', 'unit', 'status', 'variants', 'thumbnail', 'has_variants',
+        'product_type', 'digital_delivery_type', 'digital_file_path', 'digital_file_name',
+        'digital_file_mime_type', 'digital_file_size_bytes', 'digital_external_url', 'digital_delivery_channels',
     ];
 
     protected $casts = [
@@ -29,7 +37,14 @@ class Product extends Model
         'track_stock'   => 'boolean',
         'has_variants'  => 'boolean',
         'variants'      => 'array',
+        'digital_file_size_bytes' => 'integer',
+        'digital_delivery_channels' => 'array',
     ];
+
+    public function isDigital(): bool
+    {
+        return $this->product_type === self::TYPE_DIGITAL;
+    }
 
     /**
      * Pushes a stock change on a WooCommerce-linked product back out to

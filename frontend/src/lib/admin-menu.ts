@@ -19,6 +19,7 @@ export type AdminMenuLabels = {
   notificationUseCases?: string;
   notificationLogs?: string;
   productMediaSettings?: string;
+  digitalProductSettings?: string;
   reservedSubdomains?: string;
   landingTemplates?: string;
   landingPages?: string;
@@ -39,6 +40,11 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
       key: "settings-product-media",
       label: labels.productMediaSettings ?? "Product Media",
       href: "/admin/settings/product-media",
+    },
+    {
+      key: "settings-digital-products",
+      label: labels.digitalProductSettings ?? "Digital Products",
+      href: "/admin/settings/digital-products",
     },
     {
       key: "settings-platform-branding",

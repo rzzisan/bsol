@@ -6,6 +6,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-20 (৬) — **আইটেম #৮ (ডিজিটাল প্রোডাক্ট সিস্টেম) Phase 1 ✅ সম্পন্ন ও লাইভ** — user-এর ৪টা সিদ্ধান্ত অনুযায়ী ইমপ্লিমেন্ট + deploy সম্পন্ন: personal wallet রাখা হয়েছে (COD বাদ), mixed cart checkout-এ block, per-product delivery config (hosted file/external URL + email/SMS চ্যানেল), hosted file-এ OTP-gated anti-piracy। বিস্তারিত `digital_product_context.md`। Older entries kept as-is:
+
 Last updated: 2026-08-20 (৫) — **নতুন আইটেম #৮: ডিজিটাল প্রোডাক্ট সিস্টেম** — user-এর সিদ্ধান্তে পরবর্তী গবেষণার বিষয় হিসেবে যোগ করা হলো (ফিজিকালের পাশাপাশি e-book/software/course ইত্যাদি বিক্রি, instant email/WhatsApp/SMS/download-link ডেলিভারি, সুপার-অ্যাডমিন-নিয়ন্ত্রিত ফাইল সাইজ/ফরম্যাট পলিসি)। প্রাথমিক গবেষণা রিপোর্ট সম্পূর্ণ — বিস্তারিত `digital_product_context.md`। এখনো কোনো migration/কোড লেখা হয়নি, user-conferm বাকি (`digital_product_context.md §৯`)।
 
 Last updated: 2026-08-20 (৪) — **WhatsApp (#২) ও Auto-top-up (#৩) দুটোই পজড** — কোড/টেস্ট/ডক সব সম্পূর্ণ ও deployed, কিন্তু দুটোই এমন external (Meta/bKash-side) সেটআপে আটকে আছে যেটা এই dev environment থেকে production-এ শেষ করা যাচ্ছে না এখন। User পরবর্তী অন্য একটা ফিচারে সরে যাওয়ার সিদ্ধান্ত নিয়েছেন — বিস্তারিত "পরবর্তী পদক্ষেপ" সেকশনে ও status টেবিলে। Older entries kept as-is:
@@ -38,7 +40,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | — | **WordPress/WooCommerce Connector (BSOL Connect প্লাগইন)** | ✅ সম্পন্ন (২০ ফেজ, v1.17.0) — order/product sync, courier booking (৫টাই), waybill/invoice PDF, checkout OTP, Facebook CAPI, bulk sync, abandoned checkout, repeat-order block, blacklist block, tracking Pixel — সব লাইভ; বাকি শুধু real WooCommerce staging QA (ব্যবহারকারীর নিজের সাইটে) | `wordpress_connect_context.md` |
 | 6 | Custom domain সাপোর্ট (landing pages) | 🟡 আংশিক — per-seller সাবডোমেইন অংশ ✅ সম্পন্ন (উপরে); সেলারের **নিজস্ব** ডোমেইন (T8b, `custom_domain_context.md §11` আইটেম ৩) এখনো শুরু হয়নি | `custom_domain_context.md` |
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
-| 8 | ডিজিটাল প্রোডাক্ট সিস্টেম (instant delivery, নিজস্ব হোস্টিং) | 🔵 গবেষণা সম্পন্ন, user-conferm বাকি | `digital_product_context.md` |
+| 8 | ডিজিটাল প্রোডাক্ট সিস্টেম (instant delivery, নিজস্ব হোস্টিং) | ✅ Phase 1 সম্পন্ন ও লাইভ (২০২৬-০৮-২০) | `digital_product_context.md` |
 | — | Bulk/CSV order import | ⬜ Not started | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
 | — | PWA | ⬜ Not started | (§16.9) |
 | — | Referral/affiliate program (সেলার→সেলার) | ⬜ Not started | — |

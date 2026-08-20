@@ -68,6 +68,7 @@ type CheckoutDraft = {
 type CustomerForm = {
   customer_name: string;
   customer_phone: string;
+  customer_email: string;
   customer_address: string;
   customer_district: string;
   customer_thana: string;
@@ -852,6 +853,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const [customer, setCustomer] = useState<CustomerForm>({
     customer_name: "",
     customer_phone: "",
+    customer_email: "",
     customer_address: "",
     customer_district: "",
     customer_thana: "",
@@ -981,6 +983,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           setCustomer({
             customer_name: d.customer_name ?? "",
             customer_phone: d.customer_phone ?? "",
+            customer_email: d.customer_email ?? "",
             customer_address: d.customer_address ?? "",
             customer_district: d.customer_district ?? "",
             customer_thana: d.customer_thana ?? "",
@@ -1212,6 +1215,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       setCustomer({
         customer_name: "",
         customer_phone: "",
+        customer_email: "",
         customer_address: "",
         customer_district: "",
         customer_thana: "",
@@ -1540,6 +1544,22 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
 
               <div className="mt-6 space-y-5">
                 {checkoutFields.filter((field) => field.key !== "notes").map(renderCheckoutField)}
+
+                {/* Not part of the seller-configurable checkout_fields system —
+                    only needed for digital-product orders (email delivery
+                    channel), but always offered since a physical order can
+                    freely leave it blank. See digital_product_context.md §3. */}
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-slate-700">
+                    {language === "bn" ? "ইমেইল (ডিজিটাল প্রোডাক্টের জন্য প্রয়োজন হতে পারে)" : "Email (may be required for digital products)"}
+                  </span>
+                  <input
+                    type="email"
+                    value={customer.customer_email}
+                    onChange={(e) => updateCustomer("customer_email", e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
+                  />
+                </label>
 
                 <div>
                   <span className="mb-2 block text-sm font-semibold text-slate-700">Shipping</span>

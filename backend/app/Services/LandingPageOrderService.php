@@ -36,6 +36,7 @@ class LandingPageOrderService
                 'public_token' => Str::random(40),
                 'customer_name' => $validated['customer_name'],
                 'customer_phone' => $validated['customer_phone'],
+                'customer_email' => $validated['customer_email'] ?? null,
                 'customer_address' => $validated['customer_address'],
                 'customer_district' => $validated['customer_district'] ?? null,
                 'customer_thana' => $validated['customer_thana'] ?? null,

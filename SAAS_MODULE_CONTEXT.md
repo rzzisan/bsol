@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-20 (৫) — **§20 (ডিজিটাল প্রোডাক্ট সিস্টেম) Phase 1 ✅ সম্পন্ন ও লাইভ** — migration/backend/১৮টা টেস্ট/ফ্রন্টএন্ড (প্রোডাক্ট ফর্ম, চেকআউট, thank-you, নতুন `/d/[token]` ডাউনলোড পেজ, admin policy পেজ) সব deployed। বিস্তারিত `digital_product_context.md §০ক-১৩`। Older entries kept as-is:
+
 Last updated: 2026-08-20 (৪) — **নতুন §20: ডিজিটাল প্রোডাক্ট সিস্টেম — গবেষণা সম্পন্ন** (`feature_roadmap_context.md` আইটেম #৮)। ফিজিকালের পাশাপাশি e-book/software/course ইত্যাদি ডিজিটাল প্রোডাক্ট বিক্রির জন্য instant email/WhatsApp/SMS/download-link ডেলিভারি সিস্টেম। বিস্তারিত `digital_product_context.md`। কোনো কোড এখনো লেখা হয়নি, user-conferm বাকি। Older entries kept as-is:
 
 Last updated: 2026-08-20 (৩) — **WhatsApp (§আইটেম #২) ও Auto-top-up (§আইটেম #৩) দুটোই পজড** — কোড/টেস্ট/migration সব production-এ deployed ও কাজ করছে, কিন্তু দুটোই এমন external (Meta-সাইড WhatsApp App setup / bKash Tokenized Checkout credential) নির্ভরতায় আটকে আছে যেটা এই dev environment থেকে production-এ শেষ করার উপায় নেই এখন। User অন্য একটা ফিচারে সময় দেওয়ার সিদ্ধান্ত নিয়েছেন। বিস্তারিত `whatsapp_context.md`/`auto_top_up_context.md`, `feature_roadmap_context.md`। Older entries kept as-is:
@@ -1207,7 +1209,7 @@ Backend: isolated Postgres schema কনভেনশনে — manual + courier_
 
 **✅ ইমপ্লিমেন্ট + ডিপ্লয় সম্পন্ন (2026-08-17)।** ৯টা নতুন টেস্ট ([CollectionHistoryApiTest.php](backend/tests/Feature/CollectionHistoryApiTest.php)) সহ ফুল স্যুট রান — ৩৪২ passed, বেসলাইনের সেই ২টা পুরনো/অসম্পর্কিত ফেইলিউর (`AuthApiTest`, `CourierFraudCheckApiTest`) ছাড়া কিছু না। Postgres `UNION ALL`-এ explicit type-cast (`0::numeric(12,2)`, `NULL::bigint`, `NULL::varchar`) ছাড়া "could not determine polymorphic type" এরর ধরা পড়েছিল প্রথম রানেই — ডকুমেন্টেড সতর্কতা কাজে লেগেছে। মেনুতে "Accounting" সাবমেনুর ৪র্থ আইটেম হিসেবে "কালেকশন হিস্ট্রি" যোগ হয়েছে (`user-shell.tsx`, `MODULE_KEY_BY_MENU_KEY`-তে `accounting`-এ ম্যাপড, নতুন module key লাগেনি)। `tsc --noEmit` clean। Migration লাগেনি (কোনো নতুন টেবিল না, বিদ্যমান `order_payments`+`transactions`-এর উপর read-only view)। Backend `php8.3-fpm` restart + queue restart, frontend `deploy-safe.sh` — উভয়ই সফল, লাইভ smoke check pass।
 
-## 20. ডিজিটাল প্রোডাক্ট সিস্টেম — গবেষণা রিপোর্ট (design: 2026-08-20)
+## 20. ডিজিটাল প্রোডাক্ট সিস্টেম — ✅ Phase 1 সম্পন্ন (design+build: 2026-08-20)
 
 `feature_roadmap_context.md` আইটেম #৮। ফিজিকালের পাশাপাশি সেলাররা e-book/software/course-এর মতো ডিজিটাল প্রোডাক্ট বিক্রি করবে — কুরিয়ারের বদলে instant email/WhatsApp/SMS/download-link ডেলিভারি (payment-ও তাই instant হতে হবে), ফাইল হোস্টিং নিজস্ব সার্ভারে, সাইজ/ফরম্যাট পলিসি সুপার-অ্যাডমিন-নিয়ন্ত্রিত।
 
@@ -1215,6 +1217,6 @@ Backend: isolated Postgres schema কনভেনশনে — manual + courier_
 
 **সবচেয়ে গুরুত্বপূর্ণ open সিদ্ধান্ত:** instant delivery-র জন্য instant payment দরকার, কিন্তু এই প্ল্যাটফর্মের personal-wallet "send & verify" পদ্ধতি (Phase A online payment) সেলারের ম্যানুয়াল ভেরিফিকেশন লাগে — instant না। শুধু ৭টা automated merchant gateway (SSLCommerz/AamarPay/ZiniPay/ShurjoPay/EPS/bKash Merchant/Nagad Merchant) সত্যিকারের instant। ডিজিটাল চেকআউটে wallet method বন্ধ রাখা হবে কিনা — এটা user-conferm বাকি। এছাড়া mixed cart (physical+digital) Phase 1-এ block রাখার সুপারিশ, আর এই সার্ভারের ডিস্ক ক্যাপাসিটি (মাত্র ~21G ফাঁকা, শুধু local disk, কোনো S3 কনফিগার করা নাই) নিয়ে একটা ops-level সতর্কতা।
 
-বিস্তারিত (schema ডিজাইন, controller/service প্ল্যান, build order, সব open question) `digital_product_context.md`-এ। **কোনো migration/কোড এখনো লেখা হয়নি — শুধু গবেষণা রিপোর্ট।**
+**User-এর ৪টা চূড়ান্ত সিদ্ধান্তে (২০২৬-০৮-২০) ইমপ্লিমেন্ট + deploy সম্পন্ন**: personal wallet রাখা হয়েছে (COD বাদ, wallet-verify হওয়ার পরই ডেলিভারি ট্রিগার), mixed cart checkout-এ block, per-product delivery config (hosted file/external URL + email/SMS চ্যানেল প্রোডাক্ট অ্যাড করার সময় সেট করা যায়), hosted file downloads OTP-gated (লিংক শেয়ার করলেও অন্য কেউ ডাউনলোড করতে পারবে না)। ইমপ্লিমেন্টেশনের সময় একটা real correction ধরা পড়েছে — email/SMS notification infra (`NotificationDispatchService`) আসলে platform-wide admin-shared (সেলারের নিজস্ব SMTP না, আগের ধারণা ভুল ছিল), আর Auto-top-up ফিচারে একই ভুল প্যাটার্নের একটা real bug flag হয়েছে (`sms_auto_recharge_*` নোটিফিকেশন কখনো পাঠানো হচ্ছিল না — background task `task_331ef7d8`)। বিস্তারিত (schema, API surface, frontend, টেস্ট রেজাল্ট) `digital_product_context.md §০ক-১৩`।
 
 **ভবিষ্যতের জন্য নোট:** bKash merchant credential হাতে পেলে সবসময় প্রথমে confirm করা — Tokenized Checkout নাকি PGW/Checkout API (email/document-এ "Tokenized" vs "PGW"/"Checkout" শব্দ খুঁজুন) — দুটো product-এর credential/domain/client flow সম্পূর্ণ আলাদা, একটা ধরে নিয়ে implement শুরু করলে generic "invalid credential" error দিয়ে আটকে যাওয়ার ঝুঁকি আছে।

@@ -14,7 +14,7 @@ class Order extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'order_number', 'public_token', 'customer_name', 'customer_phone',
+        'user_id', 'order_number', 'public_token', 'customer_name', 'customer_phone', 'customer_email',
         'customer_address', 'customer_district', 'customer_thana', 'customer_area',
         'pathao_city_id', 'pathao_zone_id', 'pathao_area_id', 'redx_area_id',
         'source', 'source_ref', 'platform_api_key_id', 'status', 'payment_method', 'payment_status',
@@ -58,6 +58,13 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    /** See digital_product_context.md — created once per digital order-item
+     *  when the order transitions to 'confirmed' (payment recorded). */
+    public function digitalDeliveries(): HasMany
+    {
+        return $this->hasMany(DigitalDelivery::class);
     }
 
     /** Manual payment-collection log — see manual_payment_collection_context.md. */

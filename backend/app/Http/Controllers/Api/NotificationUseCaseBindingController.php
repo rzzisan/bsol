@@ -162,6 +162,12 @@ class NotificationUseCaseBindingController extends Controller
                 'sms_auto_recharge_success',
                 'sms_auto_recharge_failed',
                 'sms_auto_recharge_disabled',
+                // digital_product_context.md — digital_product_delivered
+                // carries {{download_link}}; digital_download_otp carries
+                // {{otp}}, sent when a customer opens the link (hosted_file
+                // deliveries only, anti-piracy gate, §7).
+                'digital_product_delivered',
+                'digital_download_otp',
             ])],
             'sms_template_id' => ['nullable', 'integer', 'exists:notification_templates,id'],
             'email_template_id' => ['nullable', 'integer', 'exists:notification_templates,id'],

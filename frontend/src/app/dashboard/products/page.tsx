@@ -122,6 +122,11 @@ type Product = {
   unit: string; status: string; description: string | null;
   category_id: number | null; category: { id: number; name: string } | null;
   low_stock_alert: number; thumbnail?: string | null;
+  // digital_product_context.md — physical products (courier delivery,
+  // stock tracking) unchanged; digital products skip all of that and are
+  // managed further on the detail page ([id]/page.tsx: file upload/
+  // external URL, delivery channels).
+  product_type?: "physical" | "digital";
 };
 type MediaItem = { id: number; url: string; is_primary: boolean; sort_order: number; file_name?: string | null };
 type MediaPolicy = {
@@ -257,6 +262,7 @@ export default function ProductsPage() {
         track_stock: !!form.track_stock,
         unit: form.unit ?? "pcs",
         status: form.status ?? "active",
+        product_type: form.product_type ?? "physical",
       };
       const res = await fetch(url, {
         method,
@@ -507,6 +513,25 @@ export default function ProductsPage() {
                 <input value={form.name ?? ""} onChange={e => setField("name", e.target.value)}
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
               </label>
+              <div className="sm:col-span-2 flex gap-4 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="radio" name="product_type" checked={(form.product_type ?? "physical") === "physical"}
+                    onChange={() => setField("product_type", "physical")} className="accent-[var(--accent)]" />
+                  {locale === "bn" ? "ফিজিকাল প্রোডাক্ট" : "Physical product"}
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" name="product_type" checked={form.product_type === "digital"}
+                    onChange={() => setField("product_type", "digital")} className="accent-[var(--accent)]" />
+                  {locale === "bn" ? "ডিজিটাল প্রোডাক্ট" : "Digital product"}
+                </label>
+              </div>
+              {form.product_type === "digital" && modal === "add" ? (
+                <p className="sm:col-span-2 text-xs text-[var(--muted)]">
+                  {locale === "bn"
+                    ? "ফাইল আপলোড/ডেলিভারি সেটিংস প্রোডাক্ট তৈরির পর ডিটেইল পেজ থেকে করা যাবে।"
+                    : "File upload/delivery settings can be configured on the detail page after creating this product."}
+                </p>
+              ) : null}
               <label>
                 <span className="mb-1 block text-xs text-[var(--muted)]">{txt.fieldCategory}</span>
                 <select value={form.category_id ?? ""} onChange={e => setField("category_id", e.target.value ? Number(e.target.value) : null)}

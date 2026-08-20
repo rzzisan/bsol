@@ -32,6 +32,8 @@ export type ThankYouOrder = {
     unit_price?: string | number | null;
     total?: string | number | null;
   }>;
+  // Present only for digital orders. See digital_product_context.md §4.
+  digital_deliveries?: Array<{ download_token: string }> | null;
 };
 
 const THANK_YOU_UI_TEXT = {
@@ -514,6 +516,31 @@ export default function ThankYouView({
                   number={walletNumber}
                   language={language}
                 />
+              ) : null}
+
+              {order.digital_deliveries && order.digital_deliveries.length > 0 ? (
+                <div className="lp-card rounded-3xl p-6 sm:p-8">
+                  <h2 className="text-xl font-bold" style={{ color: theme.primary }}>
+                    {language === "bn" ? "ডাউনলোড লিংক" : "Download link"}
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {language === "bn"
+                      ? "লিংকটি শুধু আপনার জন্য — খুললে ভেরিফিকেশন কোড চাওয়া হতে পারে।"
+                      : "This link is for you only — opening it may ask for a verification code."}
+                  </p>
+                  <div className="mt-4 space-y-2">
+                    {order.digital_deliveries.map((d) => (
+                      <a
+                        key={d.download_token}
+                        href={`/d/${d.download_token}`}
+                        className="block rounded-2xl px-4 py-3 text-center text-sm font-semibold"
+                        style={{ backgroundColor: theme.accent, color: theme.buttonText }}
+                      >
+                        {language === "bn" ? "ডাউনলোড করুন" : "Download"}
+                      </a>
+                    ))}
+                  </div>
+                </div>
               ) : null}
 
               {showSummary ? (

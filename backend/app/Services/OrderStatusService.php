@@ -34,6 +34,7 @@ class OrderStatusService
         private readonly WhatsappAutomationService $whatsappAutomationService,
         private readonly AccountingService $accountingService,
         private readonly TrackingIngestService $trackingIngest,
+        private readonly DigitalDeliveryService $digitalDeliveryService,
     ) {}
 
     /**
@@ -74,6 +75,17 @@ class OrderStatusService
 
         $this->smsAutomationService->handleOrderStatusChanged($order, $oldStatus, $newStatus);
         $this->whatsappAutomationService->handleOrderStatusChanged($order, $oldStatus, $newStatus);
+
+        // Digital-product delivery is gated on payment, not a courier
+        // milestone — 'confirmed' is where OnlinePaymentService actually
+        // records money (wallet-verify or automated-gateway callback, both
+        // funnel through applyConfirmedPayment()), so it's the right hook
+        // point rather than 'delivered' (a physical-fulfillment concept the
+        // order never reaches for a digital-only order). No-ops instantly
+        // for orders with no digital items. See digital_product_context.md §4.
+        if ($newStatus === 'confirmed') {
+            $this->digitalDeliveryService->deliverForOrder($order);
+        }
 
         if ($newStatus === 'delivered') {
             $this->accountingService->onOrderDelivered($order);

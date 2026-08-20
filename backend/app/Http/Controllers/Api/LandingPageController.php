@@ -131,6 +131,11 @@ class LandingPageController extends Controller
                 // the customer's checkout choice on the order, same as
                 // before. See online_payment_context.md.
                 'payment_method' => ['nullable', Rule::in(array_merge(['cod', 'bkash', 'nagad', 'rocket'], PaymentGatewayCredential::PROVIDERS))],
+                // Not part of the seller-configurable checkout_fields system
+                // (CheckoutFieldResolver) — every digital order needs one
+                // regardless of page config, see the mixed-cart/email check
+                // below. Physical-only orders leave it blank as before.
+                'customer_email' => ['nullable', 'email', 'max:255'],
                 'items' => ['required', 'array', 'min:1'],
                 'items.*.enabled' => ['nullable', 'boolean'],
                 'items.*.product_id' => ['required', 'integer'],
@@ -155,6 +160,69 @@ class LandingPageController extends Controller
                     'items' => ['Please select at least one valid product from this landing page.'],
                 ],
             ], 422);
+        }
+
+        // Mixed cart (physical + digital in one order) is blocked — see
+        // digital_product_context.md §5. Digital fulfillment is a fully
+        // separate pipeline (payment-triggered, no courier/inventory), so
+        // entangling it with a physical order's courier flow was
+        // deliberately scoped out rather than half-supported.
+        $productTypes = $lineItems
+            ->map(fn ($item) => $landingProducts->get((int) $item['product_id'])?->product?->product_type ?? \App\Models\Product::TYPE_PHYSICAL)
+            ->unique();
+
+        if ($productTypes->count() > 1) {
+            $message = $language === 'en'
+                ? 'Digital and physical products cannot be ordered together — please check out separately for each.'
+                : 'ডিজিটাল ও ফিজিকাল প্রোডাক্ট একসাথে অর্ডার করা যাবে না — আলাদাভাবে চেকআউট করুন।';
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+                'errors' => ['items' => [$message]],
+            ], 422);
+        }
+
+        // COD makes no sense for digital products — there's no courier to
+        // collect cash against, and confirming a COD order today only
+        // requires an OTP tap (proves phone ownership, not payment), so
+        // allowing it here would deliver the file for free. Wallet
+        // "send & verify" stays allowed (user decision) — the customer is
+        // told to wait, delivery only fires once the seller approves it as
+        // real money received (OrderStatusService → 'confirmed'). See
+        // digital_product_context.md §4.
+        if ($productTypes->first() === \App\Models\Product::TYPE_DIGITAL && ($validated['payment_method'] ?? 'cod') === 'cod') {
+            $message = $language === 'en'
+                ? 'Cash on delivery is not available for digital products — please pay online.'
+                : 'ডিজিটাল প্রোডাক্টে ক্যাশ অন ডেলিভারি পাওয়া যাবে না — অনলাইনে পেমেন্ট করুন।';
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+                'errors' => ['payment_method' => [$message]],
+            ], 422);
+        }
+
+        // A digital-only cart needs an email address whenever any of its
+        // items has 'email' configured as a delivery channel — SMS-only
+        // digital products don't need this. See digital_product_context.md §3.
+        if ($productTypes->first() === \App\Models\Product::TYPE_DIGITAL) {
+            $needsEmail = $lineItems->contains(function ($item) use ($landingProducts) {
+                $channels = $landingProducts->get((int) $item['product_id'])?->product?->digital_delivery_channels ?? [];
+                return in_array('email', (array) $channels, true);
+            });
+
+            if ($needsEmail && blank($validated['customer_email'] ?? null)) {
+                $message = $language === 'en'
+                    ? 'An email address is required to receive this digital product.'
+                    : 'এই ডিজিটাল প্রোডাক্টটি পেতে একটি ইমেইল ঠিকানা প্রয়োজন।';
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $message,
+                    'errors' => ['customer_email' => [$message]],
+                ], 422);
+            }
         }
 
         $order = app(LandingPageOrderService::class)->create($page, $validated, $lineItems, $resolvedFields);
@@ -228,7 +296,7 @@ class LandingPageController extends Controller
         ]);
 
         $order = Order::query()
-            ->with('items')
+            ->with(['items', 'digitalDeliveries'])
             ->where('id', $orderId)
             ->where('source', 'landing_page')
             ->where('source_ref', (string) $page->id)
@@ -266,6 +334,14 @@ class LandingPageController extends Controller
                     'quantity' => $item->quantity,
                     'unit_price' => $item->unit_price,
                     'total' => $item->total,
+                ])->values(),
+                // Present only for digital orders — empty array otherwise.
+                // The thank-you page uses this to show either "waiting for
+                // payment confirmation" (status pending, before 'confirmed')
+                // or the /d/{token} download link(s). See
+                // digital_product_context.md §4.
+                'digital_deliveries' => $order->digitalDeliveries->map(fn ($d) => [
+                    'download_token' => $d->download_token,
                 ])->values(),
             ],
         ]);

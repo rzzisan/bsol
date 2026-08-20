@@ -117,6 +117,18 @@ type Product = {
   thumbnail: string | null;
   created_at: string;
   updated_at: string;
+  // digital_product_context.md
+  product_type?: "physical" | "digital";
+  digital_delivery_type?: "hosted_file" | "external_url" | null;
+  digital_file_name?: string | null;
+  digital_file_size_bytes?: number | null;
+  digital_external_url?: string | null;
+  digital_delivery_channels?: string[] | null;
+};
+
+type DigitalPolicy = {
+  max_file_size_mb: number;
+  allowed_extensions: string[];
 };
 
 type MediaItem = {
@@ -150,6 +162,9 @@ export default function ProductDetailPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [mediaPolicy, setMediaPolicy] = useState<MediaPolicy | null>(null);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [digitalPolicy, setDigitalPolicy] = useState<DigitalPolicy | null>(null);
+  const [digitalUploading, setDigitalUploading] = useState(false);
+  const [digitalError, setDigitalError] = useState("");
 
   const loadMedia = useCallback(async () => {
     const mediaRes = await fetch(`${API}/products/${id}/media`, {
@@ -165,10 +180,11 @@ export default function ProductDetailPage() {
     setLoading(true);
     setError("");
     try {
-      const [productRes, categoryRes, policyRes] = await Promise.all([
+      const [productRes, categoryRes, policyRes, digitalPolicyRes] = await Promise.all([
         fetch(`${API}/products/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API}/categories`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API}/products/media-policy`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/products/digital-policy`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
 
       if (!productRes.ok) {
@@ -189,6 +205,11 @@ export default function ProductDetailPage() {
       if (policyRes.ok) {
         const policyData = await policyRes.json();
         setMediaPolicy(policyData?.data ?? null);
+      }
+
+      if (digitalPolicyRes.ok) {
+        const digitalPolicyData = await digitalPolicyRes.json();
+        setDigitalPolicy(digitalPolicyData?.data ?? null);
       }
 
       await loadMedia();
@@ -249,6 +270,10 @@ export default function ProductDetailPage() {
           track_stock: !!form.track_stock,
           unit: form.unit ?? "pcs",
           status: form.status ?? "active",
+          product_type: form.product_type ?? "physical",
+          digital_delivery_type: form.product_type === "digital" ? (form.digital_delivery_type ?? "hosted_file") : undefined,
+          digital_external_url: form.product_type === "digital" ? (form.digital_external_url ?? null) : undefined,
+          digital_delivery_channels: form.product_type === "digital" ? (form.digital_delivery_channels ?? []) : undefined,
         }),
       });
 
@@ -266,6 +291,54 @@ export default function ProductDetailPage() {
       setError(locale === "bn" ? "আপডেট করা যায়নি।" : "Failed to update.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleDeliveryChannel = (channel: "email" | "sms") => {
+    setForm((prev) => {
+      const current = prev.digital_delivery_channels ?? [];
+      const next = current.includes(channel) ? current.filter((c) => c !== channel) : [...current, channel];
+      return { ...prev, digital_delivery_channels: next };
+    });
+  };
+
+  const handleDigitalFileUpload = async (file: File) => {
+    setDigitalUploading(true);
+    setDigitalError("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch(`${API}/products/${id}/digital-file`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data?.message ?? Object.values(data?.errors ?? {})[0];
+        setDigitalError(Array.isArray(msg) ? String(msg[0]) : String(msg ?? "Upload failed"));
+        return;
+      }
+      setProduct(data.data as Product);
+      setForm((prev) => ({ ...prev, ...(data.data as Product) }));
+    } catch {
+      setDigitalError(locale === "bn" ? "আপলোড করা যায়নি।" : "Upload failed.");
+    } finally {
+      setDigitalUploading(false);
+    }
+  };
+
+  const handleDigitalFileRemove = async () => {
+    setDigitalUploading(true);
+    setDigitalError("");
+    try {
+      await fetch(`${API}/products/${id}/digital-file`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setForm((prev) => ({ ...prev, digital_file_name: null, digital_file_size_bytes: null }));
+    } finally {
+      setDigitalUploading(false);
     }
   };
 
@@ -549,6 +622,19 @@ export default function ProductDetailPage() {
               <span className="text-sm">{txt.fieldTrackStock}</span>
             </label>
 
+            <div className="sm:col-span-2 flex gap-4 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input type="radio" name="product_type" checked={(form.product_type ?? "physical") === "physical"}
+                  onChange={() => setField("product_type", "physical")} className="accent-[var(--accent)]" />
+                {locale === "bn" ? "ফিজিকাল প্রোডাক্ট" : "Physical product"}
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" name="product_type" checked={form.product_type === "digital"}
+                  onChange={() => setField("product_type", "digital")} className="accent-[var(--accent)]" />
+                {locale === "bn" ? "ডিজিটাল প্রোডাক্ট" : "Digital product"}
+              </label>
+            </div>
+
             <label className="sm:col-span-2">
               <span className="mb-1 block text-xs text-[var(--muted)]">{txt.fieldDescription}</span>
               <textarea
@@ -570,6 +656,141 @@ export default function ProductDetailPage() {
             </button>
           </div>
         </section>
+
+        {/* ── Digital Delivery Section ────────────────────────────── */}
+        {form.product_type === "digital" ? (
+          <section className="catv-panel p-4">
+            <h3 className="text-base font-bold">
+              {locale === "bn" ? "ডিজিটাল ডেলিভারি" : "Digital Delivery"}
+            </h3>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">
+              {locale === "bn"
+                ? "কীভাবে ফাইল ডেলিভার হবে এবং কোন কোন মাধ্যমে কাস্টমারকে জানানো হবে সেট করুন।"
+                : "Choose how the file is delivered and which channels notify the customer."}
+            </p>
+
+            <div className="mt-4 flex gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="digital_delivery_type"
+                  checked={(form.digital_delivery_type ?? "hosted_file") === "hosted_file"}
+                  onChange={() => setField("digital_delivery_type", "hosted_file")}
+                  className="accent-[var(--accent)]"
+                />
+                {locale === "bn" ? "হোস্টেড ফাইল (আমাদের সার্ভারে আপলোড)" : "Hosted file (upload to our server)"}
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="digital_delivery_type"
+                  checked={form.digital_delivery_type === "external_url"}
+                  onChange={() => setField("digital_delivery_type", "external_url")}
+                  className="accent-[var(--accent)]"
+                />
+                {locale === "bn" ? "এক্সটার্নাল লিংক" : "External URL"}
+              </label>
+            </div>
+
+            {(form.digital_delivery_type ?? "hosted_file") === "hosted_file" ? (
+              <div className="mt-4">
+                {form.digital_file_name ? (
+                  <div className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
+                    <span>
+                      {form.digital_file_name}
+                      {form.digital_file_size_bytes ? ` (${(form.digital_file_size_bytes / 1024 / 1024).toFixed(1)} MB)` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleDigitalFileRemove}
+                      disabled={digitalUploading}
+                      className="text-xs font-semibold text-red-500 disabled:opacity-60"
+                    >
+                      {locale === "bn" ? "সরান" : "Remove"}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--muted)]">
+                    {locale === "bn" ? "কোনো ফাইল আপলোড করা হয়নি।" : "No file uploaded yet."}
+                  </p>
+                )}
+                <label className="mt-2 inline-block cursor-pointer rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">
+                  {digitalUploading ? (locale === "bn" ? "আপলোড হচ্ছে..." : "Uploading...") : (locale === "bn" ? "ফাইল আপলোড/পরিবর্তন করুন" : "Upload/replace file")}
+                  <input
+                    type="file"
+                    className="hidden"
+                    disabled={digitalUploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleDigitalFileUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {digitalPolicy ? (
+                  <p className="mt-2 text-xs text-[var(--muted)]">
+                    {locale === "bn" ? "সর্বোচ্চ সাইজ" : "Max size"}: {digitalPolicy.max_file_size_mb}MB · {locale === "bn" ? "অনুমোদিত" : "Allowed"}: {digitalPolicy.allowed_extensions.join(", ")}
+                  </p>
+                ) : null}
+                {digitalError ? <p className="mt-2 text-xs text-red-500">{digitalError}</p> : null}
+              </div>
+            ) : (
+              <label className="mt-4 block">
+                <span className="mb-1 block text-xs text-[var(--muted)]">
+                  {locale === "bn" ? "এক্সটার্নাল ডাউনলোড লিংক" : "External download URL"}
+                </span>
+                <input
+                  type="url"
+                  value={form.digital_external_url ?? ""}
+                  onChange={(e) => setField("digital_external_url", e.target.value)}
+                  placeholder="https://drive.google.com/..."
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                />
+              </label>
+            )}
+
+            <div className="mt-4">
+              <span className="mb-1 block text-xs text-[var(--muted)]">
+                {locale === "bn" ? "ডেলিভারি নোটিফিকেশন মাধ্যম" : "Delivery notification channels"}
+              </span>
+              <div className="flex gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={(form.digital_delivery_channels ?? []).includes("email")}
+                    onChange={() => toggleDeliveryChannel("email")}
+                    className="accent-[var(--accent)]"
+                  />
+                  {locale === "bn" ? "ইমেইল" : "Email"}
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={(form.digital_delivery_channels ?? []).includes("sms")}
+                    onChange={() => toggleDeliveryChannel("sms")}
+                    className="accent-[var(--accent)]"
+                  />
+                  {locale === "bn" ? "এসএমএস" : "SMS"}
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                {locale === "bn"
+                  ? "কাস্টমার সবসময় অর্ডার-স্ট্যাটাস পেজ থেকেও ডাউনলোড লিংক পাবেন, এটা অতিরিক্ত মাধ্যম।"
+                  : "The customer can always get the link from the order-status page too — this is an extra channel."}
+              </p>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {saving ? txt.saving : txt.save}
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {/* ── Variants Section ────────────────────────────────────── */}
         <section className="catv-panel p-4">

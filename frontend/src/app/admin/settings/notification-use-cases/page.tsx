@@ -15,7 +15,13 @@ import {
   type ThemeMode,
 } from "@/lib/dashboard-client";
 
-type UseCaseKey = "phone_verification" | "email_verification" | "bill_notification" | "forgot_password";
+type UseCaseKey =
+  | "phone_verification"
+  | "email_verification"
+  | "bill_notification"
+  | "forgot_password"
+  | "digital_product_delivered"
+  | "digital_download_otp";
 type PriorityChannel = "sms" | "email" | "both";
 
 interface NotificationTemplateOption {
@@ -53,6 +59,8 @@ const useCaseOptions: Array<{ key: UseCaseKey; bn: string; en: string }> = [
   { key: "email_verification", bn: "ইমেইল ভেরিফাই", en: "Email Verification" },
   { key: "bill_notification", bn: "বিল নোটিফিকেশন", en: "Bill Notification" },
   { key: "forgot_password", bn: "ফরগেট পাসওয়ার্ড", en: "Forgot Password" },
+  { key: "digital_product_delivered", bn: "ডিজিটাল প্রোডাক্ট ডেলিভারি (ডাউনলোড লিংক)", en: "Digital Product Delivered (download link)" },
+  { key: "digital_download_otp", bn: "ডিজিটাল ডাউনলোড OTP", en: "Digital Download OTP" },
 ];
 
 const text = {

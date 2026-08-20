@@ -1,6 +1,21 @@
-# ডিজিটাল প্রোডাক্ট সিস্টেম — গবেষণা রিপোর্ট (Research, no code yet)
+# ডিজিটাল প্রোডাক্ট সিস্টেম
 
-শেষ আপডেট: 2026-08-20 — প্রাথমিক গবেষণা। কোনো migration/কোড এখনো লেখা হয়নি — এই ফাইল শুধু architecture সিদ্ধান্ত ও existing-infra ম্যাপিং। `feature_roadmap_context.md`-এ pointer যোগ করা হয়েছে (আইটেম #৮), `SAAS_MODULE_CONTEXT.md §20`-এও।
+শেষ আপডেট: 2026-08-20 (২) — **✅ Phase 1 ইমপ্লিমেন্ট + deploy সম্পন্ন।** User-এর ৪টা সিদ্ধান্তের ভিত্তিতে (§০ক) ফুল বিল্ড হয়েছে ও production-এ লাইভ — migration, backend (models/services/controllers/routes), ১৮টা backend টেস্ট (`DigitalProductTest.php`, সব pass), ফ্রন্টএন্ড (প্রোডাক্ট ফর্ম, চেকআউট, thank-you পেজ, নতুন পাবলিক `/d/[token]` ডাউনলোড পেজ, admin policy পেজ) — সব deployed। নিচের বাকি অংশ (§১-১০) মূল গবেষণা রিপোর্ট হিসেবে রাখা হলো (এখনো accurate, ইমপ্লিমেন্টেশনের ভিত্তি ছিল), **নতুন §০ক ও §১১-১৩ যোগ হয়েছে** চূড়ান্ত সিদ্ধান্ত ও as-built ডিটেইলের জন্য।
+
+## ০ক. User-এর ৪টা চূড়ান্ত সিদ্ধান্ত (২০২৬-০৮-২০) ও কীভাবে ইমপ্লিমেন্ট হয়েছে
+
+1. **Personal wallet আপাতত থাকবে** — §৪-এর "শুধু automated gateway" সুপারিশ user override করেছেন। ইমপ্লিমেন্টেশন: wallet claim জমা দেওয়ার পর existing মেসেজ ("সেলার যাচাই করার পর কনফার্ম হবে") অলরেডি customer-কে অপেক্ষা করতে বলে (নতুন কিছু লাগেনি — `OnlinePaymentController::submitWalletClaim()` আগে থেকেই এই মেসেজ পাঠায়)। ডেলিভারি ট্রিগার হয় `OrderStatusService::transition()`-এ order `'confirmed'`-এ গেলে — wallet-verify ও automated-gateway callback দুটোই একই `OnlinePaymentService::applyConfirmedPayment()` দিয়ে সেখানে পৌঁছায়, তাই একটাই hook point দিয়ে দুটো পথই কভার হয়। **COD বাদ দেওয়া হয়েছে** (§৪-এর মূল যুক্তি অক্ষত — COD-তে টাকা নিশ্চিত হওয়ার আগেই OTP-tap দিয়ে confirm করা যেত, ফ্রি ফাইল দিয়ে দেওয়ার ঝুঁকি)।
+2. **Mixed cart (physical+digital) না** — `LandingPageController::publicSubmitOrder()`-এ চেকআউট-টাইমে block করা হয়েছে (cart-এর সব আইটেমের `product_type` না মিললে 422)।
+3. **প্রোডাক্ট অ্যাড করার সময় ডেলিভারি মেথড সেট করা যাবে** — per-product `digital_delivery_type` (`hosted_file` | `external_url`) + `digital_delivery_channels` (email/sms subset)। In-app (অর্ডার-স্ট্যাটাস পেজের ডাউনলোড লিংক) সবসময় থাকে, এগুলো অতিরিক্ত নোটিফিকেশন চ্যানেল মাত্র।
+4. **Anti-piracy — hosted file link শেয়ার করলেও অন্য কেউ ডাউনলোড করতে না পারে** — token-in-link (long random, `hash_equals` compare) যথেষ্ট না ভেবে, **OTP গেট** যোগ করা হয়েছে: hosted_file ডেলিভারিতে প্রথমবার লিংক খুললে customer-এর নিজের ফোন/ইমেইলে ৬-সংখ্যার কোড পাঠানো হয়, ভেরিফাই না করা পর্যন্ত ডাউনলোড হয় না। external_url-এ এই গেট নেই (এটা আমাদের ফাইল না, প্রোটেক্ট করার কিছু নেই)।
+
+## Correction (২০২৬-০৮-২০, ইমপ্লিমেন্টেশনের সময় ধরা পড়েছে)
+
+**§১খ-এ একটা ভুল ধারণা ছিল, যেটা এখানে সংশোধন করা হলো:** আগে লেখা হয়েছিল email "সেলারের নিজের SMTP" দিয়ে পাঠানো হয় (Facebook/WhatsApp credential-paste-এর মতো)। বাস্তবে যাচাই করে দেখা গেছে **`EmailConfiguration`/`NotificationTemplate`/`NotificationUseCaseBinding` সবই `is_admin`-গেটেড route-এ আছে** (`routes/api.php`) — অর্থাৎ এটা platform-wide, single-tenant-style সিস্টেম (এক বা একাধিক admin কনফিগার করে, সব সেলারের জন্য শেয়ার্ড), সেলারের নিজস্ব SMTP সেট করার কোনো UI নেই। `NotificationDispatchService::dispatch()`-এর প্রথম প্যারামিটার `$user` তাই **সবসময় একজন admin হতে হবে** (কোন admin অপ্রাসঙ্গিক, সব admin একই shared binding list দেখে) — recipient শুধু `$recipientPhone`/`$recipientEmail` প্যারামিটার দিয়ে যায়। এটা `DigitalDeliveryService::platformAdmin()`-এ ঠিকভাবে implement করা হয়েছে (`User::where('role','admin')->first()`)।
+
+**একই ভুল প্যাটার্ন Auto-top-up ফিচারেও পাওয়া গেছে** (`AutoRechargeSmsCreditJob`-এ `dispatch($seller, ...)` কল হচ্ছে — ভুল, `$seller` না, admin user পাঠানো উচিত ছিল) — এই bug-টা flag করে background task হিসেবে পাঠানো হয়েছে (`task_331ef7d8`), fix করা হয়নি (out of scope, Auto-top-up নিজেই পজড)।
+
+**Admin-এর করণীয়:** `digital_product_delivered` ও `digital_download_otp` use-case-এর জন্য অন্তত একটা SMS/Email template + binding সেট না করলে (`/admin/settings/notification-use-cases`, `/admin/settings/notification-templates`) email/SMS চ্যানেল silently কিছু পাঠাবে না — কিন্তু **in-app চ্যানেল (thank-you পেজের ডাউনলোড লিংক) তখনও কাজ করবে**, তাই কাস্টমার পুরোপুরি আটকে যাবে না।
 
 ## ০. সমস্যা (user-এর ভাষায়)
 
@@ -161,3 +176,35 @@ Phase 1-এ যা থাকবে: expiring signed link + download-count cap + 
 9. `StaffPermission::MODULE_KEYS` `'digital_products'` এন্ট্রি + ফ্রন্টএন্ড mirror (তিন জায়গায়)।
 10. Backend টেস্ট: policy enforcement, token expiry/count, payment→delivery ট্রিগার শুধু automated gateway-তে, cross-shop leak না হওয়া, mixed-cart block।
 11. ডকস: এই ফাইল আপডেট + `SAAS_MODULE_CONTEXT.md`/`feature_roadmap_context.md` ফ্লিপ।
+
+---
+
+## ১১. As-built — schema (§২-এর পরিকল্পনা থেকে সরলীকৃত)
+
+`digital_product_files` টেবিলটা আলাদা বানানো হয়নি — user-এর ৪টা সিদ্ধান্তে কোথাও multi-file/per-product একাধিক hosted file-এর দরকার ছিল না (v1 এক প্রোডাক্টে এক ফাইল), তাই ফাইল-ফিল্ডগুলো সরাসরি `products` টেবিলে বসানো হয়েছে — একটা অতিরিক্ত টেবিল+মডেল+রিলেশন এড়ানো গেছে, স্কোপ যেটুকু দরকার ঠিক ততটুকুই।
+
+- **`products`** নতুন কলাম: `product_type`, `digital_delivery_type`, `digital_file_path`/`digital_file_name`/`digital_file_mime_type`/`digital_file_size_bytes`, `digital_external_url`, `digital_delivery_channels` (jsonb)।
+- **`orders`** নতুন কলাম: `customer_email` (আগে ছিলই না — email delivery-র জন্য প্রথমবার যোগ হলো, ফিজিকাল অর্ডারে ঐচ্ছিক)।
+- **`digital_product_settings`** — `DigitalProductSetting::effective()` static মেথডে single source of truth (default: ২০০MB, ৭ দিন মেয়াদ, ৫টা ডাউনলোড) — admin-controller, file-upload validator, delivery-service তিনটাই এই একই মেথড কল করে, ড্রিফট এড়াতে।
+- **`digital_deliveries`** — পরিকল্পনা মতোই, প্লাস OTP-সংক্রান্ত কলাম (`otp_code`, `otp_channel`, `otp_sent_at`, `otp_verified_at`, `otp_attempts`, `otp_resend_count`, `otp_next_resend_at`, `otp_blocked_until`) — anti-piracy সিদ্ধান্ত (§০ক-৪) সরাসরি একই রো-তে embed করা হয়েছে (আলাদা `PhoneOtpVerification` রো না, `Order.otp_verified_at`-এর মতোই direct-embed কনভেনশন অনুসরণ করে)।
+
+## ১২. As-built — API surface
+
+- Admin (`is_admin`): `GET/PUT /admin/settings/digital-products`।
+- Seller (`staff_permission:products` — নতুন module key লাগেনি, বিদ্যমান `'products'`-এর অধীনেই): `GET /products/digital-policy`, `POST/DELETE /products/{product}/digital-file`।
+- পাবলিক (`throttle:30,1`, কোনো auth লাগে না): `GET /public/digital-deliveries/{token}`, `POST .../send-otp`, `POST .../verify-otp`, `GET .../download`।
+- `POST /public/landing-pages/{slug}/order` — mixed-cart/COD/email-required ৩টা নতুন 422 গেট (§০ক-১,২,৩)।
+- `GET /public/landing-pages/{slug}/orders/{id}` (thank-you পেজের ডেটা) — নতুন `digital_deliveries: [{download_token}]` array যোগ হয়েছে।
+
+## ১৩. Frontend as-built
+
+- `dashboard/products/page.tsx` (কুইক অ্যাড মোডাল) + `dashboard/products/[id]/page.tsx` (ডিটেইল পেজ) — `product_type` রেডিও টগল দুই জায়গাতেই; ডিটেইল পেজে প্রোডাক্ট digital হলে নতুন "Digital Delivery" সেকশন (delivery type রেডিও, hosted-file আপলোড/রিমুভ উইজেট বা external URL ইনপুট, email/sms চ্যানেল চেকবক্স)।
+- `components/public-landing-page-view.tsx` — checkout ফর্মে static `customer_email` ইনপুট যোগ (dynamic `CheckoutFieldResolver` সিস্টেমের বাইরে, সবসময় optional দেখায়, backend প্রয়োজন হলে 422 দিয়ে জানায়)। **জানা সীমাবদ্ধতা:** COD অপশন প্রোঅ্যাক্টিভলি হাইড হয় না (public product payload-এ `product_type` এখনো এক্সপোজড না) — কাস্টমার COD বেছে সাবমিট করলে backend স্পষ্ট বাংলা এরর দেখায়, সিলেক্ট করার আগে না। ভবিষ্যতে improve করা যায়।
+- `components/thank-you-view.tsx` — `order.digital_deliveries` থাকলে "ডাউনলোড লিংক" কার্ড দেখায় (প্রতিটা `/d/{token}`-এ লিংক করা)।
+- **নতুন `app/d/[token]/page.tsx`** — পাবলিক ডাউনলোড পেজ (client-side): status লোড → OTP লাগলে "কোড পাঠান" → কোড ভেরিফাই → ডাউনলোড বাটন (`GET /api/public/digital-deliveries/{token}/download`, ব্রাউজার সরাসরি ফাইল নামায়)। external_url ডেলিভারিতে সরাসরি ডাউনলোড বাটন (OTP ছাড়াই)।
+- `app/admin/settings/digital-products/page.tsx` (নতুন, `product-media` সেটিংস পেজের হুবহু ক্লোন) + `lib/admin-menu.ts`-এ নতুন `digitalProductSettings` মেনু এন্ট্রি।
+- `app/admin/settings/notification-use-cases/page.tsx` — `digital_product_delivered`/`digital_download_otp` নতুন use-case অপশন যোগ (backend whitelist + frontend dropdown দুটোই)।
+
+## যাচাই (২০২৬-০৮-২০)
+
+Backend: isolated Postgres schema কনভেনশনে `DigitalProductTest.php`-এর ১৮টা টেস্ট সব pass (admin policy CRUD + non-admin-forbidden, file upload policy enforcement + cross-shop leak প্রতিরোধ, mixed-cart/COD/email-required checkout গেট, wallet-approval→delivery creation→notification dispatch end-to-end, token/OTP/expiry/download-count/external-url পাবলিক ডাউনলোড ফ্লো)। ফুল স্যুট রান — ৪৪২ passed, বেসলাইনের ৩টা পুরনো/অসম্পর্কিত ফেইলিউর (`AuthApiTest`, `CourierFraudCheckApiTest`, `ProductMediaApiTest`) ছাড়া কিছু না। Production migration সফল (৪টা নতুন migration)। Frontend `tsc --noEmit` clean, `deploy-safe.sh` সফল, লাইভ smoke check pass (`/d/{token}` পেজ ও `/admin/settings/digital-products` দুটোই সঠিক status code দিচ্ছে)।

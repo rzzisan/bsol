@@ -79,7 +79,10 @@ class ProductController extends Controller
             'source'           => 'nullable|in:manual,woocommerce',
             'source_ref'       => 'nullable|string|max:255',
             'platform_api_key_id' => 'nullable|integer|exists:platform_api_keys,id',
+            ...$this->digitalFieldRules(),
         ]);
+
+        $this->normalizeDigitalFields($data);
 
         $data['user_id']     = auth()->id();
         $data['discount_type'] = $data['discount_type'] ?? 'amount';
@@ -161,7 +164,10 @@ class ProductController extends Controller
             'source'          => 'nullable|in:manual,woocommerce',
             'source_ref'      => 'nullable|string|max:255',
             'platform_api_key_id' => 'nullable|integer|exists:platform_api_keys,id',
+            ...$this->digitalFieldRules(),
         ]);
+
+        $this->normalizeDigitalFields($data);
 
         if (!empty($data['category_id'])) {
             $this->validateCategoryOwnership($data['category_id']);
@@ -233,6 +239,39 @@ class ProductController extends Controller
             'data'      => ['stock' => $newStock],
             'message'   => 'Stock adjusted.',
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function digitalFieldRules(): array
+    {
+        return [
+            'product_type' => ['nullable', Rule::in([Product::TYPE_PHYSICAL, Product::TYPE_DIGITAL])],
+            'digital_delivery_type' => [
+                'nullable',
+                Rule::in([Product::DIGITAL_DELIVERY_HOSTED_FILE, Product::DIGITAL_DELIVERY_EXTERNAL_URL]),
+            ],
+            'digital_external_url' => ['nullable', 'url', 'max:2000'],
+            'digital_delivery_channels' => ['nullable', 'array'],
+            'digital_delivery_channels.*' => [Rule::in(['email', 'sms'])],
+        ];
+    }
+
+    /**
+     * external_url is only meaningful for that delivery type — clear it
+     * when the seller switches to hosted_file (the actual file upload is a
+     * separate multipart request, DigitalProductFileController::store()).
+     *
+     * @param array<string, mixed> $data
+     */
+    private function normalizeDigitalFields(array &$data): void
+    {
+        if (($data['product_type'] ?? null) !== Product::TYPE_DIGITAL) {
+            return;
+        }
+
+        if (($data['digital_delivery_type'] ?? null) === Product::DIGITAL_DELIVERY_HOSTED_FILE) {
+            $data['digital_external_url'] = null;
+        }
     }
 
     private function validateCategoryOwnership(int $categoryId): void

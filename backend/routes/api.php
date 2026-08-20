@@ -29,6 +29,9 @@ use App\Http\Controllers\Api\Connect\ConnectTrackingController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CourierFraudCheckController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DigitalDeliveryController;
+use App\Http\Controllers\Api\DigitalProductFileController;
+use App\Http\Controllers\Api\Admin\DigitalProductSettingsController;
 use App\Http\Controllers\Api\BkashPaymentController;
 use App\Http\Controllers\Api\BkashPgwPaymentController;
 use App\Http\Controllers\Api\SmsCreditAutoRechargeController;
@@ -198,6 +201,16 @@ Route::get('/public/landing-pages/{slug}/products/{productId}/options', [Landing
 Route::post('/public/landing-pages/{slug}/products/{productId}/variants/resolve', [LandingPageController::class, 'publicResolveVariant'])
     ->where('productId', '[0-9]+')
     ->middleware('throttle:60,1');
+
+// Digital product download — token-in-URL, no auth (the customer only ever
+// has the link from email/SMS/order-status page). hosted_file downloads are
+// additionally OTP-gated — see digital_product_context.md §7.
+Route::prefix('public/digital-deliveries/{token}')->middleware('throttle:30,1')->group(function () {
+    Route::get('/', [DigitalDeliveryController::class, 'show']);
+    Route::post('/send-otp', [DigitalDeliveryController::class, 'sendOtp']);
+    Route::post('/verify-otp', [DigitalDeliveryController::class, 'verifyOtp']);
+    Route::get('/download', [DigitalDeliveryController::class, 'download']);
+});
 
 // Meta webhook — called directly by Facebook, not by our frontend. Auth
 // boundary is the verify-token handshake (GET) / X-Hub-Signature-256 HMAC
@@ -406,6 +419,11 @@ Route::middleware('active_subscription')->group(function () {
         Route::put('/products/{product}/media/reorder', [ProductMediaController::class, 'reorder']);
         Route::put('/products/{product}/media/{mediaId}/set-thumbnail', [ProductMediaController::class, 'setThumbnail']);
         Route::delete('/products/{product}/media/{mediaId}', [ProductMediaController::class, 'destroy']);
+
+        // Digital product hosted file — see digital_product_context.md §2.
+        Route::get('/products/digital-policy', [DigitalProductFileController::class, 'policy']);
+        Route::post('/products/{product}/digital-file', [DigitalProductFileController::class, 'store']);
+        Route::delete('/products/{product}/digital-file', [DigitalProductFileController::class, 'destroy']);
         Route::post('/products/{product}/adjust-stock', [ProductController::class, 'adjustStock']);
         Route::apiResource('/products', ProductController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
 
@@ -754,6 +772,10 @@ Route::middleware('active_subscription')->group(function () {
         // Product media settings (shared admin config)
         Route::get('/settings/product-media', [ProductMediaSettingsController::class, 'show']);
         Route::put('/settings/product-media', [ProductMediaSettingsController::class, 'update']);
+
+        // Digital product settings (shared admin config) — digital_product_context.md §2.
+        Route::get('/settings/digital-products', [DigitalProductSettingsController::class, 'show']);
+        Route::put('/settings/digital-products', [DigitalProductSettingsController::class, 'update']);
 
         // Platform branding: attribution footer + public terms page content
         Route::get('/settings/platform-branding', [PlatformSettingsController::class, 'show']);
