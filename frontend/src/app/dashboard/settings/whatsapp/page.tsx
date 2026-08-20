@@ -24,7 +24,8 @@ const text = {
     subtitle: "নিজের WhatsApp Cloud API ক্রেডেনশিয়াল কানেক্ট করলে অর্ডার-স্ট্যাটাস অটোমেশন + ইনবক্স ব্যবহার করা যাবে।",
     intro: "Meta Business Suite → WhatsApp Manager থেকে নিজের phone_number_id ও একটা permanent access token বানিয়ে এখানে পেস্ট করুন — এই App-এ আলাদা কোনো OAuth/App Review লাগবে না। ⚠️ App Review পাস না হওয়া পর্যন্ত শুধু Meta-তে verified-tester হিসেবে যোগ করা নম্বরেই মেসেজ পাঠানো যাবে (সর্বোচ্চ ৫টা)।",
     phoneNumberId: "Phone Number ID",
-    wabaId: "WABA ID (ঐচ্ছিক)",
+    wabaId: "WABA ID",
+    wabaIdHint: "ইনবক্সে মেসেজ পেতে দরকার — Meta WhatsApp Manager-এ WABA-র Overview পেজে পাওয়া যাবে।",
     displayNumber: "ডিসপ্লে নম্বর (ঐচ্ছিক)",
     accessToken: "Access Token",
     accessTokenSetHint: "সেট করা আছে — বদলাতে নতুন টোকেন লিখুন",
@@ -54,7 +55,8 @@ const text = {
     subtitle: "Connect your own WhatsApp Cloud API credentials to use order-status automation + the inbox.",
     intro: "Create a phone_number_id and a permanent access token in Meta Business Suite → WhatsApp Manager and paste them here — no OAuth/App Review needed on our side. ⚠️ Until App Review passes, messages can only be sent to numbers added as verified testers in Meta (max 5).",
     phoneNumberId: "Phone Number ID",
-    wabaId: "WABA ID (optional)",
+    wabaId: "WABA ID",
+    wabaIdHint: "Needed to receive inbox messages — find it on the WABA's Overview page in Meta WhatsApp Manager.",
     displayNumber: "Display number (optional)",
     accessToken: "Access Token",
     accessTokenSetHint: "Already set — enter a new token to change it",
@@ -242,10 +244,12 @@ export default function Page() {
               <div>
                 <label className="mb-1 block text-xs text-[var(--muted)]">{t.wabaId}</label>
                 <input
+                  required
                   value={form.waba_id}
                   onChange={(e) => setForm((p) => ({ ...p, waba_id: e.target.value }))}
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
                 />
+                <p className="mt-1 text-xs text-[var(--muted)]">{t.wabaIdHint}</p>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-[var(--muted)]">{t.displayNumber}</label>

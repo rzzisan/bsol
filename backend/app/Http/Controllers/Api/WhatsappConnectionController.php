@@ -33,11 +33,14 @@ class WhatsappConnectionController extends Controller
         ]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(Request $request, WhatsappCloudApiClient $client): JsonResponse
     {
         $data = $request->validate([
             'phone_number_id' => ['required', 'string', 'max:50'],
-            'waba_id' => ['nullable', 'string', 'max:50'],
+            // Required (not just informational) — see subscribeAppToWaba()
+            // below. Without it we have no way to tell Meta to deliver this
+            // seller's inbound webhook events to us at all.
+            'waba_id' => ['required', 'string', 'max:50'],
             'display_phone_number' => ['nullable', 'string', 'max:30'],
             'access_token' => ['nullable', 'string'],
         ]);
@@ -45,15 +48,28 @@ class WhatsappConnectionController extends Controller
         $connection = $this->connection() ?? new WhatsappBusinessConnection(['user_id' => auth()->id()]);
 
         $connection->phone_number_id = $data['phone_number_id'];
-        $connection->waba_id = $data['waba_id'] ?? null;
+        $connection->waba_id = $data['waba_id'];
         $connection->display_phone_number = $data['display_phone_number'] ?? null;
         // Blank access_token = "leave unchanged" — same masking convention
         // as FacebookPixelSettingController::update().
         if (! empty($data['access_token'])) {
             $connection->access_token = $data['access_token'];
         }
+
+        if (! $connection->access_token) {
+            return response()->json(['success' => false, 'message' => 'Access token is required.'], 422);
+        }
+
+        // Subscribes our app to receive this WABA's webhook events (same
+        // shape as FacebookGraphClient::subscribeAppToPage()) — pasting
+        // credentials alone only ever enables sending, never receiving.
+        // A failure here still saves the connection (sending/automation
+        // still works) but is surfaced clearly rather than silently
+        // leaving the inbox dead.
+        $subscribed = $client->subscribeAppToWaba($data['waba_id'], $connection->access_token);
+
         $connection->status = 'connected';
-        $connection->last_error = null;
+        $connection->last_error = $subscribed ? null : 'Saved, but could not subscribe to inbound messages — check the WABA ID and that the access token has whatsapp_business_management permission. Sending/automation will still work; the inbox will not receive new messages until this is fixed.';
         $connection->save();
 
         return response()->json(['success' => true, 'data' => $connection->masked()]);

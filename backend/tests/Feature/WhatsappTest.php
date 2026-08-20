@@ -80,14 +80,45 @@ class WhatsappTest extends TestCase
         $owner = $this->owner();
         Sanctum::actingAs($owner);
 
+        Http::fake(['*/WABA1/subscribed_apps' => Http::response(['success' => true])]);
+
         $this->putJson('/api/whatsapp/connection', [
             'phone_number_id' => 'PNID123',
+            'waba_id' => 'WABA1',
             'access_token' => 'secret-token',
-        ])->assertOk()->assertJsonPath('data.access_token_set', true);
+        ])->assertOk()->assertJsonPath('data.access_token_set', true)->assertJsonPath('data.last_error', null);
 
         $response = $this->getJson('/api/whatsapp/connection')->assertOk();
         $response->assertJsonPath('data.phone_number_id', 'PNID123');
         $response->assertJsonMissingPath('data.access_token');
+    }
+
+    public function test_save_still_succeeds_but_warns_when_the_webhook_subscribe_call_fails(): void
+    {
+        $owner = $this->owner();
+        Sanctum::actingAs($owner);
+
+        Http::fake(['*/WABA1/subscribed_apps' => Http::response([], 400)]);
+
+        $response = $this->putJson('/api/whatsapp/connection', [
+            'phone_number_id' => 'PNID123',
+            'waba_id' => 'WABA1',
+            'access_token' => 'secret-token',
+        ])->assertOk();
+
+        $this->assertNotNull($response->json('data.last_error'));
+        $this->assertSame('connected', WhatsappBusinessConnection::where('user_id', $owner->id)->first()->status);
+    }
+
+    public function test_saving_without_a_waba_id_is_rejected(): void
+    {
+        $owner = $this->owner();
+        Sanctum::actingAs($owner);
+
+        $this->putJson('/api/whatsapp/connection', [
+            'phone_number_id' => 'PNID123',
+            'access_token' => 'secret-token',
+        ])->assertStatus(422);
     }
 
     public function test_staff_cannot_reach_connection_routes(): void

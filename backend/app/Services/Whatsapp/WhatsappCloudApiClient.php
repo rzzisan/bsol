@@ -24,6 +24,27 @@ class WhatsappCloudApiClient
     }
 
     /**
+     * Without this, Meta never delivers inbound webhook events for this
+     * WABA to our /facebook/webhook URL at all — pasting phone_number_id +
+     * access_token alone only enables sending, not receiving. This is the
+     * WhatsApp-side equivalent of FacebookGraphClient::subscribeAppToPage()
+     * (same shape: POST /{id}/subscribed_apps), just keyed by waba_id
+     * instead of a Page id. Called once, right after a seller saves their
+     * connection — see WhatsappConnectionController::update().
+     */
+    public function subscribeAppToWaba(string $wabaId, string $accessToken): bool
+    {
+        $response = Http::withToken($accessToken)->asJson()->timeout(15)
+            ->post('https://graph.facebook.com/' . PlatformFacebookSetting::resolvedGraphVersion() . "/{$wabaId}/subscribed_apps");
+
+        if (! $response->successful()) {
+            Log::warning('whatsapp.subscribe_app_to_waba_failed', ['waba_id' => $wabaId, 'response' => $response->json()]);
+        }
+
+        return $response->successful() && (bool) ($response->json()['success'] ?? false);
+    }
+
+    /**
      * Order-status automation always fires outside the customer-initiated
      * 24h session window (the customer didn't just message us, we're
      * reacting to their order) — WhatsApp rejects free text there, a

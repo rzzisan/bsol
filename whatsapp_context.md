@@ -1,12 +1,27 @@
 # WhatsApp Business Integration — Context
 
-শেষ আপডেট: 2026-08-20 — **Phase 1 সম্পূর্ণ ও লাইভ: order-status automation + 2-way ইনবক্স।** `feature_roadmap_context.md` আইটেম #২। কোড deploy করা হয়েছে (migration + backend + frontend সব লাইভ, `bsol.zyrotechbd.com`-এ verify করা হয়েছে), কিন্তু **`whatsapp_business_messaging` এখনো App Review-এ যায়নি** — বিস্তারিত §১-এ।
+শেষ আপডেট: 2026-08-20 (২) — **§১ সংশোধন করা হলো — আগের এন্ট্রি ভুলভাবে "BSOL-এর App Review" বলছিল, আসলে per-seller।** সেলারের প্রশ্নে ধরা পড়ল যে "app review কার করতে হবে" এই প্রশ্নের আগের উত্তরটা Facebook Pixel/CAPI-র মডেলের সাথে ভুলভাবে মিলিয়ে ফেলা হয়েছিল। WebSearch করে confirm করা হয়েছে: System User token generate করার সময় সেলার **নিজের** কোন App-এর আন্ডারে সেটা বানাচ্ছে বেছে নেয় — এই credential-paste আর্কিটেকচারে সেটা স্বাভাবিকভাবেই সেলারের **নিজের** Meta App/Business Manager হবে, BSOL-এর App না। তার মানে ৫-নম্বর cap কাটানোর জন্য **প্রতিটা সেলারকে নিজে** তার Business Manager verify করাতে হবে — BSOL-এর একটামাত্র App Review দিয়ে সবার জন্য unlock হয় না। এই ভুল সংশোধনের সময় আরেকটা **real কোড গ্যাপ** পাওয়া গেছে ও ফিক্স করা হয়েছে (§১ক)। বিস্তারিত নিচে।
 
-## ১. 🔴 লাইভ ব্লকার — real customer-দের জন্য এখনো ব্যবহারযোগ্য না
+## ১. Real customer-দের জন্য কী কী লাগবে — সংশোধিত ব্যাখ্যা
 
-`facebook_integration_context.md`-এ ডকুমেন্টেড Facebook App Review **আংশিক পাস** হয়েছে, কিন্তু সেটা `pages_*` পারমিশন (Messenger/Page comment)-এর জন্য — WhatsApp Cloud API-র `whatsapp_business_messaging` **সম্পূর্ণ আলাদা পারমিশন**, এখনো Review-এ সাবমিটই করা হয়নি। এই পারমিশনের Advanced Access পাস না হওয়া পর্যন্ত (Standard Access-এ) শুধু Meta App dashboard-এ **verified tester** হিসেবে যোগ করা সর্বোচ্চ ৫টা নম্বরেই মেসেজ পাঠানো যাবে — real কাস্টমার নম্বরে পাঠাতে গেলে Meta রিজেক্ট করবে। এটা code-এর সমস্যা না, Meta-সাইড hard cap। ঠিক Facebook CAPI Purchase event-এর মতোই ("কোড শেষ, App Review বাকি") অবস্থা — `facebook_integration_context.md §3`।
+**দুটো আলাদা জিনিস, দুটোই সেলার-সাইড, BSOL-এর একবারের App Review দিয়ে কোনোটাই unlock হয় না:**
 
-**পরবর্তী পদক্ষেপ (business/Meta-side, কোড না)**: `whatsapp_business_messaging` App Review-এ সাবমিট করা।
+1. **পাঠানোর অনুমতি (৫-নম্বর cap)** — WhatsApp Cloud API-তে একটা System User access token জেনারেট করার সময় সেলার কোন Meta App-এর আন্ডারে বানাচ্ছে সেটা বেছে নেয়; token সেই App-এর সাথে বাঁধা থাকে। এই প্ল্যাটফর্মে সেলার নিজে "Meta Business Suite → WhatsApp Manager"-এ গিয়ে token বানায় — মানে এটা স্বাভাবিকভাবেই **তার নিজের** App/Business Manager-এর আন্ডারে হয়, BSOL-এর App-এর না। ৫টা verified-tester নম্বরের বাইরে real কাস্টমারে পাঠাতে **সেলারকে নিজের Business Manager Meta-তে Business Verification করাতে হবে** (ট্রেড লাইসেন্স ইত্যাদি ডকুমেন্ট জমা — এটা `pages_messaging`-এর মতো manual reviewer/screencast App Review না, তুলনামূলক দ্রুত self-service প্রসেস)। BSOL এখানে কিছু করতে পারে না — প্রতিটা সেলারকে আলাদাভাবে এটা করতে হবে।
+2. **মেসেজ পাওয়ার অনুমতি (§১ক-এ বর্ণিত `subscribed_apps` কল)** — এটা BSOL-সাইড কোড দিয়েই হয়, সেলারের কোনো Review লাগে না, শুধু connect করার সময় ঠিকভাবে wire করা থাকতে হবে (এখন আছে)।
+
+**তাহলে BSOL নিজের কোনো App Review লাগবে কি?** এই architecture-এ (seller নিজের credential ব্যবহার করছে) — না, sending-এর জন্য BSOL-এর নিজের App-এ `whatsapp_business_messaging` চাওয়ার দরকার নেই, কারণ actual send call সবসময় সেলারের নিজের token দিয়ে হয় (`Authorization: Bearer {seller_token}`), BSOL-এর App credential ব্যবহার হয়ই না। BSOL-এর App শুধু webhook receive করার জন্য দরকার (§১ক) — সেটার জন্য App Review-এর দরকার নেই, শুধু `subscribed_apps` কল।
+
+**সেলারকে যা বলতে হবে**: "Connect WhatsApp"-এর পর real কাস্টমারে মেসেজ পাঠাতে চাইলে নিজের Meta Business Manager-এ গিয়ে Business Verification সম্পূর্ণ করতে হবে — এটা একটা onboarding ধাপ, প্রতি সেলারের জন্য একবার।
+
+## ১ক. 🔧 রিয়েল কোড গ্যাপ পাওয়া গেছে ও ফিক্স করা হয়েছে — inbound webhook subscribe
+
+সেলার connect করার পর phone_number_id + access_token সেভ হলেও, Meta **কখনোই** সেই WABA-র inbound webhook event আমাদের `/facebook/webhook`-এ পাঠাত না — কারণ `POST /{waba_id}/subscribed_apps` কলটা কোথাও করা হয়নি (Facebook Page connect-এ ঠিক এই কাজটাই `FacebookGraphClient::subscribeAppToPage()` করে, WhatsApp সাইডে সেই সমতুল্য মেথডটাই বাদ পড়ে গিয়েছিল)। মানে **App Review/Business Verification স্ট্যাটাস যাই হোক না কেন, ৫টা test নম্বরের মধ্যেই থাকা সত্ত্বেও ২-way ইনবক্স কখনো কোনো inbound মেসেজ দেখাত না** — এটা কোনো Meta-side gating না, খাঁটি missing-wiring বাগ।
+
+**ফিক্স**:
+- `WhatsappCloudApiClient::subscribeAppToWaba($wabaId, $accessToken)` — নতুন মেথড, `POST /{waba_id}/subscribed_apps`, `FacebookGraphClient::subscribeAppToPage()`-এর হুবহু প্যাটার্ন।
+- `WhatsappConnectionController::update()` — সেভ করার পর এখন এই কলটা করে; `waba_id` আগে ঐচ্ছিক ছিল, এখন **required** (এই কলের জন্য দরকার)। কল ব্যর্থ হলেও connection সেভ থাকে (sending/automation তখনো কাজ করবে) কিন্তু `last_error`-এ স্পষ্ট ওয়ার্নিং দেখায় — chুপচাপ silent-broken ইনবক্স না।
+- ফ্রন্টএন্ড: WABA ID ফিল্ড এখন required + hint টেক্সট (কোথায় পাওয়া যাবে)।
+- ২টা নতুন টেস্ট যোগ হয়েছে (subscribe fail-but-save-succeeds, waba_id ছাড়া reject)।
 
 ## ২. আর্কিটেকচার — Facebook + SMS automation প্যাটার্নের সরাসরি reuse
 
@@ -44,7 +59,7 @@ WhatsApp টেমপ্লেট তৈরি/সাবমিট (সেলা�
 
 ## ৭. টেস্ট
 
-`backend/tests/Feature/WhatsappTest.php` — ১৪টা টেস্ট: connection save/masking + owner-only gating, test-send failure path, inbound capture + wa_id customer auto-link, redelivery dedupe, delivery-status update on existing outbound row, unrelated-object no-op, order-status automation send + duplicate-trigger skip (savepoint ফিক্সের পরে pass করেছে) + not-connected clean failure, reply within/outside window, staff permission gating। Full backend suite (isolated pgsql schema): pre-existing ৪টা unrelated baseline failure (`AuthApiTest`, `CollectionHistoryApiTest`, `CourierFraudCheckApiTest`, `ProductMediaApiTest`) ছাড়া সব পাস। Frontend: `tsc --noEmit` + `next build` ক্লিন।
+`backend/tests/Feature/WhatsappTest.php` — ১৬টা টেস্ট: connection save/masking + owner-only gating (subscribed_apps ফেইল হলেও save হয়, waba_id ছাড়া reject), test-send failure path, inbound capture + wa_id customer auto-link, redelivery dedupe, delivery-status update on existing outbound row, unrelated-object no-op, order-status automation send + duplicate-trigger skip (savepoint ফিক্সের পরে pass করেছে) + not-connected clean failure, reply within/outside window, staff permission gating। Full backend suite (isolated pgsql schema): pre-existing ৪টা unrelated baseline failure (`AuthApiTest`, `CollectionHistoryApiTest`, `CourierFraudCheckApiTest`, `ProductMediaApiTest`) ছাড়া সব পাস। Frontend: `tsc --noEmit` + `next build` ক্লিন।
 
 ## ৮. Deploy নোট
 
