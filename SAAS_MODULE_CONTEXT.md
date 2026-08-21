@@ -1235,4 +1235,6 @@ Backend: isolated Postgres schema কনভেনশনে — manual + courier_
 
 Cart client-side (`localStorage`, origin-scoped — auth টোকেনের মতোই প্রতি সাবডোমেইনে আলাদা, `custom_domain_context.md §2`-এর একই নিরাপত্তা প্রপার্টি ফ্রিতে reuse হয়)। "Order on WhatsApp" বাটন একটা সাধারণ `wa.me` click-to-chat লিংক — এটা paused/pending WhatsApp Business Cloud API automation ফিচার থেকে সম্পূর্ণ আলাদা ও স্বাধীন, কোনো Meta App Review নির্ভরতা নেই।
 
-**১০-ফেজ (S0-S9) বিস্তারিত প্ল্যান, ডেটা মডেল, API সারফেস, non-goals, open questions:** `seller_storefront_context.md`। **এখনো কোনো migration/কোড লেখা হয়নি — user-এর অনুমতির অপেক্ষায়।**
+**১০-ফেজ (S0-S9) বিস্তারিত প্ল্যান, ডেটা মডেল, API সারফেস, non-goals, open questions:** `seller_storefront_context.md`।
+
+**S0 ✅ লাইভ (২০২৬-০৮-২১):** root/হোমপেজ রাউটিং + reserved path। বর্তমান বাগ ফিক্স হয়েছে — সেলারের সাবডোমেইনের bare root এখন আর platform লগইনে redirect করে না, বদলে storefront placeholder home (বা সেলার-নির্বাচিত landing page) দেখায়; `proxy.ts`-এর পুরনো redirect আসলে ইচ্ছাকৃত নিরাপত্তা সিদ্ধান্ত ছিল (login form কম-বিশ্বস্ত origin-এ রেন্ডার না হওয়া, `domain_security_audit.md M-3`) — সেটা ভাঙা হয়নি, `/store`-এ কোনো লগইন ফর্মই নেই বলে নিরাপদে সেখানে রাউট করা গেছে। বিস্তারিত `seller_storefront_context.md §১৪`। বাকি S1-S9 (পাবলিক ক্যাটালগ, কার্ট, হোমপেজ থিম, প্রোডাক্ট ডিটেইল, রিভিউ, SEO, ট্র্যাকিং) এখনো শুরু হয়নি।
