@@ -24,7 +24,8 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
   const categories = (await fetchCategories(baseUrl)) ?? [];
   const category = categories.find((c) => c.slug === slug);
 
-  return { title: category?.name ?? "Category" };
+  const title = category?.name ?? "Category";
+  return { title, openGraph: { title, type: "website" } };
 }
 
 export default async function CategoryRoute({ params, searchParams }: RouteProps) {
@@ -43,8 +44,18 @@ export default async function CategoryRoute({ params, searchParams }: RouteProps
     notFound();
   }
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      { "@type": "ListItem", position: 2, name: category?.name ?? slug },
+    ],
+  };
+
   return (
     <div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       <nav className="mb-4 text-xs text-slate-500">
         <Link href="/" className="hover:underline">
           Home

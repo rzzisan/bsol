@@ -1251,4 +1251,6 @@ Cart client-side (`localStorage`, origin-scoped — auth টোকেনের �
 
 **S3b ✅ লাইভ:** storefront checkout-এ অনলাইন পেমেন্ট — `OnlinePaymentService`-এর কোনো পরিবর্তন লাগেনি (আগে থেকেই plain Order-ভিত্তিক), নতুন `StorefrontPaymentController` শুধু host-resolved controller-level wiring। ডিজিটাল কার্টে এখন শুধু COD ব্লকড, অনলাইন পেমেন্ট (wallet/gateway) দিয়ে কেনা যায়। real bKash অর্ডার + wallet-claim `zareen.zyrotechbd.com`-এ DB-তে verify করা হয়েছে।
 
-বিস্তারিত `seller_storefront_context.md §১৭-২০`। বাকি S7 (রিভিউ), S8 (SEO), S9 (ট্র্যাকিং)।
+**S8 ✅ লাইভ:** `/sitemap.xml`+`/robots.txt` root-level (`app/sitemap.ts`/`app/robots.ts`, host-aware `headers()` দিয়ে, প্রতিটা shop host-এ কাজ করে কোনো proxy রুট ছাড়াই কারণ ডট-ওয়ালা path landing-slug ম্যাচিং থেকে আগে থেকেই বাদ), JSON-LD (Product/BreadcrumbList/Organization), OG images। real ডেটা দিয়ে verify করা।
+
+বিস্তারিত `seller_storefront_context.md §১৭-২১`। বাকি S7 (রিভিউ), S9 (ট্র্যাকিং)।

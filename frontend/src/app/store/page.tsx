@@ -22,8 +22,18 @@ function getBaseUrl(headerList: Headers) {
 export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = getBaseUrl(await headers());
   const home = await fetchHome(baseUrl);
+  const title = home?.shop_name ?? "Shop";
 
-  return { title: home?.shop_name ?? "Shop" };
+  return {
+    title,
+    description: home?.about_text ?? undefined,
+    openGraph: {
+      title,
+      description: home?.about_text ?? undefined,
+      images: home?.logo_url ? [{ url: home.logo_url }] : undefined,
+      type: "website",
+    },
+  };
 }
 
 export default async function StorefrontHomeRoute() {
@@ -34,10 +44,19 @@ export default async function StorefrontHomeRoute() {
     notFound();
   }
 
+  const organizationLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: home.shop_name,
+    url: baseUrl,
+    logo: home.logo_url ?? undefined,
+  };
+
   const hasContent = home.banner_images.length > 0 || home.featured_products.length > 0 || home.category_sections.length > 0;
 
   return (
     <div className="space-y-10">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }} />
       {/* Hero banners */}
       {home.banner_images.length > 0 ? (
         <div className={`grid gap-3 ${home.banner_images.length > 1 ? "sm:grid-cols-2" : ""}`}>

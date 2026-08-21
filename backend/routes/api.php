@@ -227,6 +227,7 @@ Route::prefix('public/storefront')->middleware('throttle:60,1')->group(function 
     Route::get('/products/{slug}', [StorefrontCatalogController::class, 'show']);
     Route::get('/orders/{token}', [StorefrontCheckoutController::class, 'showOrder']);
     Route::get('/payment-channels', [StorefrontPaymentController::class, 'channels']);
+    Route::get('/sitemap-data', [StorefrontCatalogController::class, 'sitemapData']);
 });
 
 // Cart checkout submission — tighter throttle than the read-only catalog

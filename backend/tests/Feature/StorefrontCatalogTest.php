@@ -203,4 +203,35 @@ class StorefrontCatalogTest extends TestCase
             ->assertJsonCount(1, 'data.featured_products')
             ->assertJsonPath('data.featured_products.0.id', $featured->id);
     }
+
+    public function test_sitemap_data_lists_categories_products_and_published_landing_pages_scoped_to_shop(): void
+    {
+        $a = $this->seller('shopa');
+        $b = $this->seller('shopb');
+
+        ProductCategory::create(['user_id' => $a->id, 'name' => 'Oil', 'slug' => 'oil', 'is_active' => true]);
+        ProductCategory::create(['user_id' => $a->id, 'name' => 'Hidden', 'slug' => 'hidden', 'is_active' => false]);
+        $this->product($a, ['name' => 'Visible']);
+        $this->product($a, ['name' => 'Hidden Product', 'show_in_storefront' => false]);
+        $this->product($b, ['name' => 'Other Shop Product']);
+
+        \App\Models\LandingPage::create([
+            'user_id' => $a->id, 'title' => 'Live', 'slug' => 'live',
+            'status' => 'published', 'published_at' => now(), 'content' => [],
+        ]);
+        \App\Models\LandingPage::create([
+            'user_id' => $a->id, 'title' => 'Draft', 'slug' => 'draft',
+            'status' => 'draft', 'content' => [],
+        ]);
+
+        $this->getJson("https://shopa.{$this->apex()}/api/public/storefront/sitemap-data")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.categories')
+            ->assertJsonPath('data.categories.0.slug', 'oil')
+            // Only the show_in_storefront=true, same-shop product counts —
+            // hidden and cross-shop products are excluded.
+            ->assertJsonCount(1, 'data.products')
+            ->assertJsonCount(1, 'data.landing_pages')
+            ->assertJsonPath('data.landing_pages.0.slug', 'live');
+    }
 }

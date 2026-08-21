@@ -21,9 +21,17 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
 
   if (!product) return { title: "Product not found" };
 
+  const description = product.description?.slice(0, 160) || product.name;
+
   return {
     title: product.name,
-    description: product.description?.slice(0, 160) || product.name,
+    description,
+    openGraph: {
+      title: product.name,
+      description,
+      images: product.thumbnail ? [{ url: product.thumbnail }] : undefined,
+      type: "website",
+    },
   };
 }
 
@@ -37,5 +45,44 @@ export default async function ProductDetailRoute({ params }: RouteProps) {
     notFound();
   }
 
-  return <ProductDetailView product={product} home={home} />;
+  // JSON-LD (S8) — Product + BreadcrumbList. Next's metadata API has no
+  // native structured-data support, so this is a plain inline script tag,
+  // the standard pattern for it.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description || product.name,
+    sku: product.sku ?? undefined,
+    image: product.images.map((i) => i.url),
+    offers: {
+      "@type": "Offer",
+      price: product.selling_price,
+      priceCurrency: "BDT",
+      availability: product.in_stock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    },
+    ...(product.rating.count > 0
+      ? { aggregateRating: { "@type": "AggregateRating", ratingValue: product.rating.average, reviewCount: product.rating.count } }
+      : {}),
+  };
+
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      ...(product.category
+        ? [{ "@type": "ListItem", position: 2, name: product.category.name, item: `${baseUrl}/category/${product.category.slug}` }]
+        : []),
+      { "@type": "ListItem", position: product.category ? 3 : 2, name: product.name },
+    ],
+  };
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+      <ProductDetailView product={product} home={home} />
+    </>
+  );
 }

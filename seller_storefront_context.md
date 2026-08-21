@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** প্ল্যান সম্পন্ন। **S0-S6 + S3b — সবগুলো implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — real ব্যানার/পার্টনার-লোগো/about-image আপলোড, real COD ও bKash অর্ডার, দুটোই `zareen.zyrotechbd.com`-এ যাচাই করা হয়েছে। নিচে §১৪-২০ দেখো। বাকি S7 (রিভিউ), S8 (SEO), S9 (ট্র্যাকিং)।
+**অবস্থা:** প্ল্যান সম্পন্ন। **S0-S6 + S3b + S8 — সবগুলো implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — real ব্যানার/পার্টনার-লোগো/about-image আপলোড, real COD ও bKash অর্ডার, real sitemap.xml/robots.txt/JSON-LD, সবই `zareen.zyrotechbd.com`-এ যাচাই করা হয়েছে। নিচে §১৪-২১ দেখো। বাকি S7 (রিভিউ), S9 (ট্র্যাকিং)।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -400,3 +400,19 @@ Storefront checkout-এ অনলাইন পেমেন্ট যোগ হ�
 **ভেরিফাই:** নতুন `StorefrontPaymentTest.php` (৫টা: channels endpoint, digital-cart COD-blocked-কিন্তু-online-allowed, wallet claim submission, cross-shop token ৪০৪, gateway initiate — SSLCommerz-এর `Http::fake()` দিয়ে, `OnlinePaymentGatewayTest.php`-এর একই প্যাটার্ন) — সব pass। `StorefrontCheckoutTest.php`-এর ডিজিটাল-cod টেস্টের নাম/মন্তব্য আপডেট করা হয়েছে (আর "cod is the only option" সত্যি না)। ফুল স্যুট ৪৭৪+ pass (৩টা known baseline failure অপরিবর্তিত)।
 
 **লাইভ ভেরিফাই (`zareen.zyrotechbd.com`, curl + direct DB check — ব্রাউজার এক্সটেনশন এই মুহূর্তে সাময়িকভাবে ডিসকানেক্টেড ছিল):** `/payment-channels` real ডেটা দেখিয়েছে (zareen-এর bKash/Nagad wallet + ৬টা real gateway credential কনফিগার করা!), ডিজিটাল প্রোডাক্ট (Bsol-Connect) `payment_method=bkash` দিয়ে অর্ডার তৈরি হয়েছে (`ORD-20260821-0008`), `/order/{token}` পেজের SSR HTML-এ ওয়ালেট-ক্লেইম ফর্ম সঠিক placeholder সহ উপস্থিত, wallet-claim সাবমিট করে `OrderOnlinePayment` রো তৈরি হয়েছে (`status: awaiting_verification`, `channel_type: wallet_manual`) — DB-তে সরাসরি কনফার্ম করা।
+
+---
+
+## ২১. S8 — as-built (২০২৬-০৮-২১, ✅ লাইভ)
+
+**Backend:** নতুন `StorefrontCatalogController::sitemapData()` — `GET /public/storefront/sitemap-data` — একবারে (paginated না) সব active category/visible product/published landing page-এর slug+updated_at ফেরত দেয়, sitemap বানানোর জন্যই আলাদা shape (products()/categories()-এর মতো paginated না)।
+
+**Frontend — root-level, `/store`-এর ভেতরে না:**
+- `app/sitemap.ts` — `/sitemap.xml`-এ পৌঁছায় প্রতিটা host-এ, কারণ `proxy.ts` "sitemap.xml"/"robots.txt"-কে কখনো rewrite করে না (ডট থাকা path landing-slug ম্যাচিং থেকে বাদ পড়ে, §৪.৩-এর মূল ডিজাইনেই)। `headers()` দিয়ে host-aware — শপ হোস্ট হলে categories+products+landing pages, প্ল্যাটফর্ম হোস্ট হলে একটা মিনিমাল entry।
+- `app/robots.ts` — একই প্যাটার্ন, `/dashboard` disallow + sitemap পয়েন্টার।
+- **JSON-LD** — Product+BreadcrumbList (প্রোডাক্ট পেজ), BreadcrumbList (ক্যাটাগরি পেজ), Organization (হোমপেজ) — Next.js metadata API-তে native structured-data সাপোর্ট নেই, তাই plain inline `<script type="application/ld+json">` ব্যবহার হয়েছে (established প্যাটার্ন)।
+- **OG images** — প্রোডাক্ট পেজে thumbnail, হোমপেজে শপ লোগো, `generateMetadata`-এর `openGraph` ফিল্ডে।
+
+**ভেরিফাই:** নতুন টেস্ট (`StorefrontCatalogTest::test_sitemap_data_lists_categories_products_and_published_landing_pages_scoped_to_shop`) — shop-scoping, hidden/inactive/cross-shop বাদ, শুধু published landing page — pass। ফুল স্যুট ৪৭৫ pass (৩টা known baseline failure অপরিবর্তিত, একটা transient ৪র্থ ফেইলিওর একবার দেখা গিয়েছিল, re-run-এ flaky প্রমাণিত হয়েছে)।
+
+**লাইভ ভেরিফাই:** `zareen.zyrotechbd.com/sitemap.xml`-এ real ২টা ক্যাটাগরি + ১৩টা প্রোডাক্ট সঠিক lastmod/priority সহ, `robots.txt` সঠিক disallow+sitemap পয়েন্টার, `bsol.zyrotechbd.com/sitemap.xml` platform host-এ শুধু মিনিমাল entry (শপ ডেটা leak হয়নি), প্রোডাক্ট/ক্যাটাগরি/হোমপেজ পেজে JSON-LD সঠিক ডেটা সহ রেন্ডার হয়েছে (curl দিয়ে raw HTML-এ কনফার্ম করা)।

@@ -130,6 +130,43 @@ class StorefrontCatalogController extends Controller
         ]);
     }
 
+    /**
+     * Unpaginated slug + updated_at lists for /sitemap.xml (S8,
+     * frontend/src/app/sitemap.ts) — a sitemap needs every URL in one
+     * shot, not a paginated feed, so this is deliberately not the same
+     * shape as products()/categories() above.
+     */
+    public function sitemapData(Request $request): JsonResponse
+    {
+        $label = LandingPageResolver::subdomainLabel($request->getHost());
+        $shopUserIds = $label === null ? null : LandingPageResolver::shopUserIdsForLabel($label);
+        if ($shopUserIds === null) {
+            return $this->shopNotFound();
+        }
+
+        $categories = ProductCategory::whereIn('user_id', $shopUserIds)
+            ->where('is_active', true)
+            ->get(['slug', 'updated_at']);
+
+        $products = Product::whereIn('user_id', $shopUserIds)
+            ->where('status', 'active')
+            ->where('show_in_storefront', true)
+            ->get(['slug', 'updated_at']);
+
+        $landingPages = \App\Models\LandingPage::whereIn('user_id', $shopUserIds)
+            ->where('status', 'published')
+            ->get(['slug', 'updated_at']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'categories' => $categories->map(fn ($c) => ['slug' => $c->slug, 'updated_at' => $c->updated_at])->values(),
+                'products' => $products->map(fn ($p) => ['slug' => $p->slug, 'updated_at' => $p->updated_at])->values(),
+                'landing_pages' => $landingPages->map(fn ($p) => ['slug' => $p->slug, 'updated_at' => $p->updated_at])->values(),
+            ],
+        ]);
+    }
+
     public function categories(Request $request): JsonResponse
     {
         $shopUserIds = $this->shopUserIds($request);
