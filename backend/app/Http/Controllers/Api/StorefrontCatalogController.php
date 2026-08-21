@@ -54,6 +54,12 @@ class StorefrontCatalogController extends Controller
             ->where('status', 'connected')
             ->value('fb_page_id');
 
+        // S9 — shop-wide destination only (no per-page scoping concept for
+        // a storefront, unlike a landing page's content.settings override).
+        // Same shape LandingPageController::trackingConfigFor() returns, so
+        // useBsolTracking() on the frontend needs no changes to consume it.
+        $trackingDestination = \App\Models\TrackingDestination::sendableFor($ownerId)->first();
+
         $featuredCategoryIds = $storefront?->featured_category_ids ?? [];
         $featuredCategories = ProductCategory::whereIn('user_id', $shopUserIds)
             ->where('is_active', true)
@@ -101,6 +107,10 @@ class StorefrontCatalogController extends Controller
             'data' => [
                 'shop_name' => $shop?->shop_name,
                 'logo_url' => $shop?->logo_url,
+                'tracking' => [
+                    'enabled' => $trackingDestination !== null,
+                    'pixel_id' => $trackingDestination?->pixel_id,
+                ],
                 // Contact/deep-link info for the product page's Call/
                 // WhatsApp/Messenger buttons (seller_storefront_context.md
                 // §7) — plain tel:/wa.me/m.me links, no API calls, so this

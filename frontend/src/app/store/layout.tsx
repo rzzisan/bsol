@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { CartProvider } from "@/lib/storefront-cart";
+import { StorefrontTrackingProvider } from "@/lib/storefront-tracking-context";
 import { fetchCategories, fetchHome } from "@/lib/storefront-client";
 import FloatingCartButton from "@/components/storefront/floating-cart-button";
 import AuthPlaceholderButton from "@/components/storefront/auth-placeholder-button";
@@ -27,8 +28,9 @@ export default async function StoreLayout({ children }: { children: React.ReactN
   const accent = home?.theme_primary_color || "#0f172a";
 
   return (
-    <CartProvider>
-      <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+    <StorefrontTrackingProvider tracking={home?.tracking ?? null}>
+      <CartProvider>
+        <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
             <Link href="/" className="flex items-center gap-2 font-bold">
@@ -83,7 +85,8 @@ export default async function StoreLayout({ children }: { children: React.ReactN
         </footer>
 
         <FloatingCartButton />
-      </div>
-    </CartProvider>
+        </div>
+      </CartProvider>
+    </StorefrontTrackingProvider>
   );
 }

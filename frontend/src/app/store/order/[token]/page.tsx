@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { fetchOrderServer, money } from "@/lib/storefront-client";
 import WalletClaimCard from "@/components/storefront/wallet-claim-card";
+import StorefrontPurchaseTracking from "@/components/storefront/purchase-tracking";
 
 const WALLET_PROVIDERS = ["bkash", "nagad", "rocket"];
 const PAYMENT_LABELS: Record<string, string> = {
@@ -35,6 +36,11 @@ export default async function OrderConfirmationRoute({ params }: RouteProps) {
 
   return (
     <div className="mx-auto max-w-lg text-center">
+      <StorefrontPurchaseTracking
+        orderId={order.id}
+        value={Number(order.total)}
+        contentIds={order.items.map((i) => i.product_id).filter((id): id is number => id !== null)}
+      />
       <div className="mb-4 text-5xl">✅</div>
       <h1 className="text-xl font-bold">অর্ডার সফলভাবে গ্রহণ করা হয়েছে</h1>
       <p className="mt-1 text-sm text-slate-500">শিগগিরই আমাদের প্রতিনিধি যোগাযোগ করবে।</p>

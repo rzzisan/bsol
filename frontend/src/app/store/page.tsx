@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { fetchHome } from "@/lib/storefront-client";
 import ProductCard from "@/components/storefront/product-card";
+import StorefrontPageTracking from "@/components/storefront/page-tracking";
 
 /**
  * Storefront homepage — S5 (seller_storefront_context.md §1/§12). Reached
@@ -56,6 +57,7 @@ export default async function StorefrontHomeRoute() {
 
   return (
     <div className="space-y-10">
+      <StorefrontPageTracking slug="store-home" viewContent={false} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }} />
       {/* Hero banners */}
       {home.banner_images.length > 0 ? (

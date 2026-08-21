@@ -71,6 +71,7 @@ export type ProductDetail = ProductSummary & {
 export type StorefrontHome = {
   shop_name: string | null;
   logo_url: string | null;
+  tracking: { enabled: boolean; pixel_id: string | null };
   phone: string | null;
   whatsapp_number: string | null;
   show_call_button: boolean;
@@ -120,6 +121,10 @@ async function getJsonServer<T>(baseUrl: string, path: string): Promise<T | null
 
 export function fetchHome(baseUrl: string) {
   return getJsonServer<StorefrontHome>(baseUrl, "/public/storefront/home");
+}
+
+export function fetchHomeClient() {
+  return getJson<StorefrontHome>("/public/storefront/home");
 }
 
 export function fetchCategories(baseUrl: string) {
@@ -220,6 +225,7 @@ export async function submitCheckout(
 }
 
 export type StorefrontOrder = {
+  id: number;
   order_number: string;
   created_at: string;
   status: string;
@@ -232,7 +238,7 @@ export type StorefrontOrder = {
   shipping_charge: number | string;
   discount: number | string;
   total: number | string;
-  items: Array<{ product_name: string; quantity: number; unit_price: number | string; total: number | string }>;
+  items: Array<{ product_id: number | null; product_name: string; quantity: number; unit_price: number | string; total: number | string }>;
 };
 
 export function fetchOrderClient(token: string) {

@@ -163,22 +163,33 @@ function sendEvent(pixelId: string | null, slug: string, eventName: string, even
 }
 
 /**
- * The funnel this hook drives is PageView / ViewContent (both on mount) /
- * InitiateCheckout / Lead (both caller-triggered, once) / Purchase
- * (caller-triggered on the thank-you page) — §8.8's exact list. AddToCart
- * doesn't apply here: a BSOL landing page has no separate cart step, the
- * whole page already is "the content".
+ * The funnel this hook drives is PageView (always, on mount) / ViewContent
+ * (on mount, opt-out via `viewContent: false`) / InitiateCheckout / Lead
+ * (both caller-triggered, once) / Purchase (caller-triggered on the
+ * thank-you/order page) — §8.8's exact list.
+ *
+ * AddToCart is deliberately NOT part of this hook's mount effect — a BSOL
+ * landing page has no separate cart step (the whole page already is "the
+ * content"), and even on the storefront (S9, which does have a real cart)
+ * AddToCart is a click-triggered event, not a mount one. Use the standalone
+ * `trackAddToCartEvent()` below for that instead of instantiating this hook
+ * per product card (which would double-fire PageView/ViewContent on every
+ * card's own mount).
  *
  * `disabled` should be true in the editor's live-preview iframe (a preview
  * render is not a real visit) and whenever tracking.enabled is false.
+ * `viewContent: false` is for storefront pages that aren't "a product" —
+ * home/category/search/cart/checkout — only the product detail page (and a
+ * landing page, unchanged) should fire ViewContent.
  */
 export function useBsolTracking(
   page: { slug: string; tracking?: TrackingConfig },
-  opts: { disabled?: boolean } = {},
+  opts: { disabled?: boolean; viewContent?: boolean; viewContentData?: Record<string, unknown> } = {},
 ) {
   const disabled = Boolean(opts.disabled) || !page.tracking?.enabled;
   const pixelId = page.tracking?.pixel_id ?? null;
   const slug = page.slug;
+  const fireViewContent = opts.viewContent !== false;
   const firedOnMountRef = useRef(false);
 
   useEffect(() => {
@@ -188,7 +199,12 @@ export function useBsolTracking(
     if (pixelId) ensureMetaPixelLoaded(pixelId);
 
     sendEvent(pixelId, slug, "PageView", randomEventId());
-    sendEvent(pixelId, slug, "ViewContent", getOrCreateBucketedEventId(`vc_${slug}`, 3600), { content_type: "product" });
+    if (fireViewContent) {
+      sendEvent(pixelId, slug, "ViewContent", getOrCreateBucketedEventId(`vc_${slug}`, 3600), {
+        content_type: "product",
+        ...opts.viewContentData,
+      });
+    }
     // Fires once per mount by design (firedOnMountRef) — re-running on a
     // dependency change would double-count the same page view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,4 +232,20 @@ export function useBsolTracking(
   );
 
   return { trackInitiateCheckout, trackLead, trackPurchase };
+}
+
+/**
+ * Click-triggered AddToCart (S9, storefront-only) — a standalone function
+ * rather than a useBsolTracking() export, because it's fired from many
+ * independent components (every ProductCard, the product detail page's own
+ * button) that must NOT each instantiate the hook — that would re-fire
+ * PageView/ViewContent on every card's mount. Each call gets its own fresh
+ * event_id (no bucketing/dedup — each add-to-cart click is a distinct real
+ * action, unlike a page view that can legitimately repeat within an hour).
+ */
+export function trackAddToCartEvent(tracking: TrackingConfig, slug: string, customData: Record<string, unknown> = {}) {
+  if (!tracking?.enabled) return;
+  const pixelId = tracking.pixel_id ?? null;
+  if (pixelId) ensureMetaPixelLoaded(pixelId);
+  sendEvent(pixelId, slug, "AddToCart", randomEventId(), { content_type: "product", ...customData });
 }

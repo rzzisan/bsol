@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ProductCard from "@/components/storefront/product-card";
+import StorefrontPageTracking from "@/components/storefront/page-tracking";
 import {
   fetchCategoriesClient,
   fetchProductsClient,
@@ -57,6 +58,7 @@ export default function SearchRoute() {
 
   return (
     <div>
+      <StorefrontPageTracking slug="store-search" viewContent={false} />
       <form
         onSubmit={(e) => {
           e.preventDefault();

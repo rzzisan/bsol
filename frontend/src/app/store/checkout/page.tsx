@@ -11,6 +11,8 @@ import {
   submitCheckout,
   type PaymentChannels,
 } from "@/lib/storefront-client";
+import { useStorefrontTracking } from "@/lib/storefront-tracking-context";
+import { useBsolTracking } from "@/lib/tracking";
 
 const WALLET_LABELS: Record<string, string> = { bkash: "bKash", nagad: "Nagad", rocket: "Rocket" };
 
@@ -18,6 +20,8 @@ const WALLET_LABELS: Record<string, string> = { bkash: "bKash", nagad: "Nagad", 
 export default function CheckoutRoute() {
   const router = useRouter();
   const { items, subtotal, clear } = useCart();
+  const tracking = useStorefrontTracking();
+  const { trackInitiateCheckout } = useBsolTracking({ slug: "store-checkout", tracking: tracking ?? undefined }, { viewContent: false });
 
   const [form, setForm] = useState({
     customer_name: "",
@@ -35,6 +39,13 @@ export default function CheckoutRoute() {
   const [error, setError] = useState<string | null>(null);
 
   const isDigitalCart = items.length > 0 && items.every((i) => i.productType === "digital");
+
+  useEffect(() => {
+    if (items.length > 0) trackInitiateCheckout();
+    // Fires once on mount with items present — matches the landing-page
+    // checkout's own InitiateCheckout trigger point (§9).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     fetchPaymentChannelsClient().then((data) => {

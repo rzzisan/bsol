@@ -6,6 +6,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-21 (২) — **আইটেম #৯ (সেলার স্টোরফ্রন্ট) ✅ সম্পূর্ণ — সব ১০টা ফেজ (S0-S9) + S3b লাইভ ও deploy করা হয়েছে একই সেশনে।** রাউটিং/হোমপেজ, পাবলিক ক্যাটালগ API, dashboard ফিল্ড এডিটর, checkout (COD প্রথমে, পরে wallet+gateway অনলাইন পেমেন্ট), লোকালস্টোরেজ কার্ট + ক্যাটাগরি/প্রোডাক্ট/সার্চ পেজ, পূর্ণ হোমপেজ থিম (ব্যানার/ফিচারড ক্যাটাগরি/About/পার্টনার লোগো, real আপলোড), sitemap.xml/robots.txt/JSON-LD, ওপেন-সাবমিশন+moderation রিভিউ সিস্টেম, এবং Pixel+CAPI ট্র্যাকিং (বিদ্যমান পাইপলাইনে প্লাগ-ইন, নতুন লজিক প্রায় লাগেনি)। প্রতিটা ধাপ `zareen.zyrotechbd.com`-এ real ডেটা দিয়ে ভেরিফাই করা হয়েছে। বিস্তারিত `seller_storefront_context.md`। Older entries kept as-is:
+
 Last updated: 2026-08-21 — **নতুন আইটেম #৯: সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ)** — ফিজিবিলিটি যাচাই + ১০-ফেজ প্ল্যান সম্পন্ন (`seller_storefront_context.md`)। এখন landing page একটা single-product ক্যাম্পেইন পেজ; এই ফিচার তার পাশাপাশি একটা পূর্ণাঙ্গ browsable ক্যাটালগ শপ (হোমপেজ/ক্যাটাগরি/প্রোডাক্ট লিস্টিং/কার্ট/সার্চ/রিভিউ) যোগ করে, per-seller সাবডোমেইনেই। কোনো migration/কোড এখনো লেখা হয়নি, user-এর অনুমতি বাকি। Older entries kept as-is:
 
 Last updated: 2026-08-20 (৬) — **আইটেম #৮ (ডিজিটাল প্রোডাক্ট সিস্টেম) Phase 1 ✅ সম্পন্ন ও লাইভ** — user-এর ৪টা সিদ্ধান্ত অনুযায়ী ইমপ্লিমেন্ট + deploy সম্পন্ন: personal wallet রাখা হয়েছে (COD বাদ), mixed cart checkout-এ block, per-product delivery config (hosted file/external URL + email/SMS চ্যানেল), hosted file-এ OTP-gated anti-piracy। বিস্তারিত `digital_product_context.md`। Older entries kept as-is:
@@ -43,7 +45,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 6 | Custom domain সাপোর্ট (landing pages) | 🟡 আংশিক — per-seller সাবডোমেইন অংশ ✅ সম্পন্ন (উপরে); সেলারের **নিজস্ব** ডোমেইন (T8b, `custom_domain_context.md §11` আইটেম ৩) এখনো শুরু হয়নি | `custom_domain_context.md` |
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
 | 8 | ডিজিটাল প্রোডাক্ট সিস্টেম (instant delivery, নিজস্ব হোস্টিং) | ✅ Phase 1 সম্পন্ন ও লাইভ (২০২৬-০৮-২০) | `digital_product_context.md` |
-| 9 | সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) | 🟡 S0-S8 (S7 সহ) ✅ সবগুলো লাইভ, real order/sitemap/JSON-LD/রিভিউ দিয়ে end-to-end ভেরিফাইড (২০২৬-০৮-২১) — বাকি শুধু S9 (ট্র্যাকিং) | `seller_storefront_context.md` |
+| 9 | সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) | ✅ **সম্পূর্ণ (S0-S9, S3b সহ, ২০২৬-০৮-২১)** — রাউটিং, ক্যাটালগ, কার্ট, checkout (COD+wallet+gateway), হোমপেজ থিম, রিভিউ, SEO, ট্র্যাকিং (Pixel+CAPI) — সব real ডেটা দিয়ে end-to-end ভেরিফাইড | `seller_storefront_context.md` |
 | — | Bulk/CSV order import | ⬜ Not started | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
 | — | PWA | ⬜ Not started | (§16.9) |
 | — | Referral/affiliate program (সেলার→সেলার) | ⬜ Not started | — |

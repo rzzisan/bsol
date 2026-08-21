@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { fetchHome, fetchProductDetail } from "@/lib/storefront-client";
 import ProductDetailView from "@/components/storefront/product-detail-view";
+import StorefrontPageTracking from "@/components/storefront/page-tracking";
 
 type RouteProps = { params: Promise<{ slug: string }> };
 
@@ -80,6 +81,15 @@ export default async function ProductDetailRoute({ params }: RouteProps) {
 
   return (
     <>
+      <StorefrontPageTracking
+        slug={`store-product-${slug}`}
+        viewContentData={{
+          content_ids: [product.id],
+          content_name: product.name,
+          value: Number(product.selling_price),
+          currency: "BDT",
+        }}
+      />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       <ProductDetailView product={product} home={home} />

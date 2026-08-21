@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCart } from "@/lib/storefront-cart";
 import { money } from "@/lib/storefront-client";
+import StorefrontPageTracking from "@/components/storefront/page-tracking";
 
 /**
  * Checkout (S3, COD-only) — see /store/checkout/page.tsx and
@@ -15,6 +16,7 @@ export default function CartRoute() {
   if (items.length === 0) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-center">
+        <StorefrontPageTracking slug="store-cart" viewContent={false} />
         <p className="text-lg font-semibold">আপনার কার্ট খালি</p>
         <Link href="/search" className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">
           প্রোডাক্ট দেখুন
@@ -25,6 +27,7 @@ export default function CartRoute() {
 
   return (
     <div>
+      <StorefrontPageTracking slug="store-cart" viewContent={false} />
       <h1 className="mb-4 text-xl font-bold">কার্ট</h1>
 
       <div className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">

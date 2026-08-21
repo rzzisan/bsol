@@ -1255,4 +1255,6 @@ Cart client-side (`localStorage`, origin-scoped — auth টোকেনের �
 
 **S7 ✅ লাইভ:** প্রোডাক্ট রিভিউ — ওপেন সাবমিশন + moderation gate (order-verification বাধ্যতামূলক না, §১১ সিদ্ধান্ত)। নতুন `product_reviews` টেবিল, পাবলিক সাবমিশন এন্ডপয়েন্ট, dashboard moderation (বিদ্যমান 'products' staff module key reuse), প্রোডাক্ট পেজে real rating+রিভিউ লিস্ট+সাবমিশন ফর্ম। সাবমিট→অনুমোদন→পাবলিক-ডিসপ্লে পুরো ফ্লো `zareen.zyrotechbd.com`-এ DB-level ভেরিফাই করা।
 
-বিস্তারিত `seller_storefront_context.md §১৭-২২`। বাকি শুধু S9 (ট্র্যাকিং)।
+**S9 ✅ লাইভ — প্ল্যানের শেষ ফেজ, পুরো storefront ফিচার এখন সম্পূর্ণ:** `useBsolTracking()` হুক ও `SendFacebookCapiPurchaseEventJob` — দুটোই আগে থেকেই landing-page-নির্দিষ্ট ছিল না (শুধু `{slug, tracking}` আর `Order.id`/`Order.user_id` নেয়) — তাই S9 মূলত নতুন লজিক না, বিদ্যমান পাইপলাইনে storefront-কে সঠিক জায়গায় প্লাগ-ইন করা। `home()`-এ shop-wide `tracking` config, checkout-এ fbp/fbc persist + CAPI job dispatch, ফ্রন্টএন্ডে PageView/ViewContent/AddToCart/InitiateCheckout/Purchase — সবগুলো storefront পেজে ওয়্যার করা হয়েছে (নতুন `StorefrontTrackingProvider` context দিয়ে, প্রতি পেজ/কার্ডে আলাদা fetch ছাড়াই)। zareen-এর real Pixel ID দিয়ে লাইভ ভেরিফাই করা হয়েছে।
+
+বিস্তারিত `seller_storefront_context.md §১৭-২৩`। **সেলার স্টোরফ্রন্ট ফিচার এখন সম্পূর্ণ (S0-S9 + S3b, সবগুলো লাইভ)।**

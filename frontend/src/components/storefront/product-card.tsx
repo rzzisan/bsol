@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCart } from "@/lib/storefront-cart";
 import { money, type ProductSummary } from "@/lib/storefront-client";
+import { useStorefrontTracking } from "@/lib/storefront-tracking-context";
+import { trackAddToCartEvent } from "@/lib/tracking";
 
 export default function ProductCard({ product }: { product: ProductSummary }) {
   const { addItem } = useCart();
+  const tracking = useStorefrontTracking();
   const [message, setMessage] = useState<string | null>(null);
 
   const discounted = Number(product.selling_price) < Number(product.regular_price);
@@ -20,6 +23,15 @@ export default function ProductCard({ product }: { product: ProductSummary }) {
       unitPrice: Number(product.selling_price),
       productType: product.product_type,
     });
+
+    if (result.ok) {
+      trackAddToCartEvent(tracking, `store-product-${product.slug}`, {
+        content_ids: [product.id],
+        content_name: product.name,
+        value: Number(product.selling_price),
+        currency: "BDT",
+      });
+    }
 
     setMessage(result.ok ? "কার্টে যোগ হয়েছে" : "একই কার্টে ফিজিক্যাল ও ডিজিটাল প্রোডাক্ট একসাথে যোগ করা যায় না");
     window.setTimeout(() => setMessage(null), 2500);

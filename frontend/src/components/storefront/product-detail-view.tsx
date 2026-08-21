@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useCart } from "@/lib/storefront-cart";
 import { money, type ProductDetail, type StorefrontHome } from "@/lib/storefront-client";
+import { trackAddToCartEvent } from "@/lib/tracking";
 import ContactButtons from "@/components/storefront/contact-buttons";
 import ReviewsPanel from "@/components/storefront/reviews-panel";
 
@@ -35,6 +36,7 @@ const TABS: Array<{ key: Tab; label: string }> = [
 export default function ProductDetailView({ product, home }: { product: ProductDetail; home: StorefrontHome | null }) {
   const router = useRouter();
   const { addItem } = useCart();
+  const tracking = home?.tracking ?? null;
 
   const images = product.images.length > 0 ? product.images : product.thumbnail ? [{ id: 0, url: product.thumbnail }] : [];
   const [activeImage, setActiveImage] = useState(0);
@@ -72,6 +74,13 @@ export default function ProductDetailView({ product, home }: { product: ProductD
       setMessage("একই কার্টে ফিজিক্যাল ও ডিজিটাল প্রোডাক্ট একসাথে যোগ করা যায় না।");
       return;
     }
+
+    trackAddToCartEvent(tracking, `store-product-${product.slug}`, {
+      content_ids: [product.id],
+      content_name: product.name,
+      value: Number(product.selling_price) * quantity,
+      currency: "BDT",
+    });
 
     if (goToCart) {
       router.push("/checkout");

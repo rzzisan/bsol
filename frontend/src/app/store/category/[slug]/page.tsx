@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/storefront/product-card";
 import { fetchCategories, fetchProductsServer } from "@/lib/storefront-client";
+import StorefrontPageTracking from "@/components/storefront/page-tracking";
 
 type RouteProps = {
   params: Promise<{ slug: string }>;
@@ -55,6 +56,7 @@ export default async function CategoryRoute({ params, searchParams }: RouteProps
 
   return (
     <div>
+      <StorefrontPageTracking slug={`store-category-${slug}`} viewContent={false} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       <nav className="mb-4 text-xs text-slate-500">
         <Link href="/" className="hover:underline">

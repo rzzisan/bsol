@@ -106,6 +106,28 @@ class StorefrontCheckoutController extends Controller
 
         $order = app(StorefrontOrderService::class)->create($ownerId, $shopUserIds, $validated, $lineItems, $products->all());
 
+        // Checkout is same-origin on the seller's own subdomain, so Meta's
+        // own cookies (set by the base pixel code loaded earlier this
+        // visit) are directly readable here — mirrors
+        // LandingPageController::publicSubmitOrder(). SendFacebookCapiPurchaseEventJob
+        // reads these two columns directly, not the request. See S9,
+        // seller_storefront_context.md §12.
+        $order->update([
+            'fbp' => $request->cookie('_fbp'),
+            'fbc' => $request->cookie('_fbc'),
+        ]);
+
+        // SendFacebookCapiPurchaseEventJob is source-agnostic under the hood
+        // (resolves the seller's tracking_destinations from Order.user_id,
+        // never assumed landing_page) — same dispatch call landing-page
+        // checkout already uses, no job changes needed.
+        \App\Jobs\SendFacebookCapiPurchaseEventJob::dispatch(
+            $order->id,
+            $request->ip(),
+            $request->userAgent(),
+            \App\Support\FrontendUrl::forUserPath($order->user, "order/{$order->public_token}"),
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'অর্ডার সফলভাবে গ্রহণ করা হয়েছে। শিগগিরই আমাদের প্রতিনিধি যোগাযোগ করবে।',
@@ -147,6 +169,12 @@ class StorefrontCheckoutController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
+                // id is not sensitive — landing-page thank-you pages already
+                // carry it in the URL (?order={id}&token=...) — needed here
+                // for the Purchase pixel/CAPI event_id (S9, "order_{id}",
+                // matching SendFacebookCapiPurchaseEventJob's own id so
+                // browser/server dedupe against each other).
+                'id' => $order->id,
                 'order_number' => $order->order_number,
                 'created_at' => $order->created_at,
                 'status' => $order->status,
@@ -160,6 +188,7 @@ class StorefrontCheckoutController extends Controller
                 'discount' => $order->discount,
                 'total' => $order->total,
                 'items' => $order->items->map(fn ($item) => [
+                    'product_id' => $item->product_id,
                     'product_name' => $item->product_name,
                     'quantity' => $item->quantity,
                     'unit_price' => $item->unit_price,

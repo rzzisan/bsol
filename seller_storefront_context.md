@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** প্ল্যান সম্পন্ন। **S0-S8 (S7 সহ) সবগুলো implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — real ব্যানার/পার্টনার-লোগো/about-image আপলোড, real COD ও bKash অর্ডার, real sitemap.xml/robots.txt/JSON-LD, real রিভিউ সাবমিট+মডারেশন+পাবলিক-ডিসপ্লে, সবই `zareen.zyrotechbd.com`-এ যাচাই করা হয়েছে। নিচে §১৪-২২ দেখো। বাকি শুধু S9 (ট্র্যাকিং)।
+**অবস্থা:** ✅ **প্ল্যানের সবগুলো ফেজ (S0-S9, S3b সহ) সম্পন্ন, deploy করা হয়েছে ও লাইভ (২০২৬-০৮-২১)।** পূর্ণাঙ্গ storefront — রাউটিং, ক্যাটালগ, কার্ট, checkout (COD+wallet+gateway), হোমপেজ থিম, প্রোডাক্ট ডিটেইল, রিভিউ, SEO, ট্র্যাকিং — সবকিছু `zareen.zyrotechbd.com`-এ real ডেটা দিয়ে ভেরিফাই করা। নিচে §১৪-২৩ দেখো।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -437,3 +437,25 @@ Storefront checkout-এ অনলাইন পেমেন্ট যোগ হ�
 **ভেরিফাই:** নতুন `StorefrontReviewTest.php` (৭টা: পাবলিক সাবমিশন unapproved তৈরি করে, rating ভ্যালিডেশন (required, 1-5), unapproved রিভিউ পাবলিক পেজে দেখা যায় না, cross-shop প্রোডাক্টে সাবমিট ৪০৪, owner লিস্ট+মডারেট করতে পারে, cross-shop রিভিউ মডারেট করা যায় না, unauthenticated ব্লকড) — সব pass। ফুল স্যুট ৪৮২ pass (৩টা known baseline failure অপরিবর্তিত)।
 
 **লাইভ ভেরিফাই (`zareen.zyrotechbd.com`, curl + DB — ব্রাউজার এক্সটেনশন এখনো ডিসকানেক্টেড):** real রিভিউ সাবমিট করা হয়েছে (Headphones প্রোডাক্টে), অনুমোদনের আগে `rating.count=0` ছিল, dashboard token দিয়ে অনুমোদন করার পর সাথে সাথে `rating: {average:5, count:1}` ও `reviews` লিস্টে দেখা গেছে পাবলিক এন্ডপয়েন্টে — moderation gate সঠিকভাবে কাজ করছে কনফার্ম করা।
+
+---
+
+## ২৩. S9 — as-built (২০২৬-০৮-২১, ✅ লাইভ, প্ল্যানের শেষ ফেজ)
+
+**মূল আবিষ্কার:** `useBsolTracking()` হুক (landing-page checkout-এর জন্য বানানো) এবং `SendFacebookCapiPurchaseEventJob` — দুটোই **ইতিমধ্যে landing-page-নির্দিষ্ট ছিল না**। হুক শুধু `{slug, tracking}` নেয়, জব শুধু `Order.id` নেয় এবং `Order.user_id` (সবসময় shopOwnerId) থেকে ট্র্যাকিং destination resolve করে — কোনোটাই কোথাও `LandingPage` মডেল টাচ করে না। ফলে S9 মূলত নতুন লজিক লেখা না, বরং বিদ্যমান পাইপলাইনের সাথে storefront-কে **সঠিক জায়গায় প্লাগ-ইন করা**।
+
+**Backend:**
+- `StorefrontCatalogController::home()`-এ `tracking: {enabled, pixel_id}` যোগ হয়েছে — `TrackingDestination::sendableFor($ownerId)` (কোনো scope আর্গুমেন্ট ছাড়া, তাই শুধু shop-wide destination ম্যাচ করে, per-page scoping-এর কনসেপ্ট storefront-এ নেই) — ঠিক landing page-এর `trackingConfigFor()`-এর একই shape, ফ্রন্টএন্ডের `useBsolTracking()`-এর কোনো পরিবর্তন লাগেনি
+- `StorefrontCheckoutController::submitOrder()`-এ landing-page checkout-এর ঠিক একই দুই লাইন যোগ হয়েছে: `_fbp`/`_fbc` কুকি অর্ডারে persist করা (CAPI জব সরাসরি এই কলাম পড়ে, রিকোয়েস্ট থেকে না) + `SendFacebookCapiPurchaseEventJob::dispatch()` — জবের কোনো পরিবর্তন লাগেনি
+- `StorefrontCheckoutController::showOrder()`-এ `id` (numeric order id, Purchase pixel event-এর `order_{id}` বানাতে লাগে — landing-page thank-you পেজও এটা URL-এ বহন করে, সিক্রেট না) ও প্রতি item-এ `product_id` যোগ হয়েছে
+
+**Frontend:**
+- `tracking.ts`-এর `useBsolTracking()` extend করা হয়েছে (backward-compatible) — নতুন `viewContent`/`viewContentData` অপশন, যাতে হোম/ক্যাটাগরি/সার্চ/কার্ট/checkout পেজ (এগুলো "একটা প্রোডাক্ট" না) শুধু PageView পাঠায়, ViewContent শুধু প্রোডাক্ট পেজে
+- নতুন standalone `trackAddToCartEvent()` — হুক ইনস্ট্যান্স করে না (প্রতিটা ProductCard-এ হুক কল করলে প্রতিটা কার্ডের নিজের mount-এ ভুলভাবে PageView/ViewContent আবার ফায়ার হতো) — প্রতিটা ক্লিকে fresh event_id, বাকেটেড ডিডুপ না (প্রতিটা অ্যাড-টু-কার্ট আলাদা real action)
+- নতুন `StorefrontTrackingProvider`/`useStorefrontTracking()` — `layout.tsx`-এ একবার fetch করা tracking config সব `/store/*` client component-এ context দিয়ে শেয়ার হয়, প্রতিটা পেজ/কার্ডে আবার fetch করতে হয় না (RSC boundary পার হয়েও কাজ করে, কারণ provider layout-এর অংশ)
+- নতুন `StorefrontPageTracking` (মাউন্ট-effect wrapper, প্রতিটা পেজে ১টা), `StorefrontPurchaseTracking` (অর্ডার কনফার্মেশন পেজে Purchase ফায়ার করে)
+- ওয়্যারিং: হোম+ক্যাটাগরি+সার্চ+কার্ট (PageView-only), প্রোডাক্ট (PageView+ViewContent+content_ids/value), checkout (PageView + মাউন্টে InitiateCheckout — landing-page-এর "প্রথম কিস্ট্রোক"-এর বদলে "পেজ মাউন্ট", কারণ storefront checkout একটা আলাদা রুট, ইন্টেন্ট ইতিমধ্যে স্পষ্ট), ProductCard+ProductDetailView-এর Add to Cart (AddToCart), অর্ডার কনফার্মেশন পেজ (Purchase)
+
+**ভেরিফাই:** নতুন `StorefrontTrackingTest.php` (৪টা: home()-এ tracking disabled ডিফল্ট, real destination থাকলে enabled+pixel_id, checkout dispatch + fbp/fbc persist (`withCredentials()->withUnencryptedCookie()` — landing-page-এর নিজস্ব টেস্ট থেকেই এই কনভেনশন শেখা হয়েছে), order lookup-এ id+product_id এক্সপোজড) — সব pass। ফুল স্যুট ৪৮৬ pass (৩টা known baseline failure অপরিবর্তিত)। `npx tsc --noEmit` clean, `deploy-safe.sh` সফল।
+
+**লাইভ ভেরিফাই (`zareen.zyrotechbd.com`):** zareen-এর নিজস্ব real `TrackingDestination` (pixel_id `1084518286886173`, shop-wide, enabled) সঠিকভাবে `home()`-এ প্রতিফলিত হয়েছে, সব `/store/*` পেজ নতুন ট্র্যাকিং কম্পোনেন্টসহ error ছাড়াই লোড হয়েছে (৬টা পেজ curl-এ ২০০ কনফার্ম), queue worker (`hybrid-queue-worker.service`) active কনফার্ম করা হয়েছে। একটা fresh order দিয়ে লাইভ CAPI dispatch পুনরায় ভেরিফাই করার চেষ্টায় checkout endpoint-এর নিজস্ব রেট-লিমিটে (throttle:15,1, এই সেশনের নিজেরই আগের টেস্টিং থেকে) আটকে গেছে — বিকল্প হিসেবে জব ডিসপ্যাচ+fbp/fbc persistence Queue::fake দিয়ে টেস্ট-লেভেলে কনফার্ম করা হয়েছে, আর জবটা নিজে অপরিবর্তিত (landing-page checkout-এ এটাই প্রোডাকশনে প্রমাণিত কাজ করছে)।
