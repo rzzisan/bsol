@@ -553,6 +553,12 @@ Route::middleware('active_subscription')->group(function () {
     Route::middleware('owner_only')->group(function () {
         Route::get('/storefront-settings', [StorefrontSettingController::class, 'show']);
         Route::put('/storefront-settings', [StorefrontSettingController::class, 'update']);
+        Route::post('/storefront-settings/banners', [StorefrontSettingController::class, 'uploadBanner']);
+        Route::delete('/storefront-settings/banners/{index}', [StorefrontSettingController::class, 'removeBanner']);
+        Route::post('/storefront-settings/partner-logos', [StorefrontSettingController::class, 'uploadPartnerLogo']);
+        Route::delete('/storefront-settings/partner-logos/{index}', [StorefrontSettingController::class, 'removePartnerLogo']);
+        Route::post('/storefront-settings/about-image', [StorefrontSettingController::class, 'uploadAboutImage']);
+        Route::delete('/storefront-settings/about-image', [StorefrontSettingController::class, 'removeAboutImage']);
     });
 
     // ── Sticker Template (default label design + per-courier overrides) ───────

@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** প্ল্যান সম্পন্ন। **S0, S1, S2, S3, S4, S6 — ছয়টাই implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — একটা real order (`ORD-20260821-0006`) `zareen.zyrotechbd.com`-এ end-to-end ব্রাউজারে বসিয়ে যাচাই করা হয়েছে। নিচে §১৪-১৮ দেখো। বাকি S5 (ফুল হোমপেজ থিম), S7-S9 (রিভিউ/SEO/ট্র্যাকিং), S3b (storefront online payment)।
+**অবস্থা:** প্ল্যান সম্পন্ন। **S0-S6-এর মধ্যে S0/S1/S2/S3/S4/S5/S6 — সবগুলো implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — real ব্যানার/পার্টনার-লোগো/about-image আপলোড + একটা real order দিয়ে `zareen.zyrotechbd.com`-এ end-to-end ব্রাউজারে যাচাই করা হয়েছে। নিচে §১৪-১৯ দেখো। বাকি S7-S9 (রিভিউ/SEO/ট্র্যাকিং), S3b (storefront online payment)।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -360,4 +360,23 @@ Dashboard প্রোডাক্ট ডিটেইল পেজে (`app/dash
 **অসম্পূর্ণ, পরবর্তী ধাপের জন্য নোট করা হলো:**
 - **S3b (storefront online payment)** — অনলাইন পেমেন্ট চ্যানেল storefront checkout-এ যোগ করা, যেটা ডিজিটাল প্রোডাক্টও কেনা সম্ভব করবে
 - **Variant selection UX** — প্রোডাক্ট ডিটেইল পেজে ভেরিয়েন্ট চিপ শুধু দেখায়, ক্লিক করে নির্বাচন করার ইন্টারঅ্যাক্টিভিটি এখনো নেই (S6-এর known simplification) — Add to Cart সবসময় বেস প্রোডাক্ট প্রাইসেই যোগ করে, ভেরিয়েন্ট-নির্দিষ্ট দাম/স্টক এখনো wire করা হয়নি ফ্রন্টএন্ডে (ব্যাকএন্ড `product_variant_id` অপশনাল প্যারামিটার হিসেবে রেডি আছে)
-- চেকআউট ফিল্ড শপ-লেভেল কাস্টমাইজেশন (এখন সবসময় ডিফল্ট সেট) — S5-এ যোগ হতে পারে
+- চেকআউট ফিল্ড শপ-লেভেল কাস্টমাইজেশন (এখন সবসময় ডিফল্ট সেট) — ভবিষ্যতে যোগ হতে পারে
+
+---
+
+## ১৯. S5 — as-built (২০২৬-০৮-২১, ✅ লাইভ)
+
+**Backend:**
+- `StorefrontSettingController`-এ নতুন multipart আপলোড এন্ডপয়েন্ট — `POST/DELETE storefront-settings/banners{,/​{index}}`, `.../partner-logos{,/​{index}}`, `.../about-image` — `ProductGalleryManager`-এর "একটা করে যোগ করো" প্যাটার্ন, monolithic ফর্ম সাবমিট না। প্রতিটা ছবির সাথে internal `image_path` সংরক্ষিত হয় (`ShopProfile.logo_path`/`logo_url`-এর মতো জোড়া) যাতে remove/replace-এ ফাইলটাও আসলে ডিলিট হয়।
+- **ডিজাইন সিদ্ধান্ত:** `banner_images`/`partner_logos`/`about_image_url` generic JSON `update()`-এ আর গ্রহণ করা হয় না — শুধু dedicated endpoint দিয়ে সেট হয়, নাহলে একটা naive round-trip (GET করে পুরোটা আবার PUT করা) `image_path` silently drop করে ফেলত আর পরের ডিলিট কাজ করত না। নতুন টেস্ট এই ফাঁদটা সরাসরি যাচাই করে।
+- `about_image_path` নতুন কলাম (migration `2026_08_21_120000`)।
+- `home()` এন্ডপয়েন্ট এখন `category_sections` ফেরত দেয় — প্রতিটা active ক্যাটাগরির (সর্বোচ্চ ৬টা) নাম+slug+১০টা প্রোডাক্ট, খালি ক্যাটাগরি বাদ। পাবলিক রেসপন্সে `image_path` strip করা হয় (internal storage detail, দরকার নেই)।
+
+**Frontend:**
+- Dashboard → Settings → Storefront: থিম কালার পিকার, WhatsApp নম্বর + Call/WhatsApp/Messenger টগল, ব্যানার ম্যানেজার (আপলোড+রিমুভ+লিংক), ফিচারড ক্যাটাগরি মাল্টি-সিলেক্ট (pill টগল), About টেক্সট+ইমেজ, পার্টনার লোগো ম্যানেজার, ডিফল্ট Warranty/Delivery টেক্সট
+- `/store` — real হোমপেজ: hero banner(s), Featured Categories (আইকন সার্কেল, theme color দিয়ে), Top Selling (is_featured প্রোডাক্ট গ্রিড), প্রতিটা ক্যাটাগরির নিজস্ব horizontal-scroll রো + "See All" লিংক, About সেকশন, পার্টনার লোগো স্ট্রিপ
+- `/store/layout.tsx`-এ ক্যাটাগরি নেভ বার (header-এর নিচে) + ফুটার (শপ নাম/লিংক/কপিরাইট) + Login/Register placeholder বাটন (`AuthPlaceholderButton`, §১১ সিদ্ধান্ত অনুযায়ী non-functional, ক্লিকে "শীঘ্রই আসছে")
+
+**ভেরিফাই:** নতুন `StorefrontSettingTest.php` (৭টা: থিম/পলিসি টেক্সট সেভ, banner আপলোড+রিমুভ, partner-logo আপলোড+রিমুভ, about-image আপলোড+replace-deletes-old-file+রিমুভ, generic update-এ banner/about-image silently ignored হওয়ার নিশ্চয়তা, landing-page homepage-mode ভ্যালিডেশন, staff owner_only ব্লক)। **পরিবেশগত সমস্যা সমাধান করে টেস্ট লেখা হয়েছে** — এই পরিবেশে `storage/framework/testing/disks/public/product-media` একটা stale root-owned ডিরেক্টরি (ProductMediaApiTest-এর একই known baseline issue), `Storage::fake('public')` তাই crash করে; সমাধান: টেস্টে সরাসরি 'public' disk-এর root একটা fresh unique scratch ডিরেক্টরিতে পয়েন্ট করা, `Storage::fake()`-এর ভাঙা cleanup ধাপ এড়িয়ে। সব ৭টা pass। ফুল স্যুট ৪৬৬ pass (৩টা known baseline failure অপরিবর্তিত)।
+
+**লাইভ ব্রাউজার ভেরিফাই (`zareen.zyrotechbd.com`):** temporary token দিয়ে real ব্যানার/পার্টনার-লোগো/about-image আপলোড করা হয়েছে (multipart, curl দিয়ে), থিম কালার/ফিচারড ক্যাটাগরি/about টেক্সট/warranty-delivery টেক্সট সেট করা হয়েছে — homepage-এ সবকিছু সঠিকভাবে রেন্ডার হয়েছে স্ক্রিনশটে: সবুজ hero banner, থিম-কালার্ড ফিচারড-ক্যাটাগরি আইকন, Top Selling গ্রিড, "হারবাল"/"IT items" ক্যাটাগরি রো + See All, About সেকশন (টেক্সট+ইমেজ), partner logo strip, ফুটার।

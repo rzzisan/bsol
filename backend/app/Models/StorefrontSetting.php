@@ -24,6 +24,7 @@ class StorefrontSetting extends Model
         'featured_category_ids',
         'about_text',
         'about_image_url',
+        'about_image_path',
         'partner_logos',
         'whatsapp_number',
         'show_call_button',

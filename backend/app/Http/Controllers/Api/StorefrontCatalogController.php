@@ -70,6 +70,31 @@ class StorefrontCatalogController extends Controller
             ->limit(12)
             ->get();
 
+        // Category-wise product rows (Ghorer Bazar-style homepage
+        // sections, §1). Capped at 6 categories x 10 products — a
+        // per-category query each, but catalogs at this stage are small
+        // enough that this beats a single denormalized query for clarity.
+        $categorySections = ProductCategory::whereIn('user_id', $shopUserIds)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->limit(6)
+            ->get(['id', 'name', 'slug'])
+            ->map(function (ProductCategory $category) {
+                $products = Product::where('category_id', $category->id)
+                    ->where('status', 'active')
+                    ->where('show_in_storefront', true)
+                    ->orderByDesc('id')
+                    ->limit(10)
+                    ->get();
+
+                return $products->isEmpty() ? null : [
+                    'category' => ['id' => $category->id, 'name' => $category->name, 'slug' => $category->slug],
+                    'products' => $products->map(fn (Product $p) => $this->publicProductSummary($p))->values(),
+                ];
+            })
+            ->filter()
+            ->values();
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -86,14 +111,21 @@ class StorefrontCatalogController extends Controller
                 'show_messenger_button' => ($storefront?->show_messenger_button ?? true) && $messengerPageId !== null,
                 'messenger_page_id' => $messengerPageId,
                 'theme_primary_color' => $storefront?->theme_primary_color,
-                'banner_images' => $storefront?->banner_images ?? [],
+                // image_path is an internal storage detail (used server-side
+                // to delete the file on replace/remove) — stripped here.
+                'banner_images' => collect($storefront?->banner_images ?? [])
+                    ->map(fn ($b) => ['image_url' => $b['image_url'] ?? null, 'link_url' => $b['link_url'] ?? null])
+                    ->values(),
                 'about_text' => $storefront?->about_text,
                 'about_image_url' => $storefront?->about_image_url,
-                'partner_logos' => $storefront?->partner_logos ?? [],
+                'partner_logos' => collect($storefront?->partner_logos ?? [])
+                    ->map(fn ($p) => ['image_url' => $p['image_url'] ?? null, 'link_url' => $p['link_url'] ?? null])
+                    ->values(),
                 'featured_categories' => $featuredCategories->map(fn (ProductCategory $c) => [
                     'id' => $c->id, 'name' => $c->name, 'slug' => $c->slug,
                 ]),
                 'featured_products' => $featuredProducts->map(fn (Product $p) => $this->publicProductSummary($p))->values(),
+                'category_sections' => $categorySections,
             ],
         ]);
     }

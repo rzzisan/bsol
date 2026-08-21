@@ -83,6 +83,7 @@ export type StorefrontHome = {
   partner_logos: Array<{ image_url: string; link_url?: string | null }>;
   featured_categories: CategorySummary[];
   featured_products: ProductSummary[];
+  category_sections: Array<{ category: CategorySummary; products: ProductSummary[] }>;
 };
 
 export function money(value: string | number | null | undefined): string {
