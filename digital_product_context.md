@@ -212,6 +212,16 @@ Phase 1-এ যা থাকবে: expiring signed link + download-count cap + 
 **🔴 এই কাজ করতে গিয়ে একটা real security bug ধরা পড়েছে ও ফিক্স হয়েছে:** `product_type` এক্সপোজ করার জন্য `publicShow()` টাচ করতে গিয়ে দেখা গেছে **`Product` মডেলের কোনো `$hidden` ছিল না**, ফলে পাবলিক ল্যান্ডিং পেজ JSON-এ **`digital_external_url` এবং `digital_file_path` দুটোই যেকোনো ভিজিটরের কাছে খোলা ছিল** — `external_url` ডেলিভারি টাইপের প্রোডাক্টে এটাই আসল কেনা জিনিস, মানে টাকা না দিয়েই যে কেউ ডাউনলোড লিংক পেয়ে যেত। ফিক্স: `publicShow()`-এ শুধু public serialization-এর সময় `$product->makeHidden([...])` কল (সেলারের নিজের ড্যাশবোর্ড রেসপন্সে প্রভাব পড়ে না, ওখানে ফুল অ্যাক্সেস লাগে)। Regression test যোগ হয়েছে (`test_public_landing_page_never_leaks_the_raw_file_path_or_external_url`)।
 
 **যাচাই:** `DigitalProductTest.php` এখন ১৯টা (আগে ১৮), সব pass। ফুল স্যুট ৪৪৩ passed (আগের ৩টা বেসলাইন ফেইলিউর ছাড়া কিছু না)। `tsc --noEmit` clean, `deploy-safe.sh` সফল, প্রোডাকশনে লাইভ smoke check pass।
+
+## ১৫. OTP গেট seller-configurable করা হলো (২০২৬-০৮-২০, ৪) — একটা real user-blocking সমস্যার ফিক্স
+
+**সমস্যা রিপোর্ট হয়েছিল:** ডাউনলোড লিংকে ক্লিক করলে "Could not send the code" — কারণ যাচাই করে দেখা গেছে production-এ `digital_download_otp`/`digital_product_delivered` use-case-এর জন্য কোনো admin `NotificationUseCaseBinding` তৈরিই হয়নি এখনো (§০ক-এর "Admin-এর করণীয়" নোটে আগে থেকেই flag করা ছিল) — এটা কোনো কোড বাগ না, বরং admin-side setup ধাপ এখনো বাকি।
+
+**সমাধান (কোড fix, শুধু "admin সেটআপ করুন" বলে না রেখে):** OTP গেট এখন **সেলার-কনফিগারযোগ্য** — নতুন `Product.digital_require_otp` (default `true`, আগের কঠোর আচরণই ডিফল্ট থাকে) প্রোডাক্ট ডিটেইল পেজে টগল করা যায় (ফাইল আপলোডের ঠিক নিচে, পরিষ্কার সতর্কবার্তাসহ)। SMS/email setup না থাকা সেলার এটা বন্ধ রেখে immediately কাস্টমারদের ডাউনলোড করতে দিতে পারবেন — token+expiry+download-count-ভিত্তিক বেসিক সুরক্ষা তখনও থাকে, শুধু OTP layer বাদ যায়। `DigitalDelivery.requires_otp`-এ ডেলিভারি তৈরির সময় snapshot হয় (max_downloads/expires_at-এর প্যাটার্নেই) — পরে সেলার টগল পাল্টালে আগের ডেলিভারি প্রভাবিত হয় না।
+
+**যাচাই:** ২টা নতুন টেস্ট, `DigitalProductTest.php` এখন ২১টা সব pass। ফুল স্যুট ৪৪৫ passed। Production migrate সফল, deploy সফল।
+
+**এখনো বাকি (admin-side, কোডের বাইরে):** যেসব সেলার OTP গেট **চালু রাখতে চান**, তাদের জন্য SMS/email আসলে পাঠাতে হলে admin-কে `/admin/settings/notification-templates` + `/admin/settings/notification-use-cases`-এ গিয়ে `digital_download_otp`/`digital_product_delivered`-এর জন্য টেমপ্লেট+বাইন্ডিং সেট করতে হবে — এটা এখনো করা হয়নি production-এ।
 - `components/thank-you-view.tsx` — `order.digital_deliveries` থাকলে "ডাউনলোড লিংক" কার্ড দেখায় (প্রতিটা `/d/{token}`-এ লিংক করা)।
 - **নতুন `app/d/[token]/page.tsx`** — পাবলিক ডাউনলোড পেজ (client-side): status লোড → OTP লাগলে "কোড পাঠান" → কোড ভেরিফাই → ডাউনলোড বাটন (`GET /api/public/digital-deliveries/{token}/download`, ব্রাউজার সরাসরি ফাইল নামায়)। external_url ডেলিভারিতে সরাসরি ডাউনলোড বাটন (OTP ছাড়াই)।
 - `app/admin/settings/digital-products/page.tsx` (নতুন, `product-media` সেটিংস পেজের হুবহু ক্লোন) + `lib/admin-menu.ts`-এ নতুন `digitalProductSettings` মেনু এন্ট্রি।
