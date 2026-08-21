@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** ফিজিবিলিটি যাচাই + ফেজ প্ল্যান সম্পন্ন (২০২৬-০৮-২১)। **কোনো migration/কোড এখনো লেখা হয়নি — user-এর অনুমতির অপেক্ষায়।**
+**অবস্থা:** ফিজিবিলিটি যাচাই + ফেজ প্ল্যান সম্পন্ন, ৩টা open question resolved, দ্বিতীয় রেফারেন্স ডিজাইন (স্পেক-হেভি ইলেকট্রনিক্স-স্টাইল প্রোডাক্ট পেজ) থেকে প্রোডাক্ট-ডিটেইল স্কোপ বিস্তৃত করা হয়েছে (২০২৬-০৮-২১)। **কোনো migration/কোড এখনো লেখা হয়নি — user-এর চূড়ান্ত "শুরু কর" অনুমতির অপেক্ষায়।**
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -42,6 +42,25 @@ User-এর নিজের কথায়: "আমাদের এই SaaS-এ
 - Sticky bottom nav: Home / Menu / Cart / Search / Account
 - Floating cart বাটন (item count + amount ব্যাজ সহ)
 - Hamburger মেনু (top-left), কার্ট আইকন (top-right)
+
+### দ্বিতীয় রেফারেন্স — স্পেক-হেভি/ইলেকট্রনিক্স-স্টাইল প্রোডাক্ট ডিটেইল পেজ (Sumash Tech-স্টাইল স্ক্রিনশট, ২০২৬-০৮-২১)
+
+Ghorer Bazar রেফারেন্স (FMCG/গ্রোসারি-স্টাইল) তুলনায় অনেক বেশি structured — এটাকে Phase 1-এর **বেসলাইন প্রোডাক্ট-ডিটেইল টেমপ্লেট** ধরা হচ্ছে, কারণ এর মধ্যে সরল ভার্সন (Ghorer Bazar-এর মতো) already fit করে যায়, উল্টোটা না।
+
+- **Breadcrumb** গভীর — Home / Phone / Smartphone / Vivo / Vivo Y05e (Official) (ক্যাটাগরি + ব্র্যান্ড দুটোই path-এ)
+- দাম-এর পাশে **secondary action row** — Compare, [Brand] Store, View EMI Options
+- দামের নিচে একটা **quick-spec bullet বক্স** (Display/Processor/Camera/Battery/Others — সংক্ষিপ্ত, "Key Features"-এর মতোই কিন্তু structured label:value ফরম্যাটে)
+- **Variant selector chips/swatches** — Storage (button chip), Color (color swatch) — বিদ্যমান `ProductVariant` অ্যাট্রিবিউট সিস্টেম দিয়েই ডেটা আছে, এটা শুধু storefront-এ রেন্ডারিং স্টাইলের প্রশ্ন
+- **অ্যাকশন বাটন সারি** — Add to Wishlist, Add To Cart, Buy Now, **+ তিনটা কন্টাক্ট-চ্যানেল পিল: Via Messenger, Via Hotline Call, Via WhatsApp**
+- **৬টা ট্যাব** — Specification, Description, Rating, Warranty, Delivery, Share (§১-এর আগের ২-ট্যাব ডিজাইনের বদলে এটাই বেসলাইন)
+  - **Specification ট্যাব** — গ্রুপ করা, collapsible sections (Physical Specification/Network/Display/Processor/Memory/Main Camera/Selfie Camera/OS/Connectivity/Features/Battery/Test), প্রতিটার ভেতরে label:value রো
+  - **Warranty/Delivery ট্যাব** — শপ-লেভেল পলিসি টেক্সট (একবার কনফিগার, সব প্রোডাক্টে দেখায়), প্রয়োজনে per-product override
+- **Right-rail সাইডবার** (দুই-কলাম লেআউট) — Warranty card, Rating summary card (avg + count + সংক্ষিপ্ত টেক্সট), Delivery estimate card, Social Share আইকন, Related Products লিস্ট (ছোট কার্ড: ইমেজ/নাম/দাম+save%/স্টক স্ট্যাটাস)
+- **পেজের নিচে SEO long-form ব্লক** — "[Product Name] Price in Bangladesh" প্যারাগ্রাফ + একই ব্র্যান্ড/ক্যাটাগরির বাকি প্রোডাক্টের একটা price-comparison টেবিল (internal-linking SEO প্যাটার্ন, খুব কার্যকর) — S8-এ এটা যোগ হবে (নিচে §৮ আপডেট দেখো)
+- **Badges** — "OFFICIAL" ব্যাজ, "SAVE X%" রিবন (discount থেকেই derive করা যায়, নতুন ফিল্ড লাগে না), "EARN N POINTS" রিবন (loyalty — non-goal, §১১)
+
+**Phase 1-এ যা নেওয়া হচ্ছে এখান থেকে:** structured grouped specification (§৫.২-এ নতুন `specifications` ফিল্ড), ৬-ট্যাব লেআউট + শপ-লেভেল warranty/delivery পলিসি, right-rail সাইডবার লেআউট (rating summary/related products/share), Messenger কন্টাক্ট-চ্যানেল বাটন, SEO price-comparison ব্লক।
+**যা non-goal থাকছে:** Compare (side-by-side), EMI/financing ক্যালকুলেটর, loyalty points প্রোগ্রাম, "OFFICIAL" trust-badge সিস্টেম — §১১-এ যোগ হলো।
 
 **ডিজাইন সিদ্ধান্ত — Phase 1-এ ফিক্সড টেমপ্লেট, ড্র্যাগ-ড্রপ বিল্ডার না।** ব্লক-বিল্ডার-স্টাইল ফ্লেক্সিবল হোমপেজ বানানো একটা অনেক বড় আলাদা স্কোপ (landing page builder-এর সমান কাজ)। উপরের লেআউট **ফিক্সড থাকবে**, সেলার শুধু কন্টেন্ট কনফিগার করবে (ব্যানার ইমেজ, ফিচারড ক্যাটাগরি, কালার, About টেক্সট, পার্টনার লোগো) — `bsol_history_and_new_context.md §১০`-এর নিজস্ব সতর্কতা অনুযায়ী ("অমীমাংসিত ডিজাইন প্রশ্ন রেখে দেওয়া চলবে না") একটা পথ বেছে নেওয়া হলো। ভবিষ্যতে ফ্লেক্সিবল বিল্ডার চাইলে আলাদা ফিচার হিসেবে বিবেচনা করা যাবে।
 
@@ -108,15 +127,24 @@ partner_logos           jsonb  -- [{image_url, link_url}]
 whatsapp_number         string nullable  -- ডিফল্ট ShopProfile.phone, override করা যায়
 show_call_button        boolean default true
 show_whatsapp_button    boolean default true
+show_messenger_button   boolean default true  -- FacebookPageConnection কানেক্টেড থাকলেই effective, নাহলে auto-hide
+warranty_policy_text    text nullable  -- Warranty ট্যাবের শপ-লেভেল ডিফল্ট কন্টেন্ট
+delivery_policy_text    text nullable  -- Delivery ট্যাবের শপ-লেভেল ডিফল্ট কন্টেন্ট
 is_active                boolean default true  -- ভবিষ্যতে সাময়িকভাবে বন্ধ রাখার সুবিধা (§৬-এর non-goal না, ছোট flag)
 ```
 
 ### ৫.২ `products` টেবিলে নতুন কলাম (migration)
 ```
 show_in_storefront  boolean default true   -- ক্যাম্পেইন-এক্সক্লুসিভ প্রোডাক্ট storefront থেকে লুকানোর সুবিধা
-features            jsonb nullable          -- ["100% Pure...", "No chemicals..."] — "Key Features" bullet box
-is_featured          boolean default false  -- হোমপেজ "Top Selling"-এ ম্যানুয়াল কিউরেশন (নাহলে actual sales count দিয়ে ফলব্যাক)
+features            jsonb nullable          -- ["100% Pure...", "No chemicals..."] — দামের নিচে quick-spec/key-features bullet বক্স
+specifications       jsonb nullable          -- [{group: "Display", items: [{label: "Size", value: "6.74 inches"}, ...]}, ...]
+                                              -- Specification ট্যাবের গ্রুপ করা spec টেবিল (§১-এর দ্বিতীয় রেফারেন্স)
+seo_content           text nullable           -- "[Product] Price in Bangladesh"-স্টাইল SEO প্যারাগ্রাফ, সেলার-লিখিত/ঐচ্ছিক (S8)
+warranty_override      text nullable           -- খালি থাকলে storefront_settings.warranty_policy_text দেখাবে
+delivery_override      text nullable           -- খালি থাকলে storefront_settings.delivery_policy_text দেখাবে
+is_featured          boolean default false  -- হোমপেজ "Top Selling"-এ ম্যানুয়াল কিউরেশন (user সিদ্ধান্ত: Phase 1-এ auto sales-count না, শুধু is_featured)
 ```
+`features` বনাম `specifications`-এর পার্থক্য: `features` হলো ছোট, বিক্রয়-উদ্দেশ্যমূলক bullet ("100% Pure Maghi Mustard Oil") যা দামের ঠিক নিচে দেখা যায়; `specifications` হলো টেকনিক্যাল/স্ট্রাকচার্ড ডেটা যা Specification ট্যাবে গ্রুপ করে দেখানো হয় — দুটোই ঐচ্ছিক, ফিজিকাল/ডিজিটাল দুই ধরনের প্রোডাক্টেই প্রযোজ্য (ইলেকট্রনিক্সে `specifications` বেশি ব্যবহৃত হবে, গ্রোসারি/ফ্যাশনে হয়তো খালিই থাকবে)।
 
 ### ৫.৩ `product_reviews` (নতুন টেবিল)
 ```
@@ -144,9 +172,14 @@ created_at, updated_at
 
 ---
 
-## ৭. "Order on WhatsApp" / "Call for Order" — কোনো নতুন ডিপেন্ডেন্সি না
+## ৭. "Order on WhatsApp" / "Call for Order" / "Via Messenger" — কোনো নতুন ডিপেন্ডেন্সি না
 
-এই দুটো বাটন সাধারণ `tel:`/`wa.me` ডিপ-লিংক (ShopProfile.phone / `storefront_settings.whatsapp_number` দিয়ে prefilled মেসেজ) — **paused WhatsApp Business Cloud API automation ফিচার থেকে সম্পূর্ণ আলাদা** (ওটা 2-way inbox + template automation, Meta App verification-নির্ভর, `whatsapp_context.md`)। এখানে কোনো API কল নেই, কোনো Meta ডিপেন্ডেন্সি নেই — Phase 1 থেকেই কাজ করবে।
+তিনটাই সাধারণ deep-link, কোনো API কল না:
+- **Call:** `tel:` লিংক, `ShopProfile.phone`
+- **WhatsApp:** `wa.me` লিংক, prefilled মেসেজ (`storefront_settings.whatsapp_number` — ডিফল্ট `ShopProfile.phone`) — **paused WhatsApp Business Cloud API automation ফিচার থেকে সম্পূর্ণ আলাদা** (ওটা 2-way inbox + template automation, Meta App verification-নির্ভর, `whatsapp_context.md`)। এখানে কোনো Meta ডিপেন্ডেন্সি নেই।
+- **Messenger:** `m.me/{page_id}` deep-link — শুধু সেলারের একটা `FacebookPageConnection` কানেক্টেড থাকলেই বাটন দেখাবে (§৫.১-এর `show_messenger_button`), না থাকলে auto-hide করে দিতে হবে — বিদ্যমান Facebook Page/Messenger integration-এর ডেটা reuse, নতুন কোনো Graph API কল লাগে না (এটা শুধু একটা লিংক, লিড-ক্যাপচার ইনবক্সের সাথে সম্পর্কহীন)।
+
+Phase 1 থেকেই কাজ করবে, কোনো External approval নির্ভরতা নেই।
 
 ---
 
@@ -154,6 +187,7 @@ created_at, updated_at
 
 - **Tracking:** এখন Pixel/CAPI শুধু landing-page checkout-এ ফায়ার করে। Storefront পেজে নতুন ইভেন্ট যোগ হবে: `ViewContent` (প্রোডাক্ট ডিটেইল), `AddToCart`, `InitiateCheckout` (checkout পেজ ওপেন), `Purchase` (storefront checkout completion — বিদ্যমান CAPI client-ই reuse, নতুন trigger point)। Pixel `/dashboard/*`-এ কখনো লোড হবে না নিয়ম (`custom_domain_context.md §10`) অপরিবর্তিত থাকে, বাকি সব পাবলিক পেজে লোড হবে।
 - **SEO:** প্রতিটা শপ-হোস্টে `/sitemap.xml` (ক্যাটাগরি + প্রোডাক্ট + প্রকাশিত landing page URL সব লিস্ট করে), `/robots.txt`, প্রতিটা প্রোডাক্ট/ক্যাটাগরি পেজে Next.js `generateMetadata` দিয়ে dynamic title/description/OG image (প্রোডাক্ট থাম্বনেইল ফলব্যাক), JSON-LD `Product`/`Organization`/`BreadcrumbList` schema।
+- **প্রোডাক্ট পেজের নিচে price-comparison ব্লক** (§১-এর দ্বিতীয় রেফারেন্স) — `products.seo_content` (সেলার-লিখিত, ঐচ্ছিক) + একই ক্যাটাগরি/ব্র্যান্ডের বাকি প্রোডাক্টের একটা auto-generated টেবিল (নাম + দাম, প্রতিটা নিজের প্রোডাক্ট পেজে লিংক করা) — internal-linking SEO প্যাটার্ন, কোনো নতুন ফিল্ড ছাড়াই বিদ্যমান ক্যাটাগরি/দাম ডেটা দিয়ে জেনারেট হয়।
 
 ---
 
@@ -161,10 +195,10 @@ created_at, updated_at
 
 রেফারেন্স ডিজাইনে "Login/Register", "My Account", "My Orders", "My Wishlist" আছে — কিন্তু bsol-এ কোনো **কাস্টমার-facing auth সিস্টেম নেই** (শুধু checkout-time ফোন OTP)। ফুল কাস্টমার অ্যাকাউন্ট (persistent login, saved address, order history dashboard) একটা বড় আলাদা সাবসিস্টেম — **Phase 1-এ স্কোপের বাইরে।**
 
-**Phase 1 বিকল্প:**
+**Phase 1 বিকল্প (user confirm করেছেন):**
 - **"My Orders" → phone + order-number দিয়ে lookup** (বিদ্যমান `Order.public_token`-ভিত্তিক thank-you/order-status পেজের একটা সহজ front-door — কাস্টমার ফোন+অর্ডার নম্বর দিলে সেই অর্ডারের public token পেজে রিডাইরেক্ট)।
 - **Wishlist client-side** (`localStorage`, cart-এর মতোই) — persist করার জন্য অ্যাকাউন্ট লাগবে না।
-- **"Login/Register" বাটন Phase 1-এ hide/defer** — অথবা শুধু ভবিষ্যতের জন্য UI placeholder, ফাংশনাল না। এটা একটা open question (§১১)।
+- **"Login/Register" বাটন Phase 1-এ UI placeholder** — ফাংশনাল না, ক্লিক করলে "শীঘ্রই আসছে"-জাতীয় বার্তা। কাস্টমার রেজিস্ট্রেশন/লগইন ভবিষ্যতে একটা পূর্ণাঙ্গ ফিচার হিসেবে যোগ হবে (এই ডকের স্কোপে না) — তাই এখনই এটা মাথায় রেখে ডিজাইন করা ভালো: cart/wishlist-এর localStorage key structure এমন রাখা উচিত যাতে ভবিষ্যতে অ্যাকাউন্ট চালু হলে "গেস্ট কার্ট → লগইন-করা কাস্টমারের কার্টে মার্জ" করা সহজ হয় (এখনই বানাতে হবে না, শুধু নামকরণ/স্ট্রাকচারে অন্ধ গলি এড়ানো)।
 
 ---
 
@@ -174,19 +208,23 @@ created_at, updated_at
 
 ---
 
-## ১১. Non-goals (Phase 1) ও Open Questions
+## ১১. Non-goals (Phase 1) — সব resolved, কোনো open question বাকি নেই
 
-**Non-goals:**
+**সিদ্ধান্ত (user confirm, ২০২৬-০৮-২১):**
+1. "Login/Register" বাটন Phase 1-এ **placeholder** (non-functional, "coming soon") — কাস্টমার অ্যাকাউন্ট ভবিষ্যতে আসবে (§৯)।
+2. **`is_featured` ম্যানুয়াল কিউরেশন** — Phase 1-এ auto sales-count-ভিত্তিক "Top Selling" লাগবে না।
+3. **রিভিউ সাবমিশনে অর্ডার-verification বাধ্যতামূলক না** — যে কেউ লিখতে পারবে, `is_approved=false` ডিফল্ট (§৫.৩) + সেলার moderation-ই একমাত্র গেট; `order_id` ম্যাচ পাওয়া গেলে ঐচ্ছিক "Verified Purchase" ব্যাজ দেখানো হবে, বাধ্যতামূলক শর্ত না।
+
+**Non-goals (Phase 1):**
 - ফুল কাস্টমার অ্যাকাউন্ট সিস্টেম (§৯)
 - ড্র্যাগ-ড্রপ হোমপেজ বিল্ডার (§১-এর ডিজাইন সিদ্ধান্ত — ফিক্সড টেমপ্লেট)
-- কুপন/ডিসকাউন্ট কোড (নতুন কিছুই নেই এখন — future candidate)
+- কুপন/ডিসকাউন্ট কোড (future candidate)
 - মাল্টি-ভেন্ডর মার্কেটপ্লেস কনসেপ্ট (প্রযোজ্যই না — প্রতি শপ একজন সেলারের)
 - রিভিউ-এ ছবি/ভিডিও আপলোড (টেক্সট+রেটিং যথেষ্ট Phase 1-এ)
-
-**User confirm করা লাগবে:**
-1. "Login/Register" বাটন Phase 1-এ hide করা হবে, নাকি placeholder হিসেবে থাকবে ("coming soon")?
-2. `is_featured` ম্যানুয়াল কিউরেশন যথেষ্ট, নাকি actual sales-count-ভিত্তিক "Top Selling" (auto) দরকার প্রথম থেকেই?
-3. রিভিউ সাবমিট করতে কি অর্ডার-verification বাধ্যতামূলক (শুধু যারা কিনেছে), নাকি যে কেউ লিখতে পারবে (moderation-ই একমাত্র গেট)?
+- **Compare (side-by-side প্রোডাক্ট তুলনা)** — দ্বিতীয় রেফারেন্স থেকে, real UI/state স্কোপ, future candidate
+- **EMI/financing ক্যালকুলেটর** — দ্বিতীয় রেফারেন্স থেকে, financial-partner ইন্টিগ্রেশন লাগবে, future candidate
+- **Loyalty/reward points প্রোগ্রাম** ("Earn N points") — দ্বিতীয় রেফারেন্স থেকে, আলাদা বড় ফিচার, future candidate
+- **"OFFICIAL" trust-badge সিস্টেম** — সাধারণ per-product boolean দিয়ে ট্রিভিয়ালি করা যায় কিন্তু এখন স্কিপ (কোনো ভেরিফিকেশন-ভিত্তিক অর্থ ছাড়া badge বিভ্রান্তিকর), future candidate
 
 ---
 
@@ -200,7 +238,7 @@ created_at, updated_at
 | **S3** | Cart + Checkout ব্যাকএন্ড — `StorefrontOrderService` (LandingPageOrderService জেনারালাইজড), `POST /public/storefront/orders`, shop-default `CheckoutFieldResolver` স্কোপ, mixed-cart নিয়ম reuse | S1 |
 | **S4** | Frontend cart state — localStorage cart, drawer/পেজ, floating cart বাটন + badge | S1 |
 | **S5** | Frontend হোমপেজ + সেলার-সাইড থিম কনফিগারেশন UI (ব্যানার/ফিচারড ক্যাটাগরি/কালার/About/পার্টনার লোগো আপলোড, homepage_mode/landing-page picker) | S0, S1 |
-| **S6** | Frontend ক্যাটাগরি লিস্টিং, প্রোডাক্ট ডিটেইল (গ্যালারি/৪-বাটন অ্যাকশন/key features/tabs/related), সার্চ পেজ, "My Orders" lookup | S1, S3, S4 |
+| **S6** | Frontend ক্যাটাগরি লিস্টিং, প্রোডাক্ট ডিটেইল (গ্যালারি, ৫-বাটন অ্যাকশন রো + Messenger/Call/WhatsApp পিল, quick-spec bullet বক্স, ৬-ট্যাব লেআউট + গ্রুপড Specification টেবিল, right-rail সাইডবার — warranty/rating/delivery/share/related), সার্চ পেজ, "My Orders" lookup | S1, S3, S4 |
 | **S7** | রিভিউ — ব্যাকএন্ড (মডেল+মডারেশন এন্ডপয়েন্ট) + ফ্রন্টএন্ড (সাবমিশন ফর্ম, ডিসপ্লে, সেলার moderation পেজ) | S6 |
 | **S8** | SEO — sitemap.xml/robots.txt per host, generateMetadata, JSON-LD | S6 |
 | **S9** | Tracking ইভেন্ট এক্সটেনশন (ViewContent/AddToCart/InitiateCheckout/Purchase), মোবাইল-ফার্স্ট পলিশ + responsive QA, Staff/Team permission wiring, ফুল টেস্ট স্যুট, ডক sync, রোলআউট | S1-S8 |
