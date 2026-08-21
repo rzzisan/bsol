@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useCart } from "@/lib/storefront-cart";
 import { money, type ProductDetail, type StorefrontHome } from "@/lib/storefront-client";
 import ContactButtons from "@/components/storefront/contact-buttons";
+import ReviewsPanel from "@/components/storefront/reviews-panel";
 
 const WISHLIST_KEY = "bsol_storefront_wishlist";
 
@@ -260,12 +261,12 @@ export default function ProductDetailView({ product, home }: { product: ProductD
             ) : null}
 
             {tab === "rating" ? (
-              <div>
-                <p className="text-sm font-semibold">
-                  {product.rating.average.toFixed(1)}/5 — {product.rating.count} reviews
-                </p>
-                <p className="mt-1 text-sm text-slate-500">রিভিউ ফিচার শীঘ্রই আসছে।</p>
-              </div>
+              <ReviewsPanel
+                productSlug={product.slug}
+                average={product.rating.average}
+                count={product.rating.count}
+                reviews={product.reviews}
+              />
             ) : null}
 
             {tab === "warranty" ? (

@@ -116,4 +116,9 @@ class Product extends Model
     {
         return $this->hasMany(ProductVariant::class)->orderBy('position');
     }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(\App\Models\ProductReview::class);
+    }
 }

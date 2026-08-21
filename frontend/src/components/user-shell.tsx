@@ -239,6 +239,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number, whatsappU
         { key: "product-list", label: t.productList, href: "/dashboard/products" },
         { key: "categories", label: t.categories, href: "/dashboard/products/categories" },
         { key: "stock", label: t.stock, href: "/dashboard/products/stock" },
+        { key: "reviews", label: (t as any).reviews ?? "রিভিউ", href: "/dashboard/products/reviews" },
       ],
     },
     {
@@ -370,6 +371,7 @@ const MODULE_KEY_BY_MENU_ITEM: Record<string, StaffModuleKey> = {
 
   "product-list": "products",
   categories: "products",
+  reviews: "products",
   stock: "products",
 
   "customer-list": "customers",

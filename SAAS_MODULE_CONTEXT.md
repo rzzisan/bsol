@@ -1253,4 +1253,6 @@ Cart client-side (`localStorage`, origin-scoped — auth টোকেনের �
 
 **S8 ✅ লাইভ:** `/sitemap.xml`+`/robots.txt` root-level (`app/sitemap.ts`/`app/robots.ts`, host-aware `headers()` দিয়ে, প্রতিটা shop host-এ কাজ করে কোনো proxy রুট ছাড়াই কারণ ডট-ওয়ালা path landing-slug ম্যাচিং থেকে আগে থেকেই বাদ), JSON-LD (Product/BreadcrumbList/Organization), OG images। real ডেটা দিয়ে verify করা।
 
-বিস্তারিত `seller_storefront_context.md §১৭-২১`। বাকি S7 (রিভিউ), S9 (ট্র্যাকিং)।
+**S7 ✅ লাইভ:** প্রোডাক্ট রিভিউ — ওপেন সাবমিশন + moderation gate (order-verification বাধ্যতামূলক না, §১১ সিদ্ধান্ত)। নতুন `product_reviews` টেবিল, পাবলিক সাবমিশন এন্ডপয়েন্ট, dashboard moderation (বিদ্যমান 'products' staff module key reuse), প্রোডাক্ট পেজে real rating+রিভিউ লিস্ট+সাবমিশন ফর্ম। সাবমিট→অনুমোদন→পাবলিক-ডিসপ্লে পুরো ফ্লো `zareen.zyrotechbd.com`-এ DB-level ভেরিফাই করা।
+
+বিস্তারিত `seller_storefront_context.md §১৭-২২`। বাকি শুধু S9 (ট্র্যাকিং)।

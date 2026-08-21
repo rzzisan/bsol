@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FacebookPageConnection;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\ProductReview;
 use App\Models\ProductVariant;
 use App\Models\ShopProfile;
 use App\Models\StorefrontSetting;
@@ -282,6 +283,20 @@ class StorefrontCatalogController extends Controller
             ->limit(8)
             ->get(['id', 'name', 'slug', 'thumbnail', 'regular_price', 'discount', 'discount_type', 'selling_price']);
 
+        // S7 — average/count computed over ALL approved reviews (not just
+        // the capped list below, which is display-only — a "load more"
+        // paginated feed isn't worth it yet at this catalog's scale).
+        $reviewStats = ProductReview::where('product_id', $product->id)
+            ->where('is_approved', true)
+            ->selectRaw('count(*) as count, coalesce(avg(rating), 0) as average')
+            ->first();
+
+        $approvedReviews = ProductReview::where('product_id', $product->id)
+            ->where('is_approved', true)
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get(['customer_name', 'rating', 'comment', 'created_at']);
+
         return response()->json([
             'success' => true,
             'data' => array_merge($this->publicProductSummary($product), [
@@ -302,9 +317,16 @@ class StorefrontCatalogController extends Controller
                 // instead of the loaded collection. getRelation() bypasses
                 // that collision.
                 'variants' => $product->getRelation('variants')->map(fn ($v) => $this->publicVariant($v))->values(),
-                // Reviews ship in S7 — a real, if empty, shape now so the
-                // frontend doesn't need a schema change to light it up later.
-                'rating' => ['average' => 0, 'count' => 0],
+                'rating' => [
+                    'average' => (float) round((float) $reviewStats->average, 1),
+                    'count' => (int) $reviewStats->count,
+                ],
+                'reviews' => $approvedReviews->map(fn (ProductReview $r) => [
+                    'customer_name' => $r->customer_name,
+                    'rating' => $r->rating,
+                    'comment' => $r->comment,
+                    'created_at' => $r->created_at,
+                ])->values(),
                 'related_products' => $related->map(fn (Product $p) => $this->publicProductSummary($p))->values(),
             ]),
         ]);

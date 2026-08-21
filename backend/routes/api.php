@@ -83,6 +83,8 @@ use App\Http\Controllers\Api\ShopProfileController;
 use App\Http\Controllers\Api\StorefrontCatalogController;
 use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontPaymentController;
+use App\Http\Controllers\Api\StorefrontReviewController;
+use App\Http\Controllers\Api\ProductReviewController;
 use App\Http\Controllers\Api\StorefrontSettingController;
 use App\Http\Controllers\Api\StickerTemplateController;
 use App\Http\Controllers\Api\WordpressApiKeyController;
@@ -229,6 +231,12 @@ Route::prefix('public/storefront')->middleware('throttle:60,1')->group(function 
     Route::get('/payment-channels', [StorefrontPaymentController::class, 'channels']);
     Route::get('/sitemap-data', [StorefrontCatalogController::class, 'sitemapData']);
 });
+
+// Review submission (S7) — its own throttle, tighter than browsing but
+// looser than checkout (open submission, no order-verification — see
+// StorefrontReviewController).
+Route::post('/public/storefront/products/{slug}/reviews', [StorefrontReviewController::class, 'store'])
+    ->middleware('throttle:10,1');
 
 // Cart checkout submission — tighter throttle than the read-only catalog
 // group above, matches /public/landing-pages/{slug}/order's own 15/min.
@@ -456,6 +464,11 @@ Route::middleware('active_subscription')->group(function () {
         Route::delete('/products/{product}/digital-file', [DigitalProductFileController::class, 'destroy']);
         Route::post('/products/{product}/adjust-stock', [ProductController::class, 'adjustStock']);
         Route::apiResource('/products', ProductController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+
+        // Review moderation (S7, seller_storefront_context.md §5.3/§12).
+        Route::get('/reviews', [ProductReviewController::class, 'index']);
+        Route::put('/reviews/{id}', [ProductReviewController::class, 'update']);
+        Route::delete('/reviews/{id}', [ProductReviewController::class, 'destroy']);
 
         // ── Product Variant & Option Management ───────────────────────────────
         Route::prefix('products/{product}')->group(function () {

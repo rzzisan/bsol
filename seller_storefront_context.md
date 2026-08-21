@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** প্ল্যান সম্পন্ন। **S0-S6 + S3b + S8 — সবগুলো implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — real ব্যানার/পার্টনার-লোগো/about-image আপলোড, real COD ও bKash অর্ডার, real sitemap.xml/robots.txt/JSON-LD, সবই `zareen.zyrotechbd.com`-এ যাচাই করা হয়েছে। নিচে §১৪-২১ দেখো। বাকি S7 (রিভিউ), S9 (ট্র্যাকিং)।
+**অবস্থা:** প্ল্যান সম্পন্ন। **S0-S8 (S7 সহ) সবগুলো implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — real ব্যানার/পার্টনার-লোগো/about-image আপলোড, real COD ও bKash অর্ডার, real sitemap.xml/robots.txt/JSON-LD, real রিভিউ সাবমিট+মডারেশন+পাবলিক-ডিসপ্লে, সবই `zareen.zyrotechbd.com`-এ যাচাই করা হয়েছে। নিচে §১৪-২২ দেখো। বাকি শুধু S9 (ট্র্যাকিং)।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -416,3 +416,24 @@ Storefront checkout-এ অনলাইন পেমেন্ট যোগ হ�
 **ভেরিফাই:** নতুন টেস্ট (`StorefrontCatalogTest::test_sitemap_data_lists_categories_products_and_published_landing_pages_scoped_to_shop`) — shop-scoping, hidden/inactive/cross-shop বাদ, শুধু published landing page — pass। ফুল স্যুট ৪৭৫ pass (৩টা known baseline failure অপরিবর্তিত, একটা transient ৪র্থ ফেইলিওর একবার দেখা গিয়েছিল, re-run-এ flaky প্রমাণিত হয়েছে)।
 
 **লাইভ ভেরিফাই:** `zareen.zyrotechbd.com/sitemap.xml`-এ real ২টা ক্যাটাগরি + ১৩টা প্রোডাক্ট সঠিক lastmod/priority সহ, `robots.txt` সঠিক disallow+sitemap পয়েন্টার, `bsol.zyrotechbd.com/sitemap.xml` platform host-এ শুধু মিনিমাল entry (শপ ডেটা leak হয়নি), প্রোডাক্ট/ক্যাটাগরি/হোমপেজ পেজে JSON-LD সঠিক ডেটা সহ রেন্ডার হয়েছে (curl দিয়ে raw HTML-এ কনফার্ম করা)।
+
+---
+
+## ২২. S7 — as-built (২০২৬-০৮-২১, ✅ লাইভ)
+
+**সিদ্ধান্ত (§১১-এ আগেই নেওয়া, এখানে বাস্তবায়িত):** ওপেন সাবমিশন (অর্ডার-verification বাধ্যতামূলক না), moderation gate-ই একমাত্র শর্ত। `order_id` কলাম রাখা হয়েছে ভবিষ্যতের "Verified Purchase" badge-এর জন্য, কিন্তু এই ফেজে কখনো auto-populate হয় না — সবসময় null।
+
+**Backend:**
+- নতুন `product_reviews` টেবিল + `ProductReview` মডেল (migration `2026_08_21_130000`)
+- `StorefrontReviewController::store()` — `POST /public/storefront/products/{slug}/reviews` (পাবলিক, throttle 10/min) — শুধু ওই শপের visible প্রোডাক্টেই রিভিউ যোগ করা যায়, `is_approved=false` ডিফল্ট
+- `StorefrontCatalogController::show()` এখন real rating (সব approved রিভিউর গড়/সংখ্যা, শুধু ডিসপ্লে-করা ২০টার উপর না) + approved রিভিউ লিস্ট (সর্বোচ্চ ২০টা, নতুন আগে) ফেরত দেয়
+- নতুন `ProductReviewController` (dashboard) — `GET /reviews?status=pending|approved|all`, `PUT /reviews/{id}`, `DELETE /reviews/{id}` — Pattern A, বিদ্যমান `staff_permission:products` module key reuse (নতুন module key লাগেনি)
+
+**Frontend:**
+- `ReviewsPanel` কম্পোনেন্ট — প্রোডাক্ট পেজের Rating ট্যাবে ★ রেটিং সহ approved রিভিউ লিস্ট + "রিভিউ লিখুন" ফর্ম (নাম/স্টার-রেটিং/মন্তব্য), সাবমিটের পর "যাচাইয়ের পর প্রকাশিত হবে" বার্তা
+- Dashboard → Products → Reviews (নতুন পেজ) — Pending/Approved/All ট্যাব, প্রতি রিভিউতে Approve/Reject/Delete
+- Product JSON-LD-এ এখন real `aggregateRating` (S8-এর সাথে স্বয়ংক্রিয়ভাবে যুক্ত হয়ে গেছে, কারণ rating ডেটা এখন real)
+
+**ভেরিফাই:** নতুন `StorefrontReviewTest.php` (৭টা: পাবলিক সাবমিশন unapproved তৈরি করে, rating ভ্যালিডেশন (required, 1-5), unapproved রিভিউ পাবলিক পেজে দেখা যায় না, cross-shop প্রোডাক্টে সাবমিট ৪০৪, owner লিস্ট+মডারেট করতে পারে, cross-shop রিভিউ মডারেট করা যায় না, unauthenticated ব্লকড) — সব pass। ফুল স্যুট ৪৮২ pass (৩টা known baseline failure অপরিবর্তিত)।
+
+**লাইভ ভেরিফাই (`zareen.zyrotechbd.com`, curl + DB — ব্রাউজার এক্সটেনশন এখনো ডিসকানেক্টেড):** real রিভিউ সাবমিট করা হয়েছে (Headphones প্রোডাক্টে), অনুমোদনের আগে `rating.count=0` ছিল, dashboard token দিয়ে অনুমোদন করার পর সাথে সাথে `rating: {average:5, count:1}` ও `reviews` লিস্টে দেখা গেছে পাবলিক এন্ডপয়েন্টে — moderation gate সঠিকভাবে কাজ করছে কনফার্ম করা।

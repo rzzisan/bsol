@@ -64,6 +64,7 @@ export type ProductDetail = ProductSummary & {
   images: Array<{ id: number; url: string }>;
   variants: ProductVariantPublic[];
   rating: { average: number; count: number };
+  reviews: Array<{ customer_name: string; rating: number; comment: string | null; created_at: string }>;
   related_products: ProductSummary[];
 };
 
@@ -287,5 +288,28 @@ export async function submitWalletClaim(
     return { ok: true };
   } catch {
     return { ok: false, message: "Could not submit payment info." };
+  }
+}
+
+// ── Reviews (S7) ──
+
+export async function submitReview(
+  productSlug: string,
+  payload: { customer_name: string; rating: number; comment?: string },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const res = await fetch(`${API}/public/storefront/products/${encodeURIComponent(productSlug)}/reviews`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const firstFieldErrors = Object.values(json?.errors ?? {})[0] as string[] | undefined;
+      return { ok: false, message: json?.message ?? firstFieldErrors?.[0] ?? "Could not submit review." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "Could not submit review." };
   }
 }
