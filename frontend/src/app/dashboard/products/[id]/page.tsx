@@ -53,6 +53,25 @@ const t = {
     thumbnail: "থাম্বনেইল",
     noThumbnail: "থাম্বনেইল নেই",
     noCategoryOption: "— ক্যাটাগরি নেই —",
+    storefrontTitle: "স্টোরফ্রন্ট",
+    storefrontHint: "সেলার শপে (স্টোরফ্রন্ট) এই প্রোডাক্ট কীভাবে দেখাবে সেট করুন।",
+    showInStorefront: "স্টোরফ্রন্টে দেখাও",
+    isFeatured: "হোমপেজে ফিচারড হিসেবে দেখাও",
+    featuresTitle: "কী ফিচার্স (দামের নিচে দেখাবে)",
+    addFeature: "+ যোগ করুন",
+    specTitle: "স্পেসিফিকেশন (গ্রুপ করা টেবিল)",
+    addGroup: "+ গ্রুপ যোগ করুন",
+    addItem: "+ আইটেম যোগ করুন",
+    groupName: "গ্রুপের নাম (যেমন: Display)",
+    specLabel: "লেবেল",
+    specValue: "মান",
+    seoContent: "SEO কন্টেন্ট (ঐচ্ছিক)",
+    seoContentHint: "প্রোডাক্ট পেজের নিচে দেখানো হবে, সার্চ ইঞ্জিনের জন্য সহায়ক।",
+    warrantyOverride: "ওয়ারেন্টি (এই প্রোডাক্টের জন্য আলাদা, ঐচ্ছিক)",
+    warrantyOverrideHint: "খালি রাখলে শপের ডিফল্ট ওয়ারেন্টি টেক্সট দেখাবে।",
+    deliveryOverride: "ডেলিভারি তথ্য (এই প্রোডাক্টের জন্য আলাদা, ঐচ্ছিক)",
+    deliveryOverrideHint: "খালি রাখলে শপের ডিফল্ট ডেলিভারি টেক্সট দেখাবে।",
+    remove: "সরান",
   },
   en: {
     loading: "Loading...",
@@ -93,6 +112,25 @@ const t = {
     thumbnail: "Thumbnail",
     noThumbnail: "No thumbnail",
     noCategoryOption: "— No Category —",
+    storefrontTitle: "Storefront",
+    storefrontHint: "Control how this product appears on the storefront (seller shop).",
+    showInStorefront: "Show in storefront",
+    isFeatured: "Feature on homepage",
+    featuresTitle: "Key Features (shown under the price)",
+    addFeature: "+ Add",
+    specTitle: "Specifications (grouped table)",
+    addGroup: "+ Add group",
+    addItem: "+ Add item",
+    groupName: "Group name (e.g. Display)",
+    specLabel: "Label",
+    specValue: "Value",
+    seoContent: "SEO content (optional)",
+    seoContentHint: "Shown at the bottom of the product page, helps with search engines.",
+    warrantyOverride: "Warranty (override for this product, optional)",
+    warrantyOverrideHint: "Leave empty to use the shop's default warranty text.",
+    deliveryOverride: "Delivery info (override for this product, optional)",
+    deliveryOverrideHint: "Leave empty to use the shop's default delivery text.",
+    remove: "Remove",
   },
 };
 
@@ -125,7 +163,18 @@ type Product = {
   digital_external_url?: string | null;
   digital_delivery_channels?: string[] | null;
   digital_require_otp?: boolean;
+  // seller_storefront_context.md §5.2/§12 (S2)
+  show_in_storefront?: boolean;
+  is_featured?: boolean;
+  features?: string[] | null;
+  specifications?: SpecGroup[] | null;
+  seo_content?: string | null;
+  warranty_override?: string | null;
+  delivery_override?: string | null;
+  slug?: string | null;
 };
+
+type SpecGroup = { group: string; items: Array<{ label: string; value: string }> };
 
 type DigitalPolicy = {
   max_file_size_mb: number;
@@ -276,6 +325,15 @@ export default function ProductDetailPage() {
           digital_external_url: form.product_type === "digital" ? (form.digital_external_url ?? null) : undefined,
           digital_delivery_channels: form.product_type === "digital" ? (form.digital_delivery_channels ?? []) : undefined,
           digital_require_otp: form.product_type === "digital" ? (form.digital_require_otp ?? true) : undefined,
+          show_in_storefront: form.show_in_storefront ?? true,
+          is_featured: form.is_featured ?? false,
+          features: (form.features ?? []).filter((f) => f.trim() !== ""),
+          specifications: (form.specifications ?? [])
+            .map((g) => ({ group: g.group, items: g.items.filter((i) => i.label.trim() !== "" || i.value.trim() !== "") }))
+            .filter((g) => g.group.trim() !== "" && g.items.length > 0),
+          seo_content: form.seo_content ?? null,
+          warranty_override: form.warranty_override ?? null,
+          delivery_override: form.delivery_override ?? null,
         }),
       });
 
@@ -303,6 +361,45 @@ export default function ProductDetailPage() {
       return { ...prev, digital_delivery_channels: next };
     });
   };
+
+  // ── Storefront: features (seller_storefront_context.md §5.2/§12, S2) ──
+  const addFeature = () => setForm((prev) => ({ ...prev, features: [...(prev.features ?? []), ""] }));
+  const updateFeature = (index: number, value: string) =>
+    setForm((prev) => ({ ...prev, features: (prev.features ?? []).map((f, i) => (i === index ? value : f)) }));
+  const removeFeature = (index: number) =>
+    setForm((prev) => ({ ...prev, features: (prev.features ?? []).filter((_, i) => i !== index) }));
+
+  // ── Storefront: grouped specifications ──
+  const addSpecGroup = () =>
+    setForm((prev) => ({ ...prev, specifications: [...(prev.specifications ?? []), { group: "", items: [] }] }));
+  const updateSpecGroupName = (gi: number, name: string) =>
+    setForm((prev) => ({
+      ...prev,
+      specifications: (prev.specifications ?? []).map((g, i) => (i === gi ? { ...g, group: name } : g)),
+    }));
+  const removeSpecGroup = (gi: number) =>
+    setForm((prev) => ({ ...prev, specifications: (prev.specifications ?? []).filter((_, i) => i !== gi) }));
+  const addSpecItem = (gi: number) =>
+    setForm((prev) => ({
+      ...prev,
+      specifications: (prev.specifications ?? []).map((g, i) =>
+        i === gi ? { ...g, items: [...g.items, { label: "", value: "" }] } : g,
+      ),
+    }));
+  const updateSpecItem = (gi: number, ii: number, key: "label" | "value", value: string) =>
+    setForm((prev) => ({
+      ...prev,
+      specifications: (prev.specifications ?? []).map((g, i) =>
+        i === gi ? { ...g, items: g.items.map((it, j) => (j === ii ? { ...it, [key]: value } : it)) } : g,
+      ),
+    }));
+  const removeSpecItem = (gi: number, ii: number) =>
+    setForm((prev) => ({
+      ...prev,
+      specifications: (prev.specifications ?? []).map((g, i) =>
+        i === gi ? { ...g, items: g.items.filter((_, j) => j !== ii) } : g,
+      ),
+    }));
 
   const handleDigitalFileUpload = async (file: File) => {
     setDigitalUploading(true);
@@ -814,6 +911,151 @@ export default function ProductDetailPage() {
             </div>
           </section>
         ) : null}
+
+        {/* ── Storefront Section (seller_storefront_context.md, S2) ── */}
+        <section className="catv-panel p-4">
+          <h3 className="text-base font-bold">{txt.storefrontTitle}</h3>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{txt.storefrontHint}</p>
+
+          <div className="mt-4 flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.show_in_storefront ?? true}
+                onChange={(e) => setField("show_in_storefront", e.target.checked)}
+                className="h-4 w-4 accent-[var(--accent)]"
+              />
+              {txt.showInStorefront}
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_featured ?? false}
+                onChange={(e) => setField("is_featured", e.target.checked)}
+                className="h-4 w-4 accent-[var(--accent)]"
+              />
+              {txt.isFeatured}
+            </label>
+          </div>
+
+          {/* Key features */}
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-[var(--muted)]">{txt.featuresTitle}</span>
+              <button type="button" onClick={addFeature} className="text-xs font-semibold text-[var(--accent)]">
+                {txt.addFeature}
+              </button>
+            </div>
+            <div className="space-y-2">
+              {(form.features ?? []).map((f, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={f}
+                    onChange={(e) => updateFeature(i, e.target.value)}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm"
+                  />
+                  <button type="button" onClick={() => removeFeature(i)} className="text-xs text-red-500">
+                    {txt.remove}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Grouped specifications */}
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-[var(--muted)]">{txt.specTitle}</span>
+              <button type="button" onClick={addSpecGroup} className="text-xs font-semibold text-[var(--accent)]">
+                {txt.addGroup}
+              </button>
+            </div>
+            <div className="space-y-3">
+              {(form.specifications ?? []).map((group, gi) => (
+                <div key={gi} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={group.group}
+                      onChange={(e) => updateSpecGroupName(gi, e.target.value)}
+                      placeholder={txt.groupName}
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm font-semibold"
+                    />
+                    <button type="button" onClick={() => removeSpecGroup(gi)} className="text-xs text-red-500 whitespace-nowrap">
+                      {txt.remove}
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {group.items.map((item, ii) => (
+                      <div key={ii} className="flex items-center gap-2">
+                        <input
+                          value={item.label}
+                          onChange={(e) => updateSpecItem(gi, ii, "label", e.target.value)}
+                          placeholder={txt.specLabel}
+                          className="w-1/3 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm"
+                        />
+                        <input
+                          value={item.value}
+                          onChange={(e) => updateSpecItem(gi, ii, "value", e.target.value)}
+                          placeholder={txt.specValue}
+                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm"
+                        />
+                        <button type="button" onClick={() => removeSpecItem(gi, ii)} className="text-xs text-red-500">
+                          {txt.remove}
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => addSpecItem(gi)} className="text-xs font-semibold text-[var(--accent)]">
+                      {txt.addItem}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <label className="mt-5 block">
+            <span className="mb-1 block text-xs text-[var(--muted)]">{txt.seoContent}</span>
+            <p className="mb-1 text-xs text-[var(--muted)]">{txt.seoContentHint}</p>
+            <textarea
+              rows={3}
+              value={form.seo_content ?? ""}
+              onChange={(e) => setField("seo_content", e.target.value)}
+              className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+
+          <label className="mt-4 block">
+            <span className="mb-1 block text-xs text-[var(--muted)]">{txt.warrantyOverride}</span>
+            <p className="mb-1 text-xs text-[var(--muted)]">{txt.warrantyOverrideHint}</p>
+            <textarea
+              rows={2}
+              value={form.warranty_override ?? ""}
+              onChange={(e) => setField("warranty_override", e.target.value)}
+              className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+
+          <label className="mt-4 block">
+            <span className="mb-1 block text-xs text-[var(--muted)]">{txt.deliveryOverride}</span>
+            <p className="mb-1 text-xs text-[var(--muted)]">{txt.deliveryOverrideHint}</p>
+            <textarea
+              rows={2}
+              value={form.delivery_override ?? ""}
+              onChange={(e) => setField("delivery_override", e.target.value)}
+              className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {saving ? txt.saving : txt.save}
+            </button>
+          </div>
+        </section>
 
         {/* ── Variants Section ────────────────────────────────────── */}
         <section className="catv-panel p-4">

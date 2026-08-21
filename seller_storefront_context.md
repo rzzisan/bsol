@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** প্ল্যান সম্পন্ন। **S0, S1, S4, S6 — চারটাই implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — visually ভেরিফাই করা হয়েছে `zareen.zyrotechbd.com`-এ। নিচে §১৪-১৬ দেখো। বাকি S2 (dashboard ফিল্ড এডিটর), S3 (checkout backend — কার্ট পেজে এখনো "শীঘ্রই আসছে"), S5 (ফুল হোমপেজ থিম), S7-S9 (রিভিউ/SEO/ট্র্যাকিং)।
+**অবস্থা:** প্ল্যান সম্পন্ন। **S0, S1, S4, S6, S2 — পাঁচটাই implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — visually ভেরিফাই করা হয়েছে `zareen.zyrotechbd.com`-এ। নিচে §১৪-১৭ দেখো। বাকি S3 (checkout backend — কার্ট পেজে এখনো "শীঘ্রই আসছে"), S5 (ফুল হোমপেজ থিম), S7-S9 (রিভিউ/SEO/ট্র্যাকিং)।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -316,3 +316,16 @@ User-এর অনুরোধে S2/S3/S5 বাদ দিয়ে সরা�
 **ভেরিফাই:** ব্রাউজারে (Chrome DevTools MCP) সরাসরি `zareen.zyrotechbd.com`-এ — প্রোডাক্ট ডিটেইল পেজ (গ্যালারি, দাম, quantity, ৫-বাটন অ্যাকশন রো + Call/WhatsApp/Messenger তিনটাই দৃশ্যমান কারণ zareen-এর শপে তিনটাই কনফিগার করা, ৬-ট্যাব + collapsible spec, right-rail sidebar রিলেটেড প্রোডাক্ট সহ), Add to Cart → ফ্লোটিং কার্ট বাটনে badge আপডেট, `/cart` পেজে item persist + qty control + "চেকআউট (শীঘ্রই আসছে)" disabled অবস্থা, `/search` পেজে পূর্ণ ক্যাটালগ গ্রিড + ফিল্টার/সর্ট, `/category/it-items`-এ ব্রেডক্রাম্ব + সঠিক স্টক-স্ট্যাটাস ("স্টক নেই" ঠিকমতো disable করেছে) — সব স্ক্রিনশটে কনফার্ম করা।
 
 **`npx tsc --noEmit`** clean, **`deploy-safe.sh`** (পুরো `next build` সহ) দুইবার সফল (প্রথমবার bug-সহ বিল্ড হয়েছিল, fix-এর পর আবার) — কোনো Suspense-boundary/prerender ব্যর্থতা হয়নি।
+
+---
+
+## ১৭. S2 — as-built (২০২৬-০৮-২১, ✅ লাইভ)
+
+Dashboard প্রোডাক্ট ডিটেইল পেজে (`app/dashboard/products/[id]/page.tsx`) নতুন "স্টোরফ্রন্ট" সেকশন — digital delivery সেকশনের ঠিক নিচে, একই প্যাটার্নে:
+
+- `show_in_storefront` / `is_featured` চেকবক্স
+- **Key Features** — ডাইনামিক bullet-list এডিটর (add/edit/remove)
+- **Specifications** — গ্রুপড টেবিল এডিটর (group যোগ করো → প্রতি group-এ label/value আইটেম যোগ করো), `handleSave`-এ খালি group/item ফিল্টার করে বাদ দেয়
+- `seo_content` / `warranty_override` / `delivery_override` — textarea, hint টেক্সট সহ যে খালি রাখলে শপ-ডিফল্ট ব্যবহার হবে
+
+**ভেরিফাই:** ব্যাকএন্ড round-trip সরাসরি API কলে (`PUT /products/{id}`, temporary token দিয়ে, পরে revoke করা হয়েছে) — সেভ হওয়া ডেটা সাথে সাথে পাবলিক স্টোরফ্রন্ট এন্ডপয়েন্টে (S1) ও `/product/bsol-connect` পেজে (S6) সঠিকভাবে দেখা গেছে ব্রাউজার স্ক্রিনশটে: Key Features bullet, "General" গ্রুপের Specification টেবিল (Platform/License), sidebar-এ warranty override টেক্সট, home bundle-এ `featured_products`-এ প্রোডাক্টটা যোগ হয়েছে। `npx tsc --noEmit` clean, `deploy-safe.sh` সফল।
