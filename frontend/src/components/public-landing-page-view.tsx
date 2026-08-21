@@ -1583,9 +1583,17 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                   </p>
                 ) : null}
 
+                {/* Address/district/thana/area are NOT force-hidden for a
+                    digital cart — whether to collect them is the seller's
+                    own checkout_fields configuration (they may still want
+                    it, e.g. for invoicing), and hiding a field the backend
+                    still marks required (CheckoutFieldResolver rules,
+                    seller-side config) made the order permanently
+                    unsubmittable. Only shipping/COD (irrelevant to every
+                    digital order, not seller-configurable) stay gated on
+                    isDigitalCart. */}
                 {checkoutFields
                   .filter((field) => field.key !== "notes")
-                  .filter((field) => !isDigitalCart || !["customer_address", "customer_district", "customer_thana", "customer_area"].includes(field.key))
                   .map(renderCheckoutField)}
 
                 {/* Not part of the seller-configurable checkout_fields system —
