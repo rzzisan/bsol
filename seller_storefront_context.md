@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** প্ল্যান সম্পন্ন (৩টা open question resolved, দ্বিতীয় রেফারেন্স ডিজাইন থেকে প্রোডাক্ট-ডিটেইল স্কোপ বিস্তৃত)। **S0 ✅ implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — নিচে §১৪ দেখো। S1-এর অপেক্ষায়।
+**অবস্থা:** প্ল্যান সম্পন্ন। **S0 ✅ ও S1 ✅ দুটোই implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — নিচে §১৪/§১৫ দেখো। S2-এর অপেক্ষায় (dashboard ফর্মে নতুন ফিল্ড এডিটর)।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -270,3 +270,27 @@ Phase 1 থেকেই কাজ করবে, কোনো External approval �
 - Dashboard → Settings → Storefront (নতুন পেজ) — homepage_mode picker (storefront vs আমার একটা প্রকাশিত landing page বেছে নেওয়া) — এখনই কার্যকর একটা বাস্তব সুবিধা, বাকি থিম UI S5-এ
 
 **যাচাই:** isolated schema migrate + full test suite (৩টা known baseline failure ছাড়া ৪৪৫ pass, নতুন কোনো ফেইলিওর না), production migrate, `deploy-safe.sh`, এবং লাইভ smoke test (`zareen.zyrotechbd.com/` এখন storefront placeholder দেখায় "Zareen Natural Foods — অনলাইন শপ শীঘ্রই আসছে", আগের মতো platform লগইনে redirect করে না; direct `/store` ও `/category/test` ঠিকমতো ৪০৪)।
+
+---
+
+## ১৫. S1 — as-built (২০২৬-০৮-২১, ✅ লাইভ)
+
+S1 ও S2-এর প্রোডাক্ট-কলাম migration একসাথে করা হয়েছে (একই টেবিল, একটাই migration পাস বেশি efficient) — `products` টেবিলে `slug`, `show_in_storefront`, `features`, `specifications`, `seo_content`, `warranty_override`, `delivery_override`, `is_featured` যোগ হয়েছে। `slug` নতুন — `/product/{slug}`-এর জন্য দরকার, per-shop unique DB constraint (landing_pages-এর মতোই), প্রোডাকশনের বিদ্যমান ১৩টা প্রোডাক্টে migration নিজেই backfill করেছে (নাম থেকে derive, কনফ্লিক্টে counter suffix)। ProductController-এ creation-এ auto-generate হয়, পরে name বদলালেও slug অপরিবর্তিত থাকে (public লিংক স্থিতিশীল রাখতে)।
+
+**নতুন পাবলিক এন্ডপয়েন্ট** (`StorefrontCatalogController`, host-resolved via `LandingPageResolver`, throttle 60/min):
+- `GET /public/storefront/home` — শপ পরিচয় + storefront_settings-এর পাবলিক-সেফ অংশ + featured categories/products, একটা কলে
+- `GET /public/storefront/categories` — active categories, product count সহ
+- `GET /public/storefront/products` — pagination + category/সার্চ ফিল্টার + sort (newest/price_asc/price_desc/name_asc)
+- `GET /public/storefront/products/{slug}` — পূর্ণ ডিটেইল (features/specifications/warranty-delivery-text resolved from override-or-shop-default/images/variants/rating placeholder/related products)
+
+**দুটো real bug ধরা পড়েছে ও ফিক্স হয়েছে বিল্ডের সময়:**
+1. **`Product.variants` নাম-সংঘর্ষ** — `products` টেবিলে একটা লিগ্যাসি `variants` jsonb কলাম আছে (ProductVariant টেবিল আসার আগেকার), আর `Product::variants()` HasMany রিলেশনের নামও একই। Eloquent-এ attribute access সবসময় eager-loaded relation-এর আগে জেতে, তাই `$product->variants` (property হিসেবে) সবসময় null/raw কলাম ফেরত দেয়, কখনো loaded relation না — `getRelation('variants')` দিয়ে বাইপাস করতে হয়েছে। টেস্ট লেখার সময়ই ধরা পড়েছে (500 error), প্রোডাকশনে যাওয়ার আগেই।
+2. **Cost-price leak, তবে এই ফিচারের কোডে না — বিদ্যমান কোডে।** `ProductVariantFormatter::format()` (মার্চেন্ট ড্যাশবোর্ডের জন্য বানানো shared helper) `cost_price` include করে, আর সেটাই **ইতিমধ্যে চালু থাকা পাবলিক এন্ডপয়েন্ট** `LandingPageController::publicResolveVariant()`-এ ব্যবহৃত হচ্ছে — অর্থাৎ landing-page checkout-এর ভ্যারিয়েন্ট-রিজলভ কল দিয়ে যে কেউ এখনই সেলারের cost price দেখতে পারে। এই ফিচারের কাজ করতেই ধরা পড়েছে (নিজের নতুন কোডে `ProductVariantFormatter` reuse না করে explicit allowlist লেখার সময়), কিন্তু bug টা pre-existing, storefront-সম্পর্কহীন — তাই ইনলাইনে ফিক্স না করে `spawn_task` দিয়ে flag করা হয়েছে (`task_7227a254`)।
+
+**লিক-প্রতিরোধ:** পুরো কন্ট্রোলার allowlist-বিল্ট (raw model dump না) — `cost_price`/`user_id`/`source`/`source_ref`/`platform_api_key_id`/`digital_file_path`/`digital_external_url`/`digital_file_mime_type`/`track_stock`/`low_stock_alert` কোনোটাই রেসপন্সে যায় না, রিগ্রেশন টেস্ট আছে (`StorefrontCatalogTest::test_product_detail_never_leaks_internal_fields`)। স্টক সংখ্যা exact দেখানো হয় না, শুধু `in_stock` boolean।
+
+**টেস্ট:** নতুন `StorefrontCatalogTest.php` (৭টা: shop-scoped categories/products, ফিল্টার+সর্ট, leak-regression, warranty/delivery override resolution, unknown-subdomain ৪০৪, home bundle) — সব pass। ফুল স্যুট ৪৫২ pass (৩টা known baseline failure অপরিবর্তিত)।
+
+**লাইভ ভেরিফাই:** `zareen.zyrotechbd.com`-এ categories/products/product-detail/home চারটাই বাস্তব ডেটা দিয়ে সঠিক রেসপন্স দিয়েছে, ডিজিটাল প্রোডাক্টের (`bsol-connect`) কোনো ডেলিভারি-সংক্রান্ত ফিল্ড leak হয়নি, অজানা সাবডোমেইনে ৪০৪।
+
+**বাকি (S2):** dashboard প্রোডাক্ট ফর্মে নতুন ফিল্ড এডিটর (features bullet list, specifications গ্রুপড টেবিল builder, is_featured/show_in_storefront checkbox, seo_content/warranty_override/delivery_override টেক্সট) — এখনো backend-only, সেলার এখনো UI থেকে এগুলো সেট করতে পারবে না (ডিফল্ট ভ্যালু দিয়েই কাজ করে: সব প্রোডাক্ট show_in_storefront=true, is_featured=false)।

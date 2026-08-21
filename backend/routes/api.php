@@ -80,6 +80,7 @@ use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\ShopProfileController;
+use App\Http\Controllers\Api\StorefrontCatalogController;
 use App\Http\Controllers\Api\StorefrontSettingController;
 use App\Http\Controllers\Api\StickerTemplateController;
 use App\Http\Controllers\Api\WordpressApiKeyController;
@@ -211,6 +212,17 @@ Route::prefix('public/digital-deliveries/{token}')->middleware('throttle:30,1')-
     Route::post('/send-otp', [DigitalDeliveryController::class, 'sendOtp']);
     Route::post('/verify-otp', [DigitalDeliveryController::class, 'verifyOtp']);
     Route::get('/download', [DigitalDeliveryController::class, 'download']);
+});
+
+// Public storefront catalog — host-resolved (LandingPageResolver), same
+// pattern as /public/landing-pages/{slug}. seller_storefront_context.md §12
+// (S1). throttle:60,1 matches the browsing-page traffic shape (higher than
+// the write-heavy digital-delivery group above).
+Route::prefix('public/storefront')->middleware('throttle:60,1')->group(function () {
+    Route::get('/home', [StorefrontCatalogController::class, 'home']);
+    Route::get('/categories', [StorefrontCatalogController::class, 'categories']);
+    Route::get('/products', [StorefrontCatalogController::class, 'products']);
+    Route::get('/products/{slug}', [StorefrontCatalogController::class, 'show']);
 });
 
 // Meta webhook — called directly by Facebook, not by our frontend. Auth

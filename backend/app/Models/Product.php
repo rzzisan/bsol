@@ -21,12 +21,17 @@ class Product extends Model
     public const DIGITAL_DELIVERY_EXTERNAL_URL = 'external_url';
 
     protected $fillable = [
-        'user_id', 'category_id', 'name', 'sku', 'source', 'source_ref', 'platform_api_key_id', 'description',
+        'user_id', 'category_id', 'name', 'sku', 'slug', 'source', 'source_ref', 'platform_api_key_id', 'description',
         'regular_price', 'discount', 'discount_type', 'selling_price', 'cost_price', 'stock', 'low_stock_alert',
         'track_stock', 'unit', 'status', 'variants', 'thumbnail', 'has_variants',
         'product_type', 'digital_delivery_type', 'digital_file_path', 'digital_file_name',
         'digital_file_mime_type', 'digital_file_size_bytes', 'digital_external_url', 'digital_delivery_channels',
         'digital_require_otp',
+        // Storefront (seller_storefront_context.md §5.2, S1/S2) — features is
+        // the short bullet box under the price, specifications is the
+        // grouped Specification-tab table; distinct on purpose, see §1.
+        'show_in_storefront', 'features', 'specifications', 'seo_content',
+        'warranty_override', 'delivery_override', 'is_featured',
     ];
 
     protected $casts = [
@@ -41,6 +46,10 @@ class Product extends Model
         'digital_file_size_bytes' => 'integer',
         'digital_require_otp' => 'boolean',
         'digital_delivery_channels' => 'array',
+        'show_in_storefront' => 'boolean',
+        'features' => 'array',
+        'specifications' => 'array',
+        'is_featured' => 'boolean',
     ];
 
     public function isDigital(): bool

@@ -80,9 +80,11 @@ class ProductController extends Controller
             'source_ref'       => 'nullable|string|max:255',
             'platform_api_key_id' => 'nullable|integer|exists:platform_api_keys,id',
             ...$this->digitalFieldRules(),
+            ...$this->storefrontFieldRules(),
         ]);
 
         $this->normalizeDigitalFields($data);
+        $data['slug'] = $this->uniqueSlug($data['name']);
 
         $data['user_id']     = auth()->id();
         $data['discount_type'] = $data['discount_type'] ?? 'amount';
@@ -165,9 +167,18 @@ class ProductController extends Controller
             'source_ref'      => 'nullable|string|max:255',
             'platform_api_key_id' => 'nullable|integer|exists:platform_api_keys,id',
             ...$this->digitalFieldRules(),
+            ...$this->storefrontFieldRules(),
         ]);
 
         $this->normalizeDigitalFields($data);
+
+        // Slug is set once at creation and never re-derived from a later
+        // name edit — a public /product/{slug} link must stay stable, not
+        // shift under a seller fixing a typo in the name (unlike SKU/name,
+        // there's no seller-facing slug field to edit it deliberately yet).
+        if (! $product->slug) {
+            $data['slug'] = $this->uniqueSlug($data['name'] ?? $product->name, $product->id);
+        }
 
         if (!empty($data['category_id'])) {
             $this->validateCategoryOwnership($data['category_id']);
@@ -275,6 +286,51 @@ class ProductController extends Controller
         if (($data['digital_delivery_type'] ?? null) === Product::DIGITAL_DELIVERY_HOSTED_FILE) {
             $data['digital_external_url'] = null;
         }
+    }
+
+    /**
+     * Per-shop unique (owner+staff), mirrors ProductCategoryController's own
+     * uniqueSlug() and LandingPageController::resolveSlug() — same
+     * counter-suffix approach, kept small and duplicated rather than
+     * shared, matching this codebase's stated preference (see
+     * digital_product_context.md's DigitalDeliveryService docblock).
+     */
+    private function uniqueSlug(string $name, ?int $excludeId = null): string
+    {
+        $shopUserIds = auth()->user()->shopUserIds();
+        $base = \Illuminate\Support\Str::slug($name) ?: 'product';
+        $slug = $base;
+        $i = 1;
+
+        while (
+            Product::whereIn('user_id', $shopUserIds)
+                ->where('slug', $slug)
+                ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
+                ->exists()
+        ) {
+            $slug = $base . '-' . ++$i;
+        }
+
+        return $slug;
+    }
+
+    /** @return array<string, mixed> */
+    private function storefrontFieldRules(): array
+    {
+        return [
+            'show_in_storefront' => ['nullable', 'boolean'],
+            'is_featured' => ['nullable', 'boolean'],
+            'features' => ['nullable', 'array'],
+            'features.*' => ['string', 'max:255'],
+            'specifications' => ['nullable', 'array'],
+            'specifications.*.group' => ['required_with:specifications', 'string', 'max:100'],
+            'specifications.*.items' => ['required_with:specifications', 'array'],
+            'specifications.*.items.*.label' => ['required_with:specifications', 'string', 'max:100'],
+            'specifications.*.items.*.value' => ['required_with:specifications', 'string', 'max:500'],
+            'seo_content' => ['nullable', 'string'],
+            'warranty_override' => ['nullable', 'string'],
+            'delivery_override' => ['nullable', 'string'],
+        ];
     }
 
     private function validateCategoryOwnership(int $categoryId): void
