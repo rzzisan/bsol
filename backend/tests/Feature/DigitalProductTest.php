@@ -406,6 +406,54 @@ class DigitalProductTest extends TestCase
             ->assertStatus(410);
     }
 
+    public function test_seller_can_disable_the_otp_gate_and_download_works_immediately(): void
+    {
+        $delivery = $this->makeDelivery(['requires_otp' => false]);
+
+        $this->getJson("/api/public/digital-deliveries/{$delivery->download_token}")
+            ->assertJsonPath('data.otp_required', false)
+            ->assertJsonPath('data.can_download', true);
+
+        $this->getJson("/api/public/digital-deliveries/{$delivery->download_token}/download")
+            ->assertOk()
+            ->assertHeader('content-disposition');
+    }
+
+    public function test_delivery_creation_snapshots_the_products_require_otp_setting(): void
+    {
+        $this->mockDispatchAsSent();
+        if (! User::where('role', 'admin')->exists()) {
+            User::factory()->create(['role' => 'admin']);
+        }
+        [$owner, , $product] = $this->shopWithDigitalProduct(['digital_require_otp' => false]);
+        $this->enableBkash($owner);
+
+        $orderResp = $this->postJson("https://shopa.{$this->apex()}/api/public/landing-pages/offer/order", [
+            'customer_name' => 'Karim', 'customer_phone' => '01712345678',
+            'customer_address' => 'Dhaka', 'customer_email' => 'karim@example.com',
+            'payment_method' => 'bkash',
+            'items' => [['enabled' => true, 'product_id' => $product->id, 'quantity' => 1]],
+        ]);
+        $order = Order::findOrFail($orderResp->json('data.order_id'));
+
+        $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/landing-pages/offer/orders/{$order->id}/online-payment/wallet-claim",
+            [
+                'token' => $order->public_token, 'provider' => 'bkash',
+                'sender_number' => '01712345678', 'customer_trx_id' => 'TRX' . uniqid(),
+            ]
+        )->assertCreated();
+
+        $claim = OrderOnlinePayment::where('order_id', $order->id)->firstOrFail();
+        Sanctum::actingAs($owner);
+        $this->postJson("/api/online-payments/{$claim->id}/verify", ['approve' => true, 'amount' => $order->total])
+            ->assertOk();
+
+        $delivery = DigitalDelivery::where('order_id', $order->id)->firstOrFail();
+        $this->assertFalse($delivery->requires_otp);
+        $this->assertTrue($delivery->canDownload());
+    }
+
     public function test_send_and_verify_otp_then_download_succeeds(): void
     {
         $this->mockDispatchAsSent();

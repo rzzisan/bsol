@@ -23,6 +23,7 @@ class DigitalDelivery extends Model
         'customer_phone',
         'customer_email',
         'delivery_type',
+        'requires_otp',
         'external_url',
         'download_token',
         'otp_code',
@@ -45,6 +46,7 @@ class DigitalDelivery extends Model
     protected function casts(): array
     {
         return [
+            'requires_otp' => 'boolean',
             'otp_sent_at' => 'datetime',
             'otp_verified_at' => 'datetime',
             'otp_next_resend_at' => 'datetime',
@@ -80,9 +82,11 @@ class DigitalDelivery extends Model
         return now()->gt($this->expires_at);
     }
 
+    /** Seller-configurable (Product.digital_require_otp), snapshotted onto
+     *  this row at creation time — see the 2026_08_21 migration. */
     public function isOtpRequired(): bool
     {
-        return $this->delivery_type === self::TYPE_HOSTED_FILE;
+        return $this->delivery_type === self::TYPE_HOSTED_FILE && (bool) $this->requires_otp;
     }
 
     public function isOtpVerified(): bool

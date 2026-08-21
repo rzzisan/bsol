@@ -73,6 +73,13 @@ class DigitalDeliveryService
                 'customer_phone' => $order->customer_phone,
                 'customer_email' => $order->customer_email,
                 'delivery_type' => $deliveryType,
+                // Seller-configurable per product (default true) — a
+                // seller without a working SMS/email setup can turn this
+                // off rather than have every customer's download blocked.
+                // Meaningless for external_url (nothing of ours to gate).
+                'requires_otp' => $deliveryType === Product::DIGITAL_DELIVERY_HOSTED_FILE
+                    ? (bool) $product->digital_require_otp
+                    : false,
                 'external_url' => $deliveryType === Product::DIGITAL_DELIVERY_EXTERNAL_URL
                     ? $product->digital_external_url
                     : null,

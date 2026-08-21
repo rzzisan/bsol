@@ -124,6 +124,7 @@ type Product = {
   digital_file_size_bytes?: number | null;
   digital_external_url?: string | null;
   digital_delivery_channels?: string[] | null;
+  digital_require_otp?: boolean;
 };
 
 type DigitalPolicy = {
@@ -274,6 +275,7 @@ export default function ProductDetailPage() {
           digital_delivery_type: form.product_type === "digital" ? (form.digital_delivery_type ?? "hosted_file") : undefined,
           digital_external_url: form.product_type === "digital" ? (form.digital_external_url ?? null) : undefined,
           digital_delivery_channels: form.product_type === "digital" ? (form.digital_delivery_channels ?? []) : undefined,
+          digital_require_otp: form.product_type === "digital" ? (form.digital_require_otp ?? true) : undefined,
         }),
       });
 
@@ -733,6 +735,27 @@ export default function ProductDetailPage() {
                   </p>
                 ) : null}
                 {digitalError ? <p className="mt-2 text-xs text-red-500">{digitalError}</p> : null}
+
+                <label className="mt-4 flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.digital_require_otp ?? true}
+                    onChange={(e) => setField("digital_require_otp", e.target.checked)}
+                    className="h-4 w-4 accent-[var(--accent)]"
+                  />
+                  <span className="text-sm">
+                    {locale === "bn" ? "ডাউনলোডের আগে SMS/ইমেইল ভেরিফিকেশন চাওয়া হবে" : "Require SMS/email verification before download"}
+                  </span>
+                </label>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  {form.digital_require_otp ?? true
+                    ? (locale === "bn"
+                        ? "সুপারিশকৃত — লিংক শেয়ার করলেও অন্য কেউ ভেরিফিকেশন কোড ছাড়া ডাউনলোড করতে পারবে না।"
+                        : "Recommended — even if the link is shared, no one else can download without the verification code.")
+                    : (locale === "bn"
+                        ? "⚠️ বন্ধ থাকলে লিংক যার কাছে যাবে সেই ডাউনলোড করতে পারবে — SMS গেটওয়ে/টেমপ্লেট সেট না থাকলে এটা বন্ধ রাখুন, নাহলে কাস্টমার আটকে যাবে।"
+                        : "⚠️ When off, anyone with the link can download — turn this off if your SMS gateway/templates aren't set up yet, otherwise customers get stuck.")}
+                </p>
               </div>
             ) : (
               <label className="mt-4 block">

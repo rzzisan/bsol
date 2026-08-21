@@ -26,6 +26,7 @@ class Product extends Model
         'track_stock', 'unit', 'status', 'variants', 'thumbnail', 'has_variants',
         'product_type', 'digital_delivery_type', 'digital_file_path', 'digital_file_name',
         'digital_file_mime_type', 'digital_file_size_bytes', 'digital_external_url', 'digital_delivery_channels',
+        'digital_require_otp',
     ];
 
     protected $casts = [
@@ -38,6 +39,7 @@ class Product extends Model
         'has_variants'  => 'boolean',
         'variants'      => 'array',
         'digital_file_size_bytes' => 'integer',
+        'digital_require_otp' => 'boolean',
         'digital_delivery_channels' => 'array',
     ];
 

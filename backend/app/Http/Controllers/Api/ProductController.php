@@ -253,6 +253,9 @@ class ProductController extends Controller
             'digital_external_url' => ['nullable', 'url', 'max:2000'],
             'digital_delivery_channels' => ['nullable', 'array'],
             'digital_delivery_channels.*' => [Rule::in(['email', 'sms'])],
+            // Anti-piracy OTP gate for hosted_file — seller-configurable,
+            // default true. See digital_product_context.md §0ক-4/§14.
+            'digital_require_otp' => ['nullable', 'boolean'],
         ];
     }
 
