@@ -73,7 +73,7 @@ export default function ProductDetailView({ product, home }: { product: ProductD
     }
 
     if (goToCart) {
-      router.push("/cart");
+      router.push("/checkout");
       return;
     }
 

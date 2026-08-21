@@ -172,3 +172,70 @@ export async function fetchProductsClient(params: { category?: string; q?: strin
 export function fetchCategoriesClient() {
   return getJson<CategorySummary[]>("/public/storefront/categories");
 }
+
+// ── Checkout (S3, COD-only — see StorefrontCheckoutController) ──
+
+export type CheckoutOrderResult = {
+  order_number: string;
+  public_token: string;
+  subtotal: number | string;
+  shipping_charge: number | string;
+  total: number | string;
+};
+
+export type CheckoutPayload = {
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  customer_district?: string;
+  customer_thana?: string;
+  customer_area?: string;
+  customer_email?: string;
+  notes?: string;
+  items: Array<{ product_id: number; quantity: number; product_variant_id?: number }>;
+};
+
+export async function submitCheckout(
+  payload: CheckoutPayload,
+): Promise<{ ok: true; data: CheckoutOrderResult } | { ok: false; message: string; errors?: Record<string, string[]> }> {
+  try {
+    const res = await fetch(`${API}/public/storefront/orders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      return { ok: false, message: json?.message ?? "Checkout failed.", errors: json?.errors };
+    }
+
+    return { ok: true, data: json.data as CheckoutOrderResult };
+  } catch {
+    return { ok: false, message: "Checkout failed — please try again." };
+  }
+}
+
+export type StorefrontOrder = {
+  order_number: string;
+  created_at: string;
+  status: string;
+  payment_method: string;
+  payment_status: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  subtotal: number | string;
+  shipping_charge: number | string;
+  discount: number | string;
+  total: number | string;
+  items: Array<{ product_name: string; quantity: number; unit_price: number | string; total: number | string }>;
+};
+
+export function fetchOrderClient(token: string) {
+  return getJson<StorefrontOrder>(`/public/storefront/orders/${encodeURIComponent(token)}`);
+}
+
+export function fetchOrderServer(baseUrl: string, token: string) {
+  return getJsonServer<StorefrontOrder>(baseUrl, `/public/storefront/orders/${encodeURIComponent(token)}`);
+}

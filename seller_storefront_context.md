@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** প্ল্যান সম্পন্ন। **S0, S1, S4, S6, S2 — পাঁচটাই implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — visually ভেরিফাই করা হয়েছে `zareen.zyrotechbd.com`-এ। নিচে §১৪-১৭ দেখো। বাকি S3 (checkout backend — কার্ট পেজে এখনো "শীঘ্রই আসছে"), S5 (ফুল হোমপেজ থিম), S7-S9 (রিভিউ/SEO/ট্র্যাকিং)।
+**অবস্থা:** প্ল্যান সম্পন্ন। **S0, S1, S2, S3, S4, S6 — ছয়টাই implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — একটা real order (`ORD-20260821-0006`) `zareen.zyrotechbd.com`-এ end-to-end ব্রাউজারে বসিয়ে যাচাই করা হয়েছে। নিচে §১৪-১৮ দেখো। বাকি S5 (ফুল হোমপেজ থিম), S7-S9 (রিভিউ/SEO/ট্র্যাকিং), S3b (storefront online payment)।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -329,3 +329,35 @@ Dashboard প্রোডাক্ট ডিটেইল পেজে (`app/dash
 - `seo_content` / `warranty_override` / `delivery_override` — textarea, hint টেক্সট সহ যে খালি রাখলে শপ-ডিফল্ট ব্যবহার হবে
 
 **ভেরিফাই:** ব্যাকএন্ড round-trip সরাসরি API কলে (`PUT /products/{id}`, temporary token দিয়ে, পরে revoke করা হয়েছে) — সেভ হওয়া ডেটা সাথে সাথে পাবলিক স্টোরফ্রন্ট এন্ডপয়েন্টে (S1) ও `/product/bsol-connect` পেজে (S6) সঠিকভাবে দেখা গেছে ব্রাউজার স্ক্রিনশটে: Key Features bullet, "General" গ্রুপের Specification টেবিল (Platform/License), sidebar-এ warranty override টেক্সট, home bundle-এ `featured_products`-এ প্রোডাক্টটা যোগ হয়েছে। `npx tsc --noEmit` clean, `deploy-safe.sh` সফল।
+
+---
+
+## ১৮. S3 — as-built (২০২৬-০৮-২১, ✅ লাইভ, COD-only স্কোপে)
+
+**স্কোপ সিদ্ধান্ত (কোডে স্পষ্টভাবে ডকুমেন্টেড, `StorefrontCheckoutController`-এর class docblock-এ):** এই পাসে **শুধু COD**। বিদ্যমান অনলাইন-পেমেন্ট ফ্লো (`OnlinePaymentController`-এর wallet-claim/gateway-initiate) landing-page-slug-এর সাথে বাঁধা — সেই পুরো সারফেস storefront-compatible করা একটা আলাদা, বড় কাজ (নিজস্ব "S3b", এই পাসে না)। ফলে **ডিজিটাল-শুধু কার্ট storefront থেকে এখনো চেকআউট করা যায় না** (COD ডিজিটালে ব্লকড, আর অনলাইন পেমেন্ট এখনো নেই) — client-side (cart + checkout পেজ দুটোতেই) এবং backend দুই জায়গাতেই স্পষ্ট বার্তাসহ ব্লক করা আছে, dead-end বা কনফিউজিং এরর না।
+
+**Backend:**
+- `StorefrontOrderService` — `LandingPageOrderService`-এর ছোট, ইচ্ছাকৃত duplicate (landing_page_products pivot/price_override নেই এখানে, প্রোডাক্টের নিজস্ব দাম সরাসরি ব্যবহার হয়) — একই যুক্তি যেটা `DigitalDeliveryService`-এর docblock-এ আগে লেখা হয়েছিল (ছোট per-feature duplication, cross-feature coupling-এর চেয়ে ভালো)
+- `StorefrontCheckoutController::submitOrder()` — `POST /public/storefront/orders` (throttle 15/min, landing-page order-submit-এর সাথে মেলে) — host-resolved shop, mixed-cart ব্লক, digital-cart ব্লক (COD-only হওয়ায়), শুধু ওই শপের `show_in_storefront`+active প্রোডাক্ট গ্রহণ করে (guess/cross-shop id silently drop)
+- `StorefrontCheckoutController::showOrder()` — `GET /public/storefront/orders/{token}` — token-in-URL সরাসরি lookup (`DigitalDeliveryController::findByToken()`-এর প্যাটার্ন, id+hash_equals না কারণ URL-এ id নেই শুধু token)
+- চেকআউট ফিল্ড: `CheckoutFieldResolver::resolve(null)` (ডিফল্ট ফিল্ড সেট — নাম/ফোন/ঠিকানা/জেলা/থানা/এলাকা/নোট) — শপ-লেভেল কাস্টমাইজেশন এখনো নেই (S5-এ যোগ হতে পারে), কিন্তু ইঞ্জিনটা একই reuse হয়েছে যেমন প্ল্যানে বলা ছিল
+- Reserved word `order` যোগ হয়েছে (`proxy.ts`), `/order/{token}` → `/store/order/{token}` internal rewrite, `/checkout` (আগে থেকেই reserved) এখন real পেজ পায়
+
+**Frontend:**
+- `/store/checkout` — cart থেকে ফর্ম (নাম/ফোন/ঠিকানা/জেলা/থানা/এলাকা/নোট), ডিজিটাল-কার্ট client-side guard, সাবমিটে cart clear + `/order/{token}`-এ রিডাইরেক্ট
+- `/store/order/[token]` — অর্ডার কনফার্মেশন পেজ (অর্ডার নম্বর, আইটেম, টোটাল)
+- Cart পেজের disabled "চেকআউট (শীঘ্রই আসছে)" বাটন এখন real লিংক (ডিজিটাল কার্টে এখনো amber সতর্কতা)
+- প্রোডাক্ট ডিটেইলের "Buy Now" এখন সরাসরি `/checkout`-এ যায় (আগে `/cart`-এ যেত)
+
+**ভেরিফাই — পূর্ণ end-to-end ব্রাউজার টেস্ট (`zareen.zyrotechbd.com`):**
+1. মিক্সড-কার্ট client guard — ডিজিটাল প্রোডাক্ট কার্টে থাকা অবস্থায় ফিজিক্যাল প্রোডাক্টে "Buy Now" চাপলে সঠিক বার্তা দেখিয়েছে, যোগ হয়নি
+2. ডিজিটাল-শুধু কার্টে cart পেজ সঠিকভাবে amber সতর্কতা দেখিয়েছে (checkout বাটনের বদলে)
+3. ফিজিক্যাল প্রোডাক্টে "Buy Now" → সরাসরি `/checkout`-এ প্রি-লোডেড আইটেমসহ
+4. ফর্ম পূরণ + সাবমিট → **real order তৈরি হয়েছে** (`ORD-20260821-0006`, DB-তে verify করা: `user_id=3`, `source=storefront`, `payment_method=cod`, `status=pending`, সঠিক subtotal/total, ১টা item) → cart clear → `/order/{token}` কনফার্মেশন পেজ সঠিক ডেটা সহ
+
+নতুন `StorefrontCheckoutTest.php` (৭টা: COD সাবমিট+টোটাল, cross-shop প্রোডাক্ট silently ignore, mixed-cart reject, digital-only reject, empty items reject, token-scoped order lookup, required-field ভ্যালিডেশন) — সব pass। ফুল স্যুট ৪৫৯ pass (৩টা known baseline failure অপরিবর্তিত)। `npx tsc --noEmit` clean, `deploy-safe.sh` সফল।
+
+**অসম্পূর্ণ, পরবর্তী ধাপের জন্য নোট করা হলো:**
+- **S3b (storefront online payment)** — অনলাইন পেমেন্ট চ্যানেল storefront checkout-এ যোগ করা, যেটা ডিজিটাল প্রোডাক্টও কেনা সম্ভব করবে
+- **Variant selection UX** — প্রোডাক্ট ডিটেইল পেজে ভেরিয়েন্ট চিপ শুধু দেখায়, ক্লিক করে নির্বাচন করার ইন্টারঅ্যাক্টিভিটি এখনো নেই (S6-এর known simplification) — Add to Cart সবসময় বেস প্রোডাক্ট প্রাইসেই যোগ করে, ভেরিয়েন্ট-নির্দিষ্ট দাম/স্টক এখনো wire করা হয়নি ফ্রন্টএন্ডে (ব্যাকএন্ড `product_variant_id` অপশনাল প্যারামিটার হিসেবে রেডি আছে)
+- চেকআউট ফিল্ড শপ-লেভেল কাস্টমাইজেশন (এখন সবসময় ডিফল্ট সেট) — S5-এ যোগ হতে পারে

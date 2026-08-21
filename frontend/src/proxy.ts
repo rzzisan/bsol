@@ -124,16 +124,17 @@ const APP_PATHS = new Set([
   "verify-email",
   "verify-phone",
   // Reserved for the storefront (seller_storefront_context.md §4/§12, S0).
-  // "category"/"product"/"cart"/"checkout"/"search" are rewritten to /store/*
-  // below (STOREFRONT_PATHS); "products"/"wishlist"/"account"/"shop" have no
-  // page yet but are reserved now so a landing page can never claim them —
-  // same precedent as "store" itself, reserved ahead of being built.
+  // "category"/"product"/"cart"/"checkout"/"search"/"order" are rewritten to
+  // /store/* below (STOREFRONT_PATHS); "products"/"wishlist"/"account"/"shop"
+  // have no page yet but are reserved now so a landing page can never claim
+  // them — same precedent as "store" itself, reserved ahead of being built.
   "category",
   "product",
   "products",
   "cart",
   "checkout",
   "search",
+  "order",
   "wishlist",
   "account",
   "shop",
@@ -145,7 +146,7 @@ const APP_PATHS = new Set([
  * address). Only the segments with a real S0+ page target belong here —
  * the rest of APP_PATHS above is reserved-but-not-yet-built.
  */
-const STOREFRONT_PATHS = new Set(["category", "product", "cart", "checkout", "search"]);
+const STOREFRONT_PATHS = new Set(["category", "product", "cart", "checkout", "search", "order"]);
 
 /**
  * True for `/offer` and `/offer/thank-you`, false for `/`, `/dashboard/...`

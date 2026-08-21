@@ -5,13 +5,12 @@ import { useCart } from "@/lib/storefront-cart";
 import { money } from "@/lib/storefront-client";
 
 /**
- * Checkout submission (POST /public/storefront/orders) is S3, not built
- * yet — this page shows real cart contents/totals but "Proceed to
- * checkout" is intentionally disabled rather than pointing at a dead
- * endpoint. See seller_storefront_context.md §12.
+ * Checkout (S3, COD-only) — see /store/checkout/page.tsx and
+ * StorefrontCheckoutController's class docblock for the current scope.
  */
 export default function CartRoute() {
   const { items, removeItem, updateQuantity, subtotal } = useCart();
+  const isDigitalCart = items.length > 0 && items.every((i) => i.productType === "digital");
 
   if (items.length === 0) {
     return (
@@ -71,13 +70,18 @@ export default function CartRoute() {
         <span className="text-lg font-bold">{money(subtotal)}</span>
       </div>
 
-      <button
-        disabled
-        title="চেকআউট শীঘ্রই আসছে"
-        className="mt-4 w-full rounded-xl bg-slate-300 px-5 py-3 text-sm font-semibold text-slate-500"
-      >
-        চেকআউট (শীঘ্রই আসছে)
-      </button>
+      {isDigitalCart ? (
+        <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-center text-sm text-amber-700">
+          ডিজিটাল প্রোডাক্ট এই মুহূর্তে স্টোরফ্রন্ট থেকে অনলাইন পেমেন্ট ছাড়া কেনা যাচ্ছে না — শীঘ্রই আসছে।
+        </p>
+      ) : (
+        <Link
+          href="/checkout"
+          className="mt-4 block w-full rounded-xl bg-slate-900 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-slate-800"
+        >
+          চেকআউট করুন
+        </Link>
+      )}
     </div>
   );
 }
