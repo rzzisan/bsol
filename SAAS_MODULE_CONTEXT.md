@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-21 — **নতুন §21: সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান সম্পন্ন, কোড এখনো শুরু হয়নি** (`feature_roadmap_context.md` আইটেম #৯)। এখন landing page একটা ক্যাম্পেইন-পেজ (single-product-focused), কিন্তু সেলারদের দরকার Ghorer Bazar/Deshi Tech-স্টাইল একটা পূর্ণাঙ্গ ব্রাউজযোগ্য ক্যাটালগ শপ — হোমপেজ, ক্যাটাগরি নেভিগেশন, প্রোডাক্ট লিস্টিং/ডিটেইল, কার্ট, সার্চ, রিভিউ। বিস্তারিত ১০-ফেজ প্ল্যান `seller_storefront_context.md`-এ — user-এর অনুমতির অপেক্ষায়, এখনো কোনো migration/কোড লেখা হয়নি। Older entries kept as-is:
+
 Last updated: 2026-08-20 (৫) — **§20 (ডিজিটাল প্রোডাক্ট সিস্টেম) Phase 1 ✅ সম্পন্ন ও লাইভ** — migration/backend/১৮টা টেস্ট/ফ্রন্টএন্ড (প্রোডাক্ট ফর্ম, চেকআউট, thank-you, নতুন `/d/[token]` ডাউনলোড পেজ, admin policy পেজ) সব deployed। বিস্তারিত `digital_product_context.md §০ক-১৩`। Older entries kept as-is:
 
 Last updated: 2026-08-20 (৪) — **নতুন §20: ডিজিটাল প্রোডাক্ট সিস্টেম — গবেষণা সম্পন্ন** (`feature_roadmap_context.md` আইটেম #৮)। ফিজিকালের পাশাপাশি e-book/software/course ইত্যাদি ডিজিটাল প্রোডাক্ট বিক্রির জন্য instant email/WhatsApp/SMS/download-link ডেলিভারি সিস্টেম। বিস্তারিত `digital_product_context.md`। কোনো কোড এখনো লেখা হয়নি, user-conferm বাকি। Older entries kept as-is:
@@ -1220,3 +1222,17 @@ Backend: isolated Postgres schema কনভেনশনে — manual + courier_
 **User-এর ৪টা চূড়ান্ত সিদ্ধান্তে (২০২৬-০৮-২০) ইমপ্লিমেন্ট + deploy সম্পন্ন**: personal wallet রাখা হয়েছে (COD বাদ, wallet-verify হওয়ার পরই ডেলিভারি ট্রিগার), mixed cart checkout-এ block, per-product delivery config (hosted file/external URL + email/SMS চ্যানেল প্রোডাক্ট অ্যাড করার সময় সেট করা যায়), hosted file downloads OTP-gated (লিংক শেয়ার করলেও অন্য কেউ ডাউনলোড করতে পারবে না)। ইমপ্লিমেন্টেশনের সময় একটা real correction ধরা পড়েছে — email/SMS notification infra (`NotificationDispatchService`) আসলে platform-wide admin-shared (সেলারের নিজস্ব SMTP না, আগের ধারণা ভুল ছিল), আর Auto-top-up ফিচারে একই ভুল প্যাটার্নের একটা real bug flag হয়েছে (`sms_auto_recharge_*` নোটিফিকেশন কখনো পাঠানো হচ্ছিল না — background task `task_331ef7d8`)। বিস্তারিত (schema, API surface, frontend, টেস্ট রেজাল্ট) `digital_product_context.md §০ক-১৩`।
 
 **ভবিষ্যতের জন্য নোট:** bKash merchant credential হাতে পেলে সবসময় প্রথমে confirm করা — Tokenized Checkout নাকি PGW/Checkout API (email/document-এ "Tokenized" vs "PGW"/"Checkout" শব্দ খুঁজুন) — দুটো product-এর credential/domain/client flow সম্পূর্ণ আলাদা, একটা ধরে নিয়ে implement শুরু করলে generic "invalid credential" error দিয়ে আটকে যাওয়ার ঝুঁকি আছে।
+
+---
+
+## 21. সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান সম্পন্ন (design: 2026-08-21)
+
+`feature_roadmap_context.md` আইটেম #৯। User-এর নিজের কথায়: "সকল সুবিধা একজন সেলার পেয়ে যাবে, একটা সুবিধা বাকি — সেলার শপ, পাবলিক ইকমার্স শপ যেখানে সাধারণ কাস্টমাররা সেলারের একটা পূর্ণাঙ্গ শপ দেখতে পাবে" (উদাহরণ: Ghorer Bazar/organic.deshitech.com-স্টাইল সাইট)। এখন `LandingPage` মডেল একটা single-product-focused ক্যাম্পেইন পেজ — এই ফিচার সেটার পাশাপাশি একটা পূর্ণাঙ্গ browsable ক্যাটালগ শপ যোগ করে (হোমপেজ, ক্যাটাগরি নেভিগেশন, প্রোডাক্ট লিস্টিং/ডিটেইল পেজ, কার্ট, সার্চ, রিভিউ)।
+
+**ফিজিবিলিটি যাচাই করে পাওয়া গেছে:** `Product`/`ProductCategory`/per-seller subdomain routing/checkout-payment-courier-invoice ইঞ্জিন — এই সব ভিত্তি আগে থেকেই আছে ও reuse হবে। যা সত্যিই নেই: পাবলিক ক্যাটালগ browsing API (এখন প্রোডাক্ট শুধু dashboard-auth বা এক landing page-এ attached single product হিসেবে exposed), মাল্টি-প্রোডাক্ট কার্ট (কোনো `Cart` মডেলই নেই), storefront থিম/হোমপেজ, রিভিউ সিস্টেম, SEO ইনফ্রা (sitemap/OG/JSON-LD)।
+
+**মূল আর্কিটেকচার সিদ্ধান্ত (user confirm করেছেন):** সাবডোমেইনের root path (`seller1.zyrotechbd.com/`) ডিফল্টভাবে storefront হোমপেজ দেখাবে, কিন্তু সেলার চাইলে তার যেকোনো একটা landing page-কে হোমপেজ হিসেবে সেট করতে পারবে (`ShopProfile`/নতুন `StorefrontSetting`-এ `homepage_mode`)। যেটাই হোমপেজ হোক, স্টোরফ্রন্ট সবসময় সরাসরি URL দিয়ে অ্যাক্সেসযোগ্য থাকবে (`/category/{slug}`, `/product/{slug}`, `/shop`, `/cart`, `/search` — এগুলো নতুন reserved path হিসেবে `custom_domain_context.md §4.3`-এ যোগ হবে)। বর্তমান বাগ যেটা এর মাধ্যমে ফিক্স হবে: এখন সেলারের সাবডোমেইনের bare root (`/`)-এ হিট করলে কোনো host-aware রাউটিং না থাকায় সেটা bsol-এর নিজস্ব মার্কেটিং/লগইন পেজ দেখায় (`proxy.ts` শুধু `/{slug}` আর `/dashboard/*` রিরাইট করে, bare `/` করে না)।
+
+Cart client-side (`localStorage`, origin-scoped — auth টোকেনের মতোই প্রতি সাবডোমেইনে আলাদা, `custom_domain_context.md §2`-এর একই নিরাপত্তা প্রপার্টি ফ্রিতে reuse হয়)। "Order on WhatsApp" বাটন একটা সাধারণ `wa.me` click-to-chat লিংক — এটা paused/pending WhatsApp Business Cloud API automation ফিচার থেকে সম্পূর্ণ আলাদা ও স্বাধীন, কোনো Meta App Review নির্ভরতা নেই।
+
+**১০-ফেজ (S0-S9) বিস্তারিত প্ল্যান, ডেটা মডেল, API সারফেস, non-goals, open questions:** `seller_storefront_context.md`। **এখনো কোনো migration/কোড লেখা হয়নি — user-এর অনুমতির অপেক্ষায়।**
