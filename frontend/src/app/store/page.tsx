@@ -68,35 +68,21 @@ export default async function StorefrontHomeRoute() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f8fafc",
-        color: "#0f172a",
-        fontFamily: "system-ui, sans-serif",
-        padding: 24,
-      }}
-    >
-      <div style={{ textAlign: "center", maxWidth: 480 }}>
-        {shop.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={shop.logo_url}
-            alt={shop.shop_name}
-            style={{ height: 64, marginBottom: 16, display: "inline-block" }}
-          />
-        ) : null}
-        <h1 style={{ fontSize: 22, margin: "0 0 8px" }}>{shop.shop_name}</h1>
-        <p style={{ margin: "0 0 4px", color: "#475569", fontSize: 15 }}>
-          অনলাইন শপ শীঘ্রই আসছে
-        </p>
-        <p style={{ margin: 0, color: "#94a3b8", fontSize: 13 }}>
-          Full storefront coming soon.
-        </p>
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
+      {shop.logo_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={shop.logo_url} alt={shop.shop_name} className="h-16 w-16 rounded-full object-cover" />
+      ) : null}
+      <div>
+        <h1 className="text-xl font-bold">{shop.shop_name}</h1>
+        <p className="mt-1 text-sm text-slate-500">পূর্ণাঙ্গ হোমপেজ (ব্যানার, ক্যাটাগরি) শীঘ্রই আসছে</p>
       </div>
-    </main>
+      <a
+        href="/search"
+        className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+      >
+        সব প্রোডাক্ট দেখুন
+      </a>
+    </div>
   );
 }

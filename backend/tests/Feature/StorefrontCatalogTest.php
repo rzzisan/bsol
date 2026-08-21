@@ -190,6 +190,14 @@ class StorefrontCatalogTest extends TestCase
         $this->getJson("https://shopa.{$this->apex()}/api/public/storefront/home")
             ->assertOk()
             ->assertJsonPath('data.shop_name', 'Shop A')
+            ->assertJsonPath('data.phone', '01711223344')
+            // No StorefrontSetting.whatsapp_number was set -> falls back to
+            // the shop phone (§7 of seller_storefront_context.md).
+            ->assertJsonPath('data.whatsapp_number', '01711223344')
+            // No connected FacebookPageConnection -> hidden regardless of
+            // the show_messenger_button toggle's default.
+            ->assertJsonPath('data.show_messenger_button', false)
+            ->assertJsonPath('data.messenger_page_id', null)
             ->assertJsonCount(1, 'data.featured_categories')
             ->assertJsonPath('data.featured_categories.0.slug', 'oil')
             ->assertJsonCount(1, 'data.featured_products')

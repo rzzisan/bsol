@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\FacebookPageConnection;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductVariant;
@@ -48,6 +49,9 @@ class StorefrontCatalogController extends Controller
 
         $shop = ShopProfile::where('user_id', $ownerId)->first();
         $storefront = StorefrontSetting::where('user_id', $ownerId)->first();
+        $messengerPageId = FacebookPageConnection::where('user_id', $ownerId)
+            ->where('status', 'connected')
+            ->value('fb_page_id');
 
         $featuredCategoryIds = $storefront?->featured_category_ids ?? [];
         $featuredCategories = ProductCategory::whereIn('user_id', $shopUserIds)
@@ -71,6 +75,16 @@ class StorefrontCatalogController extends Controller
             'data' => [
                 'shop_name' => $shop?->shop_name,
                 'logo_url' => $shop?->logo_url,
+                // Contact/deep-link info for the product page's Call/
+                // WhatsApp/Messenger buttons (seller_storefront_context.md
+                // §7) — plain tel:/wa.me/m.me links, no API calls, so this
+                // is safe to expose publicly (same info a footer would show).
+                'phone' => $shop?->phone,
+                'whatsapp_number' => $storefront?->whatsapp_number ?: $shop?->phone,
+                'show_call_button' => $storefront?->show_call_button ?? true,
+                'show_whatsapp_button' => $storefront?->show_whatsapp_button ?? true,
+                'show_messenger_button' => ($storefront?->show_messenger_button ?? true) && $messengerPageId !== null,
+                'messenger_page_id' => $messengerPageId,
                 'theme_primary_color' => $storefront?->theme_primary_color,
                 'banner_images' => $storefront?->banner_images ?? [],
                 'about_text' => $storefront?->about_text,

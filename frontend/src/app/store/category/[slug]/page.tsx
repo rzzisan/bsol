@@ -1,0 +1,82 @@
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import ProductCard from "@/components/storefront/product-card";
+import { fetchCategories, fetchProductsServer } from "@/lib/storefront-client";
+
+type RouteProps = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ page?: string; sort?: string }>;
+};
+
+function getBaseUrl(headerList: Headers) {
+  const forwardedProto = headerList.get("x-forwarded-proto");
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
+  if (forwardedProto && host) return `${forwardedProto}://${host}`;
+  if (host) return `https://${host}`;
+  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://127.0.0.1:3000";
+}
+
+export async function generateMetadata({ params }: RouteProps): Promise<Metadata> {
+  const { slug } = await params;
+  const baseUrl = getBaseUrl(await headers());
+  const categories = (await fetchCategories(baseUrl)) ?? [];
+  const category = categories.find((c) => c.slug === slug);
+
+  return { title: category?.name ?? "Category" };
+}
+
+export default async function CategoryRoute({ params, searchParams }: RouteProps) {
+  const { slug } = await params;
+  const { page, sort } = await searchParams;
+  const baseUrl = getBaseUrl(await headers());
+
+  const [categories, result] = await Promise.all([
+    fetchCategories(baseUrl),
+    fetchProductsServer(baseUrl, { category: slug, sort, page: page ? Number(page) : undefined }),
+  ]);
+
+  const category = (categories ?? []).find((c) => c.slug === slug);
+
+  if (!category && !result?.data?.length) {
+    notFound();
+  }
+
+  return (
+    <div>
+      <nav className="mb-4 text-xs text-slate-500">
+        <Link href="/" className="hover:underline">
+          Home
+        </Link>{" "}
+        / <span className="text-slate-700">{category?.name ?? slug}</span>
+      </nav>
+
+      <h1 className="mb-4 text-xl font-bold">{category?.name ?? slug}</h1>
+
+      {result?.data?.length ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {result.data.map((p) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-500">এই ক্যাটাগরিতে এখনো কোনো প্রোডাক্ট নেই।</p>
+      )}
+
+      {result?.meta && result.meta.last_page > 1 ? (
+        <div className="mt-6 flex justify-center gap-2 text-sm">
+          {Array.from({ length: result.meta.last_page }, (_, i) => i + 1).map((n) => (
+            <Link
+              key={n}
+              href={`/category/${slug}?page=${n}${sort ? `&sort=${sort}` : ""}`}
+              className={`rounded-lg px-3 py-1.5 ${n === result.meta.current_page ? "bg-slate-900 text-white" : "border border-slate-200"}`}
+            >
+              {n}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}

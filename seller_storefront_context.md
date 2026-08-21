@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** প্ল্যান সম্পন্ন। **S0 ✅ ও S1 ✅ দুটোই implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — নিচে §১৪/§১৫ দেখো। S2-এর অপেক্ষায় (dashboard ফর্মে নতুন ফিল্ড এডিটর)।
+**অবস্থা:** প্ল্যান সম্পন্ন। **S0, S1, S4, S6 — চারটাই implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — visually ভেরিফাই করা হয়েছে `zareen.zyrotechbd.com`-এ। নিচে §১৪-১৬ দেখো। বাকি S2 (dashboard ফিল্ড এডিটর), S3 (checkout backend — কার্ট পেজে এখনো "শীঘ্রই আসছে"), S5 (ফুল হোমপেজ থিম), S7-S9 (রিভিউ/SEO/ট্র্যাকিং)।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -294,3 +294,25 @@ S1 ও S2-এর প্রোডাক্ট-কলাম migration একসা
 **লাইভ ভেরিফাই:** `zareen.zyrotechbd.com`-এ categories/products/product-detail/home চারটাই বাস্তব ডেটা দিয়ে সঠিক রেসপন্স দিয়েছে, ডিজিটাল প্রোডাক্টের (`bsol-connect`) কোনো ডেলিভারি-সংক্রান্ত ফিল্ড leak হয়নি, অজানা সাবডোমেইনে ৪০৪।
 
 **বাকি (S2):** dashboard প্রোডাক্ট ফর্মে নতুন ফিল্ড এডিটর (features bullet list, specifications গ্রুপড টেবিল builder, is_featured/show_in_storefront checkbox, seo_content/warranty_override/delivery_override টেক্সট) — এখনো backend-only, সেলার এখনো UI থেকে এগুলো সেট করতে পারবে না (ডিফল্ট ভ্যালু দিয়েই কাজ করে: সব প্রোডাক্ট show_in_storefront=true, is_featured=false)।
+
+---
+
+## ১৬. S4 + S6 — as-built (২০২৬-০৮-২১, ✅ লাইভ)
+
+User-এর অনুরোধে S2/S3/S5 বাদ দিয়ে সরাসরি S4+S6-এ ঝাঁপ দেওয়া হয়েছে ("visually দেখতে চাই")। `/store` layout, category listing, product detail, search/browse-all, cart — সব লাইভ ও ব্রাউজারে ভেরিফাই করা।
+
+**নতুন frontend ফাইল:**
+- `lib/storefront-client.ts` — টাইপ + fetch হেল্পার (server-side `fetchHome`/`fetchCategories`/`fetchProductDetail`/`fetchProductsServer` host-aware absolute URL দিয়ে; client-side `fetchProductsClient`/`fetchCategoriesClient` **রিলেটিভ `/api`** দিয়ে — নিচে বাগ দেখো)
+- `lib/storefront-cart.tsx` — `CartProvider`/`useCart`, localStorage-based (কোনো ব্যাকএন্ড Cart মডেল নেই, ইচ্ছাকৃতভাবে — §৫.৪), মিক্সড-কার্ট (ফিজিক্যাল+ডিজিটাল) client-side-ই ব্লক করে
+- `components/storefront/{product-card,floating-cart-button,contact-buttons,product-detail-view}.tsx`
+- `app/store/layout.tsx` — CartProvider + মিনি টপ-বার + ফ্লোটিং কার্ট বাটন, সব `/store/*` পেজে শেয়ার্ড
+- `app/store/category/[slug]/page.tsx`, `app/store/product/[slug]/page.tsx`, `app/store/search/page.tsx` (browse-all + ফিল্টার/সর্ট, `useSearchParams()` না — `window.location.search`, established convention মেনে Suspense boundary এড়াতে), `app/store/cart/page.tsx`
+- `/store/page.tsx` (হোমপেজ প্লেসহোল্ডার) আপডেট — "সব প্রোডাক্ট দেখুন" লিংক যোগ, S5-এর আগেই একটা ডিসকভারি পাথ
+
+**Backend সংযোজন:** `home()` এন্ডপয়েন্ট এখন contact info-ও ফেরত দেয় (`phone`, `whatsapp_number` override-অথবা-shop-phone ফলব্যাক, `show_*_button` টগল, `messenger_page_id` — `FacebookPageConnection` থেকে, শুধু status='connected' হলে) — প্রোডাক্ট পেজের Call/WhatsApp/Messenger বাটনের জন্য।
+
+**Real bug ধরা পড়েছে ও ফিক্স হয়েছে (deploy-পরবর্তী, ব্রাউজারে টেস্ট করার সময়):** `/search` পেজে client-side fetch হেল্পার `NEXT_PUBLIC_API_BASE_URL` (absolute, `bsol.{apex}` pinned) ব্যবহার করছিল — storefront পেজ থেকে এই কল করলে platform host-এ hit করত, যেটাকে `LandingPageResolver` explicitly "কোনো শপ নেই" ধরে (§18, `custom_domain_context.md §11.4`), ফলে "কোনো প্রোডাক্ট পাওয়া যায়নি" দেখাচ্ছিল যদিও প্রোডাক্ট আছে। সব public landing-page কম্পোনেন্ট প্লেইন রিলেটিভ `/api/...` ব্যবহার করে ঠিক এই কারণেই — সেই কনভেনশন মিস করাই ভুল ছিল। ফিক্স: client-side fetch-এ hardcoded রিলেটিভ `/api`।
+
+**ভেরিফাই:** ব্রাউজারে (Chrome DevTools MCP) সরাসরি `zareen.zyrotechbd.com`-এ — প্রোডাক্ট ডিটেইল পেজ (গ্যালারি, দাম, quantity, ৫-বাটন অ্যাকশন রো + Call/WhatsApp/Messenger তিনটাই দৃশ্যমান কারণ zareen-এর শপে তিনটাই কনফিগার করা, ৬-ট্যাব + collapsible spec, right-rail sidebar রিলেটেড প্রোডাক্ট সহ), Add to Cart → ফ্লোটিং কার্ট বাটনে badge আপডেট, `/cart` পেজে item persist + qty control + "চেকআউট (শীঘ্রই আসছে)" disabled অবস্থা, `/search` পেজে পূর্ণ ক্যাটালগ গ্রিড + ফিল্টার/সর্ট, `/category/it-items`-এ ব্রেডক্রাম্ব + সঠিক স্টক-স্ট্যাটাস ("স্টক নেই" ঠিকমতো disable করেছে) — সব স্ক্রিনশটে কনফার্ম করা।
+
+**`npx tsc --noEmit`** clean, **`deploy-safe.sh`** (পুরো `next build` সহ) দুইবার সফল (প্রথমবার bug-সহ বিল্ড হয়েছিল, fix-এর পর আবার) — কোনো Suspense-boundary/prerender ব্যর্থতা হয়নি।
