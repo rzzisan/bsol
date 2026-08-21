@@ -251,6 +251,31 @@ class DigitalProductTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
+    public function test_public_landing_page_never_leaks_the_raw_file_path_or_external_url(): void
+    {
+        // external_url IS the paid product for that delivery type — leaking
+        // it on the public page would let anyone download for free without
+        // ever paying. digital_file_path is a private-disk path with no
+        // reason to be public either. product_type stays visible (the
+        // checkout UI needs it to gate COD/shipping for digital carts).
+        $this->shopWithDigitalProduct([
+            'digital_delivery_type' => Product::DIGITAL_DELIVERY_EXTERNAL_URL,
+            'digital_external_url' => 'https://drive.example.com/secret-file',
+            'digital_file_path' => null,
+        ]);
+
+        $response = $this->getJson("https://shopa.{$this->apex()}/api/public/landing-pages/offer");
+
+        $response->assertOk();
+        $product = collect($response->json('data.products'))->first()['product'];
+        $this->assertSame('digital', $product['product_type']);
+        $this->assertArrayNotHasKey('digital_external_url', $product);
+        $this->assertArrayNotHasKey('digital_file_path', $product);
+        $this->assertArrayNotHasKey('digital_file_mime_type', $product);
+        $body = $response->getContent();
+        $this->assertStringNotContainsString('drive.example.com', $body);
+    }
+
     public function test_digital_order_without_email_channel_does_not_require_email(): void
     {
         [, , $product] = $this->shopWithDigitalProduct(['digital_delivery_channels' => ['sms']]);

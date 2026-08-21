@@ -98,6 +98,11 @@ type PublicProduct = {
     thumbnail?: string | null;
     has_variants?: boolean;
     active_variants_count?: number;
+    // digital_product_context.md — external_url/file_path deliberately
+    // withheld from this public payload (LandingPageController::publicShow),
+    // only the type + which channels it delivers through are exposed.
+    product_type?: "physical" | "digital";
+    digital_delivery_channels?: string[] | null;
   } | null;
 };
 
@@ -1086,6 +1091,14 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     ? Number(shipping.inside_dhaka ?? 80)
     : Number(shipping.outside_dhaka ?? shipping.inside_dhaka ?? 120);
   const selectedProducts = products.filter((item) => checkout[item.product_id]?.enabled);
+  // digital_product_context.md §5 — mixed carts are rejected server-side
+  // regardless, but gating the UI on this too means the customer never
+  // even sees a COD/shipping option that would 422 at submit time.
+  const isDigitalCart = selectedProducts.length > 0 && selectedProducts.every((item) => item.product?.product_type === "digital");
+  // Mirrors LandingPageController::publicSubmitOrder()'s email-required
+  // check exactly — only when some selected digital item lists 'email' as
+  // a delivery channel, not for every digital cart.
+  const digitalCartNeedsEmail = isDigitalCart && selectedProducts.some((item) => (item.product?.digital_delivery_channels ?? []).includes("email"));
   const subtotal = selectedProducts.reduce((sum, item) => {
     const quantity = checkout[item.product_id]?.quantity ?? 1;
     const price = getProductPrices(item, checkout[item.product_id]?.resolvedVariant).currentPrice;
@@ -1096,7 +1109,19 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     return sum + (getProductPrices(item, checkout[item.product_id]?.resolvedVariant).originalPrice * quantity);
   }, 0);
   const discountTotal = Math.max(0, originalSubtotal - subtotal);
-  const total = Math.max(0, subtotal + shippingCharge);
+  const effectiveShippingCharge = isDigitalCart ? 0 : shippingCharge;
+  const total = Math.max(0, subtotal + effectiveShippingCharge);
+
+  // COD is hidden for a digital cart (above) — if that was still the
+  // selected method (the default, or left over from switching away from a
+  // physical selection), move to whatever online method is actually on offer.
+  useEffect(() => {
+    if (isDigitalCart && paymentMethod === "cod") {
+      const fallback = walletChannels[0]?.provider ?? gatewayChannels[0]?.provider;
+      if (fallback) setPaymentMethod(fallback);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDigitalCart, paymentMethod, walletChannels, gatewayChannels]);
   const defaultLayoutOrder = ["html_sections", "carousel_images", "features", "faq", "reviews", "products"];
   const layoutOrder = Array.isArray(content.layout_order) && content.layout_order.length > 0
     ? content.layout_order
@@ -1156,7 +1181,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         ...customer,
         custom_fields: customFieldValues,
         checkout_session_id: sessionToken || undefined,
-        shipping_charge: shippingCharge,
+        shipping_charge: effectiveShippingCharge,
         payment_method: paymentMethod,
         items: products.map((item) => ({
           enabled: checkout[item.product_id]?.enabled ?? false,
@@ -1462,7 +1487,13 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                   const needsPick = needsCustomerVariantPick(item);
                   const activeVariant = item.variant ?? draft.resolvedVariant ?? null;
                   const thumbnail = activeVariant?.image_url || product.thumbnail;
-                  const canEnable = !needsPick || Boolean(draft.resolvedVariant);
+                  // Mixed physical+digital cart is rejected server-side
+                  // (digital_product_context.md §5) — block it at the
+                  // checkbox too, rather than letting the customer build an
+                  // invalid cart and only find out at submit.
+                  const cartType = selectedProducts.find((sel) => sel.product_id !== item.product_id)?.product?.product_type;
+                  const crossTypeConflict = !draft.enabled && cartType !== undefined && cartType !== product.product_type;
+                  const canEnable = (!needsPick || Boolean(draft.resolvedVariant)) && !crossTypeConflict;
 
                   return (
                     <article key={`${item.product_id}-${item.sort_order ?? 0}`} className={`rounded-3xl border bg-white p-4 shadow-sm transition ${draft.enabled ? "border-orange-300 ring-1 ring-orange-200" : "border-orange-200"}`}>
@@ -1472,6 +1503,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                             type="checkbox"
                             checked={draft.enabled}
                             disabled={!canEnable}
+                            title={crossTypeConflict ? (language === "bn" ? "ডিজিটাল ও ফিজিকাল প্রোডাক্ট একসাথে অর্ডার করা যাবে না" : "Digital and physical products can't be ordered together") : undefined}
                             onChange={(e) => patchCheckout(item.product_id, { enabled: e.target.checked })}
                             className="h-4 w-4 rounded border-slate-300 accent-[var(--accent)] disabled:opacity-40"
                           />
@@ -1543,7 +1575,18 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               {submitSuccess ? <div className="mt-5 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{submitSuccess}</div> : null}
 
               <div className="mt-6 space-y-5">
-                {checkoutFields.filter((field) => field.key !== "notes").map(renderCheckoutField)}
+                {isDigitalCart ? (
+                  <p className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                    {language === "bn"
+                      ? "এটি একটি ডিজিটাল প্রোডাক্ট — কোনো কুরিয়ার লাগবে না, পেমেন্ট কনফার্ম হওয়ার সাথে সাথেই ডাউনলোড লিংক পাবেন।"
+                      : "This is a digital product — no courier needed, you'll get the download link as soon as payment is confirmed."}
+                  </p>
+                ) : null}
+
+                {checkoutFields
+                  .filter((field) => field.key !== "notes")
+                  .filter((field) => !isDigitalCart || !["customer_address", "customer_district", "customer_thana", "customer_area"].includes(field.key))
+                  .map(renderCheckoutField)}
 
                 {/* Not part of the seller-configurable checkout_fields system —
                     only needed for digital-product orders (email delivery
@@ -1551,35 +1594,40 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                     freely leave it blank. See digital_product_context.md §3. */}
                 <label className="block">
                   <span className="mb-1 block text-sm font-semibold text-slate-700">
-                    {language === "bn" ? "ইমেইল (ডিজিটাল প্রোডাক্টের জন্য প্রয়োজন হতে পারে)" : "Email (may be required for digital products)"}
+                    {digitalCartNeedsEmail
+                      ? (language === "bn" ? "ইমেইল *" : "Email *")
+                      : (language === "bn" ? "ইমেইল (ডিজিটাল প্রোডাক্টের জন্য প্রয়োজন হতে পারে)" : "Email (may be required for digital products)")}
                   </span>
                   <input
                     type="email"
+                    required={digitalCartNeedsEmail}
                     value={customer.customer_email}
                     onChange={(e) => updateCustomer("customer_email", e.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900"
                   />
                 </label>
 
-                <div>
-                  <span className="mb-2 block text-sm font-semibold text-slate-700">Shipping</span>
-                  <div className="space-y-3">
-                    <label className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm transition ${shippingZone === "inside" ? "border-orange-300 bg-orange-50 text-orange-700" : "border-slate-200 bg-white text-slate-700"}`}>
-                      <span className="flex items-center gap-2">
-                        <input type="radio" checked={shippingZone === "inside"} onChange={() => setShippingZone("inside")} />
-                        {t.insideDhaka}
-                      </span>
-                      <strong>{money(shipping.inside_dhaka)}</strong>
-                    </label>
-                    <label className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm transition ${shippingZone === "outside" ? "border-orange-300 bg-orange-50 text-orange-700" : "border-slate-200 bg-white text-slate-700"}`}>
-                      <span className="flex items-center gap-2">
-                        <input type="radio" checked={shippingZone === "outside"} onChange={() => setShippingZone("outside")} />
-                        {t.outsideDhaka}
-                      </span>
-                      <strong>{money(shipping.outside_dhaka)}</strong>
-                    </label>
+                {!isDigitalCart ? (
+                  <div>
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Shipping</span>
+                    <div className="space-y-3">
+                      <label className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm transition ${shippingZone === "inside" ? "border-orange-300 bg-orange-50 text-orange-700" : "border-slate-200 bg-white text-slate-700"}`}>
+                        <span className="flex items-center gap-2">
+                          <input type="radio" checked={shippingZone === "inside"} onChange={() => setShippingZone("inside")} />
+                          {t.insideDhaka}
+                        </span>
+                        <strong>{money(shipping.inside_dhaka)}</strong>
+                      </label>
+                      <label className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm transition ${shippingZone === "outside" ? "border-orange-300 bg-orange-50 text-orange-700" : "border-slate-200 bg-white text-slate-700"}`}>
+                        <span className="flex items-center gap-2">
+                          <input type="radio" checked={shippingZone === "outside"} onChange={() => setShippingZone("outside")} />
+                          {t.outsideDhaka}
+                        </span>
+                        <strong>{money(shipping.outside_dhaka)}</strong>
+                      </label>
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 {(() => {
                   const notesField = checkoutFields.find((field) => field.key === "notes");
@@ -1631,7 +1679,9 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                 <div className="mt-6 space-y-3 border-t border-dashed border-slate-200 pt-4 text-sm text-slate-600">
                   <div className="flex justify-between"><span>Original Price</span><strong>{money(originalSubtotal)}</strong></div>
                   <div className="flex justify-between"><span>Product Discount</span><strong className="text-rose-500">-{money(discountTotal)}</strong></div>
-                  <div className="flex justify-between"><span>Shipping</span><strong>{money(shippingCharge)}</strong></div>
+                  {!isDigitalCart ? (
+                    <div className="flex justify-between"><span>Shipping</span><strong>{money(effectiveShippingCharge)}</strong></div>
+                  ) : null}
                   <div className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-semibold">TOTAL</span><strong style={{ color: theme.primary }}>{money(total)}</strong></div>
                 </div>
               </div>
@@ -1639,7 +1689,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               <div className="lp-card rounded-3xl p-6 sm:p-8">
                 <h3 className="text-lg font-bold" style={{ color: theme.primary }}>Payment Method</h3>
                 <div className="mt-4 space-y-3">
-                  {codEnabled && (
+                  {codEnabled && !isDigitalCart && (
                     <label className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${paymentMethod === "cod" ? "border-orange-300 bg-orange-50" : "border-slate-200 bg-white"}`}>
                       <input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mt-1" />
                       <div>
@@ -1648,6 +1698,17 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                       </div>
                     </label>
                   )}
+                  {/* Digital products need instant, confirmed payment — COD
+                      can't back that (nothing to collect cash against, and
+                      today's COD-confirm path is just an OTP tap, not real
+                      payment). See digital_product_context.md §4. */}
+                  {isDigitalCart && walletChannels.length === 0 && gatewayChannels.length === 0 ? (
+                    <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                      {language === "bn"
+                        ? "ডিজিটাল প্রোডাক্টের জন্য অনলাইন পেমেন্ট প্রয়োজন — এই মুহূর্তে কোনো অনলাইন পেমেন্ট মাধ্যম চালু নেই।"
+                        : "Digital products require online payment — no online payment method is currently available."}
+                    </p>
+                  ) : null}
                   {/* Personal-wallet "send & verify" channels — only the ones
                       this seller actually turned on, from /payment-channels.
                       See online_payment_context.md. */}

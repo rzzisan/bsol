@@ -67,6 +67,23 @@ class LandingPageController extends Controller
             ->with(['template', 'products.product.images', 'products.variant.optionValues.option'])
             ->firstOrFail();
 
+        // Product has no model-level $hidden (the seller's own dashboard
+        // needs every column) — but this is the one place an anonymous
+        // visitor sees the raw row. digital_external_url IS the paid
+        // product itself for external_url deliveries; leaking it here
+        // would let anyone download for free without ever paying.
+        // digital_file_path is a private-disk path, not directly useful,
+        // but no reason to expose server-internal detail either.
+        // product_type/digital_delivery_channels stay visible — the
+        // checkout UI needs them to gate COD/shipping for digital carts.
+        foreach ($page->products as $landingProduct) {
+            $landingProduct->product?->makeHidden([
+                'digital_file_path',
+                'digital_external_url',
+                'digital_file_mime_type',
+            ]);
+        }
+
         return response()->json([
             'success' => true,
             'data' => array_merge($page->toArray(), [
