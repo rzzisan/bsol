@@ -127,6 +127,12 @@ class OnlinePaymentController extends Controller
                 . '/wp-json/bsol-connect/v1/payment-return?wc_order_id=' . urlencode((string) $order->source_ref);
         }
 
+        // Storefront checkout (S3b, seller_storefront_context.md §12) — no
+        // landing page involved, straight to the order confirmation page.
+        if ($order->source === 'storefront') {
+            return FrontendUrl::forUserPath($order->user, "order/{$order->public_token}");
+        }
+
         $page = LandingPage::find((int) $order->source_ref);
         $thankYouPath = $page ? "/{$page->slug}/thank-you?order={$order->id}&token={$order->public_token}" : '/';
 

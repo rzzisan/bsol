@@ -23,8 +23,8 @@ use Illuminate\Support\Str;
  * product's own price directly) and no landing_page_visits conversion
  * tracking applies here.
  *
- * seller_storefront_context.md §6/§12 (S3, COD-only for now — see the
- * class docblock on StorefrontCheckoutController for why).
+ * seller_storefront_context.md §6/§12 (S3, S3b — payment_method is
+ * whatever the checkout validated, COD or an online channel).
  */
 class StorefrontOrderService
 {
@@ -54,7 +54,7 @@ class StorefrontOrderService
                 'source' => 'storefront',
                 'source_ref' => null,
                 'status' => 'pending',
-                'payment_method' => 'cod',
+                'payment_method' => $validated['payment_method'] ?? 'cod',
                 'payment_status' => 'due',
                 'shipping_charge' => (float) ($validated['shipping_charge'] ?? 0),
                 'discount' => 0,

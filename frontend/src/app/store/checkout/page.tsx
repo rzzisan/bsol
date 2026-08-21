@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/lib/storefront-cart";
-import { money, submitCheckout } from "@/lib/storefront-client";
+import {
+  fetchPaymentChannelsClient,
+  initiateGateway,
+  money,
+  submitCheckout,
+  type PaymentChannels,
+} from "@/lib/storefront-client";
 
-/**
- * COD-only for now — see StorefrontCheckoutController's class docblock.
- * A digital-only cart is guarded client-side too (§6/§12, S3) so the
- * customer sees a clear reason instead of a generic backend error.
- */
+const WALLET_LABELS: Record<string, string> = { bkash: "bKash", nagad: "Nagad", rocket: "Rocket" };
+
+/** COD + online payment (S3b) — see StorefrontCheckoutController's class docblock. */
 export default function CheckoutRoute() {
   const router = useRouter();
   const { items, subtotal, clear } = useCart();
@@ -22,12 +26,28 @@ export default function CheckoutRoute() {
     customer_district: "",
     customer_thana: "",
     customer_area: "",
+    customer_email: "",
     notes: "",
   });
+  const [channels, setChannels] = useState<PaymentChannels | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<string>("cod");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isDigitalCart = items.length > 0 && items.every((i) => i.productType === "digital");
+
+  useEffect(() => {
+    fetchPaymentChannelsClient().then((data) => {
+      setChannels(data);
+      if (isDigitalCart) {
+        // COD isn't offered for digital carts — default to the first
+        // available online channel instead.
+        const firstOnline = data?.wallet_channels[0]?.provider ?? data?.gateway_channels[0]?.provider;
+        if (firstOnline) setPaymentMethod(firstOnline);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (items.length === 0) {
     return (
@@ -40,10 +60,11 @@ export default function CheckoutRoute() {
     );
   }
 
-  if (isDigitalCart) {
+  const noOnlineChannels = isDigitalCart && !channels?.wallet_channels.length && !channels?.gateway_channels.length;
+  if (noOnlineChannels) {
     return (
       <div className="mx-auto max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center text-sm text-amber-800">
-        ডিজিটাল প্রোডাক্ট এই মুহূর্তে স্টোরফ্রন্ট থেকে অনলাইন পেমেন্ট ছাড়া কেনা যাচ্ছে না — শীঘ্রই আসছে।
+        ডিজিটাল প্রোডাক্টের জন্য অনলাইন পেমেন্ট এখনো চালু করা হয়নি — সেলারের সাথে যোগাযোগ করুন।
       </div>
     );
   }
@@ -62,17 +83,31 @@ export default function CheckoutRoute() {
       customer_district: form.customer_district || undefined,
       customer_thana: form.customer_thana || undefined,
       customer_area: form.customer_area || undefined,
+      customer_email: form.customer_email || undefined,
       notes: form.notes || undefined,
+      payment_method: paymentMethod,
       items: items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
     });
 
-    setSubmitting(false);
-
     if (!result.ok) {
       setError(result.message);
+      setSubmitting(false);
       return;
     }
 
+    const isGateway = channels?.gateway_channels.some((c) => c.provider === paymentMethod);
+    if (isGateway) {
+      const init = await initiateGateway(result.data.public_token, paymentMethod);
+      if (init.ok) {
+        clear();
+        window.location.href = init.redirect_url;
+        return;
+      }
+      // Order still exists even if the gateway session failed to open —
+      // send the customer to the confirmation page rather than a dead end.
+    }
+
+    setSubmitting(false);
     clear();
     router.push(`/order/${result.data.public_token}`);
   }
@@ -94,7 +129,40 @@ export default function CheckoutRoute() {
           <span>সাবটোটাল</span>
           <span>{money(subtotal)}</span>
         </div>
-        <p className="mt-1 text-xs text-slate-400">পেমেন্ট: ক্যাশ অন ডেলিভারি</p>
+      </div>
+
+      {/* Payment method */}
+      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="mb-2 text-sm font-semibold">পেমেন্ট পদ্ধতি</h2>
+        <div className="space-y-2">
+          {channels?.cod_enabled && !isDigitalCart ? (
+            <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${paymentMethod === "cod" ? "border-slate-900" : "border-slate-200"}`}>
+              <input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} />
+              ক্যাশ অন ডেলিভারি
+            </label>
+          ) : null}
+          {channels?.wallet_channels.map((ch) => (
+            <label
+              key={ch.provider}
+              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${paymentMethod === ch.provider ? "border-slate-900" : "border-slate-200"}`}
+            >
+              <span className="flex items-center gap-2">
+                <input type="radio" checked={paymentMethod === ch.provider} onChange={() => setPaymentMethod(ch.provider)} />
+                {WALLET_LABELS[ch.provider] ?? ch.provider} (Send Money)
+              </span>
+              <span className="text-xs text-slate-400">{ch.number}</span>
+            </label>
+          ))}
+          {channels?.gateway_channels.map((ch) => (
+            <label
+              key={ch.provider}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm capitalize ${paymentMethod === ch.provider ? "border-slate-900" : "border-slate-200"}`}
+            >
+              <input type="radio" checked={paymentMethod === ch.provider} onChange={() => setPaymentMethod(ch.provider)} />
+              {ch.provider}
+            </label>
+          ))}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
@@ -140,6 +208,15 @@ export default function CheckoutRoute() {
           onChange={(e) => setField("customer_area", e.target.value)}
           className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
         />
+        {isDigitalCart ? (
+          <input
+            type="email"
+            placeholder="ইমেইল (ডিজিটাল প্রোডাক্টের জন্য প্রয়োজন হতে পারে)"
+            value={form.customer_email}
+            onChange={(e) => setField("customer_email", e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          />
+        ) : null}
         <textarea
           rows={2}
           placeholder="অতিরিক্ত নোট (ঐচ্ছিক)"
@@ -155,7 +232,7 @@ export default function CheckoutRoute() {
           disabled={submitting}
           className="w-full rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
         >
-          {submitting ? "অর্ডার হচ্ছে..." : "অর্ডার কনফার্ম করুন (COD)"}
+          {submitting ? "অর্ডার হচ্ছে..." : "অর্ডার কনফার্ম করুন"}
         </button>
       </form>
     </div>

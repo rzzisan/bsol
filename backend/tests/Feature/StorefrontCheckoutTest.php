@@ -138,7 +138,8 @@ class StorefrontCheckoutTest extends TestCase
         $this->assertStringContainsString('একসাথে', $response->json('errors.items.0'));
     }
 
-    public function test_rejects_digital_only_cart_since_cod_is_the_only_option(): void
+    /** payment_method defaults to 'cod' when omitted — see StorefrontPaymentTest for the online-payment path (S3b). */
+    public function test_rejects_digital_cart_on_cod_default(): void
     {
         $a = $this->seller('shopa');
         $digital = $this->product($a, [

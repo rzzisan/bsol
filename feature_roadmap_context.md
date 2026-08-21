@@ -43,7 +43,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 6 | Custom domain সাপোর্ট (landing pages) | 🟡 আংশিক — per-seller সাবডোমেইন অংশ ✅ সম্পন্ন (উপরে); সেলারের **নিজস্ব** ডোমেইন (T8b, `custom_domain_context.md §11` আইটেম ৩) এখনো শুরু হয়নি | `custom_domain_context.md` |
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
 | 8 | ডিজিটাল প্রোডাক্ট সিস্টেম (instant delivery, নিজস্ব হোস্টিং) | ✅ Phase 1 সম্পন্ন ও লাইভ (২০২৬-০৮-২০) | `digital_product_context.md` |
-| 9 | সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) | 🟡 S0-S6 (S0/S1/S2/S3/S4/S5/S6) ✅ সবগুলো লাইভ, real হোমপেজ + order দিয়ে end-to-end ভেরিফাইড (২০২৬-০৮-২১) — বাকি S7-S9 (রিভিউ/SEO/ট্র্যাকিং), S3b (অনলাইন পেমেন্ট) | `seller_storefront_context.md` |
+| 9 | সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) | 🟡 S0-S6 + S3b ✅ সবগুলো লাইভ, real হোমপেজ + COD/bKash order দিয়ে end-to-end ভেরিফাইড (২০২৬-০৮-২১) — বাকি S7 (রিভিউ), S8 (SEO), S9 (ট্র্যাকিং) | `seller_storefront_context.md` |
 | — | Bulk/CSV order import | ⬜ Not started | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
 | — | PWA | ⬜ Not started | (§16.9) |
 | — | Referral/affiliate program (সেলার→সেলার) | ⬜ Not started | — |

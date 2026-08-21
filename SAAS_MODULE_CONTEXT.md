@@ -1249,4 +1249,6 @@ Cart client-side (`localStorage`, origin-scoped — auth টোকেনের �
 
 **S5 ✅ লাইভ:** পূর্ণাঙ্গ হোমপেজ (hero banner, Featured Categories, Top Selling, প্রতি-ক্যাটাগরি প্রোডাক্ট রো, About, পার্টনার লোগো), dashboard-এ থিম/ব্যানার/লোগো ম্যানেজার (multipart আপলোড এন্ডপয়েন্ট, `ProductGalleryManager`-এর প্যাটার্ন), ক্যাটাগরি নেভ বার + ফুটার + Login/Register placeholder। একটা টেস্টিং-এনভায়রনমেন্ট সমস্যা (stale root-owned `storage/framework/testing/disks/public/product-media`, `ProductMediaApiTest`-এর একই known issue) সমাধান করে নতুন টেস্ট লেখা হয়েছে (`Storage::fake()`-এর বদলে ম্যানুয়াল fresh scratch dir)। real ব্যানার/লোগো আপলোড করে `zareen.zyrotechbd.com`-এ পূর্ণ হোমপেজ ব্রাউজারে ভেরিফাই করা হয়েছে।
 
-বিস্তারিত `seller_storefront_context.md §১৭-১৯`। বাকি S7-S9 (রিভিউ, SEO, ট্র্যাকিং), S3b (storefront অনলাইন পেমেন্ট)।
+**S3b ✅ লাইভ:** storefront checkout-এ অনলাইন পেমেন্ট — `OnlinePaymentService`-এর কোনো পরিবর্তন লাগেনি (আগে থেকেই plain Order-ভিত্তিক), নতুন `StorefrontPaymentController` শুধু host-resolved controller-level wiring। ডিজিটাল কার্টে এখন শুধু COD ব্লকড, অনলাইন পেমেন্ট (wallet/gateway) দিয়ে কেনা যায়। real bKash অর্ডার + wallet-claim `zareen.zyrotechbd.com`-এ DB-তে verify করা হয়েছে।
+
+বিস্তারিত `seller_storefront_context.md §১৭-২০`। বাকি S7 (রিভিউ), S8 (SEO), S9 (ট্র্যাকিং)।

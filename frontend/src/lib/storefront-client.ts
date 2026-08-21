@@ -193,6 +193,7 @@ export type CheckoutPayload = {
   customer_area?: string;
   customer_email?: string;
   notes?: string;
+  payment_method?: string;
   items: Array<{ product_id: number; quantity: number; product_variant_id?: number }>;
 };
 
@@ -239,4 +240,52 @@ export function fetchOrderClient(token: string) {
 
 export function fetchOrderServer(baseUrl: string, token: string) {
   return getJsonServer<StorefrontOrder>(baseUrl, `/public/storefront/orders/${encodeURIComponent(token)}`);
+}
+
+// ── Online payment (S3b) ──
+
+export type WalletChannel = { provider: "bkash" | "nagad" | "rocket"; number: string };
+export type GatewayChannel = { provider: string };
+export type PaymentChannels = { cod_enabled: boolean; wallet_channels: WalletChannel[]; gateway_channels: GatewayChannel[] };
+
+export function fetchPaymentChannelsClient() {
+  return getJson<PaymentChannels>("/public/storefront/payment-channels");
+}
+
+export async function initiateGateway(
+  token: string,
+  provider: string,
+): Promise<{ ok: true; redirect_url: string } | { ok: false; message: string }> {
+  try {
+    const res = await fetch(`${API}/public/storefront/orders/${encodeURIComponent(token)}/gateway/initiate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.data?.redirect_url) {
+      return { ok: false, message: json?.message ?? "Could not start payment." };
+    }
+    return { ok: true, redirect_url: json.data.redirect_url };
+  } catch {
+    return { ok: false, message: "Could not start payment." };
+  }
+}
+
+export async function submitWalletClaim(
+  token: string,
+  payload: { provider: string; sender_number: string; customer_trx_id: string },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const res = await fetch(`${API}/public/storefront/orders/${encodeURIComponent(token)}/wallet-claim`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, message: json?.message ?? "Could not submit payment info." };
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "Could not submit payment info." };
+  }
 }

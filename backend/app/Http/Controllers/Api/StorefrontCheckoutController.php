@@ -4,24 +4,23 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\PaymentGatewayCredential;
 use App\Models\Product;
 use App\Services\StorefrontOrderService;
 use App\Support\CheckoutFieldResolver;
 use App\Support\LandingPageResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
- * Storefront cart checkout. seller_storefront_context.md §6/§12 (S3).
+ * Storefront cart checkout. seller_storefront_context.md §6/§12 (S3, S3b).
  *
- * COD-only for now, deliberately: the online-payment channels
- * (OnlinePaymentController's wallet-claim/gateway-initiate flow) are tied
- * to a landing page ({slug} in the URL, page-level channel config) —
- * generalizing that whole surface to be storefront-compatible is a
- * separate, larger pass (its own S3b), not bundled into this one. A
- * digital-only cart therefore can't check out here yet either, since COD
- * is blocked for digital products (no online-payment option exists to
- * fall back to) — see the digital-only-cart guard below.
+ * Online payment (wallet_manual + gateway_auto) added in S3b —
+ * StorefrontPaymentController reuses OnlinePaymentService as-is (it was
+ * already Order-based, not landing-page-specific) for channel listing,
+ * gateway initiate, and wallet-claim submission. Same COD-blocked-for-
+ * digital rule as landing-page checkout — see the guard below.
  */
 class StorefrontCheckoutController extends Controller
 {
@@ -42,6 +41,7 @@ class StorefrontCheckoutController extends Controller
             [
                 'shipping_charge' => ['nullable', 'numeric', 'min:0'],
                 'customer_email' => ['nullable', 'email', 'max:255'],
+                'payment_method' => ['nullable', Rule::in(array_merge(['cod', 'bkash', 'nagad', 'rocket'], PaymentGatewayCredential::PROVIDERS))],
                 'items' => ['required', 'array', 'min:1'],
                 'items.*.product_id' => ['required', 'integer'],
                 'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
@@ -79,13 +79,29 @@ class StorefrontCheckoutController extends Controller
             return response()->json(['success' => false, 'message' => $message, 'errors' => ['items' => [$message]]], 422);
         }
 
-        // COD-only checkout (see class docblock) means a digital-only cart
-        // has nothing to pay with yet — block it here with an explicit
-        // reason rather than silently accepting an order that can never be
-        // paid/delivered.
+        // COD makes no sense for digital products — no courier to collect
+        // cash against. Same rule as landing-page checkout
+        // (digital_product_context.md §4); an online payment channel is now
+        // available (S3b) so this only blocks COD specifically, not every
+        // digital-cart checkout.
+        if ($productTypes->first() === Product::TYPE_DIGITAL && ($validated['payment_method'] ?? 'cod') === 'cod') {
+            $message = 'ডিজিটাল প্রোডাক্টে ক্যাশ অন ডেলিভারি পাওয়া যাবে না — অনলাইনে পেমেন্ট করুন।';
+            return response()->json(['success' => false, 'message' => $message, 'errors' => ['payment_method' => [$message]]], 422);
+        }
+
+        // A digital-only cart needs an email whenever any item has 'email'
+        // configured as a delivery channel — same rule as landing-page
+        // checkout (digital_product_context.md §3).
         if ($productTypes->first() === Product::TYPE_DIGITAL) {
-            $message = 'ডিজিটাল প্রোডাক্ট এই মুহূর্তে স্টোরফ্রন্ট থেকে অনলাইন পেমেন্ট ছাড়া কেনা যাচ্ছে না — শীঘ্রই আসছে।';
-            return response()->json(['success' => false, 'message' => $message, 'errors' => ['items' => [$message]]], 422);
+            $needsEmail = $lineItems->contains(function ($item) use ($products) {
+                $channels = $products->get((int) $item['product_id'])?->digital_delivery_channels ?? [];
+                return in_array('email', (array) $channels, true);
+            });
+
+            if ($needsEmail && blank($validated['customer_email'] ?? null)) {
+                $message = 'এই ডিজিটাল প্রোডাক্টটি পেতে একটি ইমেইল ঠিকানা প্রয়োজন।';
+                return response()->json(['success' => false, 'message' => $message, 'errors' => ['customer_email' => [$message]]], 422);
+            }
         }
 
         $order = app(StorefrontOrderService::class)->create($ownerId, $shopUserIds, $validated, $lineItems, $products->all());

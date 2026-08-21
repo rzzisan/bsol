@@ -82,6 +82,7 @@ use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\ShopProfileController;
 use App\Http\Controllers\Api\StorefrontCatalogController;
 use App\Http\Controllers\Api\StorefrontCheckoutController;
+use App\Http\Controllers\Api\StorefrontPaymentController;
 use App\Http\Controllers\Api\StorefrontSettingController;
 use App\Http\Controllers\Api\StickerTemplateController;
 use App\Http\Controllers\Api\WordpressApiKeyController;
@@ -225,13 +226,20 @@ Route::prefix('public/storefront')->middleware('throttle:60,1')->group(function 
     Route::get('/products', [StorefrontCatalogController::class, 'products']);
     Route::get('/products/{slug}', [StorefrontCatalogController::class, 'show']);
     Route::get('/orders/{token}', [StorefrontCheckoutController::class, 'showOrder']);
+    Route::get('/payment-channels', [StorefrontPaymentController::class, 'channels']);
 });
 
 // Cart checkout submission — tighter throttle than the read-only catalog
 // group above, matches /public/landing-pages/{slug}/order's own 15/min.
-// seller_storefront_context.md §6/§12 (S3, COD-only).
+// seller_storefront_context.md §6/§12 (S3, S3b).
 Route::post('/public/storefront/orders', [StorefrontCheckoutController::class, 'submitOrder'])
     ->middleware('throttle:15,1');
+
+// Online payment (S3b) — same throttle as the order-submit route above.
+Route::prefix('public/storefront/orders/{token}')->middleware('throttle:15,1')->group(function () {
+    Route::post('/gateway/initiate', [StorefrontPaymentController::class, 'initiateGateway']);
+    Route::post('/wallet-claim', [StorefrontPaymentController::class, 'submitWalletClaim']);
+});
 
 // Meta webhook — called directly by Facebook, not by our frontend. Auth
 // boundary is the verify-token handshake (GET) / X-Hub-Signature-256 HMAC

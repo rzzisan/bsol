@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** প্ল্যান সম্পন্ন। **S0-S6-এর মধ্যে S0/S1/S2/S3/S4/S5/S6 — সবগুলো implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — real ব্যানার/পার্টনার-লোগো/about-image আপলোড + একটা real order দিয়ে `zareen.zyrotechbd.com`-এ end-to-end ব্রাউজারে যাচাই করা হয়েছে। নিচে §১৪-১৯ দেখো। বাকি S7-S9 (রিভিউ/SEO/ট্র্যাকিং), S3b (storefront online payment)।
+**অবস্থা:** প্ল্যান সম্পন্ন। **S0-S6 + S3b — সবগুলো implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — real ব্যানার/পার্টনার-লোগো/about-image আপলোড, real COD ও bKash অর্ডার, দুটোই `zareen.zyrotechbd.com`-এ যাচাই করা হয়েছে। নিচে §১৪-২০ দেখো। বাকি S7 (রিভিউ), S8 (SEO), S9 (ট্র্যাকিং)।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -380,3 +380,23 @@ Dashboard প্রোডাক্ট ডিটেইল পেজে (`app/dash
 **ভেরিফাই:** নতুন `StorefrontSettingTest.php` (৭টা: থিম/পলিসি টেক্সট সেভ, banner আপলোড+রিমুভ, partner-logo আপলোড+রিমুভ, about-image আপলোড+replace-deletes-old-file+রিমুভ, generic update-এ banner/about-image silently ignored হওয়ার নিশ্চয়তা, landing-page homepage-mode ভ্যালিডেশন, staff owner_only ব্লক)। **পরিবেশগত সমস্যা সমাধান করে টেস্ট লেখা হয়েছে** — এই পরিবেশে `storage/framework/testing/disks/public/product-media` একটা stale root-owned ডিরেক্টরি (ProductMediaApiTest-এর একই known baseline issue), `Storage::fake('public')` তাই crash করে; সমাধান: টেস্টে সরাসরি 'public' disk-এর root একটা fresh unique scratch ডিরেক্টরিতে পয়েন্ট করা, `Storage::fake()`-এর ভাঙা cleanup ধাপ এড়িয়ে। সব ৭টা pass। ফুল স্যুট ৪৬৬ pass (৩টা known baseline failure অপরিবর্তিত)।
 
 **লাইভ ব্রাউজার ভেরিফাই (`zareen.zyrotechbd.com`):** temporary token দিয়ে real ব্যানার/পার্টনার-লোগো/about-image আপলোড করা হয়েছে (multipart, curl দিয়ে), থিম কালার/ফিচারড ক্যাটাগরি/about টেক্সট/warranty-delivery টেক্সট সেট করা হয়েছে — homepage-এ সবকিছু সঠিকভাবে রেন্ডার হয়েছে স্ক্রিনশটে: সবুজ hero banner, থিম-কালার্ড ফিচারড-ক্যাটাগরি আইকন, Top Selling গ্রিড, "হারবাল"/"IT items" ক্যাটাগরি রো + See All, About সেকশন (টেক্সট+ইমেজ), partner logo strip, ফুটার।
+
+---
+
+## ২০. S3b — as-built (২০২৬-০৮-২১, ✅ লাইভ)
+
+Storefront checkout-এ অনলাইন পেমেন্ট যোগ হলো — `OnlinePaymentService`-এর **কোনো পরিবর্তন লাগেনি**, ওটা আগে থেকেই plain `Order` নিয়ে কাজ করত, landing-page-নির্দিষ্ট কিছু ছিল না। শুধু কন্ট্রোলার-লেভেল resolution (page slug-এর বদলে host, per-page channel narrowing নেই কারণ storefront-এর কোনো "page" নেই) নতুন।
+
+**Backend:**
+- নতুন `StorefrontPaymentController` — `GET /public/storefront/payment-channels`, `POST /public/storefront/orders/{token}/gateway/initiate`, `POST /public/storefront/orders/{token}/wallet-claim` — token-in-URL সরাসরি lookup, `OnlinePaymentService` সরাসরি reuse
+- `StorefrontCheckoutController::submitOrder()`-এ `payment_method` ভ্যালিডেশন যোগ হলো (cod + bkash/nagad/rocket + ৭টা gateway provider) — ডিজিটাল কার্টে শুধু COD ব্লকড (আগের মতো ব্লানকেট ব্লক না), email-required-for-digital-with-email-channel চেকও যোগ হলো (landing-page checkout-এর একই নিয়ম)
+- `OnlinePaymentController::resolveRedirectUrl()`-এ storefront ব্রাঞ্চ যোগ হলো (gateway callback/IPN — provider-প্রতি একটাই শেয়ার্ড URL, source-agnostic — storefront অর্ডার হলে `/order/{token}`-এ রিডাইরেক্ট)
+- `StorefrontOrderService::create()` এখন hardcoded 'cod'-এর বদলে validated `payment_method` ব্যবহার করে
+
+**Frontend:**
+- `/store/checkout` — পেমেন্ট-পদ্ধতি সিলেকশন (COD + wallet channels + gateway channels, `/payment-channels` থেকে fetched), ডিজিটাল কার্টে COD hide হয়ে যায় + প্রথম available অনলাইন চ্যানেল ডিফল্ট সিলেক্ট হয়, ইমেইল ফিল্ড ডিজিটাল কার্টে দেখায়। Gateway channel সিলেক্ট করলে সাবমিটের পর provider-এর hosted checkout-এ রিডাইরেক্ট
+- `/store/order/[token]` — `WalletClaimCard` (নতুন কম্পোনেন্ট, thank-you-view.tsx-এর WalletClaimCard-এর storefront সংস্করণ) — payment_method wallet provider হলে ও payment_status !== 'paid' হলে sender-number+TrxID ফর্ম দেখায়
+
+**ভেরিফাই:** নতুন `StorefrontPaymentTest.php` (৫টা: channels endpoint, digital-cart COD-blocked-কিন্তু-online-allowed, wallet claim submission, cross-shop token ৪০৪, gateway initiate — SSLCommerz-এর `Http::fake()` দিয়ে, `OnlinePaymentGatewayTest.php`-এর একই প্যাটার্ন) — সব pass। `StorefrontCheckoutTest.php`-এর ডিজিটাল-cod টেস্টের নাম/মন্তব্য আপডেট করা হয়েছে (আর "cod is the only option" সত্যি না)। ফুল স্যুট ৪৭৪+ pass (৩টা known baseline failure অপরিবর্তিত)।
+
+**লাইভ ভেরিফাই (`zareen.zyrotechbd.com`, curl + direct DB check — ব্রাউজার এক্সটেনশন এই মুহূর্তে সাময়িকভাবে ডিসকানেক্টেড ছিল):** `/payment-channels` real ডেটা দেখিয়েছে (zareen-এর bKash/Nagad wallet + ৬টা real gateway credential কনফিগার করা!), ডিজিটাল প্রোডাক্ট (Bsol-Connect) `payment_method=bkash` দিয়ে অর্ডার তৈরি হয়েছে (`ORD-20260821-0008`), `/order/{token}` পেজের SSR HTML-এ ওয়ালেট-ক্লেইম ফর্ম সঠিক placeholder সহ উপস্থিত, wallet-claim সাবমিট করে `OrderOnlinePayment` রো তৈরি হয়েছে (`status: awaiting_verification`, `channel_type: wallet_manual`) — DB-তে সরাসরি কনফার্ম করা।
