@@ -199,7 +199,19 @@ Phase 1-এ যা থাকবে: expiring signed link + download-count cap + 
 ## ১৩. Frontend as-built
 
 - `dashboard/products/page.tsx` (কুইক অ্যাড মোডাল) + `dashboard/products/[id]/page.tsx` (ডিটেইল পেজ) — `product_type` রেডিও টগল দুই জায়গাতেই; ডিটেইল পেজে প্রোডাক্ট digital হলে নতুন "Digital Delivery" সেকশন (delivery type রেডিও, hosted-file আপলোড/রিমুভ উইজেট বা external URL ইনপুট, email/sms চ্যানেল চেকবক্স)।
-- `components/public-landing-page-view.tsx` — checkout ফর্মে static `customer_email` ইনপুট যোগ (dynamic `CheckoutFieldResolver` সিস্টেমের বাইরে, সবসময় optional দেখায়, backend প্রয়োজন হলে 422 দিয়ে জানায়)। **জানা সীমাবদ্ধতা:** COD অপশন প্রোঅ্যাক্টিভলি হাইড হয় না (public product payload-এ `product_type` এখনো এক্সপোজড না) — কাস্টমার COD বেছে সাবমিট করলে backend স্পষ্ট বাংলা এরর দেখায়, সিলেক্ট করার আগে না। ভবিষ্যতে improve করা যায়।
+- `components/public-landing-page-view.tsx` — checkout ফর্মে static `customer_email` ইনপুট যোগ (dynamic `CheckoutFieldResolver` সিস্টেমের বাইরে)।
+
+## ১৪. UX ফলো-আপ (২০২৬-০৮-২০, ৩) — checkout UX সম্পূর্ণ + একটা real leak ফিক্স
+
+**checkout UX shortcut আর নেই** — `LandingPageController::publicShow()`-এ `product_type`/`digital_delivery_channels` এক্সপোজ করে ফ্রন্টএন্ডে ব্যবহার করা হয়েছে:
+- ডিজিটাল-অনলি কার্টে COD অপশন প্রোঅ্যাক্টিভলি হাইড (আগে শুধু submit-এ backend reject করত)।
+- shipping zone picker + shipping charge হাইড/জিরো ডিজিটাল-অনলি কার্টে।
+- address/district/thana/area ফিল্ড ডিজিটাল-অনলি কার্টে স্কিপ; email ফিল্ড শুধু তখনই "*"-required দেখায় যখন সিলেক্টেড প্রোডাক্ট আসলেই `email` চ্যানেল ব্যবহার করে (backend-এর শর্তের সাথে হুবহু মিলিয়ে)।
+- প্রোডাক্ট চেকবক্সে cross-type conflict ব্লক করা হয়েছে — physical+digital মেশানো cart বানানোর চেষ্টাই disabled checkbox + tooltip দিয়ে আটকে দেয়, submit-এ গিয়ে fail করতে হয় না।
+
+**🔴 এই কাজ করতে গিয়ে একটা real security bug ধরা পড়েছে ও ফিক্স হয়েছে:** `product_type` এক্সপোজ করার জন্য `publicShow()` টাচ করতে গিয়ে দেখা গেছে **`Product` মডেলের কোনো `$hidden` ছিল না**, ফলে পাবলিক ল্যান্ডিং পেজ JSON-এ **`digital_external_url` এবং `digital_file_path` দুটোই যেকোনো ভিজিটরের কাছে খোলা ছিল** — `external_url` ডেলিভারি টাইপের প্রোডাক্টে এটাই আসল কেনা জিনিস, মানে টাকা না দিয়েই যে কেউ ডাউনলোড লিংক পেয়ে যেত। ফিক্স: `publicShow()`-এ শুধু public serialization-এর সময় `$product->makeHidden([...])` কল (সেলারের নিজের ড্যাশবোর্ড রেসপন্সে প্রভাব পড়ে না, ওখানে ফুল অ্যাক্সেস লাগে)। Regression test যোগ হয়েছে (`test_public_landing_page_never_leaks_the_raw_file_path_or_external_url`)।
+
+**যাচাই:** `DigitalProductTest.php` এখন ১৯টা (আগে ১৮), সব pass। ফুল স্যুট ৪৪৩ passed (আগের ৩টা বেসলাইন ফেইলিউর ছাড়া কিছু না)। `tsc --noEmit` clean, `deploy-safe.sh` সফল, প্রোডাকশনে লাইভ smoke check pass।
 - `components/thank-you-view.tsx` — `order.digital_deliveries` থাকলে "ডাউনলোড লিংক" কার্ড দেখায় (প্রতিটা `/d/{token}`-এ লিংক করা)।
 - **নতুন `app/d/[token]/page.tsx`** — পাবলিক ডাউনলোড পেজ (client-side): status লোড → OTP লাগলে "কোড পাঠান" → কোড ভেরিফাই → ডাউনলোড বাটন (`GET /api/public/digital-deliveries/{token}/download`, ব্রাউজার সরাসরি ফাইল নামায়)। external_url ডেলিভারিতে সরাসরি ডাউনলোড বাটন (OTP ছাড়াই)।
 - `app/admin/settings/digital-products/page.tsx` (নতুন, `product-media` সেটিংস পেজের হুবহু ক্লোন) + `lib/admin-menu.ts`-এ নতুন `digitalProductSettings` মেনু এন্ট্রি।
