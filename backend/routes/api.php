@@ -80,6 +80,7 @@ use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductVariantController;
 use App\Http\Controllers\Api\ShopProfileController;
+use App\Http\Controllers\Api\StorefrontSettingController;
 use App\Http\Controllers\Api\StickerTemplateController;
 use App\Http\Controllers\Api\WordpressApiKeyController;
 use App\Http\Controllers\LandingPageAnalyticsController;
@@ -524,6 +525,14 @@ Route::middleware('active_subscription')->group(function () {
             ->middleware('throttle:30,1');
         Route::put('/shop-profile/subdomain', [ShopProfileController::class, 'setSubdomain']);
         Route::delete('/shop-profile/subdomain', [ShopProfileController::class, 'releaseSubdomain']);
+    });
+
+    // ── Storefront settings (homepage mode + theme) ────────────────────────
+    // Pattern B, owner-only — mirrors Shop Profile above.
+    // seller_storefront_context.md §5.1/§12 (S0).
+    Route::middleware('owner_only')->group(function () {
+        Route::get('/storefront-settings', [StorefrontSettingController::class, 'show']);
+        Route::put('/storefront-settings', [StorefrontSettingController::class, 'update']);
     });
 
     // ── Sticker Template (default label design + per-courier overrides) ───────

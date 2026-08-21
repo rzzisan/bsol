@@ -30,7 +30,12 @@ const NEGATIVE_TTL_MS = 60 * 1000;
 // costs one resolver call every few minutes rather than one per request.
 // Proxy runs before the data cache, so fetch's own caching options are
 // documented as having no effect here — this has to be done by hand.
-type Resolution = { exists: boolean; movedTo: string | null };
+type Resolution = {
+  exists: boolean;
+  movedTo: string | null;
+  homepageMode: "storefront" | "landing_page";
+  homepageLandingSlug: string | null;
+};
 
 const cache = new Map<string, Resolution & { until: number }>();
 
@@ -61,9 +66,12 @@ async function resolveShop(label: string): Promise<Resolution> {
     });
 
     const body = await res.json().catch(() => ({}));
+    const data = body?.data ?? {};
     const resolution: Resolution = {
       exists: res.ok,
       movedTo: typeof body?.moved_to === "string" ? body.moved_to : null,
+      homepageMode: data?.homepage_mode === "landing_page" ? "landing_page" : "storefront",
+      homepageLandingSlug: typeof data?.homepage_landing_slug === "string" ? data.homepage_landing_slug : null,
     };
 
     cache.set(label, {
@@ -76,7 +84,11 @@ async function resolveShop(label: string): Promise<Resolution> {
     // Fail open, matching how every other storefront-facing remote check in
     // this codebase behaves: a backend blip must not take every seller's
     // dashboard offline. Not cached, so it retries on the next request.
-    return { exists: true, movedTo: null };
+    // homepageMode falls back to storefront — the safer of the two on a
+    // backend blip, since /store never contains a login form (§9 rule 2/3
+    // in custom_domain_context.md) while a picked landing page might be
+    // unreachable to verify right now.
+    return { exists: true, movedTo: null, homepageMode: "storefront", homepageLandingSlug: null };
   }
 }
 
@@ -111,7 +123,29 @@ const APP_PATHS = new Set([
   "forgot-password",
   "verify-email",
   "verify-phone",
+  // Reserved for the storefront (seller_storefront_context.md §4/§12, S0).
+  // "category"/"product"/"cart"/"checkout"/"search" are rewritten to /store/*
+  // below (STOREFRONT_PATHS); "products"/"wishlist"/"account"/"shop" have no
+  // page yet but are reserved now so a landing page can never claim them —
+  // same precedent as "store" itself, reserved ahead of being built.
+  "category",
+  "product",
+  "products",
+  "cart",
+  "checkout",
+  "search",
+  "wishlist",
+  "account",
+  "shop",
 ]);
+
+/**
+ * First path segment -> rewritten under /store/* (the storefront's internal
+ * render target, same relationship /lp/{slug} has to a landing page's own
+ * address). Only the segments with a real S0+ page target belong here —
+ * the rest of APP_PATHS above is reserved-but-not-yet-built.
+ */
+const STOREFRONT_PATHS = new Set(["category", "product", "cart", "checkout", "search"]);
 
 /**
  * True for `/offer` and `/offer/thank-you`, false for `/`, `/dashboard/...`
@@ -131,10 +165,13 @@ function isLandingSlugPath(pathname: string): boolean {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // /lp/ is the internal render target the rewrite below points at, not a
-  // public address — landing pages live only on their seller's own host.
-  // Blocking it here is safe because a rewrite does not re-enter the proxy.
-  if (pathname === "/lp" || pathname.startsWith("/lp/")) {
+  // /lp/ and /store/ are internal render targets the rewrites below point
+  // at, not public addresses — landing pages live at their own slug, the
+  // storefront lives at `/`. Blocking direct hits here also keeps each one
+  // indexable at exactly one URL (duplicate-content concern noted in
+  // custom_domain_context.md §14). Safe because a rewrite does not re-enter
+  // the proxy.
+  if (pathname === "/lp" || pathname.startsWith("/lp/") || pathname === "/store" || pathname.startsWith("/store/")) {
     return new NextResponse(null, { status: 404 });
   }
 
@@ -175,13 +212,31 @@ export async function proxy(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.set(SHOP_HEADER, label);
 
-  // The platform home carries the sign-in form, and this origin also serves
-  // the shop's own landing-page HTML — so a password typed here would be
-  // typed into markup the shop controls. Send it to the platform instead.
-  // The API refuses a foreign-subdomain sign-in as well; this just stops the
-  // credential ever being entered (domain_security_audit.md M-3).
+  // Root path: the storefront home by default, or a landing page the
+  // seller picked (seller_storefront_context.md §4). Neither one carries a
+  // sign-in form, so — unlike the old unconditional redirect to the
+  // platform host this replaces — rendering either on the seller's own
+  // origin doesn't reopen the credential-typed-into-shop-controlled-markup
+  // risk from domain_security_audit.md M-3 (§9 rule 2/3 still holds: the
+  // *login form itself* never renders here, only /dashboard's shell, which
+  // is un-routable without an existing token).
   if (pathname === "/") {
-    return NextResponse.redirect(new URL("/", `https://${PLATFORM_HOST}`), 302);
+    if (shop.homepageMode === "landing_page" && shop.homepageLandingSlug) {
+      const rewritten = new URL(`/lp/${shop.homepageLandingSlug}`, request.url);
+      return NextResponse.rewrite(rewritten, { request: { headers } });
+    }
+
+    return NextResponse.rewrite(new URL("/store", request.url), { request: { headers } });
+  }
+
+  // /category/*, /product/*, /cart, /checkout, /search -> the storefront's
+  // internal render target, same relationship /lp/{slug} has below.
+  const firstSegment = pathname.split("/").filter(Boolean)[0];
+  if (firstSegment && STOREFRONT_PATHS.has(firstSegment)) {
+    const rewritten = new URL(`/store${pathname}`, request.url);
+    rewritten.search = request.nextUrl.search;
+
+    return NextResponse.rewrite(rewritten, { request: { headers } });
   }
 
   // seller1.<apex>/offer renders the landing page route. A rewrite, not a

@@ -243,12 +243,22 @@ class ShopProfileController extends Controller
             ], 404);
         }
 
+        // homepage_mode drives proxy.ts's root-path rewrite (`/` -> the
+        // seller's chosen landing page, or the storefront home) — bundled
+        // into this same call so the proxy doesn't need a second round
+        // trip. See seller_storefront_context.md §4/§12 (S0).
+        $storefront = \App\Models\StorefrontSetting::where('user_id', $profile->user_id)->first();
+        $homepageMode = $storefront?->homepage_mode ?? \App\Models\StorefrontSetting::HOMEPAGE_STOREFRONT;
+        $homepageLandingSlug = $storefront?->resolveHomepageLandingSlug();
+
         return response()->json([
             'success' => true,
             'data' => [
                 'subdomain' => $profile->subdomain,
                 'shop_name' => $profile->shop_name,
                 'logo_url' => $profile->logo_url,
+                'homepage_mode' => $homepageLandingSlug ? $homepageMode : \App\Models\StorefrontSetting::HOMEPAGE_STOREFRONT,
+                'homepage_landing_slug' => $homepageLandingSlug,
             ],
         ]);
     }

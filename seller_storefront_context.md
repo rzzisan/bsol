@@ -1,6 +1,6 @@
 # BSOL — সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান
 
-**অবস্থা:** ফিজিবিলিটি যাচাই + ফেজ প্ল্যান সম্পন্ন, ৩টা open question resolved, দ্বিতীয় রেফারেন্স ডিজাইন (স্পেক-হেভি ইলেকট্রনিক্স-স্টাইল প্রোডাক্ট পেজ) থেকে প্রোডাক্ট-ডিটেইল স্কোপ বিস্তৃত করা হয়েছে (২০২৬-০৮-২১)। **কোনো migration/কোড এখনো লেখা হয়নি — user-এর চূড়ান্ত "শুরু কর" অনুমতির অপেক্ষায়।**
+**অবস্থা:** প্ল্যান সম্পন্ন (৩টা open question resolved, দ্বিতীয় রেফারেন্স ডিজাইন থেকে প্রোডাক্ট-ডিটেইল স্কোপ বিস্তৃত)। **S0 ✅ implement + deploy সম্পন্ন ও লাইভ (২০২৬-০৮-২১)** — নিচে §১৪ দেখো। S1-এর অপেক্ষায়।
 
 **সম্পর্কিত:** `custom_domain_context.md` (per-seller সাবডোমেইন — এই ফিচারের ভিত্তি), `landing_page_context.md` (single-product ক্যাম্পেইন পেজ — এর পাশে বসবে, প্রতিস্থাপন না), `tracking_capi_context.md` (Pixel/CAPI — storefront পেজে extend করতে হবে), `digital_product_context.md` (Product model-এ সাম্প্রতিক ডিজিটাল-প্রোডাক্ট এক্সটেনশন, একই cart-এ থাকবে), `SAAS_MODULE_CONTEXT.md §21`, `feature_roadmap_context.md` আইটেম #৯।
 
@@ -252,3 +252,21 @@ Phase 1 থেকেই কাজ করবে, কোনো External approval �
 - **Public API leak সতর্কতা reuse** — digital-product ফিচারে `Product.digital_file_path`/`digital_external_url` পাবলিক landing page JSON-এ leak হয়েছিল কারণ `Product` মডেলে `$hidden` ছিল না। storefront-এর পাবলিক ক্যাটালগ endpoint বানানোর সময় একই ক্লাস-এর ভুল যেন না হয় — কোন ফিল্ড পাবলিক-safe তার একটা explicit allowlist/`makeHidden()` স্কোপড সিরিয়ালাইজেশন থেকেই শুরু করতে হবে, model-wide `$hidden` না (সেলারের নিজের dashboard-এ ফুল অ্যাক্সেস লাগবে)।
 - **Reserved-slug কনফ্লিক্ট** — S0-এ migration চালানোর আগে বিদ্যমান landing page-গুলোর slug-এ `category`/`product`/`cart`/ইত্যাদি সংঘর্ষ আছে কিনা চেক করা বাধ্যতামূলক।
 - **CheckoutFieldResolver জেনারালাইজেশন** — landing_page_id থেকে user_id-scoped "ডিফল্ট" রো-তে সরানোর সময় বিদ্যমান landing page checkout ফ্লো যেন না ভাঙে, রিগ্রেশন টেস্ট লাগবে।
+
+---
+
+## ১৪. S0 — as-built (২০২৬-০৮-২১, ✅ লাইভ)
+
+**গুরুত্বপূর্ণ সংশোধন যা কোড পড়ে ধরা পড়েছে:** §৪-এ ধরে নেওয়া হয়েছিল root `/`-এ redirect হওয়ার কারণ "কোনো host-aware রাউটিং নেই"। বাস্তবে `proxy.ts`-এ এটা **ইচ্ছাকৃত নিরাপত্তা সিদ্ধান্ত** ছিল (`domain_security_audit.md M-3`) — platform hostের root পেজে লগইন ফর্ম থাকে, আর সেলারের সাবডোমেইনে সেলারের নিজের landing-page HTML-ও চলে (কম বিশ্বস্ত origin), তাই লগইন ফর্ম ভুলেও সেখানে রেন্ডার হওয়া ঠেকাতে root hit করলেই platform host-এ পাঠানো হতো। এটা ভাঙা হয়নি — বদলে `/store` (storefront home) **কখনোই কোনো লগইন ফর্ম রাখে না** (Login/Register বাটন এমনিতেই placeholder-only, §১১) বলে root-কে নিরাপদে সেলারের নিজের origin-এ রেন্ডার করা গেছে, নিরাপত্তা নিয়মটা অক্ষত রেখেই।
+
+**যা করা হয়েছে:**
+- `storefront_settings` টেবিল (§৫.১-এর পূর্ণ কলাম সেট, migration `2026_08_21_100000`) — production-এ migrate করা হয়েছে
+- `StorefrontSetting` মডেল, `StorefrontSettingController` (owner-only GET/PUT `/storefront-settings`)
+- `/public/shop-by-subdomain/{label}` এখন `homepage_mode`/`homepage_landing_slug`-ও ফেরত দেয় (proxy.ts-এর একই round-trip-এ, অতিরিক্ত কল ছাড়াই)
+- **Reserved words** `APP_PATHS`-এ যোগ হয়েছে: `category`, `product`, `products`, `cart`, `checkout`, `search`, `wishlist`, `account`, `shop` (migration-এর আগে production-এ conflict চেক করা হয়েছে — কোনো বিদ্যমান landing page slug এই শব্দগুলো ব্যবহার করছিল না)
+- `STOREFRONT_PATHS` (category/product/cart/checkout/search) — `/lp/{slug}`-এর মতোই `/store/*`-এ internal rewrite, direct `/store` hit ৪০৪ (`/lp`-এর মতো, duplicate-content এড়াতে)
+- Root `/` এখন: `homepage_mode = 'landing_page'` + valid published page হলে সেই পেজে rewrite, নাহলে (ডিফল্ট) `/store`-এ rewrite
+- `/store/page.tsx` — **S0 placeholder** (shop নাম/লোগো + "শীঘ্রই আসছে"), পূর্ণাঙ্গ হোমপেজ S5/S6-এ
+- Dashboard → Settings → Storefront (নতুন পেজ) — homepage_mode picker (storefront vs আমার একটা প্রকাশিত landing page বেছে নেওয়া) — এখনই কার্যকর একটা বাস্তব সুবিধা, বাকি থিম UI S5-এ
+
+**যাচাই:** isolated schema migrate + full test suite (৩টা known baseline failure ছাড়া ৪৪৫ pass, নতুন কোনো ফেইলিওর না), production migrate, `deploy-safe.sh`, এবং লাইভ smoke test (`zareen.zyrotechbd.com/` এখন storefront placeholder দেখায় "Zareen Natural Foods — অনলাইন শপ শীঘ্রই আসছে", আগের মতো platform লগইনে redirect করে না; direct `/store` ও `/category/test` ঠিকমতো ৪০৪)।

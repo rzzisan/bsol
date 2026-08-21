@@ -325,6 +325,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number, whatsappU
       icon: "⚙️",
       children: [
         { key: "shop-profile", label: t.shopProfile, href: "/dashboard/settings/shop" },
+        { key: "storefront-settings", label: (t as any).storefrontSettings ?? "স্টোরফ্রন্ট", href: "/dashboard/settings/storefront" },
         { key: "sticker-templates", label: t.stickerTemplates, href: "/dashboard/settings/sticker-templates" },
         { key: "courier-accounts", label: t.courierAccounts, href: "/dashboard/settings/courier" },
         { key: "online-payment-settings", label: t.onlinePaymentSettings, href: "/dashboard/settings/payments" },
