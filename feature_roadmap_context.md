@@ -6,6 +6,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-22 (৪) — **P3 (Bulk/CSV order import) ✅ সম্পন্ন ও লাইভ** — user সরাসরি এই আইটেম বেছে নিয়েছেন P2 (payment gateway sandbox verify) স্কিপ করে। প্লাস একটা real cross-shop `order_number` collision বাগ ফিক্স হয়েছে (উপরের টেবিল রো দেখো)। পরবর্তী প্রায়োরিটি এখনো P2। Older entries kept as-is:
+
 Last updated: 2026-08-22 (৩) — **P1 (Onboarding Getting Started checklist) ✅ সম্পন্ন ও লাইভ** — মান্ডেটরি `/onboarding` (শপ প্রোফাইল+সাবডোমেইন)-এর পরে dashboard-এ একটা dismissible checklist যোগ হয়েছে (প্রথম পণ্য/কুরিয়ার/পেমেন্ট), প্লাস opt-in ডেমো-পণ্য লোডার। বিস্তারিত `onboarding_checklist_context.md`। পরবর্তী প্রায়োরিটি: P2 (payment gateway sandbox verify)। Older entries kept as-is:
 
 > **📋 প্রায়োরিটি সোর্স:** ২০২৬-০৮-২২ তারিখের প্রডাকশন-রেডিনেস অডিট রিপোর্ট — `production_audit_report_context.md` — এখন এই ফাইলের নিচের priority-order/status আপডেটের rationale। নতুন কাজ বাছাই করার সময় ওই ফাইলের §৬/§৭ দেখো, আর কাজ শেষ হলে §৮-এর ডকুমেন্টেশন-নির্দেশনা অনুযায়ী **এই ফাইল + dedicated `*_context.md` + audit রিপোর্টের §৭ টেবিল** — তিনটাই আপডেট করতে হবে।
@@ -54,7 +56,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 9 | সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) | ✅ **সম্পূর্ণ (S0-S9, S3b সহ) + Theme Templates addendum (২০২৬-০৮-২২)** — রাউটিং, ক্যাটালগ, কার্ট, checkout (COD+wallet+gateway), হোমপেজ থিম, রিভিউ, SEO, ট্র্যাকিং (Pixel+CAPI), মাল্টি-টেমপ্লেট ডিজাইন (Standard/CareSolution) + শিপিং-চার্জ — সব real ডেটা দিয়ে end-to-end ভেরিফাইড | `seller_storefront_context.md` |
 | **P1** | Onboarding "Getting Started" checklist + opt-in demo-seed data | ✅ সম্পন্ন ও লাইভ (২০২৬-০৮-২২) — dashboard-এ dismissible checklist (প্রোফাইল/পণ্য/কুরিয়ার/পেমেন্ট, প্রতিটা ধাপ live ডেটা থেকে derived), opt-in ৩টা ডেমো পণ্য (সবসময় status=inactive, লাইভ শপ/অর্ডারে কখনো দেখাবে না — যাচাই করা হয়েছে) | `onboarding_checklist_context.md` |
 | **P2** | Payment gateway sandbox verification (Nagad Merchant, EPS) | ⬜ Not started — audit-প্রায়োরিটি #২, real sandbox টেস্ট ছাড়া financial risk | `online_payment_context.md`, `production_audit_report_context.md §৭` |
-| **P3** | Bulk/CSV order import | ⬜ Not started — audit-প্রায়োরিটি #৩ | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
+| **P3** | Bulk/CSV order import | ✅ সম্পন্ন ও লাইভ (২০২৬-০৮-২২, user-এর অনুরোধে P1 এর পরে সরাসরি এটাই বাছাই করা হয়েছে) — টেমপ্লেট ডাউনলোড → preview (কোনো অর্ডার তৈরি হয় না, প্রতিটা সারির ভ্যালিডেশন এরর দেখায়) → commit (শুধু সঠিক সারিগুলো এক transaction-এ তৈরি হয়, `source: bulk_import`)। এক সারি = এক অর্ডার = এক পণ্য (v1 স্কোপ)। মাসিক অর্ডার-লিমিট respect করে। **লাইভ ভেরিফিকেশনের সময় একটা real প্রি-এক্সিস্টিং প্ল্যাটফর্ম-ওয়াইড বাগ পাওয়া গেছে ও ফিক্স হয়েছে** — `orders.order_number`-এ global unique constraint ছিল অথচ `Order::generateOrderNumber()` per-shop scoped, তাই দুইটা ভিন্ন শপের একই দিনের প্রথম অর্ডার সংঘর্ষে 500 error দিত (শুধু bulk import না, `OrderController::store()`/storefront/landing-page checkout/WooCommerce sync সবগুলো পথেই এফেক্টেড ছিল) — এখন `unique(['user_id','order_number'])`, products/landing_pages-এর slug-এর মতোই per-shop স্কোপড। বিস্তারিত `SAAS_MODULE_CONTEXT.md` নতুন সাব-সেকশন | `SAAS_MODULE_CONTEXT.md §4.1` |
 | **P4** | Referral/affiliate program (সেলার→সেলার) | ⬜ Not started — audit-প্রায়োরিটি #৪ (সস্তা, বিশ্বাসযোগ্য CAC চ্যানেল) | — |
 | **P5** | Ads ROI ট্র্যাকার সম্পূর্ণ করা | ⬜ Not started (এখনো placeholder) — audit-প্রায়োরিটি #৫, UTM/ad-spend ডেটা সোর্স দরকার | `SAAS_MODULE_CONTEXT.md §15.7/§16.1`, `production_audit_report_context.md §৭` |
 | **P6** | Marketing broadcast (SMS+Email) | ⬜ Not started — audit-প্রায়োরিটি #৬, উপরে #৭-এও আছে | — |
@@ -117,10 +119,8 @@ SMS automation এখন শুধু order-status trigger। VIP/loyal/risky se
 
 ## নিম্ন-প্রায়োরিটি / দীর্ঘমেয়াদী (আগের turn-এ উল্লেখিত, বিস্তারিত এখানে repeat করা হয়নি — `SAAS_MODULE_CONTEXT.md §16`-এ ক্রস-রেফারেন্স)
 
-- Bulk/CSV order import (§16.8)
 - PWA (§16.9)
 - Referral/affiliate program (সেলার→সেলার) — কম CAC-তে নতুন সেলার আনা
-- Onboarding wizard — নতুন সেলারের setup complexity কমানো, churn কমায়
 - Facebook App Review সম্পূর্ণ করা (external, `facebook_integration_context.md §3`)
 - Native mobile app (Android প্রথমে)
 - AI-assisted product description / auto-reply generator

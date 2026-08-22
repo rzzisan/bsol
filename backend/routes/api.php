@@ -71,6 +71,7 @@ use App\Http\Controllers\Api\Admin\AdminTrackingController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\PublicTrackingController;
 use App\Http\Controllers\Api\OnlinePaymentController;
+use App\Http\Controllers\Api\OrderBulkImportController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderPaymentController;
 use App\Http\Controllers\Api\PaymentGatewayCredentialController;
@@ -504,6 +505,9 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/orders/create-bootstrap', [OrderController::class, 'createBootstrap']);
         Route::get('/orders/create/bootstrap', [OrderController::class, 'createBootstrap']);
         Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
+        Route::get('/orders/bulk-import/template', [OrderBulkImportController::class, 'template']);
+        Route::post('/orders/bulk-import/preview', [OrderBulkImportController::class, 'preview']);
+        Route::post('/orders/bulk-import/commit', [OrderBulkImportController::class, 'commit']);
         Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
         Route::get('/orders/{order}/invoice', [OrderController::class, 'invoicePdf']);
         Route::get('/orders/{order}/payments', [OrderPaymentController::class, 'index']);

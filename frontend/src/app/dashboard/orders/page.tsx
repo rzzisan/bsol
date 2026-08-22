@@ -38,6 +38,7 @@ const t = {
   bn: {
     pageTitle: "অর্ডার তালিকা",
     createOrder: "নতুন অর্ডার",
+    bulkImport: "বাল্ক ইমপোর্ট",
     loading: "লোড হচ্ছে...",
     noOrders: "কোনো অর্ডার নেই।",
     search: "অর্ডার নম্বর / নাম / ফোন",
@@ -110,6 +111,7 @@ const t = {
   en: {
     pageTitle: "Order List",
     createOrder: "New Order",
+    bulkImport: "Bulk Import",
     loading: "Loading...",
     noOrders: "No orders found.",
     search: "Order no / name / phone",
@@ -518,8 +520,12 @@ export default function OrdersPage() {
           </div>
         )}
 
+        <Link href="/dashboard/orders/bulk-import"
+          className="ml-auto rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold hover:bg-[var(--surface-soft)]">
+          {txt.bulkImport}
+        </Link>
         <Link href="/dashboard/orders/create"
-          className="ml-auto rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+          className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
           + {txt.createOrder}
         </Link>
       </div>

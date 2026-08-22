@@ -41,6 +41,7 @@ const menuText = {
     orders: "অর্ডার",
     allOrders: "সকল অর্ডার",
     createOrder: "নতুন অর্ডার",
+    bulkImportOrders: "বাল্ক ইমপোর্ট (CSV)",
     fraudCheck: "ফ্রড চেক",
     blacklist: "ব্লকলিস্ট",
 
@@ -125,6 +126,7 @@ const menuText = {
     orders: "Orders",
     allOrders: "All Orders",
     createOrder: "New Order",
+    bulkImportOrders: "Bulk Import (CSV)",
     fraudCheck: "Fraud Check",
     blacklist: "Blacklist",
 
@@ -227,6 +229,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number, whatsappU
       children: [
         { key: "all-orders", label: t.allOrders, href: "/dashboard/orders" },
         { key: "create-order", label: t.createOrder, href: "/dashboard/orders/create" },
+        { key: "bulk-import-orders", label: t.bulkImportOrders, href: "/dashboard/orders/bulk-import" },
         { key: "fraud-check", label: t.fraudCheck, href: "/dashboard/orders/fraud-check" },
         { key: "blacklist", label: t.blacklist, href: "/dashboard/orders/blacklist" },
       ],
@@ -366,6 +369,7 @@ const MODULE_KEY_BY_MENU_ITEM: Record<string, StaffModuleKey> = {
 
   "all-orders": "orders",
   "create-order": "orders",
+  "bulk-import-orders": "orders",
   "fraud-check": "fraud",
   blacklist: "fraud",
 
