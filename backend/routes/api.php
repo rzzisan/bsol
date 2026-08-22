@@ -85,6 +85,7 @@ use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontPaymentController;
 use App\Http\Controllers\Api\StorefrontReviewController;
 use App\Http\Controllers\Api\ProductReviewController;
+use App\Http\Controllers\Api\DashboardGettingStartedController;
 use App\Http\Controllers\Api\StorefrontSettingController;
 use App\Http\Controllers\Api\StickerTemplateController;
 use App\Http\Controllers\Api\WordpressApiKeyController;
@@ -583,6 +584,17 @@ Route::middleware('active_subscription')->group(function () {
         Route::delete('/storefront-settings/partner-logos/{index}', [StorefrontSettingController::class, 'removePartnerLogo']);
         Route::post('/storefront-settings/about-image', [StorefrontSettingController::class, 'uploadAboutImage']);
         Route::delete('/storefront-settings/about-image', [StorefrontSettingController::class, 'removeAboutImage']);
+    });
+
+    // ── Dashboard "Getting Started" checklist ──────────────────────────────
+    // Pattern B (owner_only) — post-onboarding setup guidance for the shop
+    // owner, not an operational staff task. production_audit_report_context.md
+    // §7 (P1) / onboarding_checklist_context.md.
+    Route::middleware('owner_only')->prefix('dashboard/getting-started')->group(function () {
+        Route::get('/', [DashboardGettingStartedController::class, 'show']);
+        Route::post('/dismiss', [DashboardGettingStartedController::class, 'dismiss']);
+        Route::post('/demo-products', [DashboardGettingStartedController::class, 'createDemoProducts']);
+        Route::delete('/demo-products', [DashboardGettingStartedController::class, 'deleteDemoProducts']);
     });
 
     // ── Sticker Template (default label design + per-courier overrides) ───────

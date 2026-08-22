@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-22 (৩) — **§22: Onboarding "Getting Started" Checklist — ✅ সম্পন্ন ও লাইভ, অডিটের P1 প্রায়োরিটি বন্ধ হলো।** dashboard-এ dismissible checklist (প্রোফাইল/পণ্য/কুরিয়ার/পেমেন্ট, সব live-derived) + opt-in ডেমো-পণ্য লোডার (সবসময় inactive, স্টোরফ্রন্ট/অর্ডার থেকে verified-absent)। বিস্তারিত `onboarding_checklist_context.md`, `feature_roadmap_context.md`, `production_audit_report_context.md §৭`। Older entries kept as-is:
+
 Last updated: 2026-08-22 (২) — **প্রডাকশন-রেডিনেস অডিট রিপোর্ট যোগ হলো** — `production_audit_report_context.md`। §15-এর ground-truth audit আর §16-এর recommendation থেকে একটা business/launch-readiness সিদ্ধান্ত বের করা হয়েছে (soft-launch cohort সুপারিশ, প্রায়োরিটি-অর্ডার P1-P8)। নতুন প্রায়োরিটি অনুযায়ী `feature_roadmap_context.md`-এর status টেবিল আপডেট হয়েছে। §15.7 (Ads ROI still placeholder) এখন সেই অডিটের P5 আইটেম হিসেবে cross-referenced। Older entries kept as-is:
 
 Last updated: 2026-08-22 — **§21: সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — S0-S9 + S3b সম্পূর্ণ লাইভ, প্লাস Theme Templates addendum (multi-template + CareSolution-style টেমপ্লেট) লাইভ** (`feature_roadmap_context.md` আইটেম #৯)। বিস্তারিত `seller_storefront_context.md`। Older entries kept as-is:
@@ -1264,3 +1266,13 @@ Cart client-side (`localStorage`, origin-scoped — auth টোকেনের �
 **Theme Templates addendum ✅ লাইভ (২০২৬-০৮-২২):** স্টোরফ্রন্ট এখন multi-template — সেলার dashboard-এ "Standard" (আগের ডিজাইন) বা "CareSolution Style" (নতুন — ডার্ক হেডার, ট্রাস্ট-ব্যাজ স্ট্রিপ, SALE-ব্যাজ প্রোডাক্ট কার্ড+Cart/Buy বাটন, মোবাইলে bottom nav + drawer, ডার্ক ফুটার) বেছে নিতে পারে। `storefront_settings.theme_template` একটাই সেটিং পুরো template switch চালায় (`useStorefrontTheme()` context, `StorefrontTrackingProvider`-এর মতোই প্যাটার্ন)। সাথে একটা real নতুন ফিচার: Inside/Outside Dhaka শিপিং চার্জ (সেলার dashboard-এ রেট সেট করে, `shipping_location` server-side রিজলভ হয়ে client-supplied amount override করে)। বিস্তারিত `seller_storefront_context.md §২৪`।
 
 **Follow-up ✅ লাইভ (২০২৬-০৮-২২, §২৫):** ক্যাটাগরি ন্যাভ বারের bg/text কালার সেলার-কনফিগারেবল, হোমপেজ ব্যানারে প্রোডাক্ট-লিংক পিকার (relative `/product/{slug}` — `link_url` ভ্যালিডেশন এখন absolute URL-এর পাশাপাশি relative পাথও গ্রহণ করে), ফিচারড ক্যাটাগরিতে প্রতি-ক্যাটাগরি থাম্বনেইল আপলোড (`product_categories.thumbnail_url`, না-সেট করলে আগের লেটার-সার্কেল fallback অপরিবর্তিত)।
+
+---
+
+## 22. Onboarding "Getting Started" Checklist — ✅ সম্পন্ন ও লাইভ (২০২৬-০৮-২২)
+
+প্রডাকশন-রেডিনেস অডিটের P1 প্রায়োরিটি (`production_audit_report_context.md §৭`)। মান্ডেটরি `/onboarding` (শপ প্রোফাইল + সাবডোমেইন ক্লেইম, `AuthController::onboardingState()`) সম্পূর্ণ হওয়ার পর সেলার একটা all-zero dashboard-এ পড়ত, কোনো গাইডেন্স বা sample data ছাড়াই — সেই গ্যাপ বন্ধ করা হয়েছে।
+
+**যা তৈরি হয়েছে:** dashboard হোমে dismissible checklist widget — প্রোফাইল (সবসময় সম্পন্ন)/প্রথম পণ্য/কুরিয়ার কানেক্ট/পেমেন্ট মেথড, প্রতিটা ধাপ real ডেটা থেকে live derived (কোনো stored per-step flag নেই, তাই stale হওয়ার সুযোগ নেই)। শপ-লিংক কপি/ভিজিট বাটন, "✕" দিয়ে dismiss (নতুন `shop_profiles.getting_started_dismissed_at`)। Opt-in ডেমো-ডেটা লোডার — ৩টা নমুনা পণ্য (`products.is_demo`, সবসময় `status: inactive`, লাইভ স্টোরফ্রন্ট ও order-create picker উভয় জায়গা থেকে verified-absent), idempotent create + bulk delete। Pattern B (`owner_only` middleware) — staff-দের জন্য সম্পূর্ণ hidden।
+
+সম্পূর্ণ বিস্তারিত রেফারেন্স: [`onboarding_checklist_context.md`](onboarding_checklist_context.md) — ডিজাইন সিদ্ধান্ত, API surface, ফাইল লিস্ট, টেস্ট কভারেজ, লাইভ ভেরিফিকেশন লগ।

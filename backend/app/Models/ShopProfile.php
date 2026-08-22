@@ -16,12 +16,15 @@ class ShopProfile extends Model
         'user_id', 'shop_name', 'phone', 'email', 'address', 'logo_path', 'logo_url',
         'show_phone_on_sticker', 'show_address_on_sticker',
         'subdomain', 'subdomain_status', 'subdomain_set_at',
+        // Getting-started checklist (onboarding_checklist_context.md)
+        'getting_started_dismissed_at',
     ];
 
     protected $casts = [
         'show_phone_on_sticker'   => 'boolean',
         'show_address_on_sticker' => 'boolean',
         'subdomain_set_at'        => 'datetime',
+        'getting_started_dismissed_at' => 'datetime',
     ];
 
     /**

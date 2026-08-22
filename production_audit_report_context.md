@@ -59,7 +59,7 @@ BSOL একটা টয়/MVP প্রজেক্ট না — এটা ge
 
 | Priority | ফিচার | কেন | ট্র্যাকিং |
 |---|---|---|---|
-| 1 | Onboarding wizard + demo-seed data | churn কমানো, নতুন সেলার activation | `feature_roadmap_context.md` — নতুন আইটেম, নিচে §৮ দ্রষ্টব্য |
+| 1 | Onboarding wizard + demo-seed data | churn কমানো, নতুন সেলার activation | ✅ **সম্পন্ন (২০২৬-০৮-২২)** — বিস্তারিত `onboarding_checklist_context.md`, `feature_roadmap_context.md` |
 | 2 | Payment gateway sandbox verification (Nagad, EPS) | financial risk বন্ধ করা soft-launch-এর আগে | `online_payment_context.md` |
 | 3 | Bulk/CSV order import | migrating সেলারদের ঘর্ষণ কমায় | `feature_roadmap_context.md` #বিদ্যমান আইটেম |
 | 4 | Referral/affiliate program (সেলার→সেলার) | সস্তা, বিশ্বাসযোগ্য CAC চ্যানেল | `feature_roadmap_context.md` #বিদ্যমান আইটেম |

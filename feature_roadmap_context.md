@@ -6,6 +6,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-22 (৩) — **P1 (Onboarding Getting Started checklist) ✅ সম্পন্ন ও লাইভ** — মান্ডেটরি `/onboarding` (শপ প্রোফাইল+সাবডোমেইন)-এর পরে dashboard-এ একটা dismissible checklist যোগ হয়েছে (প্রথম পণ্য/কুরিয়ার/পেমেন্ট), প্লাস opt-in ডেমো-পণ্য লোডার। বিস্তারিত `onboarding_checklist_context.md`। পরবর্তী প্রায়োরিটি: P2 (payment gateway sandbox verify)। Older entries kept as-is:
+
 > **📋 প্রায়োরিটি সোর্স:** ২০২৬-০৮-২২ তারিখের প্রডাকশন-রেডিনেস অডিট রিপোর্ট — `production_audit_report_context.md` — এখন এই ফাইলের নিচের priority-order/status আপডেটের rationale। নতুন কাজ বাছাই করার সময় ওই ফাইলের §৬/§৭ দেখো, আর কাজ শেষ হলে §৮-এর ডকুমেন্টেশন-নির্দেশনা অনুযায়ী **এই ফাইল + dedicated `*_context.md` + audit রিপোর্টের §৭ টেবিল** — তিনটাই আপডেট করতে হবে।
 
 Last updated: 2026-08-22 (২) — **প্রডাকশন-রেডিনেস অডিট সম্পন্ন**, নতুন প্রায়োরিটি-অর্ডার সেট হয়েছে (নিচের status টেবিল + "পরবর্তী পদক্ষেপ" সেকশন দেখো)। বিস্তারিত `production_audit_report_context.md`। Older entries kept as-is:
@@ -50,7 +52,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
 | 8 | ডিজিটাল প্রোডাক্ট সিস্টেম (instant delivery, নিজস্ব হোস্টিং) | ✅ Phase 1 সম্পন্ন ও লাইভ (২০২৬-০৮-২০) | `digital_product_context.md` |
 | 9 | সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) | ✅ **সম্পূর্ণ (S0-S9, S3b সহ) + Theme Templates addendum (২০২৬-০৮-২২)** — রাউটিং, ক্যাটালগ, কার্ট, checkout (COD+wallet+gateway), হোমপেজ থিম, রিভিউ, SEO, ট্র্যাকিং (Pixel+CAPI), মাল্টি-টেমপ্লেট ডিজাইন (Standard/CareSolution) + শিপিং-চার্জ — সব real ডেটা দিয়ে end-to-end ভেরিফাইড | `seller_storefront_context.md` |
-| **P1** | Onboarding wizard + demo-seed data | ⬜ Not started — audit-প্রায়োরিটি #১ (churn কমানো, নতুন সেলার activation) | `production_audit_report_context.md §৭` |
+| **P1** | Onboarding "Getting Started" checklist + opt-in demo-seed data | ✅ সম্পন্ন ও লাইভ (২০২৬-০৮-২২) — dashboard-এ dismissible checklist (প্রোফাইল/পণ্য/কুরিয়ার/পেমেন্ট, প্রতিটা ধাপ live ডেটা থেকে derived), opt-in ৩টা ডেমো পণ্য (সবসময় status=inactive, লাইভ শপ/অর্ডারে কখনো দেখাবে না — যাচাই করা হয়েছে) | `onboarding_checklist_context.md` |
 | **P2** | Payment gateway sandbox verification (Nagad Merchant, EPS) | ⬜ Not started — audit-প্রায়োরিটি #২, real sandbox টেস্ট ছাড়া financial risk | `online_payment_context.md`, `production_audit_report_context.md §৭` |
 | **P3** | Bulk/CSV order import | ⬜ Not started — audit-প্রায়োরিটি #৩ | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
 | **P4** | Referral/affiliate program (সেলার→সেলার) | ⬜ Not started — audit-প্রায়োরিটি #৪ (সস্তা, বিশ্বাসযোগ্য CAC চ্যানেল) | — |

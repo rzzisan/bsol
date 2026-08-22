@@ -32,6 +32,8 @@ class Product extends Model
         // grouped Specification-tab table; distinct on purpose, see §1.
         'show_in_storefront', 'features', 'specifications', 'seo_content',
         'warranty_override', 'delivery_override', 'is_featured',
+        // Getting-started checklist demo data (onboarding_checklist_context.md)
+        'is_demo',
     ];
 
     protected $casts = [
@@ -50,6 +52,7 @@ class Product extends Model
         'features' => 'array',
         'specifications' => 'array',
         'is_featured' => 'boolean',
+        'is_demo' => 'boolean',
     ];
 
     public function isDigital(): bool

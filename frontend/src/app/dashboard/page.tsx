@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import UserShell from "@/components/user-shell";
+import GettingStartedChecklist from "@/components/dashboard/getting-started-checklist";
 import {
   getStoredLocale,
   getStoredToken,
@@ -154,6 +155,10 @@ export default function UserDashboardPage() {
         </h2>
         <p className="mt-1 text-sm text-[var(--muted)]">{t.pageSubtitle}</p>
       </section>
+
+      <div className="mt-4">
+        <GettingStartedChecklist />
+      </div>
 
       {/* Stat cards */}
       <section className="mt-4">

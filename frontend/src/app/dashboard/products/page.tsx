@@ -127,6 +127,11 @@ type Product = {
   // managed further on the detail page ([id]/page.tsx: file upload/
   // external URL, delivery channels).
   product_type?: "physical" | "digital";
+  // onboarding_checklist_context.md — demo product seeded by the Getting
+  // Started checklist. Always status=inactive server-side, never shown on
+  // the live storefront or in real order-creation; badged here so it's
+  // visually distinguishable from real inventory in this list.
+  is_demo?: boolean;
 };
 type MediaItem = { id: number; url: string; is_primary: boolean; sort_order: number; file_name?: string | null };
 type MediaPolicy = {
@@ -397,7 +402,14 @@ export default function ProductsPage() {
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--surface-soft)] text-xs text-[var(--muted)]">N/A</div>
                     )}
                     <div>
-                      <p className="font-medium">{p.name}</p>
+                      <p className="font-medium">
+                        {p.name}
+                        {p.is_demo && (
+                          <span className="ml-2 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-400 align-middle">
+                            {locale === "bn" ? "ডেমো" : "DEMO"}
+                          </span>
+                        )}
+                      </p>
                       {p.sku && <p className="text-xs text-[var(--muted)]">SKU: {p.sku}</p>}
                     </div>
                   </div>
