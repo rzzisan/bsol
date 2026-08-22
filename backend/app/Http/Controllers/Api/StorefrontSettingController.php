@@ -46,6 +46,8 @@ class StorefrontSettingController extends Controller
             'shipping_charge_inside_dhaka' => ['nullable', 'numeric', 'min:0'],
             'shipping_charge_outside_dhaka' => ['nullable', 'numeric', 'min:0'],
             'theme_primary_color' => ['nullable', 'string', 'max:7'],
+            'nav_bg_color' => ['nullable', 'string', 'max:7'],
+            'nav_text_color' => ['nullable', 'string', 'max:7'],
             'about_text' => ['nullable', 'string'],
             // about_image_url not accepted here — only via the dedicated
             // upload endpoint below (keeps it paired with about_image_path).
@@ -101,7 +103,12 @@ class StorefrontSettingController extends Controller
     {
         $data = $request->validate([
             'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
-            'link_url' => ['nullable', 'url', 'max:500'],
+            // Accepts an absolute URL OR an in-app relative path (e.g.
+            // "/product/{slug}", set by the dashboard's per-banner product
+            // picker — theme-templates addendum, seller_storefront_context.md
+            // §24) — relative on purpose so it resolves against whichever
+            // host actually renders it (the seller's own subdomain).
+            'link_url' => ['nullable', 'string', 'max:500', self::linkUrlRule()],
         ]);
 
         $ownerId = auth()->user()->shopOwnerId();
@@ -130,7 +137,7 @@ class StorefrontSettingController extends Controller
     {
         $data = $request->validate([
             'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-            'link_url' => ['nullable', 'url', 'max:500'],
+            'link_url' => ['nullable', 'string', 'max:500', self::linkUrlRule()],
         ]);
 
         $ownerId = auth()->user()->shopOwnerId();
@@ -209,5 +216,19 @@ class StorefrontSettingController extends Controller
         }
 
         return response()->json(['success' => true, 'data' => $settings]);
+    }
+
+    /** Absolute URL (Laravel's built-in `url` rule) or an in-app relative path starting with `/`. */
+    private static function linkUrlRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) {
+            if (str_starts_with((string) $value, '/')) {
+                return;
+            }
+
+            if (! filter_var($value, FILTER_VALIDATE_URL)) {
+                $fail('The :attribute must be a valid URL or a relative path starting with /.');
+            }
+        };
     }
 }

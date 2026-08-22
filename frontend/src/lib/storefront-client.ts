@@ -14,7 +14,13 @@
 // explicitly treats as "no shop" — every one of these would silently 404.
 const API = "/api";
 
-export type CategorySummary = { id: number; name: string; slug: string; product_count?: number };
+export type CategorySummary = {
+  id: number;
+  name: string;
+  slug: string;
+  product_count?: number;
+  thumbnail_url?: string | null;
+};
 
 export type ProductSummary = {
   id: number;
@@ -82,6 +88,8 @@ export type StorefrontHome = {
   messenger_page_id: string | null;
   theme_template: ThemeTemplate;
   theme_primary_color: string | null;
+  nav_bg_color: string;
+  nav_text_color: string;
   shipping_charge_inside_dhaka: string | number;
   shipping_charge_outside_dhaka: string | number;
   banner_images: Array<{ image_url: string; link_url?: string | null }>;

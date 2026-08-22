@@ -99,7 +99,7 @@ SMS automation এখন শুধু order-status trigger। VIP/loyal/risky se
 ### 9. সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) (২০২৬-০৮-২২, ✅ সম্পূর্ণ + Theme Templates addendum)
 এখন landing page একটা single-product ক্যাম্পেইন পেজ (বিজ্ঞাপন থেকে আসা ট্রাফিকের জন্য)। সেলারদের একটা পূর্ণাঙ্গ browsable ইকমার্স শপও দরকার ছিল — হোমপেজ (ব্যানার/ফিচারড ক্যাটাগরি/টপ-সেলিং), ক্যাটাগরি নেভিগেশন, প্রোডাক্ট লিস্টিং+সার্চ, প্রোডাক্ট ডিটেইল (গ্যালারি/রিভিউ/related products), মাল্টি-প্রোডাক্ট কার্ট — S0-S9 + S3b (COD → wallet+gateway অনলাইন পেমেন্ট, SEO, রিভিউ, Pixel+CAPI ট্র্যাকিং) সব ✅ লাইভ।
 
-**Theme Templates addendum (২০২৬-০৮-২২, ✅ লাইভ):** সেলার এখন dashboard থেকে স্টোরফ্রন্টের ডিজাইন টেমপ্লেট বেছে নিতে পারে — "Standard" (আগের ডিজাইন) বা "CareSolution Style" (ডার্ক হেডার, ট্রাস্ট-ব্যাজ, SALE-ব্যাজ প্রোডাক্ট কার্ড+Cart/Buy বাটন, মোবাইল bottom nav+drawer)। সাথে একটা real Inside/Outside Dhaka শিপিং-চার্জ ফিচারও যোগ হয়েছে (সেলার রেট সেট করে, checkout-এ server-side রিজলভ হয়)। বিস্তারিত `seller_storefront_context.md §২৪`।
+**Theme Templates addendum (২০২৬-০৮-২২, ✅ লাইভ):** সেলার এখন dashboard থেকে স্টোরফ্রন্টের ডিজাইন টেমপ্লেট বেছে নিতে পারে — "Standard" (আগের ডিজাইন) বা "CareSolution Style" (ডার্ক হেডার, ট্রাস্ট-ব্যাজ, SALE-ব্যাজ প্রোডাক্ট কার্ড+Cart/Buy বাটন, মোবাইল bottom nav+drawer)। সাথে একটা real Inside/Outside Dhaka শিপিং-চার্জ ফিচারও যোগ হয়েছে (সেলার রেট সেট করে, checkout-এ server-side রিজলভ হয়)। **ফলো-আপ (একই দিনে):** ন্যাভ বার কালার কাস্টমাইজেশন, ব্যানার প্রোডাক্ট-লিংক পিকার, ফিচারড ক্যাটাগরি থাম্বনেইল। বিস্তারিত `seller_storefront_context.md §২৪-২৫`।
 
 ---
 

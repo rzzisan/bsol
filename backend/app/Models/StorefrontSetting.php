@@ -23,12 +23,19 @@ class StorefrontSetting extends Model
     public const DEFAULT_SHIPPING_INSIDE_DHAKA = 70.0;
     public const DEFAULT_SHIPPING_OUTSIDE_DHAKA = 120.0;
 
+    // "caresolution" template's category nav bar, when the seller hasn't
+    // picked their own colors.
+    public const DEFAULT_NAV_BG_COLOR = '#111827';
+    public const DEFAULT_NAV_TEXT_COLOR = '#ffffff';
+
     protected $fillable = [
         'user_id',
         'homepage_mode',
         'homepage_landing_page_id',
         'theme_template',
         'theme_primary_color',
+        'nav_bg_color',
+        'nav_text_color',
         'banner_images',
         'featured_category_ids',
         'about_text',

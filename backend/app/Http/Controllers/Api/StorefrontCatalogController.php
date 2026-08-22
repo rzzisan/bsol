@@ -66,7 +66,7 @@ class StorefrontCatalogController extends Controller
             ->when(! empty($featuredCategoryIds), fn ($q) => $q->whereIn('id', $featuredCategoryIds))
             ->orderBy('sort_order')
             ->limit(12)
-            ->get(['id', 'name', 'slug']);
+            ->get(['id', 'name', 'slug', 'thumbnail_url']);
 
         $featuredProducts = Product::whereIn('user_id', $shopUserIds)
             ->where('status', 'active')
@@ -123,6 +123,11 @@ class StorefrontCatalogController extends Controller
                 'messenger_page_id' => $messengerPageId,
                 'theme_template' => $storefront?->theme_template ?? StorefrontSetting::THEME_STANDARD,
                 'theme_primary_color' => $storefront?->theme_primary_color,
+                // "caresolution" template's category nav bar — fallback
+                // defaults applied here (not stored) same as the shipping
+                // charges above.
+                'nav_bg_color' => $storefront?->nav_bg_color ?: StorefrontSetting::DEFAULT_NAV_BG_COLOR,
+                'nav_text_color' => $storefront?->nav_text_color ?: StorefrontSetting::DEFAULT_NAV_TEXT_COLOR,
                 // Fallback defaults applied here (not stored) so a seller
                 // who hasn't configured a rate yet still gets a sane cart
                 // — see StorefrontSetting::shippingChargeFor().
@@ -145,7 +150,7 @@ class StorefrontCatalogController extends Controller
                     ->map(fn ($p) => ['image_url' => $p['image_url'] ?? null, 'link_url' => $p['link_url'] ?? null])
                     ->values(),
                 'featured_categories' => $featuredCategories->map(fn (ProductCategory $c) => [
-                    'id' => $c->id, 'name' => $c->name, 'slug' => $c->slug,
+                    'id' => $c->id, 'name' => $c->name, 'slug' => $c->slug, 'thumbnail_url' => $c->thumbnail_url,
                 ]),
                 'featured_products' => $featuredProducts->map(fn (Product $p) => $this->publicProductSummary($p))->values(),
                 'category_sections' => $categorySections,

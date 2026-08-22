@@ -10,6 +10,7 @@ class ProductCategory extends Model
 {
     protected $fillable = [
         'user_id', 'name', 'slug', 'description', 'sort_order', 'is_active',
+        'thumbnail_url', 'thumbnail_path',
     ];
 
     protected $casts = [

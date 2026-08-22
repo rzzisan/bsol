@@ -25,9 +25,14 @@ export default function CaresolutionHome({ home }: { home: StorefrontHome }) {
                 href={`/category/${c.slug}`}
                 className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-4 text-center text-xs font-medium hover:border-orange-300"
               >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-50 text-lg text-orange-600">
-                  {c.name.charAt(0)}
-                </span>
+                {c.thumbnail_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.thumbnail_url} alt="" className="h-12 w-12 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-50 text-lg text-orange-600">
+                    {c.name.charAt(0)}
+                  </span>
+                )}
                 {c.name}
               </Link>
             ))}

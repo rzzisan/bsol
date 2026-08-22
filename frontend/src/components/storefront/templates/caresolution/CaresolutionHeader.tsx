@@ -67,10 +67,13 @@ export default function CaresolutionHeader({
       </form>
 
       {categories && categories.length > 0 ? (
-        <div className="hidden border-t border-white/10 bg-white text-slate-800 sm:block">
+        <div
+          className="hidden border-t border-white/10 sm:block"
+          style={{ background: home?.nav_bg_color || "#111827", color: home?.nav_text_color || "#ffffff" }}
+        >
           <div className="mx-auto flex max-w-6xl gap-5 overflow-x-auto px-4 py-2.5 text-sm font-medium">
             {categories.map((c) => (
-              <Link key={c.id} href={`/category/${c.slug}`} className="whitespace-nowrap hover:text-orange-600">
+              <Link key={c.id} href={`/category/${c.slug}`} className="whitespace-nowrap opacity-90 hover:opacity-100">
                 {c.name}
               </Link>
             ))}

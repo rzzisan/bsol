@@ -493,6 +493,8 @@ Route::middleware('active_subscription')->group(function () {
         });
 
         Route::apiResource('/categories', ProductCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::post('/categories/{id}/thumbnail', [ProductCategoryController::class, 'uploadThumbnail'])->where('id', '[0-9]+');
+        Route::delete('/categories/{id}/thumbnail', [ProductCategoryController::class, 'removeThumbnail'])->where('id', '[0-9]+');
     });
 
     // ── Order Management ──────────────────────────────────────────────────────

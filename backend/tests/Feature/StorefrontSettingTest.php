@@ -84,6 +84,30 @@ class StorefrontSettingTest extends TestCase
         $this->assertCount(0, $removed->json('data.banner_images'));
     }
 
+    public function test_banner_accepts_a_relative_product_link(): void
+    {
+        $owner = $this->owner();
+        Sanctum::actingAs($owner);
+
+        $upload = $this->postJson('/api/storefront-settings/banners', [
+            'image' => UploadedFile::fake()->image('banner.jpg'),
+            'link_url' => '/product/some-product',
+        ])->assertOk();
+
+        $this->assertSame('/product/some-product', $upload->json('data.banner_images.0.link_url'));
+    }
+
+    public function test_banner_rejects_a_malformed_link(): void
+    {
+        $owner = $this->owner();
+        Sanctum::actingAs($owner);
+
+        $this->postJson('/api/storefront-settings/banners', [
+            'image' => UploadedFile::fake()->image('banner.jpg'),
+            'link_url' => 'not a url and not relative',
+        ])->assertStatus(422);
+    }
+
     public function test_partner_logo_upload_and_remove(): void
     {
         $owner = $this->owner();
@@ -194,6 +218,20 @@ class StorefrontSettingTest extends TestCase
             ->assertJsonPath('data.theme_template', 'caresolution')
             ->assertJsonPath('data.shipping_charge_inside_dhaka', '80.00')
             ->assertJsonPath('data.shipping_charge_outside_dhaka', '150.00');
+    }
+
+    public function test_owner_can_set_nav_bar_colors(): void
+    {
+        $owner = $this->owner();
+        Sanctum::actingAs($owner);
+
+        $this->putJson('/api/storefront-settings', [
+            'homepage_mode' => 'storefront',
+            'nav_bg_color' => '#123456',
+            'nav_text_color' => '#fedcba',
+        ])->assertOk()
+            ->assertJsonPath('data.nav_bg_color', '#123456')
+            ->assertJsonPath('data.nav_text_color', '#fedcba');
     }
 
     public function test_theme_template_rejects_unknown_value(): void

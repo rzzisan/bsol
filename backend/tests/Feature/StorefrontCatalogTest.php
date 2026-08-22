@@ -206,7 +206,34 @@ class StorefrontCatalogTest extends TestCase
             // rates configured -> platform fallback defaults (70/120).
             ->assertJsonPath('data.theme_template', 'standard')
             ->assertJsonPath('data.shipping_charge_inside_dhaka', '70.00')
-            ->assertJsonPath('data.shipping_charge_outside_dhaka', '120.00');
+            ->assertJsonPath('data.shipping_charge_outside_dhaka', '120.00')
+            // No nav colors configured -> platform fallback defaults.
+            ->assertJsonPath('data.nav_bg_color', '#111827')
+            ->assertJsonPath('data.nav_text_color', '#ffffff')
+            // No thumbnail uploaded -> null (storefront falls back to the
+            // letter-circle).
+            ->assertJsonPath('data.featured_categories.0.thumbnail_url', null);
+    }
+
+    public function test_home_reflects_configured_nav_colors_and_category_thumbnail(): void
+    {
+        $a = $this->seller('shopc', 'Shop C');
+        $cat = ProductCategory::create([
+            'user_id' => $a->id, 'name' => 'Oil', 'slug' => 'oil', 'is_active' => true,
+            'thumbnail_url' => 'https://example.com/oil-thumb.jpg',
+        ]);
+        \App\Models\StorefrontSetting::create([
+            'user_id' => $a->id,
+            'featured_category_ids' => [$cat->id],
+            'nav_bg_color' => '#0f2e28',
+            'nav_text_color' => '#f0fdf4',
+        ]);
+
+        $this->getJson("https://shopc.{$this->apex()}/api/public/storefront/home")
+            ->assertOk()
+            ->assertJsonPath('data.nav_bg_color', '#0f2e28')
+            ->assertJsonPath('data.nav_text_color', '#f0fdf4')
+            ->assertJsonPath('data.featured_categories.0.thumbnail_url', 'https://example.com/oil-thumb.jpg');
     }
 
     public function test_home_reflects_configured_theme_template_and_shipping_charges(): void

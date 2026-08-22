@@ -26,6 +26,10 @@ const t = {
     shippingHint: "CareSolution টেমপ্লেটে কার্ট পেজে এই দুটো রেট দেখানো হবে এবং অর্ডারে যোগ হবে। খালি রাখলে ডিফল্ট রেট (৭০/১২০ টাকা) ব্যবহার হবে।",
     shippingInside: "ঢাকার ভেতরে (৳)",
     shippingOutside: "ঢাকার বাইরে (৳)",
+    navBarSection: "ক্যাটাগরি ন্যাভ বার (CareSolution টেমপ্লেট)",
+    navBarHint: "হোমপেজের উপরের ক্যাটাগরি বার-এর রঙ।",
+    navBgColor: "ব্যাকগ্রাউন্ড কালার",
+    navTextColor: "টেক্সট কালার",
     modeStorefront: "শপ হোমপেজ (ডিফল্ট)",
     modeStorefrontHint: "একটা পূর্ণাঙ্গ ক্যাটালগ হোমপেজ (ব্যানার/ফিচারড ক্যাটাগরি/টপ-সেলিং)।",
     modeLandingPage: "আমার একটা ল্যান্ডিং পেজ",
@@ -48,8 +52,11 @@ const t = {
     bannerHint: "হোমপেজের উপরে দেখানো হবে। একাধিক ব্যানার দিতে পারেন।",
     uploadBanner: "ব্যানার আপলোড করুন",
     linkUrlPlaceholder: "লিংক (ঐচ্ছিক)",
+    bannerProductLabel: "প্রোডাক্ট লিংক",
+    bannerNoProductLink: "কোনো লিংক না",
     featuredCategoriesSection: "ফিচারড ক্যাটাগরি",
-    featuredCategoriesHint: "হোমপেজে কোন ক্যাটাগরিগুলো হাইলাইট করে দেখানো হবে বেছে নিন। কিছু না বাছলে সবগুলো দেখাবে।",
+    featuredCategoriesHint: "হোমপেজে কোন ক্যাটাগরিগুলো হাইলাইট করে দেখানো হবে বেছে নিন। কিছু না বাছলে সবগুলো দেখাবে। প্রতিটার জন্য একটা থাম্বনেইল ছবিও সেট করতে পারেন — সেট না করলে বর্তমানে যেভাবে দেখাচ্ছে (অক্ষরের গোল আইকন) সেভাবেই থাকবে।",
+    categoryThumbUpload: "থাম্বনেইল",
     aboutSection: "শপ সম্পর্কে",
     aboutText: "শপ সম্পর্কে টেক্সট",
     uploadAboutImage: "ছবি আপলোড করুন",
@@ -77,6 +84,10 @@ const t = {
     shippingHint: "Shown on the cart page and added to orders on the CareSolution template. Leave empty to use the default rates (৳70/৳120).",
     shippingInside: "Inside Dhaka (৳)",
     shippingOutside: "Outside Dhaka (৳)",
+    navBarSection: "Category Nav Bar (CareSolution template)",
+    navBarHint: "Colors for the category bar at the top of the homepage.",
+    navBgColor: "Background color",
+    navTextColor: "Text color",
     modeStorefront: "Shop homepage (default)",
     modeStorefrontHint: "A full catalog homepage (banners/featured categories/top-selling).",
     modeLandingPage: "One of my landing pages",
@@ -99,8 +110,11 @@ const t = {
     bannerHint: "Shown at the top of the homepage. You can add multiple.",
     uploadBanner: "Upload banner",
     linkUrlPlaceholder: "Link (optional)",
+    bannerProductLabel: "Product link",
+    bannerNoProductLink: "No link",
     featuredCategoriesSection: "Featured Categories",
-    featuredCategoriesHint: "Choose which categories are highlighted on the homepage. Leave empty to show all.",
+    featuredCategoriesHint: "Choose which categories are highlighted on the homepage. Leave empty to show all. You can also set a thumbnail image for each — if not set, it keeps showing the current letter-circle icon.",
+    categoryThumbUpload: "Thumbnail",
     aboutSection: "About the shop",
     aboutText: "About text",
     uploadAboutImage: "Upload image",
@@ -117,7 +131,8 @@ const t = {
 };
 
 type LandingPageOption = { id: number; title: string; status: string };
-type Category = { id: number; name: string };
+type Category = { id: number; name: string; thumbnail_url: string | null };
+type ProductOption = { id: number; name: string; slug: string };
 type ImageEntry = { image_url: string; link_url: string | null };
 type Settings = {
   homepage_mode: "storefront" | "landing_page";
@@ -126,6 +141,8 @@ type Settings = {
   shipping_charge_inside_dhaka: string | number | null;
   shipping_charge_outside_dhaka: string | number | null;
   theme_primary_color: string | null;
+  nav_bg_color: string | null;
+  nav_text_color: string | null;
   whatsapp_number: string | null;
   show_call_button: boolean;
   show_whatsapp_button: boolean;
@@ -145,12 +162,15 @@ export default function StorefrontSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [pages, setPages] = useState<LandingPageOption[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
 
   const [mode, setMode] = useState<"storefront" | "landing_page">("storefront");
   const [pageId, setPageId] = useState<number | "">("");
   const [themeTemplate, setThemeTemplate] = useState<"standard" | "caresolution">("standard");
   const [shippingInside, setShippingInside] = useState("");
   const [shippingOutside, setShippingOutside] = useState("");
+  const [navBgColor, setNavBgColor] = useState("#111827");
+  const [navTextColor, setNavTextColor] = useState("#ffffff");
   const [themeColor, setThemeColor] = useState("#ea580c");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [showCall, setShowCall] = useState(true);
@@ -165,6 +185,7 @@ export default function StorefrontSettingsPage() {
   const [partnerLogos, setPartnerLogos] = useState<ImageEntry[]>([]);
   const [bannerLinkInput, setBannerLinkInput] = useState("");
   const [partnerLinkInput, setPartnerLinkInput] = useState("");
+  const [thumbUploadingId, setThumbUploadingId] = useState<number | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -184,6 +205,8 @@ export default function StorefrontSettingsPage() {
     setThemeTemplate(settings.theme_template === "caresolution" ? "caresolution" : "standard");
     setShippingInside(settings.shipping_charge_inside_dhaka != null ? String(settings.shipping_charge_inside_dhaka) : "");
     setShippingOutside(settings.shipping_charge_outside_dhaka != null ? String(settings.shipping_charge_outside_dhaka) : "");
+    setNavBgColor(settings.nav_bg_color || "#111827");
+    setNavTextColor(settings.nav_text_color || "#ffffff");
     setThemeColor(settings.theme_primary_color || "#ea580c");
     setWhatsappNumber(settings.whatsapp_number ?? "");
     setShowCall(settings.show_call_button ?? true);
@@ -203,15 +226,17 @@ export default function StorefrontSettingsPage() {
 
     (async () => {
       try {
-        const [settingsRes, pagesRes, categoriesRes] = await Promise.all([
+        const [settingsRes, pagesRes, categoriesRes, productsRes] = await Promise.all([
           fetch(`${API}/storefront-settings`, { headers: authHeaders }),
           fetch(`${API}/landing/pages?per_page=100`, { headers: authHeaders }),
           fetch(`${API}/categories`, { headers: authHeaders }),
+          fetch(`${API}/products?per_page=200&status=active`, { headers: authHeaders }),
         ]);
 
         const settingsJson = await settingsRes.json().catch(() => ({}));
         const pagesJson = await pagesRes.json().catch(() => ({}));
         const categoriesJson = await categoriesRes.json().catch(() => ({}));
+        const productsJson = await productsRes.json().catch(() => ({}));
 
         if (settingsJson?.data) applySettings(settingsJson.data);
 
@@ -220,6 +245,7 @@ export default function StorefrontSettingsPage() {
         );
         setPages(published);
         setCategories(categoriesJson?.data ?? []);
+        setProducts(productsJson?.data ?? []);
       } finally {
         setLoading(false);
       }
@@ -250,6 +276,8 @@ export default function StorefrontSettingsPage() {
           theme_template: themeTemplate,
           shipping_charge_inside_dhaka: shippingInside === "" ? null : Number(shippingInside),
           shipping_charge_outside_dhaka: shippingOutside === "" ? null : Number(shippingOutside),
+          nav_bg_color: navBgColor,
+          nav_text_color: navTextColor,
           theme_primary_color: themeColor,
           whatsapp_number: whatsappNumber || null,
           show_call_button: showCall,
@@ -304,6 +332,41 @@ export default function StorefrontSettingsPage() {
       if (res.ok) applySettings(data.data);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function uploadCategoryThumbnail(categoryId: number, file: File) {
+    setThumbUploadingId(categoryId);
+    try {
+      const body = new FormData();
+      body.append("image", file);
+
+      const res = await fetch(`${API}/categories/${categoryId}/thumbnail`, {
+        method: "POST",
+        headers: authHeaders,
+        body,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCategories((prev) => prev.map((c) => (c.id === categoryId ? { ...c, thumbnail_url: data.data.thumbnail_url } : c)));
+      }
+    } finally {
+      setThumbUploadingId(null);
+    }
+  }
+
+  async function removeCategoryThumbnail(categoryId: number) {
+    setThumbUploadingId(categoryId);
+    try {
+      const res = await fetch(`${API}/categories/${categoryId}/thumbnail`, {
+        method: "DELETE",
+        headers: authHeaders,
+      });
+      if (res.ok) {
+        setCategories((prev) => prev.map((c) => (c.id === categoryId ? { ...c, thumbnail_url: null } : c)));
+      }
+    } finally {
+      setThumbUploadingId(null);
     }
   }
 
@@ -372,6 +435,28 @@ export default function StorefrontSettingsPage() {
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
               />
             </label>
+          </div>
+        </section>
+
+        {/* Category nav bar colors */}
+        <section className="catv-panel mt-4 p-5">
+          <h2 className="text-sm font-bold">{txt.navBarSection}</h2>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{txt.navBarHint}</p>
+          <div className="mt-3 flex flex-wrap items-end gap-4">
+            <label className="block">
+              <span className="mb-1 block text-xs text-[var(--muted)]">{txt.navBgColor}</span>
+              <input type="color" value={navBgColor} onChange={(e) => setNavBgColor(e.target.value)} className="h-10 w-16 rounded-lg border border-[var(--border)]" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-[var(--muted)]">{txt.navTextColor}</span>
+              <input type="color" value={navTextColor} onChange={(e) => setNavTextColor(e.target.value)} className="h-10 w-16 rounded-lg border border-[var(--border)]" />
+            </label>
+            <div
+              className="flex h-10 flex-1 min-w-[160px] items-center rounded-lg px-4 text-sm font-medium"
+              style={{ background: navBgColor, color: navTextColor }}
+            >
+              {(categories[0]?.name ?? "Category")} · {(categories[1]?.name ?? "Category")}
+            </div>
           </div>
         </section>
 
@@ -463,13 +548,20 @@ export default function StorefrontSettingsPage() {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <input
-              value={bannerLinkInput}
-              onChange={(e) => setBannerLinkInput(e.target.value)}
-              placeholder={txt.linkUrlPlaceholder}
-              className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm"
-            />
-            <label className="cursor-pointer rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">
+            <label className="block">
+              <span className="mb-1 block text-xs text-[var(--muted)]">{txt.bannerProductLabel}</span>
+              <select
+                value={bannerLinkInput}
+                onChange={(e) => setBannerLinkInput(e.target.value)}
+                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm"
+              >
+                <option value="">{txt.bannerNoProductLink}</option>
+                {products.map((p) => (
+                  <option key={p.id} value={`/product/${p.slug}`}>{p.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="cursor-pointer self-end rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">
               {uploading ? txt.uploading : txt.uploadBanner}
               <input
                 type="file"
@@ -491,20 +583,56 @@ export default function StorefrontSettingsPage() {
         <section className="catv-panel mt-4 p-5">
           <h2 className="text-sm font-bold">{txt.featuredCategoriesSection}</h2>
           <p className="mt-0.5 text-xs text-[var(--muted)]">{txt.featuredCategoriesHint}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {categories.map((c) => (
-              <label
+              <div
                 key={c.id}
-                className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs ${featuredCategoryIds.includes(c.id) ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]" : "border-[var(--border)]"}`}
+                className={`rounded-xl border p-3 ${featuredCategoryIds.includes(c.id) ? "border-[var(--accent)] bg-[var(--accent)]/5" : "border-[var(--border)]"}`}
               >
-                <input
-                  type="checkbox"
-                  checked={featuredCategoryIds.includes(c.id)}
-                  onChange={() => toggleFeaturedCategory(c.id)}
-                  className="hidden"
-                />
-                {c.name}
-              </label>
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={featuredCategoryIds.includes(c.id)}
+                    onChange={() => toggleFeaturedCategory(c.id)}
+                    className="h-3.5 w-3.5 accent-[var(--accent)]"
+                  />
+                  {c.name}
+                </label>
+
+                <div className="mt-2 flex items-center gap-2">
+                  {c.thumbnail_url ? (
+                    <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={c.thumbnail_url} alt="" className="h-10 w-10 rounded-full object-cover" />
+                      <button
+                        onClick={() => removeCategoryThumbnail(c.id)}
+                        disabled={thumbUploadingId === c.id}
+                        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-[9px] text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)]/10 text-sm text-[var(--accent)]">
+                      {c.name.charAt(0)}
+                    </span>
+                  )}
+                  <label className="cursor-pointer text-[11px] font-medium text-[var(--accent)]">
+                    {thumbUploadingId === c.id ? txt.uploading : txt.categoryThumbUpload}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={thumbUploadingId === c.id}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void uploadCategoryThumbnail(c.id, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
             ))}
           </div>
         </section>
