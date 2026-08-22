@@ -18,11 +18,19 @@ export default function CaresolutionHero({ home }: { home: StorefrontHome }) {
     <div className="space-y-4">
       {banners.length > 0 ? (
         <div className={`grid gap-3 ${stacked.length > 0 ? "sm:grid-cols-3" : ""}`}>
-          <Banner banner={main} className={`h-40 sm:h-64 ${stacked.length > 0 ? "sm:col-span-2" : ""}`} />
+          <div className={`h-40 sm:h-64 ${stacked.length > 0 ? "sm:col-span-2" : ""}`}>
+            <Banner banner={main} />
+          </div>
           {stacked.length > 0 ? (
-            <div className="grid gap-3 sm:h-64 sm:grid-rows-2">
+            // flex, not grid-rows-2 — self-adjusts to fill the full 256px
+            // whether there's 1 or 2 stacked banners, instead of leaving an
+            // empty row (1 banner) that a naive h-auto image could then
+            // overflow past and visually cover the trust-badge strip below.
+            <div className="flex flex-col gap-3 sm:h-64">
               {stacked.map((b, i) => (
-                <Banner key={i} banner={b} className="h-28 sm:h-auto" />
+                <div key={i} className="h-28 min-h-0 flex-1 sm:h-auto">
+                  <Banner banner={b} />
+                </div>
               ))}
             </div>
           ) : null}
@@ -41,10 +49,17 @@ export default function CaresolutionHero({ home }: { home: StorefrontHome }) {
   );
 }
 
-function Banner({ banner, className }: { banner: { image_url: string; link_url?: string | null }; className: string }) {
+/** Always fills its wrapper (h-full) — height is controlled by the wrapper, never the image's own aspect ratio. */
+function Banner({ banner }: { banner: { image_url: string; link_url?: string | null } }) {
   const img = (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={banner.image_url} alt="" className={`w-full rounded-2xl object-cover ${className}`} />
+    <img src={banner.image_url} alt="" className="h-full w-full rounded-2xl object-cover" />
   );
-  return banner.link_url ? <a href={banner.link_url}>{img}</a> : img;
+  return banner.link_url ? (
+    <a href={banner.link_url} className="block h-full">
+      {img}
+    </a>
+  ) : (
+    <div className="h-full">{img}</div>
+  );
 }
