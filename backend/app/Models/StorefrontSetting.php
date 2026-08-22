@@ -15,10 +15,19 @@ class StorefrontSetting extends Model
     public const HOMEPAGE_STOREFRONT = 'storefront';
     public const HOMEPAGE_LANDING_PAGE = 'landing_page';
 
+    public const THEME_STANDARD = 'standard';
+    public const THEME_CARESOLUTION = 'caresolution';
+
+    // Fallback flat rates when a seller hasn't set their own — matches the
+    // caresolutionbd.com reference the "caresolution" template is based on.
+    public const DEFAULT_SHIPPING_INSIDE_DHAKA = 70.0;
+    public const DEFAULT_SHIPPING_OUTSIDE_DHAKA = 120.0;
+
     protected $fillable = [
         'user_id',
         'homepage_mode',
         'homepage_landing_page_id',
+        'theme_template',
         'theme_primary_color',
         'banner_images',
         'featured_category_ids',
@@ -32,6 +41,8 @@ class StorefrontSetting extends Model
         'show_messenger_button',
         'warranty_policy_text',
         'delivery_policy_text',
+        'shipping_charge_inside_dhaka',
+        'shipping_charge_outside_dhaka',
         'is_active',
     ];
 
@@ -42,8 +53,19 @@ class StorefrontSetting extends Model
         'show_call_button' => 'boolean',
         'show_whatsapp_button' => 'boolean',
         'show_messenger_button' => 'boolean',
+        'shipping_charge_inside_dhaka' => 'decimal:2',
+        'shipping_charge_outside_dhaka' => 'decimal:2',
         'is_active' => 'boolean',
     ];
+
+    public function shippingChargeFor(string $location): float
+    {
+        if ($location === 'outside_dhaka') {
+            return (float) ($this->shipping_charge_outside_dhaka ?? self::DEFAULT_SHIPPING_OUTSIDE_DHAKA);
+        }
+
+        return (float) ($this->shipping_charge_inside_dhaka ?? self::DEFAULT_SHIPPING_INSIDE_DHAKA);
+    }
 
     public function user(): BelongsTo
     {

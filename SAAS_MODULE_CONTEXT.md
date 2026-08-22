@@ -1,6 +1,6 @@
 # F-Commerce SaaS — Module Context
 
-Last updated: 2026-08-21 — **নতুন §21: সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — প্ল্যান সম্পন্ন, কোড এখনো শুরু হয়নি** (`feature_roadmap_context.md` আইটেম #৯)। এখন landing page একটা ক্যাম্পেইন-পেজ (single-product-focused), কিন্তু সেলারদের দরকার Ghorer Bazar/Deshi Tech-স্টাইল একটা পূর্ণাঙ্গ ব্রাউজযোগ্য ক্যাটালগ শপ — হোমপেজ, ক্যাটাগরি নেভিগেশন, প্রোডাক্ট লিস্টিং/ডিটেইল, কার্ট, সার্চ, রিভিউ। বিস্তারিত ১০-ফেজ প্ল্যান `seller_storefront_context.md`-এ — user-এর অনুমতির অপেক্ষায়, এখনো কোনো migration/কোড লেখা হয়নি। Older entries kept as-is:
+Last updated: 2026-08-22 — **§21: সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — S0-S9 + S3b সম্পূর্ণ লাইভ, প্লাস Theme Templates addendum (multi-template + CareSolution-style টেমপ্লেট) লাইভ** (`feature_roadmap_context.md` আইটেম #৯)। বিস্তারিত `seller_storefront_context.md`। Older entries kept as-is:
 
 Last updated: 2026-08-20 (৫) — **§20 (ডিজিটাল প্রোডাক্ট সিস্টেম) Phase 1 ✅ সম্পন্ন ও লাইভ** — migration/backend/১৮টা টেস্ট/ফ্রন্টএন্ড (প্রোডাক্ট ফর্ম, চেকআউট, thank-you, নতুন `/d/[token]` ডাউনলোড পেজ, admin policy পেজ) সব deployed। বিস্তারিত `digital_product_context.md §০ক-১৩`। Older entries kept as-is:
 
@@ -1258,3 +1258,5 @@ Cart client-side (`localStorage`, origin-scoped — auth টোকেনের �
 **S9 ✅ লাইভ — প্ল্যানের শেষ ফেজ, পুরো storefront ফিচার এখন সম্পূর্ণ:** `useBsolTracking()` হুক ও `SendFacebookCapiPurchaseEventJob` — দুটোই আগে থেকেই landing-page-নির্দিষ্ট ছিল না (শুধু `{slug, tracking}` আর `Order.id`/`Order.user_id` নেয়) — তাই S9 মূলত নতুন লজিক না, বিদ্যমান পাইপলাইনে storefront-কে সঠিক জায়গায় প্লাগ-ইন করা। `home()`-এ shop-wide `tracking` config, checkout-এ fbp/fbc persist + CAPI job dispatch, ফ্রন্টএন্ডে PageView/ViewContent/AddToCart/InitiateCheckout/Purchase — সবগুলো storefront পেজে ওয়্যার করা হয়েছে (নতুন `StorefrontTrackingProvider` context দিয়ে, প্রতি পেজ/কার্ডে আলাদা fetch ছাড়াই)। zareen-এর real Pixel ID দিয়ে লাইভ ভেরিফাই করা হয়েছে।
 
 বিস্তারিত `seller_storefront_context.md §১৭-২৩`। **সেলার স্টোরফ্রন্ট ফিচার এখন সম্পূর্ণ (S0-S9 + S3b, সবগুলো লাইভ)।**
+
+**Theme Templates addendum ✅ লাইভ (২০২৬-০৮-২২):** স্টোরফ্রন্ট এখন multi-template — সেলার dashboard-এ "Standard" (আগের ডিজাইন) বা "CareSolution Style" (নতুন — ডার্ক হেডার, ট্রাস্ট-ব্যাজ স্ট্রিপ, SALE-ব্যাজ প্রোডাক্ট কার্ড+Cart/Buy বাটন, মোবাইলে bottom nav + drawer, ডার্ক ফুটার) বেছে নিতে পারে। `storefront_settings.theme_template` একটাই সেটিং পুরো template switch চালায় (`useStorefrontTheme()` context, `StorefrontTrackingProvider`-এর মতোই প্যাটার্ন)। সাথে একটা real নতুন ফিচার: Inside/Outside Dhaka শিপিং চার্জ (সেলার dashboard-এ রেট সেট করে, `shipping_location` server-side রিজলভ হয়ে client-supplied amount override করে)। বিস্তারিত `seller_storefront_context.md §২৪`।

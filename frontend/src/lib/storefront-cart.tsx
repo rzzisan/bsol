@@ -26,6 +26,8 @@ export type CartItem = {
   productType: "physical" | "digital" | null;
 };
 
+export type ShippingLocation = "inside_dhaka" | "outside_dhaka";
+
 type CartContextValue = {
   items: CartItem[];
   addItem: (item: Omit<CartItem, "quantity">, quantity?: number) => { ok: boolean; error?: string };
@@ -34,34 +36,51 @@ type CartContextValue = {
   clear: () => void;
   itemCount: number;
   subtotal: number;
+  // Only the "caresolution" template's cart page exposes a picker for
+  // this — Standard keeps the pre-existing shipping_charge=0 behavior by
+  // simply never changing it away from the default. See
+  // seller_storefront_context.md's theme-templates addendum.
+  shippingLocation: ShippingLocation;
+  setShippingLocation: (location: ShippingLocation) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-function loadCart(): CartItem[] {
-  if (typeof window === "undefined") return [];
+type StoredCart = { items: CartItem[]; shippingLocation: ShippingLocation };
+
+function loadCart(): StoredCart {
+  const fallback: StoredCart = { items: [], shippingLocation: "inside_dhaka" };
+  if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    // Backward-compatible with the pre-existing items-only array shape.
+    if (Array.isArray(parsed)) return { items: parsed, shippingLocation: "inside_dhaka" };
+    return {
+      items: Array.isArray(parsed?.items) ? parsed.items : [],
+      shippingLocation: parsed?.shippingLocation === "outside_dhaka" ? "outside_dhaka" : "inside_dhaka",
+    };
   } catch {
-    return [];
+    return fallback;
   }
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [shippingLocation, setShippingLocation] = useState<ShippingLocation>("inside_dhaka");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setItems(loadCart());
+    const stored = loadCart();
+    setItems(stored.items);
+    setShippingLocation(stored.shippingLocation);
     setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  }, [items, hydrated]);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, shippingLocation }));
+  }, [items, shippingLocation, hydrated]);
 
   // Mixed cart (physical + digital in one order) isn't allowed — the same
   // rule the landing-page checkout enforces (digital_product_context.md).
@@ -106,8 +125,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0), [items]);
 
   const value = useMemo(
-    () => ({ items, addItem, removeItem, updateQuantity, clear, itemCount, subtotal }),
-    [items, addItem, removeItem, updateQuantity, clear, itemCount, subtotal],
+    () => ({ items, addItem, removeItem, updateQuantity, clear, itemCount, subtotal, shippingLocation, setShippingLocation }),
+    [items, addItem, removeItem, updateQuantity, clear, itemCount, subtotal, shippingLocation],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

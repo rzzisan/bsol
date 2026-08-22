@@ -121,7 +121,19 @@ class StorefrontCatalogController extends Controller
                 'show_whatsapp_button' => $storefront?->show_whatsapp_button ?? true,
                 'show_messenger_button' => ($storefront?->show_messenger_button ?? true) && $messengerPageId !== null,
                 'messenger_page_id' => $messengerPageId,
+                'theme_template' => $storefront?->theme_template ?? StorefrontSetting::THEME_STANDARD,
                 'theme_primary_color' => $storefront?->theme_primary_color,
+                // Fallback defaults applied here (not stored) so a seller
+                // who hasn't configured a rate yet still gets a sane cart
+                // — see StorefrontSetting::shippingChargeFor().
+                'shipping_charge_inside_dhaka' => number_format(
+                    (float) ($storefront?->shipping_charge_inside_dhaka ?? StorefrontSetting::DEFAULT_SHIPPING_INSIDE_DHAKA),
+                    2, '.', '',
+                ),
+                'shipping_charge_outside_dhaka' => number_format(
+                    (float) ($storefront?->shipping_charge_outside_dhaka ?? StorefrontSetting::DEFAULT_SHIPPING_OUTSIDE_DHAKA),
+                    2, '.', '',
+                ),
                 // image_path is an internal storage detail (used server-side
                 // to delete the file on replace/remove) — stripped here.
                 'banner_images' => collect($storefront?->banner_images ?? [])

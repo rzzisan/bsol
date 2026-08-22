@@ -16,6 +16,16 @@ const t = {
     pageTitle: "স্টোরফ্রন্ট",
     intro: "আপনার সাবডোমেইনের হোমপেজ (রুট ঠিকানা) কী দেখাবে বেছে নিন। যেটাই বেছে নিন, ক্যাটাগরি/প্রোডাক্ট পেজ সবসময় সরাসরি লিংকে চালু থাকবে।",
     loading: "লোড হচ্ছে...",
+    templateSection: "ডিজাইন টেমপ্লেট",
+    templateHint: "আপনার স্টোরফ্রন্টের ডিজাইন বেছে নিন।",
+    templateStandard: "Standard",
+    templateStandardHint: "বর্তমান সাধারণ ডিজাইন।",
+    templateCaresolution: "CareSolution Style",
+    templateCaresolutionHint: "ডার্ক হেডার, ট্রাস্ট ব্যাজ, SALE ব্যাজসহ প্রোডাক্ট কার্ড, মোবাইলে বটম ন্যাভ বার।",
+    shippingSection: "শিপিং চার্জ",
+    shippingHint: "CareSolution টেমপ্লেটে কার্ট পেজে এই দুটো রেট দেখানো হবে এবং অর্ডারে যোগ হবে। খালি রাখলে ডিফল্ট রেট (৭০/১২০ টাকা) ব্যবহার হবে।",
+    shippingInside: "ঢাকার ভেতরে (৳)",
+    shippingOutside: "ঢাকার বাইরে (৳)",
     modeStorefront: "শপ হোমপেজ (ডিফল্ট)",
     modeStorefrontHint: "একটা পূর্ণাঙ্গ ক্যাটালগ হোমপেজ (ব্যানার/ফিচারড ক্যাটাগরি/টপ-সেলিং)।",
     modeLandingPage: "আমার একটা ল্যান্ডিং পেজ",
@@ -57,6 +67,16 @@ const t = {
     pageTitle: "Storefront",
     intro: "Choose what your subdomain's homepage (root address) shows. Either way, category/product pages stay live at their own direct links.",
     loading: "Loading...",
+    templateSection: "Design Template",
+    templateHint: "Choose your storefront's design.",
+    templateStandard: "Standard",
+    templateStandardHint: "The current, plain design.",
+    templateCaresolution: "CareSolution Style",
+    templateCaresolutionHint: "Dark header, trust badges, SALE-badge product cards, mobile bottom nav bar.",
+    shippingSection: "Shipping Charge",
+    shippingHint: "Shown on the cart page and added to orders on the CareSolution template. Leave empty to use the default rates (৳70/৳120).",
+    shippingInside: "Inside Dhaka (৳)",
+    shippingOutside: "Outside Dhaka (৳)",
     modeStorefront: "Shop homepage (default)",
     modeStorefrontHint: "A full catalog homepage (banners/featured categories/top-selling).",
     modeLandingPage: "One of my landing pages",
@@ -102,6 +122,9 @@ type ImageEntry = { image_url: string; link_url: string | null };
 type Settings = {
   homepage_mode: "storefront" | "landing_page";
   homepage_landing_page_id: number | null;
+  theme_template: "standard" | "caresolution" | null;
+  shipping_charge_inside_dhaka: string | number | null;
+  shipping_charge_outside_dhaka: string | number | null;
   theme_primary_color: string | null;
   whatsapp_number: string | null;
   show_call_button: boolean;
@@ -125,6 +148,9 @@ export default function StorefrontSettingsPage() {
 
   const [mode, setMode] = useState<"storefront" | "landing_page">("storefront");
   const [pageId, setPageId] = useState<number | "">("");
+  const [themeTemplate, setThemeTemplate] = useState<"standard" | "caresolution">("standard");
+  const [shippingInside, setShippingInside] = useState("");
+  const [shippingOutside, setShippingOutside] = useState("");
   const [themeColor, setThemeColor] = useState("#ea580c");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [showCall, setShowCall] = useState(true);
@@ -155,6 +181,9 @@ export default function StorefrontSettingsPage() {
   function applySettings(settings: Settings) {
     if (settings.homepage_mode) setMode(settings.homepage_mode);
     if (settings.homepage_landing_page_id) setPageId(settings.homepage_landing_page_id);
+    setThemeTemplate(settings.theme_template === "caresolution" ? "caresolution" : "standard");
+    setShippingInside(settings.shipping_charge_inside_dhaka != null ? String(settings.shipping_charge_inside_dhaka) : "");
+    setShippingOutside(settings.shipping_charge_outside_dhaka != null ? String(settings.shipping_charge_outside_dhaka) : "");
     setThemeColor(settings.theme_primary_color || "#ea580c");
     setWhatsappNumber(settings.whatsapp_number ?? "");
     setShowCall(settings.show_call_button ?? true);
@@ -218,6 +247,9 @@ export default function StorefrontSettingsPage() {
         body: JSON.stringify({
           homepage_mode: mode,
           homepage_landing_page_id: mode === "landing_page" ? pageId : null,
+          theme_template: themeTemplate,
+          shipping_charge_inside_dhaka: shippingInside === "" ? null : Number(shippingInside),
+          shipping_charge_outside_dhaka: shippingOutside === "" ? null : Number(shippingOutside),
           theme_primary_color: themeColor,
           whatsapp_number: whatsappNumber || null,
           show_call_button: showCall,
@@ -289,8 +321,62 @@ export default function StorefrontSettingsPage() {
         <h1 className="text-xl font-bold sm:text-2xl">{txt.pageTitle}</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">{txt.intro}</p>
 
-        {/* Homepage mode */}
+        {/* Design template */}
         <section className="catv-panel mt-5 p-5">
+          <h2 className="text-sm font-bold">{txt.templateSection}</h2>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{txt.templateHint}</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label
+              className={`cursor-pointer rounded-xl border p-3 ${themeTemplate === "standard" ? "border-[var(--accent)] bg-[var(--accent)]/5" : "border-[var(--border)]"}`}
+            >
+              <input type="radio" checked={themeTemplate === "standard"} onChange={() => setThemeTemplate("standard")} className="hidden" />
+              <div className="mb-2 h-16 rounded-lg bg-gradient-to-b from-slate-100 to-white" />
+              <span className="block text-sm font-semibold">{txt.templateStandard}</span>
+              <span className="mt-0.5 block text-xs text-[var(--muted)]">{txt.templateStandardHint}</span>
+            </label>
+            <label
+              className={`cursor-pointer rounded-xl border p-3 ${themeTemplate === "caresolution" ? "border-[var(--accent)] bg-[var(--accent)]/5" : "border-[var(--border)]"}`}
+            >
+              <input type="radio" checked={themeTemplate === "caresolution"} onChange={() => setThemeTemplate("caresolution")} className="hidden" />
+              <div className="mb-2 h-16 rounded-lg bg-gradient-to-b from-neutral-900 via-neutral-900 to-orange-500" />
+              <span className="block text-sm font-semibold">{txt.templateCaresolution}</span>
+              <span className="mt-0.5 block text-xs text-[var(--muted)]">{txt.templateCaresolutionHint}</span>
+            </label>
+          </div>
+        </section>
+
+        {/* Shipping charge */}
+        <section className="catv-panel mt-4 p-5">
+          <h2 className="text-sm font-bold">{txt.shippingSection}</h2>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{txt.shippingHint}</p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1 block text-xs text-[var(--muted)]">{txt.shippingInside}</span>
+              <input
+                type="number"
+                min={0}
+                value={shippingInside}
+                onChange={(e) => setShippingInside(e.target.value)}
+                placeholder="70"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs text-[var(--muted)]">{txt.shippingOutside}</span>
+              <input
+                type="number"
+                min={0}
+                value={shippingOutside}
+                onChange={(e) => setShippingOutside(e.target.value)}
+                placeholder="120"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+        </section>
+
+        {/* Homepage mode */}
+        <section className="catv-panel mt-4 p-5">
           <h2 className="mb-3 text-sm font-bold">{txt.homepageSection}</h2>
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--border)] p-3">
             <input type="radio" checked={mode === "storefront"} onChange={() => setMode("storefront")} className="mt-1 h-4 w-4 accent-[var(--accent)]" />

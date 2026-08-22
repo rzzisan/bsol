@@ -68,6 +68,8 @@ export type ProductDetail = ProductSummary & {
   related_products: ProductSummary[];
 };
 
+export type ThemeTemplate = "standard" | "caresolution";
+
 export type StorefrontHome = {
   shop_name: string | null;
   logo_url: string | null;
@@ -78,7 +80,10 @@ export type StorefrontHome = {
   show_whatsapp_button: boolean;
   show_messenger_button: boolean;
   messenger_page_id: string | null;
+  theme_template: ThemeTemplate;
   theme_primary_color: string | null;
+  shipping_charge_inside_dhaka: string | number;
+  shipping_charge_outside_dhaka: string | number;
   banner_images: Array<{ image_url: string; link_url?: string | null }>;
   about_text: string | null;
   about_image_url: string | null;
@@ -200,6 +205,7 @@ export type CheckoutPayload = {
   customer_email?: string;
   notes?: string;
   payment_method?: string;
+  shipping_location?: "inside_dhaka" | "outside_dhaka";
   items: Array<{ product_id: number; quantity: number; product_variant_id?: number }>;
 };
 

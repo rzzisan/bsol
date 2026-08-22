@@ -5,12 +5,25 @@ import { useState } from "react";
 import { useCart } from "@/lib/storefront-cart";
 import { money, type ProductSummary } from "@/lib/storefront-client";
 import { useStorefrontTracking } from "@/lib/storefront-tracking-context";
+import { useStorefrontTheme } from "@/lib/storefront-theme-context";
 import { trackAddToCartEvent } from "@/lib/tracking";
+import CaresolutionProductCard from "./templates/caresolution/CaresolutionProductCard";
 
+/**
+ * Reused on Home, Category, Search, and "related products" — branching
+ * here reskins all four surfaces for the "caresolution" template with no
+ * other page needing to change. See seller_storefront_context.md's
+ * theme-templates addendum.
+ */
 export default function ProductCard({ product }: { product: ProductSummary }) {
+  const theme = useStorefrontTheme();
   const { addItem } = useCart();
   const tracking = useStorefrontTracking();
   const [message, setMessage] = useState<string | null>(null);
+
+  if (theme === "caresolution") {
+    return <CaresolutionProductCard product={product} />;
+  }
 
   const discounted = Number(product.selling_price) < Number(product.regular_price);
 

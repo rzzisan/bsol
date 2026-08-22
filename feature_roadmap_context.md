@@ -6,7 +6,7 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
-Last updated: 2026-08-21 (২) — **আইটেম #৯ (সেলার স্টোরফ্রন্ট) ✅ সম্পূর্ণ — সব ১০টা ফেজ (S0-S9) + S3b লাইভ ও deploy করা হয়েছে একই সেশনে।** রাউটিং/হোমপেজ, পাবলিক ক্যাটালগ API, dashboard ফিল্ড এডিটর, checkout (COD প্রথমে, পরে wallet+gateway অনলাইন পেমেন্ট), লোকালস্টোরেজ কার্ট + ক্যাটাগরি/প্রোডাক্ট/সার্চ পেজ, পূর্ণ হোমপেজ থিম (ব্যানার/ফিচারড ক্যাটাগরি/About/পার্টনার লোগো, real আপলোড), sitemap.xml/robots.txt/JSON-LD, ওপেন-সাবমিশন+moderation রিভিউ সিস্টেম, এবং Pixel+CAPI ট্র্যাকিং (বিদ্যমান পাইপলাইনে প্লাগ-ইন, নতুন লজিক প্রায় লাগেনি)। প্রতিটা ধাপ `zareen.zyrotechbd.com`-এ real ডেটা দিয়ে ভেরিফাই করা হয়েছে। বিস্তারিত `seller_storefront_context.md`। Older entries kept as-is:
+Last updated: 2026-08-22 — **আইটেম #৯ (সেলার স্টোরফ্রন্ট) ✅ সম্পূর্ণ (S0-S9 + S3b) + নতুন Theme Templates addendum ✅ লাইভ** — সেলার এখন dashboard থেকে স্টোরফ্রন্টের ডিজাইন টেমপ্লেট (Standard বা নতুন "CareSolution Style") বেছে নিতে পারে, প্লাস real Inside/Outside Dhaka শিপিং-চার্জ ফিচার। বিস্তারিত `seller_storefront_context.md §২৪`। Older entries kept as-is:
 
 Last updated: 2026-08-21 — **নতুন আইটেম #৯: সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ)** — ফিজিবিলিটি যাচাই + ১০-ফেজ প্ল্যান সম্পন্ন (`seller_storefront_context.md`)। এখন landing page একটা single-product ক্যাম্পেইন পেজ; এই ফিচার তার পাশাপাশি একটা পূর্ণাঙ্গ browsable ক্যাটালগ শপ (হোমপেজ/ক্যাটাগরি/প্রোডাক্ট লিস্টিং/কার্ট/সার্চ/রিভিউ) যোগ করে, per-seller সাবডোমেইনেই। কোনো migration/কোড এখনো লেখা হয়নি, user-এর অনুমতি বাকি। Older entries kept as-is:
 
@@ -45,7 +45,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 6 | Custom domain সাপোর্ট (landing pages) | 🟡 আংশিক — per-seller সাবডোমেইন অংশ ✅ সম্পন্ন (উপরে); সেলারের **নিজস্ব** ডোমেইন (T8b, `custom_domain_context.md §11` আইটেম ৩) এখনো শুরু হয়নি | `custom_domain_context.md` |
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
 | 8 | ডিজিটাল প্রোডাক্ট সিস্টেম (instant delivery, নিজস্ব হোস্টিং) | ✅ Phase 1 সম্পন্ন ও লাইভ (২০২৬-০৮-২০) | `digital_product_context.md` |
-| 9 | সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) | ✅ **সম্পূর্ণ (S0-S9, S3b সহ, ২০২৬-০৮-২১)** — রাউটিং, ক্যাটালগ, কার্ট, checkout (COD+wallet+gateway), হোমপেজ থিম, রিভিউ, SEO, ট্র্যাকিং (Pixel+CAPI) — সব real ডেটা দিয়ে end-to-end ভেরিফাইড | `seller_storefront_context.md` |
+| 9 | সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) | ✅ **সম্পূর্ণ (S0-S9, S3b সহ) + Theme Templates addendum (২০২৬-০৮-২২)** — রাউটিং, ক্যাটালগ, কার্ট, checkout (COD+wallet+gateway), হোমপেজ থিম, রিভিউ, SEO, ট্র্যাকিং (Pixel+CAPI), মাল্টি-টেমপ্লেট ডিজাইন (Standard/CareSolution) + শিপিং-চার্জ — সব real ডেটা দিয়ে end-to-end ভেরিফাইড | `seller_storefront_context.md` |
 | — | Bulk/CSV order import | ⬜ Not started | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
 | — | PWA | ⬜ Not started | (§16.9) |
 | — | Referral/affiliate program (সেলার→সেলার) | ⬜ Not started | — |
@@ -96,10 +96,10 @@ SMS automation এখন শুধু order-status trigger। VIP/loyal/risky se
 ### 8. ডিজিটাল প্রোডাক্ট সিস্টেম (২০২৬-০৮-২০, গবেষণা সম্পন্ন)
 ফিজিকালের পাশাপাশি সেলাররা e-book/software/course ইত্যাদি ডিজিটাল প্রোডাক্ট বিক্রি করবে — কুরিয়ারের বদলে instant email/WhatsApp/SMS/download-link ডেলিভারি, ফাইল হোস্টিং নিজেদের সার্ভারে, সাইজ/ফরম্যাট পলিসি সুপার-অ্যাডমিন-নিয়ন্ত্রিত। গবেষণায় দেখা গেছে অনেক ইনফ্রা আগে থেকেই আছে (admin-controlled file-policy প্যাটার্ন `ProductMediaSetting`-এ, email+SMS dispatch `NotificationDispatchService`-এ, secure token-link `Order.public_token`-এ, private storage disk আগে থেকেই আলাদা) — মূল নতুন কাজ হলো ডিজিটাল ফাইল স্টোরেজ+ডেলিভারি পাইপলাইন আর payment→instant-delivery gating (শুধু automated gateway-তে instant, personal-wallet manual-verify-তে না — এইটাই সবচেয়ে বড় সিদ্ধান্ত)। বিস্তারিত `digital_product_context.md`।
 
-### 9. সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) (২০২৬-০৮-২১, প্ল্যান সম্পন্ন)
-এখন landing page একটা single-product ক্যাম্পেইন পেজ (বিজ্ঞাপন থেকে আসা ট্রাফিকের জন্য)। সেলারদের একটা পূর্ণাঙ্গ browsable ইকমার্স শপও দরকার — হোমপেজ (ব্যানার/ফিচারড ক্যাটাগরি/টপ-সেলিং), ক্যাটাগরি নেভিগেশন, প্রোডাক্ট লিস্টিং+সার্চ, প্রোডাক্ট ডিটেইল (গ্যালারি/রিভিউ/related products), মাল্টি-প্রোডাক্ট কার্ট। User-এর দেওয়া রেফারেন্স ডিজাইন (Ghorer Bazar/organic.deshitech.com) থেকে স্পেসিফিকেশন নেওয়া, মোবাইল-ফার্স্ট (bottom nav + floating cart), SEO-friendly।
+### 9. সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) (২০২৬-০৮-২২, ✅ সম্পূর্ণ + Theme Templates addendum)
+এখন landing page একটা single-product ক্যাম্পেইন পেজ (বিজ্ঞাপন থেকে আসা ট্রাফিকের জন্য)। সেলারদের একটা পূর্ণাঙ্গ browsable ইকমার্স শপও দরকার ছিল — হোমপেজ (ব্যানার/ফিচারড ক্যাটাগরি/টপ-সেলিং), ক্যাটাগরি নেভিগেশন, প্রোডাক্ট লিস্টিং+সার্চ, প্রোডাক্ট ডিটেইল (গ্যালারি/রিভিউ/related products), মাল্টি-প্রোডাক্ট কার্ট — S0-S9 + S3b (COD → wallet+gateway অনলাইন পেমেন্ট, SEO, রিভিউ, Pixel+CAPI ট্র্যাকিং) সব ✅ লাইভ।
 
-`Product`/`ProductCategory`/per-seller subdomain/checkout-payment-courier ইঞ্জিন সরাসরি reuse হবে — নতুন মূল কাজ: পাবলিক ক্যাটালগ API, client-side cart, storefront থিম/হোমপেজ কনফিগারেশন, রিভিউ সিস্টেম, SEO ইনফ্রা। root path (`/`) ডিফল্টে storefront দেখাবে, সেলার চাইলে একটা landing page-কে হোমপেজ হিসেবে সেট করতে পারবে — কিন্তু স্টোরফ্রন্ট সবসময় সরাসরি URL-এ অ্যাক্সেসযোগ্য থাকবে। বিস্তারিত ১০-ফেজ প্ল্যান `seller_storefront_context.md`। **User-এর অনুমতির অপেক্ষায়, কোনো কোড এখনো লেখা হয়নি।**
+**Theme Templates addendum (২০২৬-০৮-২২, ✅ লাইভ):** সেলার এখন dashboard থেকে স্টোরফ্রন্টের ডিজাইন টেমপ্লেট বেছে নিতে পারে — "Standard" (আগের ডিজাইন) বা "CareSolution Style" (ডার্ক হেডার, ট্রাস্ট-ব্যাজ, SALE-ব্যাজ প্রোডাক্ট কার্ড+Cart/Buy বাটন, মোবাইল bottom nav+drawer)। সাথে একটা real Inside/Outside Dhaka শিপিং-চার্জ ফিচারও যোগ হয়েছে (সেলার রেট সেট করে, checkout-এ server-side রিজলভ হয়)। বিস্তারিত `seller_storefront_context.md §২৪`।
 
 ---
 

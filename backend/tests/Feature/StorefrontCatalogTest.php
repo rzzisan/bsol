@@ -201,7 +201,29 @@ class StorefrontCatalogTest extends TestCase
             ->assertJsonCount(1, 'data.featured_categories')
             ->assertJsonPath('data.featured_categories.0.slug', 'oil')
             ->assertJsonCount(1, 'data.featured_products')
-            ->assertJsonPath('data.featured_products.0.id', $featured->id);
+            ->assertJsonPath('data.featured_products.0.id', $featured->id)
+            // No theme_template set -> defaults to 'standard'; no shipping
+            // rates configured -> platform fallback defaults (70/120).
+            ->assertJsonPath('data.theme_template', 'standard')
+            ->assertJsonPath('data.shipping_charge_inside_dhaka', '70.00')
+            ->assertJsonPath('data.shipping_charge_outside_dhaka', '120.00');
+    }
+
+    public function test_home_reflects_configured_theme_template_and_shipping_charges(): void
+    {
+        $a = $this->seller('shopb', 'Shop B');
+        \App\Models\StorefrontSetting::create([
+            'user_id' => $a->id,
+            'theme_template' => 'caresolution',
+            'shipping_charge_inside_dhaka' => 90,
+            'shipping_charge_outside_dhaka' => 160,
+        ]);
+
+        $this->getJson("https://shopb.{$this->apex()}/api/public/storefront/home")
+            ->assertOk()
+            ->assertJsonPath('data.theme_template', 'caresolution')
+            ->assertJsonPath('data.shipping_charge_inside_dhaka', '90.00')
+            ->assertJsonPath('data.shipping_charge_outside_dhaka', '160.00');
     }
 
     public function test_sitemap_data_lists_categories_products_and_published_landing_pages_scoped_to_shop(): void

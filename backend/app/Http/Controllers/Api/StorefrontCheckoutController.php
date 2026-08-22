@@ -40,6 +40,7 @@ class StorefrontCheckoutController extends Controller
             CheckoutFieldResolver::buildRules($resolvedFields, true),
             [
                 'shipping_charge' => ['nullable', 'numeric', 'min:0'],
+                'shipping_location' => ['nullable', Rule::in(['inside_dhaka', 'outside_dhaka'])],
                 'customer_email' => ['nullable', 'email', 'max:255'],
                 'payment_method' => ['nullable', Rule::in(array_merge(['cod', 'bkash', 'nagad', 'rocket'], PaymentGatewayCredential::PROVIDERS))],
                 'items' => ['required', 'array', 'min:1'],
@@ -102,6 +103,20 @@ class StorefrontCheckoutController extends Controller
                 $message = 'এই ডিজিটাল প্রোডাক্টটি পেতে একটি ইমেইল ঠিকানা প্রয়োজন।';
                 return response()->json(['success' => false, 'message' => $message, 'errors' => ['customer_email' => [$message]]], 422);
             }
+        }
+
+        // shipping_location (when sent) overrides any raw shipping_charge
+        // with the seller's own configured rate — never trust a client-
+        // supplied amount when we can resolve it server-side ourselves.
+        if (! empty($validated['shipping_location'])) {
+            $storefront = \App\Models\StorefrontSetting::where('user_id', $ownerId)->first();
+            $validated['shipping_charge'] = $storefront
+                ? $storefront->shippingChargeFor($validated['shipping_location'])
+                : (
+                    $validated['shipping_location'] === 'outside_dhaka'
+                        ? \App\Models\StorefrontSetting::DEFAULT_SHIPPING_OUTSIDE_DHAKA
+                        : \App\Models\StorefrontSetting::DEFAULT_SHIPPING_INSIDE_DHAKA
+                );
         }
 
         $order = app(StorefrontOrderService::class)->create($ownerId, $shopUserIds, $validated, $lineItems, $products->all());

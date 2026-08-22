@@ -1,14 +1,16 @@
-import Link from "next/link";
 import { headers } from "next/headers";
 import { CartProvider } from "@/lib/storefront-cart";
 import { StorefrontTrackingProvider } from "@/lib/storefront-tracking-context";
+import { StorefrontThemeProvider } from "@/lib/storefront-theme-context";
 import { fetchCategories, fetchHome } from "@/lib/storefront-client";
-import FloatingCartButton from "@/components/storefront/floating-cart-button";
-import AuthPlaceholderButton from "@/components/storefront/auth-placeholder-button";
+import StandardShell from "@/components/storefront/templates/standard/StandardShell";
+import CaresolutionShell from "@/components/storefront/templates/caresolution/CaresolutionShell";
 
 /**
  * Shared chrome for every /store/* page (home, category, product, search,
  * cart, checkout, order) — seller_storefront_context.md §12 (S4/S5/S6).
+ * Picks a Shell per the shop's `theme_template` — see the theme-templates
+ * addendum for the full template-switch design.
  */
 
 function getBaseUrl(headerList: Headers) {
@@ -25,68 +27,23 @@ export default async function StoreLayout({ children }: { children: React.ReactN
   const headerList = await headers();
   const baseUrl = getBaseUrl(headerList);
   const [home, categories] = await Promise.all([fetchHome(baseUrl), fetchCategories(baseUrl)]);
-  const accent = home?.theme_primary_color || "#0f172a";
+  const theme = home?.theme_template ?? "standard";
+  const shippingRates = {
+    insideDhaka: Number(home?.shipping_charge_inside_dhaka ?? 70),
+    outsideDhaka: Number(home?.shipping_charge_outside_dhaka ?? 120),
+  };
+
+  const Shell = theme === "caresolution" ? CaresolutionShell : StandardShell;
 
   return (
     <StorefrontTrackingProvider tracking={home?.tracking ?? null}>
-      <CartProvider>
-        <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-            <Link href="/" className="flex items-center gap-2 font-bold">
-              {home?.logo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={home.logo_url} alt={home.shop_name ?? "Shop"} className="h-8 w-8 rounded-full object-cover" />
-              ) : null}
-              <span className="truncate">{home?.shop_name ?? "Shop"}</span>
-            </Link>
-            <nav className="flex items-center gap-4 text-sm">
-              <Link href="/search" className="text-slate-600 hover:text-slate-900">
-                সব প্রোডাক্ট
-              </Link>
-              <Link href="/cart" className="text-slate-600 hover:text-slate-900">
-                কার্ট
-              </Link>
-              <AuthPlaceholderButton />
-            </nav>
-          </div>
-
-          {categories && categories.length > 0 ? (
-            <div className="border-t border-slate-100">
-              <div className="mx-auto flex max-w-6xl gap-4 overflow-x-auto px-4 py-2 text-sm">
-                {categories.map((c) => (
-                  <Link key={c.id} href={`/category/${c.slug}`} className="whitespace-nowrap text-slate-600 hover:text-slate-900">
-                    {c.name}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </header>
-
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
-
-        <footer className="mt-8 border-t border-slate-200 bg-white">
-          <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-slate-500">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="font-semibold" style={{ color: accent }}>
-                {home?.shop_name ?? "Shop"}
-              </span>
-              <nav className="flex gap-4">
-                <Link href="/" className="hover:text-slate-900">হোম</Link>
-                <Link href="/search" className="hover:text-slate-900">সব প্রোডাক্ট</Link>
-                <Link href="/cart" className="hover:text-slate-900">কার্ট</Link>
-              </nav>
-            </div>
-            <p className="mt-4 text-xs text-slate-400">
-              © {new Date().getFullYear()} {home?.shop_name ?? "Shop"}. Powered by BSOL Connect.
-            </p>
-          </div>
-        </footer>
-
-        <FloatingCartButton />
-        </div>
-      </CartProvider>
+      <StorefrontThemeProvider theme={theme} shippingRates={shippingRates}>
+        <CartProvider>
+          <Shell home={home} categories={categories}>
+            {children}
+          </Shell>
+        </CartProvider>
+      </StorefrontThemeProvider>
     </StorefrontTrackingProvider>
   );
 }

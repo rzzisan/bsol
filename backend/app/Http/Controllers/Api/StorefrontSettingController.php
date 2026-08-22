@@ -39,6 +39,12 @@ class StorefrontSettingController extends Controller
                 StorefrontSetting::HOMEPAGE_LANDING_PAGE,
             ])],
             'homepage_landing_page_id' => ['nullable', 'integer'],
+            'theme_template' => ['nullable', Rule::in([
+                StorefrontSetting::THEME_STANDARD,
+                StorefrontSetting::THEME_CARESOLUTION,
+            ])],
+            'shipping_charge_inside_dhaka' => ['nullable', 'numeric', 'min:0'],
+            'shipping_charge_outside_dhaka' => ['nullable', 'numeric', 'min:0'],
             'theme_primary_color' => ['nullable', 'string', 'max:7'],
             'about_text' => ['nullable', 'string'],
             // about_image_url not accepted here — only via the dedicated

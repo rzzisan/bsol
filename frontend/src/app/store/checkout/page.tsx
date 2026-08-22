@@ -12,6 +12,7 @@ import {
   type PaymentChannels,
 } from "@/lib/storefront-client";
 import { useStorefrontTracking } from "@/lib/storefront-tracking-context";
+import { useStorefrontTheme } from "@/lib/storefront-theme-context";
 import { useBsolTracking } from "@/lib/tracking";
 
 const WALLET_LABELS: Record<string, string> = { bkash: "bKash", nagad: "Nagad", rocket: "Rocket" };
@@ -19,7 +20,8 @@ const WALLET_LABELS: Record<string, string> = { bkash: "bKash", nagad: "Nagad", 
 /** COD + online payment (S3b) — see StorefrontCheckoutController's class docblock. */
 export default function CheckoutRoute() {
   const router = useRouter();
-  const { items, subtotal, clear } = useCart();
+  const { items, subtotal, clear, shippingLocation } = useCart();
+  const theme = useStorefrontTheme();
   const tracking = useStorefrontTracking();
   const { trackInitiateCheckout } = useBsolTracking({ slug: "store-checkout", tracking: tracking ?? undefined }, { viewContent: false });
 
@@ -97,6 +99,10 @@ export default function CheckoutRoute() {
       customer_email: form.customer_email || undefined,
       notes: form.notes || undefined,
       payment_method: paymentMethod,
+      // Only the "caresolution" template's cart page exposes the Inside/
+      // Outside Dhaka picker — omitted for Standard so existing sellers'
+      // orders keep today's shipping_charge=0 behavior unchanged.
+      shipping_location: theme === "caresolution" ? shippingLocation : undefined,
       items: items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
     });
 

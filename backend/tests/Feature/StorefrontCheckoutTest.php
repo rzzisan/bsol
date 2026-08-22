@@ -190,6 +190,45 @@ class StorefrontCheckoutTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_shipping_location_resolves_the_shops_configured_rate_server_side(): void
+    {
+        $a = $this->seller('shopa');
+        \App\Models\StorefrontSetting::create([
+            'user_id' => $a->id,
+            'shipping_charge_inside_dhaka' => 80,
+            'shipping_charge_outside_dhaka' => 150,
+        ]);
+        $product = $this->product($a, ['selling_price' => 500]);
+
+        // A tampered shipping_charge is ignored in favor of the seller's
+        // own configured rate once shipping_location is present.
+        $response = $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/storefront/orders",
+            $this->checkoutPayload(
+                [['product_id' => $product->id, 'quantity' => 1]],
+                ['shipping_location' => 'outside_dhaka', 'shipping_charge' => 1],
+            ),
+        );
+
+        $response->assertCreated()->assertJsonPath('data.shipping_charge', '150.00');
+    }
+
+    public function test_shipping_location_falls_back_to_platform_defaults_when_unconfigured(): void
+    {
+        $a = $this->seller('shopa');
+        $product = $this->product($a, ['selling_price' => 500]);
+
+        $response = $this->postJson(
+            "https://shopa.{$this->apex()}/api/public/storefront/orders",
+            $this->checkoutPayload(
+                [['product_id' => $product->id, 'quantity' => 1]],
+                ['shipping_location' => 'inside_dhaka'],
+            ),
+        );
+
+        $response->assertCreated()->assertJsonPath('data.shipping_charge', '70.00');
+    }
+
     public function test_requires_customer_name_phone_and_address(): void
     {
         $a = $this->seller('shopa');

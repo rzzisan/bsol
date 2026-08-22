@@ -180,6 +180,33 @@ class StorefrontSettingTest extends TestCase
         ])->assertOk()->assertJsonPath('data.homepage_landing_page_id', $published->id);
     }
 
+    public function test_owner_can_set_theme_template_and_shipping_charges(): void
+    {
+        $owner = $this->owner();
+        Sanctum::actingAs($owner);
+
+        $this->putJson('/api/storefront-settings', [
+            'homepage_mode' => 'storefront',
+            'theme_template' => 'caresolution',
+            'shipping_charge_inside_dhaka' => 80,
+            'shipping_charge_outside_dhaka' => 150,
+        ])->assertOk()
+            ->assertJsonPath('data.theme_template', 'caresolution')
+            ->assertJsonPath('data.shipping_charge_inside_dhaka', '80.00')
+            ->assertJsonPath('data.shipping_charge_outside_dhaka', '150.00');
+    }
+
+    public function test_theme_template_rejects_unknown_value(): void
+    {
+        $owner = $this->owner();
+        Sanctum::actingAs($owner);
+
+        $this->putJson('/api/storefront-settings', [
+            'homepage_mode' => 'storefront',
+            'theme_template' => 'not-a-real-template',
+        ])->assertStatus(422);
+    }
+
     public function test_staff_cannot_manage_storefront_settings(): void
     {
         $owner = $this->owner();
