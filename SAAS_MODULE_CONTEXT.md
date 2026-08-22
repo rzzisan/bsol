@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-08-22 (২) — **প্রডাকশন-রেডিনেস অডিট রিপোর্ট যোগ হলো** — `production_audit_report_context.md`। §15-এর ground-truth audit আর §16-এর recommendation থেকে একটা business/launch-readiness সিদ্ধান্ত বের করা হয়েছে (soft-launch cohort সুপারিশ, প্রায়োরিটি-অর্ডার P1-P8)। নতুন প্রায়োরিটি অনুযায়ী `feature_roadmap_context.md`-এর status টেবিল আপডেট হয়েছে। §15.7 (Ads ROI still placeholder) এখন সেই অডিটের P5 আইটেম হিসেবে cross-referenced। Older entries kept as-is:
+
 Last updated: 2026-08-22 — **§21: সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) — S0-S9 + S3b সম্পূর্ণ লাইভ, প্লাস Theme Templates addendum (multi-template + CareSolution-style টেমপ্লেট) লাইভ** (`feature_roadmap_context.md` আইটেম #৯)। বিস্তারিত `seller_storefront_context.md`। Older entries kept as-is:
 
 Last updated: 2026-08-20 (৫) — **§20 (ডিজিটাল প্রোডাক্ট সিস্টেম) Phase 1 ✅ সম্পন্ন ও লাইভ** — migration/backend/১৮টা টেস্ট/ফ্রন্টএন্ড (প্রোডাক্ট ফর্ম, চেকআউট, thank-you, নতুন `/d/[token]` ডাউনলোড পেজ, admin policy পেজ) সব deployed। বিস্তারিত `digital_product_context.md §০ক-১৩`। Older entries kept as-is:
@@ -719,7 +721,7 @@ backend/app/
 | Sales funnel + top products (`analytics/sales`) | ✅ DONE (2026-08-02) | `Api/AnalyticsController::sales()` + `::products()` — funnel by status, daily trend, top products with revenue/margin/return-rate. Frontend replaces placeholder with stat cards, funnel grid, CSS bar-chart trend, product table |
 | Customer intelligence (`analytics/intelligence`) | ✅ DONE (2026-08-02) | `AnalyticsController::customers()` — loyal/VIP/risky/blocked counts, repeat-buyer rate, avg LTV, district-wise order breakdown |
 | Courier analytics (`analytics/courier`) | ✅ DONE (2026-08-02) | `AnalyticsController::courier()` — per-courier success/return rate, avg delivery time (from `order_status_logs`), charges, delivered revenue |
-| Ads ROI (`analytics/ads-roi`) | ⛔ still placeholder — **intentional** | No UTM/ad-spend/Facebook data source exists yet (§16.3 Facebook MVP is the prerequisite); building this now would show fake numbers |
+| Ads ROI (`analytics/ads-roi`) | ⛔ still placeholder — **intentional** | No UTM/ad-spend/Facebook data source exists yet (§16.3 Facebook MVP is the prerequisite); building this now would show fake numbers. **প্রডাকশন-রেডিনেস অডিটে এটাই P5 প্রায়োরিটি** — `production_audit_report_context.md §৭` |
 
 **Backend:** `app/Http/Controllers/Api/AnalyticsController.php`, routes under `auth:sanctum` at `/api/analytics/{sales,products,customers,courier}`, all scoped `where('user_id', auth()->id())`, date-range filterable (`range=today\|week\|month`, or `from`/`to`). No new migrations — built entirely on existing `orders`, `order_items`, `customers`, `order_status_logs` tables.
 

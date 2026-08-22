@@ -6,6 +6,10 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+> **📋 প্রায়োরিটি সোর্স:** ২০২৬-০৮-২২ তারিখের প্রডাকশন-রেডিনেস অডিট রিপোর্ট — `production_audit_report_context.md` — এখন এই ফাইলের নিচের priority-order/status আপডেটের rationale। নতুন কাজ বাছাই করার সময় ওই ফাইলের §৬/§৭ দেখো, আর কাজ শেষ হলে §৮-এর ডকুমেন্টেশন-নির্দেশনা অনুযায়ী **এই ফাইল + dedicated `*_context.md` + audit রিপোর্টের §৭ টেবিল** — তিনটাই আপডেট করতে হবে।
+
+Last updated: 2026-08-22 (২) — **প্রডাকশন-রেডিনেস অডিট সম্পন্ন**, নতুন প্রায়োরিটি-অর্ডার সেট হয়েছে (নিচের status টেবিল + "পরবর্তী পদক্ষেপ" সেকশন দেখো)। বিস্তারিত `production_audit_report_context.md`। Older entries kept as-is:
+
 Last updated: 2026-08-22 — **আইটেম #৯ (সেলার স্টোরফ্রন্ট) ✅ সম্পূর্ণ (S0-S9 + S3b) + নতুন Theme Templates addendum ✅ লাইভ** — সেলার এখন dashboard থেকে স্টোরফ্রন্টের ডিজাইন টেমপ্লেট (Standard বা নতুন "CareSolution Style") বেছে নিতে পারে, প্লাস real Inside/Outside Dhaka শিপিং-চার্জ ফিচার। বিস্তারিত `seller_storefront_context.md §২৪`। Older entries kept as-is:
 
 Last updated: 2026-08-21 — **নতুন আইটেম #৯: সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ)** — ফিজিবিলিটি যাচাই + ১০-ফেজ প্ল্যান সম্পন্ন (`seller_storefront_context.md`)। এখন landing page একটা single-product ক্যাম্পেইন পেজ; এই ফিচার তার পাশাপাশি একটা পূর্ণাঙ্গ browsable ক্যাটালগ শপ (হোমপেজ/ক্যাটাগরি/প্রোডাক্ট লিস্টিং/কার্ট/সার্চ/রিভিউ) যোগ করে, per-seller সাবডোমেইনেই। কোনো migration/কোড এখনো লেখা হয়নি, user-এর অনুমতি বাকি। Older entries kept as-is:
@@ -46,11 +50,17 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | 7 | Marketing broadcast campaign (CRM-segment টার্গেটেড) | ⬜ Not started | — |
 | 8 | ডিজিটাল প্রোডাক্ট সিস্টেম (instant delivery, নিজস্ব হোস্টিং) | ✅ Phase 1 সম্পন্ন ও লাইভ (২০২৬-০৮-২০) | `digital_product_context.md` |
 | 9 | সেলার স্টোরফ্রন্ট (ফুল ইকমার্স শপ) | ✅ **সম্পূর্ণ (S0-S9, S3b সহ) + Theme Templates addendum (২০২৬-০৮-২২)** — রাউটিং, ক্যাটালগ, কার্ট, checkout (COD+wallet+gateway), হোমপেজ থিম, রিভিউ, SEO, ট্র্যাকিং (Pixel+CAPI), মাল্টি-টেমপ্লেট ডিজাইন (Standard/CareSolution) + শিপিং-চার্জ — সব real ডেটা দিয়ে end-to-end ভেরিফাইড | `seller_storefront_context.md` |
-| — | Bulk/CSV order import | ⬜ Not started | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
+| **P1** | Onboarding wizard + demo-seed data | ⬜ Not started — audit-প্রায়োরিটি #১ (churn কমানো, নতুন সেলার activation) | `production_audit_report_context.md §৭` |
+| **P2** | Payment gateway sandbox verification (Nagad Merchant, EPS) | ⬜ Not started — audit-প্রায়োরিটি #২, real sandbox টেস্ট ছাড়া financial risk | `online_payment_context.md`, `production_audit_report_context.md §৭` |
+| **P3** | Bulk/CSV order import | ⬜ Not started — audit-প্রায়োরিটি #৩ | (SAAS_MODULE_CONTEXT.md §16.8-এও আছে) |
+| **P4** | Referral/affiliate program (সেলার→সেলার) | ⬜ Not started — audit-প্রায়োরিটি #৪ (সস্তা, বিশ্বাসযোগ্য CAC চ্যানেল) | — |
+| **P5** | Ads ROI ট্র্যাকার সম্পূর্ণ করা | ⬜ Not started (এখনো placeholder) — audit-প্রায়োরিটি #৫, UTM/ad-spend ডেটা সোর্স দরকার | `SAAS_MODULE_CONTEXT.md §15.7/§16.1`, `production_audit_report_context.md §৭` |
+| **P6** | Marketing broadcast (SMS+Email) | ⬜ Not started — audit-প্রায়োরিটি #৬, উপরে #৭-এও আছে | — |
+| **P7** | WhatsApp + Auto-top-up resume | ⏸️ পজড, external ব্লকার সরলে resume | `whatsapp_context.md`, `auto_top_up_context.md` |
+| **P8** | 2FA + Admin audit trail (security hardening) | ⬜ Not started — audit-প্রায়োরিটি #৮ | `production_audit_report_context.md §৭` |
 | — | PWA | ⬜ Not started | (§16.9) |
-| — | Referral/affiliate program (সেলার→সেলার) | ⬜ Not started | — |
-| — | Onboarding wizard | ⬜ Not started | — |
 | — | Facebook App Review সম্পূর্ণ করা (external) | ⬜ Not started | `facebook_integration_context.md` §3 |
+| — | WooCommerce Connector real staging QA (external, ব্যবহারকারীর নিজের সাইটে) | ⬜ Not started | `wordpress_connect_context.md` |
 | — | Native mobile app | ⬜ Not started | দীর্ঘমেয়াদী |
 | — | AI product-description/auto-reply generator | ⬜ Not started | দীর্ঘমেয়াদী |
 | — | Cross-seller courier rate negotiation | ⬜ Not started | দীর্ঘমেয়াদী |
@@ -118,6 +128,10 @@ SMS automation এখন শুধু order-status trigger। VIP/loyal/risky se
 ---
 
 ## পরবর্তী পদক্ষেপ
+
+> **আপডেট (২০২৬-০৮-২২) — প্রডাকশন-রেডিনেস অডিট থেকে নতুন প্রায়োরিটি অর্ডার (বিস্তারিত `production_audit_report_context.md §৬/§৭`):**
+> **P1 Onboarding wizard + demo-seed → P2 Payment gateway sandbox verify (Nagad/EPS) → P3 Bulk/CSV import → P4 Referral/affiliate program → P5 Ads ROI tracker → P6 Marketing broadcast → P7 WhatsApp/Auto-top-up resume (ব্লকার সরলে) → P8 2FA/audit trail।**
+> যুক্তি: mass-launch/FB-ad-স্কেলিং-এর আগে churn-reducing onboarding আর financial-risk payment-gateway ভেরিফিকেশন সবচেয়ে জরুরি — শুধু বিজ্ঞাপন দিয়ে ট্রাফিক আনা যথেষ্ট না যদি নতুন সেলার activation-এই আটকে যায়। উপরের status টেবিলে P1-P8 ট্যাগ করা আছে। যেকোনো আইটেম শুরু করার আগে `production_audit_report_context.md §৮`-এর ডকুমেন্টেশন-নির্দেশনা মেনে চলতে হবে।
 
 > **আপডেট (২০২৬-০৮-২০, ৪)** — user সিদ্ধান্ত নিয়েছেন: **#২ (WhatsApp) ও #৩ (Auto-top-up) দুটোই আপাতত পজড** — কোড সম্পূর্ণ ও deployed, কিন্তু দুটোই এমন external ব্লকারে আটকে আছে যেটা এই dev environment থেকে production-এ সরাসরি টেস্ট করার উপায় নেই (bKash-এর real credential Tokenized Checkout-এর জন্য না — `auto_top_up_context.md §২ক`; WhatsApp-এ WhatsApp product/token generation সেলারকে নিজে Meta Business Suite-এ গিয়ে করতে হয় — `whatsapp_context.md §১`)। দুটোই resume-able অবস্থায় রেখে দেওয়া হয়েছে (কোড/টেস্ট/ডক সব আপ-টু-ডেট) — bKash credential ঠিক হলে বা কেউ Meta-সাইড setup শেষ করলে যেকোনো সময় ফিরে আসা যাবে, নতুন করে ডিজাইন করতে হবে না।
 >
