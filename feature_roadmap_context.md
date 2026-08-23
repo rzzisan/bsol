@@ -6,6 +6,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-23 (২) — **SaaS বিলিং ধাপ ২ (Order quota redesign) ✅ সম্পন্ন ও লাইভ** — অর্ডার তৈরি এখন আনলিমিটেড, মাসিক লিমিট এখন প্রসেসিং-এর সময় (`OrderStatusService::transition()`) একবার এনফোর্স হয়। বিস্তারিত `subscription_billing_context.md §৯.৮`। পরবর্তী: Order-credit addon। Older entries kept as-is:
+
 Last updated: 2026-08-23 — **P2 (payment gateway sandbox verify) এখনো বাকি, কিন্তু user সরাসরি SaaS বিলিং/সাবস্ক্রিপশন redesign-এ সরে গেছেন** (P-লিস্টের বাইরের নতুন উদ্যোগ, user-এর নিজের আইডিয়া) — অর্ডার-কোটা redesign (place vs process), Add-on/credit প্যাকেজ (order credit/landing page/storefront/tracking), ফিচার-অ্যাক্সেস কন্ট্রোল। পূর্ণ প্ল্যান + প্রায়োরিটি-অর্ডার `subscription_billing_context.md §৯`-এ। ধাপ ১ (feature-gate ফাউন্ডেশন) ✅ সম্পন্ন ও লাইভ — বিস্তারিত `subscription_billing_context.md §৯.৭`।
 
 Last updated: 2026-08-22 (৪) — **P3 (Bulk/CSV order import) ✅ সম্পন্ন ও লাইভ** — user সরাসরি এই আইটেম বেছে নিয়েছেন P2 (payment gateway sandbox verify) স্কিপ করে। প্লাস একটা real cross-shop `order_number` collision বাগ ফিক্স হয়েছে (উপরের টেবিল রো দেখো)। পরবর্তী প্রায়োরিটি এখনো P2। Older entries kept as-is:

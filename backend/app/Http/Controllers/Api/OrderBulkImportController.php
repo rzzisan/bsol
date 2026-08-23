@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Order;
 use App\Services\AccountingService;
 use App\Services\OrderBulkImportService;
 use Illuminate\Http\JsonResponse;
@@ -72,24 +71,18 @@ class OrderBulkImportController extends Controller
 
         $validRows = array_values(array_filter($parsed['rows'], fn ($r) => $r['errors'] === []));
 
-        $maxOrders = auth()->user()->shopOwner()->subscriptionPackage?->max_orders;
-        $remainingQuota = null;
-        if ($maxOrders !== null) {
-            $ordersThisMonth = Order::whereIn('user_id', $shopUserIds)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->count();
-            $remainingQuota = max(0, $maxOrders - $ordersThisMonth);
-        }
-
-        $result = $this->importer->commit($validRows, $actingUserId, $ownerId, $shopUserIds, $remainingQuota, $this->accountingService);
+        // No monthly-limit check here — order quota redesign
+        // (subscription_billing_context.md §9.2-A): bulk-imported orders
+        // are created as 'pending' unconditionally, same as a manually
+        // created order. The plan's limit is enforced later, once, when
+        // each order is first moved out of 'pending'.
+        $result = $this->importer->commit($validRows, $actingUserId, $ownerId, $shopUserIds, $this->accountingService);
 
         return response()->json([
             'success' => true,
             'data' => [
                 'created_count' => count($result['created']),
                 'created_order_numbers' => collect($result['created'])->pluck('order_number'),
-                'skipped_for_quota' => $result['skipped_for_quota'],
                 'skipped' => collect($parsed['rows'])
                     ->where('errors', '!=', [])
                     ->map(fn ($r) => ['row_number' => $r['row_number'], 'errors' => $r['errors']])

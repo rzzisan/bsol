@@ -338,7 +338,25 @@ class ConnectApiTest extends TestCase
             ->assertJsonPath('error_code', 'order_not_found');
     }
 
-    public function test_monthly_order_limit_is_enforced_through_the_connector(): void
+    public function test_monthly_order_limit_no_longer_blocks_sync_creation(): void
+    {
+        // Order quota redesign (subscription_billing_context.md §9.2-A) —
+        // WooCommerce order sync creates through OrderController::store(),
+        // which no longer checks the monthly limit at all; both syncs
+        // succeed regardless of max_orders. See the next test for where
+        // the limit now actually bites (status sync, i.e. leaving pending).
+        $package = SubscriptionPackage::create([
+            'name' => 'Starter', 'slug' => 'starter', 'price' => 500,
+            'duration_days' => 30, 'max_orders' => 1, 'is_active' => true,
+        ]);
+        [, $rawKey] = $this->connectedMerchant(['subscription_package_id' => $package->id]);
+        $headers = $this->connectHeaders($rawKey);
+
+        $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload('wc-1'), $headers)->assertCreated();
+        $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload('wc-2'), $headers)->assertCreated();
+    }
+
+    public function test_monthly_order_limit_is_enforced_when_status_sync_leaves_pending(): void
     {
         $package = SubscriptionPackage::create([
             'name' => 'Starter', 'slug' => 'starter', 'price' => 500,
@@ -348,10 +366,15 @@ class ConnectApiTest extends TestCase
         $headers = $this->connectHeaders($rawKey);
 
         $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload('wc-1'), $headers)->assertCreated();
+        $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload('wc-2'), $headers)->assertCreated();
 
-        $this->postJson('/api/connect/v1/orders/sync', $this->samplePayload('wc-2'), $headers)
-            ->assertStatus(402)
-            ->assertJsonPath('error_code', 'order_limit_reached');
+        $this->postJson('/api/connect/v1/orders/sync-status', [
+            'wc_order_id' => 'wc-1', 'status' => 'confirmed',
+        ], $headers)->assertOk();
+
+        $this->postJson('/api/connect/v1/orders/sync-status', [
+            'wc_order_id' => 'wc-2', 'status' => 'confirmed',
+        ], $headers)->assertStatus(402);
     }
 
     // ── Fraud check ──────────────────────────────────────────────────────────

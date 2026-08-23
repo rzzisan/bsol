@@ -192,21 +192,11 @@ class OrderController extends Controller
         $ownerId = auth()->user()->shopOwnerId();
         $shopUserIds = auth()->user()->shopUserIds();
 
-        $maxOrders = auth()->user()->shopOwner()->subscriptionPackage?->max_orders;
-        if ($maxOrders !== null) {
-            $ordersThisMonth = Order::whereIn('user_id', $shopUserIds)
-                ->whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->count();
-
-            if ($ordersThisMonth >= $maxOrders) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Monthly order limit reached for your current plan. Please upgrade to create more orders.',
-                    'error_code' => 'order_limit_reached',
-                ], 402);
-            }
-        }
+        // No monthly-limit check here — order quota redesign
+        // (subscription_billing_context.md §9.2-A): placing an order is
+        // always unlimited (every order is created as 'pending' below);
+        // the plan's monthly limit is enforced once, the first time an
+        // order leaves 'pending', by OrderStatusService::transition().
 
         return DB::transaction(function () use ($data, $actingUserId, $ownerId, $shopUserIds) {
 

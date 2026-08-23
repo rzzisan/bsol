@@ -38,6 +38,10 @@ class Order extends Model
         'custom_fields'  => 'array',
         'otp_required'   => 'boolean',
         'otp_verified_at' => 'datetime',
+        // Deliberately absent from $fillable — only ever set by
+        // OrderStatusService::transition()'s atomic claim, never
+        // client-writable. subscription_billing_context.md §9.2-A.
+        'quota_consumed_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

@@ -470,4 +470,21 @@ Addon purchase-এর পুরো পেমেন্ট পাইপলাই�
 **যা এই ধাপে করা হয়নি (out of scope, পরে):**
 - Frontend UX পলিশ — `feature_not_in_plan` রেসপন্স পেলে dashboard-এর storefront settings/Facebook পেজগুলো এখনো generic error দেখাবে (crash করবে না, কিন্তু "আপগ্রেড করুন" ধরনের বিশেষ মেসেজ/CTA নেই)। `user-shell.tsx`-এ মেনু আইটেম হাইড/লক-ব্যাজও যোগ করা হয়নি। ফিচার এনফোর্সমেন্ট (ব্যাকএন্ড) সম্পূর্ণ কাজ করে, শুধু ফ্রন্টএন্ড মেসেজিং এখনো generic।
 - Admin প্যাকেজ লিস্ট টেবিলে feature-flag badge/কলাম (এডিট মোডালে দেখা যায়, লিস্ট ভিউতে না)।
-- ধাপ ২ (Order quota redesign) এখনো শুরু হয়নি।
+
+### 9.8 ধাপ ২ — Implementation log (2026-08-23, order quota redesign সম্পন্ন)
+
+**যা তৈরি হয়েছে:**
+- নতুন migration `2026_08_23_090000_add_quota_consumed_at_to_orders_table.php` — `orders.quota_consumed_at` (nullable timestamp, `['user_id','quota_consumed_at']` ইনডেক্স)। ইচ্ছাকৃতভাবে `Order::$fillable`-এ নেই — শুধু `OrderStatusService`-এর atomic claim দিয়েই সেট হয়, কখনো client-writable না।
+- **একক choke point আবিষ্কার ও ব্যবহার:** কোটা-চেক বসানোর আগে খুঁজে বের করা হয় যে `OrderController::updateStatus()`/`bulkStatus()` ছাড়াও কুরিয়ার স্ট্যাটাস-সিঙ্ক, WooCommerce স্ট্যাটাস-সিঙ্ক, অনলাইন-পেমেন্ট-কনফার্ম, চেকআউট OTP, ডিজিটাল-ডেলিভারি — মোট ৮টা জায়গা সরাসরি `OrderStatusService::transition()` কল করে। তাই কোটা-চেক controller-এ ডুপ্লিকেট না করে সরাসরি `transition()`-এর ভেতরে বসানো হয়েছে (একবার লেখা, সব পাথ কভার — কোনো bypass loophole থাকে না)।
+- **লজিক:** `$order->quota_consumed_at === null && $newStatus !== 'pending'` হলে `consumeProcessingQuotaOrFail()` — মাসিক প্রসেসড-কাউন্ট এখন `quota_consumed_at`-এর মাস/বছর দিয়ে গণনা হয় (আগে `created_at` দিয়ে হতো, যেটা creation-time ব্লকের জন্য ছিল)। কোটা শেষ হলে `ValidationException` (stock-check-এর existing প্যাটার্নের মতোই) কিন্তু `->status = 402` সেট করে — Laravel-এর default JSON renderer এই status honor করে, তাই `bulkStatus()`-এর বিদ্যমান `catch (ValidationException $e)` ব্লক (স্টক-ব্যর্থতার মতোই per-row "failed" রিপোর্ট করে, পুরো ব্যাচ থামে না) কোনো পরিবর্তন ছাড়াই কোটা-ব্যর্থতাও একইভাবে হ্যান্ডেল করে। কোটা claim atomic (`whereNull('quota_consumed_at')->update(...)`) — একই অর্ডারে concurrent transition রেসে ডাবল-কনজিউম হবে না।
+- **`OrderController::store()` ও `OrderBulkImportService::commit()`/`OrderBulkImportController`** — creation-time ব্লক সম্পূর্ণ সরানো হয়েছে (আগের মতো `max_orders` চেক নেই)। Bulk-import-এর `remainingQuota`/`skipped_for_quota` মেকানিজম পুরো সরানো হয়েছে (এখন সব valid সারি সবসময় তৈরি হয়, আংশিক স্কিপ করার দরকার নেই) — ফ্রন্টএন্ড (`bulk-import/page.tsx`)-এও সংশ্লিষ্ট UI/টেক্সট সরানো হয়েছে।
+- `ConnectOrderController::sync()` (WooCommerce order create) `OrderController::store()`-কেই ভেতরে ডাকে — তাই আলাদা কোনো পরিবর্তন লাগেনি, creation-time ব্লক ওখান থেকেও এমনিতেই সরে গেছে।
+
+**Verification:**
+- Isolated pgsql schema: migration ক্লিন। নতুন `tests/Feature/OrderProcessingQuotaTest.php` (৮টা টেস্ট) — creation কখনো ব্লক হয় না, প্রথম non-pending transition-এ কোটা কাটে, ৪০২ + সঠিক HTTP status, `max_orders=null` আনলিমিটেড কিন্তু তবুও স্ট্যাম্প হয়, cancel/pending-এ ফেরা refund দেয় না, shop-wide (staff-scoped) কোটা, bulk-status আংশিক-সফল রিপোর্টিং, single-update endpoint ৪০২। `OrderBulkImportTest.php` ও `ConnectApiTest.php`-এর পুরনো creation-time-quota টেস্ট দুটো নতুন আচরণ অনুযায়ী rewrite করা হয়েছে (ConnectApiTest-এ নতুন করে status-sync-এর মাধ্যমে কোটা এনফোর্স হওয়ার টেস্টও যোগ)। ফুল সুইট: ৫২৯ পাস, শুধু ৩টা known baseline failure।
+- `npx tsc --noEmit` clean, `deploy-safe.sh` 8/8 pass।
+- **লাইভ প্রোডাকশন ভেরিফিকেশন** (disposable package `max_orders:1` + user + product, tinker দিয়ে তৈরি, cleanup করা হয়েছে): দুটো অর্ডার তৈরি — দুটোই `201` (unlimited placement প্রমাণিত) → প্রথমটা confirm → `200`, response-এ `quota_consumed_at` স্ট্যাম্প দেখা গেছে → দ্বিতীয়টা confirm → `402` সঠিক মেসেজ সহ। সব টেস্ট ডেটা (২টা order+item+status_log, product, user, package, token) মুছে ফেলা হয়েছে এবং delete কনফার্ম করা হয়েছে।
+
+**যা এই ধাপে করা হয়নি:** ধাপ ৩-এর (order-credit addon) সাথে integration এখনো নেই — কোটা শেষ হলে এখনো কেবল ব্লক হয়, addon কিনে auto-bypass করার কোনো hook এখনো যোগ হয়নি (§9.2-B-এ ডিজাইন করা আছে, বিল্ড বাকি)। Frontend-এ ৪০২ পেলে "Add-on কিনুন" ধরনের বিশেষ UI/CTA এখনো নেই (ব্যাকএন্ড এরর সঠিকভাবে propagate করে, ফ্রন্টএন্ড এখনো generic এরর টেক্সট দেখাবে)।
+
+**পরবর্তী ধাপ:** Order-credit addon (§9.6 ধাপ ৩) — এখন কোটা-গেট প্রস্তুত, তাই addon কেনার পর `consumeProcessingQuotaOrFail()`-এ একটা wallet-fallback hook যোগ করাই যথেষ্ট হবে।

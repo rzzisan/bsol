@@ -34,7 +34,6 @@ const t = {
     startOver: "আবার শুরু করুন",
     resultTitle: "ইমপোর্ট সম্পন্ন",
     created: "টা অর্ডার তৈরি হয়েছে",
-    skippedForQuota: "টা আপনার প্ল্যানের মাসিক লিমিটের কারণে বাদ পড়েছে",
     skippedInvalid: "টা ভুল থাকায় তৈরি হয়নি",
     viewOrders: "অর্ডার লিস্টে যান",
     noValidRows: "কোনো সঠিক সারি নেই, তৈরি করার কিছু নেই।",
@@ -59,7 +58,6 @@ const t = {
     startOver: "Start over",
     resultTitle: "Import complete",
     created: "order(s) created",
-    skippedForQuota: "skipped due to your plan's monthly limit",
     skippedInvalid: "skipped due to errors",
     viewOrders: "Go to Orders list",
     noValidRows: "No valid rows — nothing to create.",
@@ -69,7 +67,7 @@ const t = {
 
 type PreviewRow = { row_number: number; data: Record<string, string | null>; errors: string[] };
 type PreviewResult = { total_rows: number; valid_count: number; invalid_count: number; rows: PreviewRow[] };
-type CommitResult = { created_count: number; skipped_for_quota: number; skipped: { row_number: number; errors: string[] }[] };
+type CommitResult = { created_count: number; skipped: { row_number: number; errors: string[] }[] };
 
 export default function BulkImportOrdersPage() {
   const [locale] = useState<Locale>(getStoredLocale);
@@ -261,9 +259,6 @@ export default function BulkImportOrdersPage() {
           <p className="mt-2 text-sm">
             <span className="font-bold text-emerald-500">{result.created_count}</span> {txt.created}
           </p>
-          {result.skipped_for_quota > 0 && (
-            <p className="mt-1 text-sm text-amber-500">{result.skipped_for_quota} {txt.skippedForQuota}</p>
-          )}
           {result.skipped.length > 0 && (
             <p className="mt-1 text-sm text-red-400">{result.skipped.length} {txt.skippedInvalid}</p>
           )}

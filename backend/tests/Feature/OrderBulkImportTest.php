@@ -86,8 +86,13 @@ class OrderBulkImportTest extends TestCase
         $this->assertSame(1, $order->items()->count());
     }
 
-    public function test_monthly_order_limit_partially_fills_and_reports_the_rest_as_skipped_for_quota(): void
+    public function test_monthly_order_limit_does_not_block_bulk_creation_any_more(): void
     {
+        // Order quota redesign (subscription_billing_context.md §9.2-A) —
+        // creation is always unlimited now, even with max_orders=1; the
+        // limit only bites later when an order is first moved out of
+        // 'pending' (see EnsurePackageFeatureTest's sibling,
+        // OrderProcessingQuotaTest, for that gate).
         $package = SubscriptionPackage::create([
             'name' => 'Starter', 'slug' => 'starter', 'price' => 500,
             'duration_days' => 30, 'max_orders' => 1, 'is_active' => true,
@@ -101,9 +106,9 @@ class OrderBulkImportTest extends TestCase
 
         $res = $this->postJson('/api/orders/bulk-import/commit', ['file' => $this->csvFile($csv)])->assertOk();
 
-        $this->assertSame(1, $res->json('data.created_count'));
-        $this->assertSame(1, $res->json('data.skipped_for_quota'));
-        $this->assertSame(1, Order::where('user_id', $owner->id)->count());
+        $this->assertSame(2, $res->json('data.created_count'));
+        $this->assertSame(2, Order::where('user_id', $owner->id)->count());
+        $this->assertNull(Order::where('user_id', $owner->id)->first()->quota_consumed_at);
     }
 
     public function test_file_with_more_than_max_rows_is_rejected(): void

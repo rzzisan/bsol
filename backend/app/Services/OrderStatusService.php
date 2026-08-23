@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\OrderStatusLog;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\User;
 use App\Services\Tracking\TrackingIngestService;
 use App\Services\Whatsapp\WhatsappAutomationService;
 use App\Support\PhoneIntelCache;
@@ -50,6 +51,19 @@ class OrderStatusService
         $oldStatus = $order->status;
         if ($oldStatus === $newStatus) {
             return;
+        }
+
+        // Order quota redesign (subscription_billing_context.md §9.2-A) —
+        // placing an order never costs quota (unlimited pending); the first
+        // time it ever leaves 'pending', for any status, through any of
+        // this service's callers (manual/bulk status change, courier sync,
+        // WooCommerce sync, payment confirm), it counts against the plan's
+        // monthly processing limit. Checked here, not in each caller, so
+        // none of them can be a loophole. No refund if it's later
+        // cancelled or somehow reverts to pending and leaves again (§9.3
+        // decision #4) — quota_consumed_at is a one-way stamp.
+        if ($order->quota_consumed_at === null && $newStatus !== 'pending') {
+            $this->consumeProcessingQuotaOrFail($order);
         }
 
         // Status update + inventory decrement happen atomically: if a variant
@@ -200,6 +214,43 @@ class OrderStatusService
         }
 
         return $context;
+    }
+
+    /**
+     * §9.2-A's quota gate. `order.user_id` is always the shop owner
+     * (Order.user_id, staff_team_role_context.md §3.3 convention), so no
+     * shopOwner() indirection needed here.
+     */
+    private function consumeProcessingQuotaOrFail(Order $order): void
+    {
+        $owner = User::find($order->user_id);
+        $maxOrders = $owner?->subscriptionPackage?->max_orders;
+
+        if ($maxOrders !== null) {
+            $shopUserIds = $owner->shopUserIds();
+            $processedThisMonth = Order::whereIn('user_id', $shopUserIds)
+                ->whereNotNull('quota_consumed_at')
+                ->whereYear('quota_consumed_at', now()->year)
+                ->whereMonth('quota_consumed_at', now()->month)
+                ->count();
+
+            if ($processedThisMonth >= $maxOrders) {
+                $exception = ValidationException::withMessages([
+                    'status' => ['Monthly order-processing limit reached for your current plan. Please upgrade or buy an order-credit add-on to process more orders this month.'],
+                ]);
+                $exception->status = 402;
+                throw $exception;
+            }
+        }
+
+        // Atomic claim (whereNull guard) — a concurrent transition on the
+        // same order can't double-consume; a small race at the exact
+        // monthly boundary between two *different* orders is possible
+        // (same precision the old creation-time check had) and accepted.
+        $affected = Order::where('id', $order->id)->whereNull('quota_consumed_at')->update(['quota_consumed_at' => now()]);
+        if ($affected > 0) {
+            $order->quota_consumed_at = now();
+        }
     }
 
     private function adjustInventoryForStatusTransition(Order $order, string $oldStatus, string $newStatus): void

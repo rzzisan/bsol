@@ -148,22 +148,23 @@ class OrderBulkImportService
     }
 
     /**
-     * Creates one Order per currently-valid row, up to $remainingQuota, all
-     * inside one transaction (all created or none, on an unexpected
-     * mid-batch failure — every row here already passed parseAndValidate()).
+     * Creates one Order per currently-valid row, all inside one transaction
+     * (all created or none, on an unexpected mid-batch failure — every row
+     * here already passed parseAndValidate()). No monthly-limit check —
+     * order quota redesign (subscription_billing_context.md §9.2-A): every
+     * row is created as 'pending' (see below), unlimited; the plan's
+     * monthly limit only bites later, once, the first time each order
+     * leaves 'pending' (OrderStatusService::transition()).
      *
      * @param array<int, array> $validRows rows from parseAndValidate() with errors === []
      * @param array<int, int> $shopUserIds
-     * @return array{created: array<int, Order>, skipped_for_quota: int}
+     * @return array{created: array<int, Order>}
      */
-    public function commit(array $validRows, int $actingUserId, int $ownerId, array $shopUserIds, ?int $remainingQuota, AccountingService $accounting): array
+    public function commit(array $validRows, int $actingUserId, int $ownerId, array $shopUserIds, AccountingService $accounting): array
     {
-        $toCreate = $remainingQuota !== null ? array_slice($validRows, 0, max(0, $remainingQuota)) : $validRows;
-        $skippedForQuota = count($validRows) - count($toCreate);
-
-        $created = DB::transaction(function () use ($toCreate, $actingUserId, $ownerId, $shopUserIds, $accounting) {
+        $created = DB::transaction(function () use ($validRows, $actingUserId, $ownerId, $shopUserIds, $accounting) {
             $orders = [];
-            foreach ($toCreate as $row) {
+            foreach ($validRows as $row) {
                 $data = $row['data'];
                 $quantity = (int) $data['quantity'];
                 $unitPrice = (float) $data['unit_price'];
@@ -226,6 +227,6 @@ class OrderBulkImportService
             return $orders;
         });
 
-        return ['created' => $created, 'skipped_for_quota' => $skippedForQuota];
+        return ['created' => $created];
     }
 }
