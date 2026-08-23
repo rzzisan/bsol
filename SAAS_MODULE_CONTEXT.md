@@ -1303,4 +1303,6 @@ User-এর নিজের আইডিয়া থেকে শুরু হ�
 
 **ধাপ ২ (Order quota redesign) ✅ সম্পন্ন:** অর্ডার তৈরি এখন সবসময় আনলিমিটেড (creation-time ব্লক সম্পূর্ণ সরানো — `OrderController::store()`, bulk-import দুটোই)। মাসিক লিমিট এখন `OrderStatusService::transition()`-এ একবার এনফোর্স হয় (নতুন `orders.quota_consumed_at` কলাম, প্রথম pending→non-pending ট্রানজিশনে কাটে, রিফান্ড নেই) — এই একটাই choke point ব্যবহার করা হয়েছে কারণ কুরিয়ার/WooCommerce সিঙ্ক, পেমেন্ট-কনফার্ম সহ ৮টা ভিন্ন জায়গা এই একই মেথড কল করে। বিস্তারিত + লাইভ verification: `subscription_billing_context.md §৯.৮`।
 
-**পরবর্তী ধাপ:** Order-credit addon (§9.6 ধাপ ৩)।
+**ধাপ ৩ (Order-credit add-on) ✅ সম্পন্ন:** SMS-credit-purchase প্যাটার্নের generalization — নতুন জেনেরিক `addon_packages`/`addon_purchases` (৪ টাইপের জন্য পুনর্ব্যবহারযোগ্য, আপাতত শুধু `order_credit` wired) + single-balance `order_credit_wallets` (§9.3 decision #1/#2: রিফ্রেশিং মেয়াদ, রোলওভার নেই)। প্ল্যান-কোটা শেষ হলে `OrderStatusService`-এ এখন addon-credit fallback হয় (নতুন `orders.quota_source` কলাম দিয়ে প্ল্যান-vs-addon consumption আলাদা রাখা হয়েছে, নাহলে ক্রেডিট অর্থহীন হয়ে যেত)। সেলার-facing `/dashboard/order-credits` (manual bKash-only, automated gateway ইচ্ছাকৃত fast-follow) + admin `/admin/addon-packages` (প্যাকেজ CRUD + approve queue)। লাইভ ভেরিফিকেশনে একটা real Fillable বাগ ও ধাপ-২-এর একটা atomicity বাগ ধরা পড়ে ফিক্স হয়েছে। বিস্তারিত + verification log: `subscription_billing_context.md §১০`।
+
+**পরবর্তী ধাপ:** Storefront addon (§9.6 ধাপ ৪)।

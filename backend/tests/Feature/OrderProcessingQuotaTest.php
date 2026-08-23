@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\StaffPermission;
 use App\Models\SubscriptionPackage;
 use App\Models\User;
+use App\Services\OrderCreditService;
 use App\Services\OrderStatusService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -186,5 +187,93 @@ class OrderProcessingQuotaTest extends TestCase
 
         $this->putJson("/api/orders/{$order->id}/status", ['status' => 'confirmed'])
             ->assertStatus(402);
+    }
+
+    // ── Order-credit add-on fallback (§9.2-B / §9.6 step 3) ─────────────────
+
+    public function test_addon_credit_covers_an_order_once_plan_quota_is_exhausted(): void
+    {
+        $owner = $this->sellerWithLimit(1);
+        app(OrderCreditService::class)->grant($owner->id, 5, 30, 'test grant');
+
+        $first = $this->order($owner);
+        $second = $this->order($owner);
+
+        app(OrderStatusService::class)->transition($first, 'confirmed');
+        $this->assertSame('plan', $first->fresh()->quota_source);
+
+        // Plan quota is now exhausted, but the wallet has credit — this
+        // must succeed instead of throwing, drawing from the add-on.
+        app(OrderStatusService::class)->transition($second, 'confirmed');
+        $this->assertSame('confirmed', $second->fresh()->status);
+        $this->assertSame('addon_credit', $second->fresh()->quota_source);
+        $this->assertSame(4, app(OrderCreditService::class)->getAvailableBalance($owner->id));
+    }
+
+    public function test_addon_credit_covered_orders_never_inflate_the_plan_quota_count(): void
+    {
+        // Regression guard for the exact bug this design avoids: if an
+        // addon-covered order were counted as 'plan', it would eat into
+        // the plan's own quota forever, making credits worthless.
+        $owner = $this->sellerWithLimit(1);
+        app(OrderCreditService::class)->grant($owner->id, 10, 30, 'test grant');
+
+        for ($i = 0; $i < 3; $i++) {
+            app(OrderStatusService::class)->transition($this->order($owner), 'confirmed');
+        }
+
+        $this->assertSame(
+            1,
+            Order::where('user_id', $owner->id)->where('quota_source', 'plan')->count(),
+        );
+        $this->assertSame(
+            2,
+            Order::where('user_id', $owner->id)->where('quota_source', 'addon_credit')->count(),
+        );
+    }
+
+    public function test_still_blocks_with_402_once_both_plan_and_credit_are_exhausted(): void
+    {
+        $owner = $this->sellerWithLimit(1);
+        app(OrderCreditService::class)->grant($owner->id, 1, 30, 'test grant');
+
+        app(OrderStatusService::class)->transition($this->order($owner), 'confirmed'); // plan
+        app(OrderStatusService::class)->transition($this->order($owner), 'confirmed'); // 1 credit
+
+        $third = $this->order($owner);
+        $this->expectException(ValidationException::class);
+        app(OrderStatusService::class)->transition($third, 'confirmed');
+    }
+
+    public function test_an_expired_wallet_is_not_used_even_with_a_positive_balance(): void
+    {
+        $owner = $this->sellerWithLimit(1);
+        app(OrderCreditService::class)->grant($owner->id, 5, 30, 'test grant');
+        \App\Models\OrderCreditWallet::where('user_id', $owner->id)->update(['expires_at' => now()->subDay()]);
+
+        app(OrderStatusService::class)->transition($this->order($owner), 'confirmed'); // plan
+
+        $second = $this->order($owner);
+        $this->expectException(ValidationException::class);
+        app(OrderStatusService::class)->transition($second, 'confirmed');
+    }
+
+    public function test_a_failed_transition_never_spends_a_credit_or_a_quota_slot(): void
+    {
+        // Stock-insufficient failure inside the same DB::transaction must
+        // roll back the quota/credit charge along with the status change
+        // — otherwise a doomed-to-fail attempt silently burns a paid credit.
+        $owner = $this->sellerWithLimit(5);
+        $order = $this->order($owner);
+        $order->items()->first()->product->update(['track_stock' => true, 'stock' => 0]);
+
+        try {
+            app(OrderStatusService::class)->transition($order, 'confirmed');
+            $this->fail('Expected a ValidationException for insufficient stock.');
+        } catch (ValidationException $e) {
+            // expected
+        }
+
+        $this->assertNull($order->fresh()->quota_consumed_at);
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\AdminAddonPackageController;
+use App\Http\Controllers\AdminAddonPurchaseController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminSmsCreditController;
 use App\Http\Controllers\AdminSmsGatewayController;
@@ -37,6 +39,7 @@ use App\Http\Controllers\Api\BkashPgwPaymentController;
 use App\Http\Controllers\Api\SmsCreditAutoRechargeController;
 use App\Http\Controllers\Api\SmsCreditBkashPaymentController;
 use App\Http\Controllers\Api\SmsCreditBkashPgwPaymentController;
+use App\Http\Controllers\Api\OrderCreditPurchaseController;
 use App\Http\Controllers\Api\SmsCreditPurchaseController;
 use App\Http\Controllers\Api\FacebookConnectController;
 use App\Http\Controllers\Api\FacebookLeadController;
@@ -372,6 +375,17 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::put('/sms/credit/auto-recharge/settings', [SmsCreditAutoRechargeController::class, 'updateSettings']);
         Route::post('/sms/credit/auto-recharge/agreement/create', [SmsCreditAutoRechargeController::class, 'createAgreement']);
         Route::delete('/sms/credit/auto-recharge/agreement', [SmsCreditAutoRechargeController::class, 'disconnect']);
+    });
+
+    // ── Order-credit add-on self-service purchase — subscription_billing_context.md
+    // §9.2-B / §9.6 step 3 ── Owner-only (Pattern B), same reasoning as SMS
+    // credit above: billing/wallet management, not an operational action.
+    Route::middleware('owner_only')->group(function () {
+        Route::get('/order-credits/packages', [OrderCreditPurchaseController::class, 'packages']);
+        Route::get('/order-credits/balance', [OrderCreditPurchaseController::class, 'balance']);
+        Route::get('/order-credits/history', [OrderCreditPurchaseController::class, 'history']);
+        Route::get('/order-credits/purchases', [OrderCreditPurchaseController::class, 'myPurchases']);
+        Route::post('/order-credits/purchases', [OrderCreditPurchaseController::class, 'submitPayment']);
     });
 
     // ── Subscription (self-service — must stay reachable even when expired) ───
@@ -802,6 +816,15 @@ Route::middleware('active_subscription')->group(function () {
         Route::post('/packages', [AdminController::class, 'createPackage']);
         Route::put('/packages/{package}', [AdminController::class, 'updatePackage']);
         Route::delete('/packages/{package}', [AdminController::class, 'deletePackage']);
+
+        // Add-on packages + purchase approve queue — subscription_billing_context.md §9.4.
+        Route::get('/addon-packages', [AdminAddonPackageController::class, 'index']);
+        Route::post('/addon-packages', [AdminAddonPackageController::class, 'store']);
+        Route::put('/addon-packages/{addonPackage}', [AdminAddonPackageController::class, 'update']);
+        Route::delete('/addon-packages/{addonPackage}', [AdminAddonPackageController::class, 'destroy']);
+        Route::get('/addon-purchases', [AdminAddonPurchaseController::class, 'index']);
+        Route::post('/addon-purchases/{addonPurchase}/approve', [AdminAddonPurchaseController::class, 'approve']);
+        Route::post('/addon-purchases/{addonPurchase}/reject', [AdminAddonPurchaseController::class, 'reject']);
 
         Route::get('/registration-defaults', [AdminController::class, 'getRegistrationDefaults']);
         Route::put('/registration-defaults', [AdminController::class, 'updateRegistrationDefaults']);

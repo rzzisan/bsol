@@ -11,6 +11,7 @@ export type AdminMenuLabels = {
   smsHistory: string;
   smsCredit: string;
   packages: string;
+  addonPackages?: string;
   billing: string;
   reports: string;
   settings: string;
@@ -104,6 +105,7 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
       ],
     },
     { key: "packages", label: labels.packages, icon: "📦", href: "/admin/packages" },
+    { key: "addon-packages", label: labels.addonPackages ?? "Add-on Packages", icon: "➕", href: "/admin/addon-packages" },
     { key: "billing", label: labels.billing, icon: "💳", href: "/admin/billing" },
     {
       key: "landing",

@@ -98,6 +98,7 @@ const menuText = {
     facebookConnect: "ফেসবুক পেজ",
     wordpressConnect: "ওয়ার্ডপ্রেস কানেক্ট",
     subscription: "সাবস্ক্রিপশন",
+    orderCredits: "অর্ডার ক্রেডিট",
     staffManagement: "টিম / স্টাফ",
 
     // force-password-change gate
@@ -183,6 +184,7 @@ const menuText = {
     facebookConnect: "Facebook Page",
     wordpressConnect: "WordPress Connect",
     subscription: "Subscription",
+    orderCredits: "Order Credits",
     staffManagement: "Staff & Team",
 
     // force-password-change gate
@@ -337,6 +339,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number, whatsappU
         { key: "whatsapp-connect", label: (t as any).whatsappConnect ?? "হোয়াটসঅ্যাপ", href: "/dashboard/settings/whatsapp" },
         { key: "wordpress-connect", label: (t as any).wordpressConnect ?? "ওয়ার্ডপ্রেস কানেক্ট", href: "/dashboard/settings/wordpress" },
         { key: "subscription", label: t.subscription, href: "/dashboard/settings/subscription" },
+        { key: "order-credits", label: (t as any).orderCredits ?? "অর্ডার ক্রেডিট", href: "/dashboard/order-credits" },
         { key: "staff-management", label: t.staffManagement, href: "/dashboard/settings/staff" },
       ],
     },

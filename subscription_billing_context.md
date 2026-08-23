@@ -487,4 +487,31 @@ Addon purchase-এর পুরো পেমেন্ট পাইপলাই�
 
 **যা এই ধাপে করা হয়নি:** ধাপ ৩-এর (order-credit addon) সাথে integration এখনো নেই — কোটা শেষ হলে এখনো কেবল ব্লক হয়, addon কিনে auto-bypass করার কোনো hook এখনো যোগ হয়নি (§9.2-B-এ ডিজাইন করা আছে, বিল্ড বাকি)। Frontend-এ ৪০২ পেলে "Add-on কিনুন" ধরনের বিশেষ UI/CTA এখনো নেই (ব্যাকএন্ড এরর সঠিকভাবে propagate করে, ফ্রন্টএন্ড এখনো generic এরর টেক্সট দেখাবে)।
 
-**পরবর্তী ধাপ:** Order-credit addon (§9.6 ধাপ ৩) — এখন কোটা-গেট প্রস্তুত, তাই addon কেনার পর `consumeProcessingQuotaOrFail()`-এ একটা wallet-fallback hook যোগ করাই যথেষ্ট হবে।
+---
+
+## 10. ধাপ ৩ — Implementation log (2026-08-23, Order-credit add-on সম্পন্ন)
+
+**যা তৈরি হয়েছে (§9.2-B-এর জেনেরিক addon ইনফ্রা + order_credit-এর প্রথম টাইপ একসাথে — দুটো আলাদা করে বানানো অর্থহীন, ৯.৬-এর ধাপ ৩/৪ কার্যত মার্জ হয়ে গেছে):**
+- ৫টা নতুন migration: `addon_packages` (super-admin SKU, `type` কলাম — শুধু `order_credit` আপাতত creatable, বাকি ৩টা reserved string), `addon_purchases` (subscription_payments-এর হুবহু কপি), `order_credit_wallets` (single-balance + refreshing `expires_at`, §9.3 decision #1/#2), `order_credit_histories` (transparency log), `orders.quota_source` (`'plan'|'addon_credit'|null` — নিচে দেখো কেন লাগল)।
+- `AddonPackage`/`AddonPurchase`/`OrderCreditWallet`/`OrderCreditHistory` মডেল, `OrderCreditService` (grant/consumeOne/getAvailableBalance, lazy expiry — cron sweep নেই, "derived not stored" নীতি Getting Started checklist-এর মতোই), `AddonApplyService` (purchase approve হলে effect apply করে, idempotent, আপাতত শুধু `order_credit` branch)।
+- Seller-facing: `OrderCreditPurchaseController` (packages/balance/history/myPurchases/submitPayment) + `/dashboard/order-credits` পেজ — **শুধু manual bKash** (bKash Tokenized/PGW automated gateway ইচ্ছাকৃতভাবে বাদ, deliberate fast-follow — subscription/SMS-credit-এর নিজস্ব Phase A-আগে-B/C precedent অনুসরণ করে)।
+- Admin: `AdminAddonPackageController` + `AdminAddonPurchaseController` + `/admin/addon-packages` পেজ (প্যাকেজ CRUD + pending-purchase approve/reject queue একই পেজে)।
+- **`quota_source` কেন লাগল:** addon credit দিয়ে কভার হওয়া অর্ডার প্ল্যানের নিজস্ব কোটা-কাউন্টে গোনা যাবে না (নাহলে ক্রেডিট কেনা অর্থহীন হয়ে যেত — প্রতিটা addon-covered অর্ডার চিরকাল প্ল্যান-কোটার বিরুদ্ধে গোনা থেকে যেত)। তাই `quota_consumed_at` (কবে consume হলো) আর `quota_source` (কী দিয়ে কভার হলো) দুটো আলাদা কলাম — মাসিক-প্রসেসড-কাউন্ট শুধু `quota_source='plan'` গোনে।
+- **`OrderStatusService::consumeProcessingQuotaOrFail()` rewrite:** প্ল্যান-কোটা শেষ হলে এখন সরাসরি ব্লক না করে প্রথমে `OrderCreditService::consumeOne()` ট্রাই করে — ক্রেডিট থাকলে auto-deduct করে অর্ডার প্রসেস হতে দেয় (`quota_source='addon_credit'`), না থাকলে তবেই ৪০২।
+
+**🔧 ধাপ ২-এর একটা লেটেন্ট atomicity বাগ এই ধাপেই ধরা পড়ে ফিক্স হয়েছে:** কোটা-consume + status-update + stock-adjust তিনটাই আলাদা ছিল না — কোটা-চেক আগের `DB::transaction()`-এর **বাইরে** ছিল। মানে stock-insufficient হয়ে transaction rollback হলেও কোটা/ক্রেডিট ইতিমধ্যে consume হয়ে যেত (ব্যর্থ attempt-এই টাকার মতো মূল্যবান ক্রেডিট নষ্ট হতো)। এখন `consumeProcessingQuotaOrFail()` কল same `DB::transaction()`-এর ভেতরে সরানো হয়েছে (nested transaction, savepoint দিয়ে সঠিকভাবে rollback হয়) — নতুন টেস্ট `test_a_failed_transition_never_spends_a_credit_or_a_quota_slot` এটা কভার করে।
+
+**🐛 লাইভ ভেরিফিকেশনের সময় ধরা পড়া real বাগ:** `AddonPurchase`-এর Fillable-এ `applied_at` বাদ ছিল — `AddonApplyService::apply()`-এর নিজস্ব idempotency stamp (`$purchase->update(['applied_at' => now()])`) silently no-op হচ্ছিল (mass-assignment protection)। ক্রেডিট ঠিকই গ্রান্ট হচ্ছিল (grant() স্বাধীনভাবে কাজ করে) কিন্তু `apply()`-কে দ্বিতীয়বার সরাসরি কল করলে (controller-এর নিজস্ব status!=='pending' guard bypass করে) ডাবল-গ্রান্ট হতো — normal flow-এ এই বাগ ধরা পড়েনি কারণ controller-এর নিজস্ব guard কাকতালীয়ভাবে মাস্ক করে রেখেছিল। **ফিক্স:** Fillable-এ `applied_at` যোগ + নতুন টেস্ট (`test_apply_service_itself_is_idempotent_not_just_the_controller_guard`) যেটা controller guard bypass করে সরাসরি service-level idempotency টেস্ট করে।
+
+**Verification:**
+- Isolated pgsql schema: সব migration ক্লিন। নতুন `tests/Feature/OrderCreditAddonApiTest.php` (১১টা, seller purchase flow + admin CRUD/approve/reject + idempotency regression) ও `OrderProcessingQuotaTest.php`-এ ৫টা নতুন টেস্ট যোগ (addon fallback succeeds, addon-covered orders don't inflate plan count, both exhausted still blocks, expired wallet not used, failed transition never spends)। ফুল সুইট: প্রথমে ৫৪৪ পাস (৩টা baseline), Fillable বাগ ফিক্সের পর ৫৪৫ পাস — দুবারই শুধু ৩টা known baseline failure।
+- `npx tsc --noEmit` clean, `deploy-safe.sh` 8/8 pass।
+- **লাইভ প্রোডাকশন ভেরিফিকেশন** (disposable admin+seller+package+product, tinker দিয়ে তৈরি, cleanup করা হয়েছে): admin package তৈরি (`order_credit` টাইপ ✅, `landing_page` টাইপ ৪২২ রিজেক্ট ✅) → সেলার প্যাকেজ দেখল → পেমেন্ট সাবমিট (amount সার্ভার-সাইড হিসাব হয়েছে ৫.০০) → admin approve (এখানেই Fillable বাগ প্রথম ধরা পড়ে, ফিক্স করে আবার ডিপ্লয়) → balance 5 → দুটো অর্ডার তৈরি → প্রথমটা confirm (`quota_source: 'plan'`) → দ্বিতীয়টা confirm (প্ল্যান-কোটা শেষ, `quota_source: 'addon_credit'`, balance 5→4) — সব সঠিক। সব টেস্ট ডেটা (২টা অর্ডার+আইটেম+লগ, প্রোডাক্ট, ওয়ালেট+হিস্ট্রি, addon purchase+package, সেলার+অ্যাডমিন ইউজার+টোকেন, subscription package) মুছে ফেলা হয়েছে এবং delete কনফার্ম করা হয়েছে।
+
+**যা এই ধাপে করা হয়নি:**
+- **Automated bKash gateway (Tokenized+PGW)** — শুধু manual bKash flow, ইচ্ছাকৃত স্কোপ-কমানো (উপরে ব্যাখ্যা করা)।
+- **PDF ইনভয়েস** — subscription/SMS-credit-এ যেমন আছে, order-credit purchase-এ এখনো নেই।
+- **Frontend polish** — `/dashboard/order-credits` পেজ functional কিন্তু SMS-credit পেজের মতো ২ দফা visual redesign হয়নি (hero ring, receipt-card ইত্যাদি `billing-ui.tsx` shared component ব্যবহার করা হয়নি — খরচ/সময় বাঁচাতে সরল `catv-panel` লেআউট)। Admin `/admin/addon-packages` পেজেও `/admin/packages`-এর edit-modal নেই (শুধু create+delete, edit করতে হলে delete+recreate)।
+- **৪০২ পেলে "Add-on কিনুন" CTA** — অর্ডার লিস্ট/স্ট্যাটাস-আপডেট UI-তে এখনো generic error, `/dashboard/order-credits`-এ deep-link করা হয়নি।
+
+**পরবর্তী ধাপ (§9.6):** Storefront addon (বাইনারি, সবচেয়ে সহজ টাইপ) — generic addon ইনফ্রা এখন প্রস্তুত, `AddonApplyService`-এ নতুন `storefront` branch + `storefront_unlocked_until` কলাম যোগ করাই মূল কাজ হবে।

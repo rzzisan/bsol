@@ -36,6 +36,7 @@ class OrderStatusService
         private readonly AccountingService $accountingService,
         private readonly TrackingIngestService $trackingIngest,
         private readonly DigitalDeliveryService $digitalDeliveryService,
+        private readonly OrderCreditService $orderCreditService,
     ) {}
 
     /**
@@ -53,26 +54,27 @@ class OrderStatusService
             return;
         }
 
-        // Order quota redesign (subscription_billing_context.md §9.2-A) —
-        // placing an order never costs quota (unlimited pending); the first
-        // time it ever leaves 'pending', for any status, through any of
-        // this service's callers (manual/bulk status change, courier sync,
-        // WooCommerce sync, payment confirm), it counts against the plan's
-        // monthly processing limit. Checked here, not in each caller, so
-        // none of them can be a loophole. No refund if it's later
+        // Status update + inventory decrement + the quota/credit charge all
+        // happen atomically: if a variant or tracked product doesn't have
+        // enough stock left (adjustInventoryForStatusTransition throws), or
+        // the plan quota is exhausted with no add-on credit to fall back on
+        // (consumeProcessingQuotaOrFail throws), NOTHING here is left
+        // half-applied — a failed attempt must never silently spend a
+        // quota slot or an order-credit for an order that didn't actually
+        // move. Order quota redesign: subscription_billing_context.md
+        // §9.2-A/§9.2-B. Placing an order never costs quota (unlimited
+        // pending); the first time it ever leaves 'pending', for any
+        // status, through any of this service's callers (manual/bulk
+        // status change, courier sync, WooCommerce sync, payment confirm),
+        // it counts against the plan's monthly processing limit (or an
+        // add-on credit once that's exhausted). No refund if it's later
         // cancelled or somehow reverts to pending and leaves again (§9.3
         // decision #4) — quota_consumed_at is a one-way stamp.
-        if ($order->quota_consumed_at === null && $newStatus !== 'pending') {
-            $this->consumeProcessingQuotaOrFail($order);
-        }
-
-        // Status update + inventory decrement happen atomically: if a variant
-        // or tracked product doesn't have enough stock left
-        // (adjustInventoryForStatusTransition throws), the order's status
-        // change and any earlier decrements already made for this same order
-        // both roll back together, instead of leaving the order
-        // half-transitioned with mismatched stock.
         DB::transaction(function () use ($order, $oldStatus, $newStatus) {
+            if ($order->quota_consumed_at === null && $newStatus !== 'pending') {
+                $this->consumeProcessingQuotaOrFail($order);
+            }
+
             $order->update(['status' => $newStatus]);
             $this->adjustInventoryForStatusTransition($order, $oldStatus, $newStatus);
         });
@@ -226,30 +228,58 @@ class OrderStatusService
         $owner = User::find($order->user_id);
         $maxOrders = $owner?->subscriptionPackage?->max_orders;
 
-        if ($maxOrders !== null) {
-            $shopUserIds = $owner->shopUserIds();
-            $processedThisMonth = Order::whereIn('user_id', $shopUserIds)
-                ->whereNotNull('quota_consumed_at')
-                ->whereYear('quota_consumed_at', now()->year)
-                ->whereMonth('quota_consumed_at', now()->month)
-                ->count();
-
-            if ($processedThisMonth >= $maxOrders) {
-                $exception = ValidationException::withMessages([
-                    'status' => ['Monthly order-processing limit reached for your current plan. Please upgrade or buy an order-credit add-on to process more orders this month.'],
-                ]);
-                $exception->status = 402;
-                throw $exception;
-            }
+        if ($maxOrders === null) {
+            // Unlimited plan — nothing was actually consumed against
+            // anything, so quota_source stays null (distinguishes this
+            // from a plan-quota or addon-credit consumption below).
+            $this->stampQuota($order, null);
+            return;
         }
 
-        // Atomic claim (whereNull guard) — a concurrent transition on the
-        // same order can't double-consume; a small race at the exact
-        // monthly boundary between two *different* orders is possible
-        // (same precision the old creation-time check had) and accepted.
-        $affected = Order::where('id', $order->id)->whereNull('quota_consumed_at')->update(['quota_consumed_at' => now()]);
+        $shopUserIds = $owner->shopUserIds();
+        // Only 'plan'-sourced consumption counts here — an order covered
+        // by an add-on credit (below) must never keep counting against
+        // the plan's own quota, or every add-on-covered order would
+        // permanently inflate this count and the credits would be
+        // worthless (subscription_billing_context.md §9.2-B).
+        $processedThisMonth = Order::whereIn('user_id', $shopUserIds)
+            ->where('quota_source', 'plan')
+            ->whereYear('quota_consumed_at', now()->year)
+            ->whereMonth('quota_consumed_at', now()->month)
+            ->count();
+
+        if ($processedThisMonth < $maxOrders) {
+            $this->stampQuota($order, 'plan');
+            return;
+        }
+
+        // Plan quota exhausted this month — fall back to the order-credit
+        // add-on wallet (§9.2-B) before blocking.
+        if ($this->orderCreditService->consumeOne($owner->id, $order->id, "Order #{$order->id} processed past plan quota")) {
+            $this->stampQuota($order, 'addon_credit');
+            return;
+        }
+
+        $exception = ValidationException::withMessages([
+            'status' => ['Monthly order-processing limit reached for your current plan. Please upgrade or buy an order-credit add-on to process more orders this month.'],
+        ]);
+        $exception->status = 402;
+        throw $exception;
+    }
+
+    /**
+     * Atomic claim (whereNull guard) — a concurrent transition on the
+     * same order can't double-consume; a small race at the exact monthly
+     * boundary between two *different* orders is possible (same precision
+     * the old creation-time check had) and accepted.
+     */
+    private function stampQuota(Order $order, ?string $source): void
+    {
+        $affected = Order::where('id', $order->id)->whereNull('quota_consumed_at')
+            ->update(['quota_consumed_at' => now(), 'quota_source' => $source]);
         if ($affected > 0) {
             $order->quota_consumed_at = now();
+            $order->quota_source = $source;
         }
     }
 
