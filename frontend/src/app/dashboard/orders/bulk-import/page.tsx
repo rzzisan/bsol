@@ -83,6 +83,22 @@ export default function BulkImportOrdersPage() {
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [result, setResult] = useState<CommitResult | null>(null);
 
+  const downloadTemplate = async () => {
+    // A plain <a href> would navigate without the Authorization header
+    // (browsers don't attach it to normal navigation) and this endpoint
+    // sits behind auth:sanctum + staff_permission:orders — same
+    // fetch+blob pattern as abandoned-checkouts' CSV export.
+    const res = await fetch(`${API}/orders/bulk-import/template`, { headers: authHeaders });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "bsol-order-import-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const runPreview = async () => {
     if (!file) return;
     setBusy(true);
@@ -140,12 +156,13 @@ export default function BulkImportOrdersPage() {
       pageSubtitle={{ bn: t.bn.subtitle, en: t.en.subtitle }}
     >
       <section className="catv-panel p-4 sm:p-5">
-        <a
-          href={`${API}/orders/bulk-import/template`}
+        <button
+          type="button"
+          onClick={() => void downloadTemplate()}
           className="inline-block rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold hover:bg-[var(--surface-soft)]"
         >
           ⬇ {txt.template}
-        </a>
+        </button>
         <p className="mt-2 text-xs text-[var(--muted)]">{txt.templateHint}</p>
 
         {!result && (
