@@ -11,6 +11,7 @@ use App\Models\ProductVariant;
 use App\Models\ShopProfile;
 use App\Models\StorefrontSetting;
 use App\Models\User;
+use App\Services\StorefrontAddonService;
 use App\Support\LandingPageResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -53,12 +54,16 @@ class StorefrontCatalogController extends Controller
         // unlike every owner_only settings route, this call has no Sanctum
         // session to run `package_feature:storefront` middleware against
         // (it's the public-facing home() the frontend layout fetches first),
-        // so the check lives here instead. Every other /public/storefront/*
-        // route is only ever reachable from a page that itself depends on
-        // this response succeeding first. Default-allow, matches
-        // EnsurePackageFeature — only an explicit `false` locks it.
+        // so the check lives here instead (same logic as EnsurePackageFeature,
+        // including the storefront add-on override — §9.6 step 4). Every
+        // other /public/storefront/* route is only ever reachable from a
+        // page that itself depends on this response succeeding first.
+        // Default-allow — only an explicit `false` locks it, unless an
+        // active add-on overrides that.
         $owner = User::find($ownerId);
-        if (($owner?->subscriptionPackage?->feature_flags['storefront'] ?? true) === false) {
+        $deniedByPlan = ($owner?->subscriptionPackage?->feature_flags['storefront'] ?? true) === false;
+        $unlockedByAddon = $owner && app(StorefrontAddonService::class)->hasActiveAddon($owner);
+        if ($deniedByPlan && ! $unlockedByAddon) {
             return $this->storefrontLocked();
         }
 

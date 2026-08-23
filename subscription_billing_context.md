@@ -514,4 +514,28 @@ Addon purchase-এর পুরো পেমেন্ট পাইপলাই�
 - **Frontend polish** — `/dashboard/order-credits` পেজ functional কিন্তু SMS-credit পেজের মতো ২ দফা visual redesign হয়নি (hero ring, receipt-card ইত্যাদি `billing-ui.tsx` shared component ব্যবহার করা হয়নি — খরচ/সময় বাঁচাতে সরল `catv-panel` লেআউট)। Admin `/admin/addon-packages` পেজেও `/admin/packages`-এর edit-modal নেই (শুধু create+delete, edit করতে হলে delete+recreate)।
 - **৪০২ পেলে "Add-on কিনুন" CTA** — অর্ডার লিস্ট/স্ট্যাটাস-আপডেট UI-তে এখনো generic error, `/dashboard/order-credits`-এ deep-link করা হয়নি।
 
-**পরবর্তী ধাপ (§9.6):** Storefront addon (বাইনারি, সবচেয়ে সহজ টাইপ) — generic addon ইনফ্রা এখন প্রস্তুত, `AddonApplyService`-এ নতুন `storefront` branch + `storefront_unlocked_until` কলাম যোগ করাই মূল কাজ হবে।
+---
+
+## 11. ধাপ ৪ — Implementation log (2026-08-23, Storefront add-on সম্পন্ন)
+
+**যা তৈরি হয়েছে:**
+- নতুন কলাম `users.storefront_addon_until` (nullable timestamp, ইচ্ছাকৃতভাবে `$fillable`-এ নেই)। ল্যান্ডিং-পেজ/ট্র্যাকিং-বুস্টের মতো নিজস্ব `duration_days` নেই — বাইনারি, মেইন সাবস্ক্রিপশনের সাথে **co-terminous**।
+- নতুন `StorefrontAddonService` — `hasActiveAddon()`, `activate()` (কেনার সময় `subscription_ends_at`-এ anchor করে, active subscription না থাকলে ৩০ দিন fallback), `extendToMatchIfActive()` (renewal-এ sync করার জন্য, lapsed হলে no-op — কখনো বিনামূল্যে পুনরুজ্জীবিত করে না)।
+- `SubscriptionActivationService::activate()`-এ hook যোগ — প্রতিটা renewal/upgrade-এ ইতিমধ্যে-সক্রিয় addon-কে নতুন `subscription_ends_at`-এর সাথে sync করে (co-terminous behavior-এর মূল বাস্তবায়ন)।
+- `AddonPackage::CREATABLE_TYPES`-এ `storefront` যোগ। Admin ভ্যালিডেশনে `quantity`/`duration_days` এখন `order_credit`-এর জন্য conditional-required (`Rule::requiredIf`), storefront-এ প্রযোজ্য না।
+- `AddonApplyService`-এ নতুন `storefront` branch — approve হলে `StorefrontAddonService::activate()` কল করে।
+- `EnsurePackageFeature` middleware ও `StorefrontCatalogController::home()` দুটোতেই override যোগ — প্ল্যান storefront বাদ দিলেও active addon থাকলে allow (দুই জায়গাতেই একই লজিক ডুপ্লিকেট এড়াতে `StorefrontAddonService::hasActiveAddon()` reuse করা হয়েছে)।
+- Seller-facing `StorefrontAddonPurchaseController` + `/dashboard/storefront-addon` (status/history/manual-bKash submit — বাইনারি বলে balance/wallet কনসেপ্ট নেই)। Admin-এর দিকে নতুন কিছু লাগেনি — `AdminAddonPurchaseController` আগে থেকেই generic (যেকোনো টাইপের purchase approve করতে পারে); শুধু `/admin/addon-packages` ফর্মে টাইপ-selector যোগ হয়েছে (order_credit/storefront টগল করলে quantity/duration ফিল্ড conditionally দেখায়/লুকায়)।
+
+**🐛 লাইভ ভেরিফিকেশনের আগেই টেস্টে ধরা পড়া বাগ (আগের ধাপের একই ক্লাসের ভুল আবার হতে গিয়েছিল):** `StorefrontAddonService`-এ প্রথমে `$owner->update(['storefront_addon_until' => ...])` লেখা হয়েছিল — কিন্তু `storefront_addon_until` ইচ্ছাকৃতভাবে `User::$fillable`-এ নেই (client-writable না রাখার জন্য), তাই `update()` silently no-op করত (ধাপ ৩-এর `applied_at` বাগের হুবহু একই প্যাটার্ন)। টেস্ট লেখার সময়ই (deploy-এর আগে) ধরা পড়ে — ফিক্স: `forceFill(['storefront_addon_until' => ...])->save()`।
+
+**Verification:**
+- Isolated pgsql schema: migration ক্লিন। নতুন `tests/Feature/StorefrontAddonTest.php` (১২টা টেস্ট — service-level activate/extend/lapse-protection, co-terminous renewal sync (`SubscriptionActivationService` দিয়ে সরাসরি), `AddonApplyService` integration, `EnsurePackageFeature` override (allow+still-blocks-when-lapsed দুটোই), public storefront home override, admin conditional validation)। ফুল সুইট: ৫৫৭ পাস, শুধু ৩টা known baseline failure (একবার আগের রানে অসম্পর্কিত `CollectionHistoryApiTest`-এ একটা flaky failure দেখা গিয়েছিল, isolation-এ ৩ বার consistently pass করে কনফার্ম করা হয়েছে এই কাজের সাথে সম্পর্কহীন)।
+- `npx tsc --noEmit` clean, `deploy-safe.sh` 8/8 pass।
+- **লাইভ প্রোডাকশন ভেরিফিকেশন** (disposable plan (storefront বাদ) + seller + admin, tinker দিয়ে তৈরি): সেলার storefront-settings হিট করল → `402` সঠিক → admin storefront প্যাকেজ তৈরি করল → সেলার status দেখল (`addon_active:false`) → পেমেন্ট সাবমিট → admin approve → status আবার চেক (`addon_active:true`, `addon_until` = সেলারের `subscription_ends_at`-এর সাথে হুবহু মিলেছে) → storefront-settings আবার হিট → `200` (unlock কাজ করেছে) → **co-terminous renewal সিমুলেট** করা হয়েছে (`SubscriptionActivationService::activate()` সরাসরি কল করে) → `subscription_ends_at` ও `storefront_addon_until` দুটোই একসাথে ১ মাস বেড়েছে, হুবহু মিলেছে। সব টেস্ট ডেটা (purchase, package, subscription payment, সেলার+অ্যাডমিন ইউজার+টোকেন, plan) মুছে ফেলা হয়েছে।
+
+**যা এই ধাপে করা হয়নি:**
+- Automated bKash gateway — আগের ধাপের মতোই manual-only।
+- `/dashboard/settings/storefront`-এ deep-link/CTA — locked অবস্থায় সেলার এখনো নিজে থেকে `/dashboard/storefront-addon`-এ যাওয়া লাগবে, সরাসরি লিঙ্ক করা হয়নি।
+
+**পরবর্তী ধাপ (§9.6):** Landing page addon + auto-unpublish (সবচেয়ে জটিল — কোটা + কোনগুলো unpublish হবে সেই সিদ্ধান্ত + cron, §9.3-এর বাকি open question #৬)।

@@ -56,7 +56,7 @@ export default function AdminAddonPackagesPage() {
 
   const [packages, setPackages] = useState<AddonPackageRow[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRow[]>([]);
-  const [form, setForm] = useState({ name: "", price: "", quantity: "", duration_days: "30" });
+  const [form, setForm] = useState({ type: "order_credit", name: "", price: "", quantity: "", duration_days: "30" });
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -133,7 +133,8 @@ export default function AdminAddonPackagesPage() {
   const createPackage = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
-    if (!form.name.trim() || !form.price || !form.quantity || !form.duration_days) {
+    const needsQuantityAndDuration = form.type === "order_credit";
+    if (!form.name.trim() || !form.price || (needsQuantityAndDuration && (!form.quantity || !form.duration_days))) {
       setMessage({ type: "err", text: locale === "bn" ? "সব ফিল্ড পূরণ করুন।" : "Fill all fields." });
       return;
     }
@@ -143,11 +144,11 @@ export default function AdminAddonPackagesPage() {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
-          type: "order_credit",
+          type: form.type,
           name: form.name.trim(),
           price: Number(form.price),
-          quantity: Number(form.quantity),
-          duration_days: Number(form.duration_days),
+          quantity: needsQuantityAndDuration ? Number(form.quantity) : null,
+          duration_days: needsQuantityAndDuration ? Number(form.duration_days) : null,
         }),
       });
       const data = await res.json();
@@ -156,7 +157,7 @@ export default function AdminAddonPackagesPage() {
         return;
       }
       setMessage({ type: "ok", text: locale === "bn" ? "প্যাকেজ তৈরি হয়েছে।" : "Package created." });
-      setForm({ name: "", price: "", quantity: "", duration_days: "30" });
+      setForm({ type: "order_credit", name: "", price: "", quantity: "", duration_days: "30" });
       void loadPackages();
     } finally {
       setSubmitting(false);
@@ -210,16 +211,27 @@ export default function AdminAddonPackagesPage() {
     >
       <section className="catv-panel mb-5 p-4 sm:p-5">
         <h2 className="text-base font-semibold text-[var(--foreground)]">
-          {locale === "bn" ? "নতুন অর্ডার-ক্রেডিট প্যাকেজ" : "New order-credit package"}
+          {locale === "bn" ? "নতুন অ্যাড-অন প্যাকেজ" : "New add-on package"}
         </h2>
         <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={createPackage}>
+          <div className="md:col-span-2">
+            <label className={labelCls}>{locale === "bn" ? "টাইপ" : "Type"}</label>
+            <select
+              className={inputCls}
+              value={form.type}
+              onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
+            >
+              <option value="order_credit">{locale === "bn" ? "অর্ডার ক্রেডিট" : "Order credit"}</option>
+              <option value="storefront">{locale === "bn" ? "স্টোরফ্রন্ট আনলক" : "Storefront unlock"}</option>
+            </select>
+          </div>
           <div>
             <label className={labelCls}>{locale === "bn" ? "নাম" : "Name"}</label>
             <input
               className={inputCls}
               value={form.name}
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              placeholder="50 Orders / 1 Month"
+              placeholder={form.type === "storefront" ? "Unlock Storefront" : "50 Orders / 1 Month"}
             />
           </div>
           <div>
@@ -231,24 +243,35 @@ export default function AdminAddonPackagesPage() {
               onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
             />
           </div>
-          <div>
-            <label className={labelCls}>{locale === "bn" ? "অর্ডার সংখ্যা" : "Order quantity"}</label>
-            <input
-              type="number" min={1}
-              className={inputCls}
-              value={form.quantity}
-              onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className={labelCls}>{locale === "bn" ? "মেয়াদ (দিন)" : "Validity (days)"}</label>
-            <input
-              type="number" min={1}
-              className={inputCls}
-              value={form.duration_days}
-              onChange={(e) => setForm((p) => ({ ...p, duration_days: e.target.value }))}
-            />
-          </div>
+          {form.type === "order_credit" && (
+            <>
+              <div>
+                <label className={labelCls}>{locale === "bn" ? "অর্ডার সংখ্যা" : "Order quantity"}</label>
+                <input
+                  type="number" min={1}
+                  className={inputCls}
+                  value={form.quantity}
+                  onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>{locale === "bn" ? "মেয়াদ (দিন)" : "Validity (days)"}</label>
+                <input
+                  type="number" min={1}
+                  className={inputCls}
+                  value={form.duration_days}
+                  onChange={(e) => setForm((p) => ({ ...p, duration_days: e.target.value }))}
+                />
+              </div>
+            </>
+          )}
+          {form.type === "storefront" && (
+            <p className="text-xs text-[var(--muted)] md:col-span-2">
+              {locale === "bn"
+                ? "স্টোরফ্রন্ট আনলক মেইন সাবস্ক্রিপশনের মেয়াদ অনুযায়ী চলবে — আলাদা মেয়াদ/পরিমাণ লাগে না।"
+                : "Storefront unlock runs co-terminous with the main subscription — no separate quantity/validity needed."}
+            </p>
+          )}
           <div className="md:col-span-2">
             <button
               type="submit"
@@ -284,9 +307,9 @@ export default function AdminAddonPackagesPage() {
             <tbody>
               {packages.map((p) => (
                 <tr key={p.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-2">{p.name}</td>
-                  <td className="px-3 py-2 text-right">{p.quantity}</td>
-                  <td className="px-3 py-2 text-right">{p.duration_days}</td>
+                  <td className="px-3 py-2">{p.name} <span className="text-xs text-[var(--muted)]">({p.type})</span></td>
+                  <td className="px-3 py-2 text-right">{p.quantity ?? "—"}</td>
+                  <td className="px-3 py-2 text-right">{p.duration_days ?? "—"}</td>
                   <td className="px-3 py-2 text-right">৳{p.price}</td>
                   <td className="px-3 py-2 text-center">
                     <button

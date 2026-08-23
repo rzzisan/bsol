@@ -37,6 +37,10 @@ class User extends Authenticatable
             'password'               => 'hashed',
             'subscription_started_at' => 'datetime',
             'subscription_ends_at'    => 'datetime',
+            // Deliberately absent from $fillable — only ever set by
+            // StorefrontAddonService, never client-writable.
+            // subscription_billing_context.md §9.2-D.
+            'storefront_addon_until'  => 'datetime',
             'deleted_at'              => 'datetime',
             'must_change_password'    => 'boolean',
         ];

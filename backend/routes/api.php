@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\SmsCreditBkashPaymentController;
 use App\Http\Controllers\Api\SmsCreditBkashPgwPaymentController;
 use App\Http\Controllers\Api\OrderCreditPurchaseController;
 use App\Http\Controllers\Api\SmsCreditPurchaseController;
+use App\Http\Controllers\Api\StorefrontAddonPurchaseController;
 use App\Http\Controllers\Api\FacebookConnectController;
 use App\Http\Controllers\Api\FacebookLeadController;
 use App\Http\Controllers\Api\FacebookPixelSettingController;
@@ -386,6 +387,14 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::get('/order-credits/history', [OrderCreditPurchaseController::class, 'history']);
         Route::get('/order-credits/purchases', [OrderCreditPurchaseController::class, 'myPurchases']);
         Route::post('/order-credits/purchases', [OrderCreditPurchaseController::class, 'submitPayment']);
+    });
+
+    // ── Storefront add-on self-service purchase — subscription_billing_context.md
+    // §9.2-D / §9.6 step 4 ── Owner-only (Pattern B), same reasoning as above.
+    Route::middleware('owner_only')->group(function () {
+        Route::get('/storefront-addon/status', [StorefrontAddonPurchaseController::class, 'status']);
+        Route::get('/storefront-addon/purchases', [StorefrontAddonPurchaseController::class, 'myPurchases']);
+        Route::post('/storefront-addon/purchases', [StorefrontAddonPurchaseController::class, 'submitPayment']);
     });
 
     // ── Subscription (self-service — must stay reachable even when expired) ───

@@ -17,7 +17,7 @@ class AddonPackage extends Model
     public const TYPES = ['order_credit', 'landing_page', 'storefront', 'tracking_boost'];
 
     /** Types with a working AddonApplyService branch — the only ones admin can create right now. */
-    public const CREATABLE_TYPES = ['order_credit'];
+    public const CREATABLE_TYPES = ['order_credit', 'storefront'];
 
     protected function casts(): array
     {

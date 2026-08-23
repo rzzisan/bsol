@@ -99,6 +99,7 @@ const menuText = {
     wordpressConnect: "ওয়ার্ডপ্রেস কানেক্ট",
     subscription: "সাবস্ক্রিপশন",
     orderCredits: "অর্ডার ক্রেডিট",
+    storefrontAddon: "স্টোরফ্রন্ট Add-on",
     staffManagement: "টিম / স্টাফ",
 
     // force-password-change gate
@@ -185,6 +186,7 @@ const menuText = {
     wordpressConnect: "WordPress Connect",
     subscription: "Subscription",
     orderCredits: "Order Credits",
+    storefrontAddon: "Storefront Add-on",
     staffManagement: "Staff & Team",
 
     // force-password-change gate
@@ -340,6 +342,7 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number, whatsappU
         { key: "wordpress-connect", label: (t as any).wordpressConnect ?? "ওয়ার্ডপ্রেস কানেক্ট", href: "/dashboard/settings/wordpress" },
         { key: "subscription", label: t.subscription, href: "/dashboard/settings/subscription" },
         { key: "order-credits", label: (t as any).orderCredits ?? "অর্ডার ক্রেডিট", href: "/dashboard/order-credits" },
+        { key: "storefront-addon", label: (t as any).storefrontAddon ?? "স্টোরফ্রন্ট Add-on", href: "/dashboard/storefront-addon" },
         { key: "staff-management", label: t.staffManagement, href: "/dashboard/settings/staff" },
       ],
     },

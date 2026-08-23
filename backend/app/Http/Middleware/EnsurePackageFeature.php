@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\StorefrontAddonService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +31,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnsurePackageFeature
 {
+    public function __construct(private readonly StorefrontAddonService $storefrontAddonService) {}
+
     public function handle(Request $request, Closure $next, string $featureKey): Response
     {
         $user = $request->user();
@@ -38,10 +41,16 @@ class EnsurePackageFeature
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $package = $user->shopOwner()->subscriptionPackage;
-        $denied = ($package?->feature_flags[$featureKey] ?? true) === false;
+        $owner = $user->shopOwner();
+        $package = $owner->subscriptionPackage;
+        $deniedByPlan = ($package?->feature_flags[$featureKey] ?? true) === false;
 
-        if ($denied) {
+        // storefront can also be unlocked independently of the plan via
+        // the add-on (§9.2-D) — an active add-on always wins over a plan
+        // that excludes it.
+        $unlockedByAddon = $featureKey === 'storefront' && $this->storefrontAddonService->hasActiveAddon($owner);
+
+        if ($deniedByPlan && ! $unlockedByAddon) {
             return response()->json([
                 'message' => 'This feature is not included in your current plan.',
                 'error_code' => 'feature_not_in_plan',

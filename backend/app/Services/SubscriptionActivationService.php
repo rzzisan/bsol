@@ -14,7 +14,10 @@ use App\Services\NotificationDispatchService;
  */
 class SubscriptionActivationService
 {
-    public function __construct(private readonly NotificationDispatchService $notificationDispatchService) {}
+    public function __construct(
+        private readonly NotificationDispatchService $notificationDispatchService,
+        private readonly StorefrontAddonService $storefrontAddonService,
+    ) {}
 
     public function activate(SubscriptionPayment $payment): void
     {
@@ -47,6 +50,11 @@ class SubscriptionActivationService
             'subscription_started_at' => $user->subscription_started_at ?? now(),
             'subscription_ends_at' => $newEndsAt,
         ]);
+
+        // Storefront add-on (§9.2-D) — co-terminous with the main cycle,
+        // kept in sync here on every renewal/upgrade. No-op if the seller
+        // never had it, or it already lapsed.
+        $this->storefrontAddonService->extendToMatchIfActive($user, $newEndsAt);
 
         try {
             $this->notificationDispatchService->dispatch($user, 'subscription_payment_approved', $user->mobile, $user->email, [

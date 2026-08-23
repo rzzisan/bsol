@@ -25,12 +25,17 @@ class AdminAddonPackageController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // quantity/duration_days only mean something for order_credit
+        // (how many credits, how long they last) — storefront is a binary
+        // unlock, co-terminous with the main plan, so it has neither
+        // (StorefrontAddonService derives its own validity from
+        // subscription_ends_at, not from this package).
         $validated = $request->validate([
             'type' => ['required', Rule::in(AddonPackage::CREATABLE_TYPES)],
             'name' => ['required', 'string', 'max:255'],
             'price' => ['required', 'numeric', 'min:0'],
-            'quantity' => ['required', 'integer', 'min:1'],
-            'duration_days' => ['required', 'integer', 'min:1'],
+            'quantity' => [Rule::requiredIf($request->input('type') === 'order_credit'), 'nullable', 'integer', 'min:1'],
+            'duration_days' => [Rule::requiredIf($request->input('type') === 'order_credit'), 'nullable', 'integer', 'min:1'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 

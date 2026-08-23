@@ -6,6 +6,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-23 (৪) — **SaaS বিলিং ধাপ ৪ (Storefront add-on) ✅ সম্পন্ন ও লাইভ** — বাইনারি আনলক, মেইন সাবস্ক্রিপশনের সাথে co-terminous (renewal-এ auto-sync)। সেলার-facing `/dashboard/storefront-addon`। বিস্তারিত `subscription_billing_context.md §১১`। পরবর্তী: Landing page addon + auto-unpublish (সবচেয়ে জটিল ধাপ)। Older entries kept as-is:
+
 Last updated: 2026-08-23 (৩) — **SaaS বিলিং ধাপ ৩ (Order-credit add-on) ✅ সম্পন্ন ও লাইভ** — প্ল্যান-কোটা শেষ হলে এখন addon-credit fallback হয় (আগে শুধু ব্লক হতো)। সেলার-facing `/dashboard/order-credits` + admin `/admin/addon-packages`। বিস্তারিত `subscription_billing_context.md §১০`। পরবর্তী: Storefront addon। Older entries kept as-is:
 
 Last updated: 2026-08-23 (২) — **SaaS বিলিং ধাপ ২ (Order quota redesign) ✅ সম্পন্ন ও লাইভ** — অর্ডার তৈরি এখন আনলিমিটেড, মাসিক লিমিট এখন প্রসেসিং-এর সময় (`OrderStatusService::transition()`) একবার এনফোর্স হয়। বিস্তারিত `subscription_billing_context.md §৯.৮`। পরবর্তী: Order-credit addon। Older entries kept as-is:
