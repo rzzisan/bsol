@@ -159,6 +159,8 @@ class AdminController extends Controller
             // null = unlimited, 0 = tracking not included on this package.
             'max_tracking_events_per_day' => ['nullable', 'integer', 'min:0'],
             'features' => ['nullable', 'array'],
+            'feature_flags' => ['nullable', 'array'],
+            'feature_flags.*' => ['boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
@@ -184,6 +186,8 @@ class AdminController extends Controller
             'max_orders' => ['nullable', 'integer', 'min:0'],
             'max_tracking_events_per_day' => ['nullable', 'integer', 'min:0'],
             'features' => ['nullable', 'array'],
+            'feature_flags' => ['nullable', 'array'],
+            'feature_flags.*' => ['boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 

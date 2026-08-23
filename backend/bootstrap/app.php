@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Middleware\AuthenticatePlatformApiKey;
 use App\Http\Middleware\EnsureActiveSubscription;
+use App\Http\Middleware\EnsurePackageFeature;
 use App\Http\Middleware\EnsureShopOwner;
 use App\Http\Middleware\EnsureStaffPermission;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -57,6 +58,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // Staff/Team sub-account role — see staff_team_role_context.md §3.4/§3.7
             'staff_permission' => EnsureStaffPermission::class,
             'owner_only' => EnsureShopOwner::class,
+            // Package/plan feature gate — subscription_billing_context.md §9.2-E
+            'package_feature' => EnsurePackageFeature::class,
             'force_password_change' => ForcePasswordChange::class,
             // WordPress/WooCommerce connector — bsol_history_and_new_context.md §5
             'connect_api_key' => AuthenticatePlatformApiKey::class,

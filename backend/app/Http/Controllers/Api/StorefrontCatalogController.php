@@ -10,6 +10,7 @@ use App\Models\ProductReview;
 use App\Models\ProductVariant;
 use App\Models\ShopProfile;
 use App\Models\StorefrontSetting;
+use App\Models\User;
 use App\Support\LandingPageResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -46,6 +47,19 @@ class StorefrontCatalogController extends Controller
 
         if ($shopUserIds === null || $ownerId === null) {
             return $this->shopNotFound();
+        }
+
+        // Package-gated module (subscription_billing_context.md §9.2-D/E) —
+        // unlike every owner_only settings route, this call has no Sanctum
+        // session to run `package_feature:storefront` middleware against
+        // (it's the public-facing home() the frontend layout fetches first),
+        // so the check lives here instead. Every other /public/storefront/*
+        // route is only ever reachable from a page that itself depends on
+        // this response succeeding first. Default-allow, matches
+        // EnsurePackageFeature — only an explicit `false` locks it.
+        $owner = User::find($ownerId);
+        if (($owner?->subscriptionPackage?->feature_flags['storefront'] ?? true) === false) {
+            return $this->storefrontLocked();
         }
 
         $shop = ShopProfile::where('user_id', $ownerId)->first();
@@ -415,5 +429,15 @@ class StorefrontCatalogController extends Controller
     private function shopNotFound(): JsonResponse
     {
         return response()->json(['success' => false, 'message' => 'Unknown shop.'], 404);
+    }
+
+    private function storefrontLocked(): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'This storefront is temporarily unavailable.',
+            'error_code' => 'feature_not_in_plan',
+            'feature' => 'storefront',
+        ], 402);
     }
 }

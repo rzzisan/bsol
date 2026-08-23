@@ -8,7 +8,7 @@
 
 > **🚨 সেলার সাবডোমেইন — পেমেন্ট কলব্যাক এখন host-aware (2026-08-15):** সেলার এখন নিজের ঠিকানায় (`{label}.zyrotechbd.com`) ড্যাশবোর্ড চালায়, তাই bKash subscription ও SMS-credit কলব্যাক দুটোই সেলারকে **তার নিজের ঠিকানায়** ফেরত পাঠায়, প্ল্যাটফর্ম ডোমেইনে নয়। এটা `App\Support\FrontendUrl` দিয়ে হয়, আর ঠিকানা resolve হয় **payment রেকর্ডের মালিক থেকে — রিকোয়েস্টের `Host` হেডার থেকে নয়**। এই পার্থক্যটা নিরাপত্তাগত: bKash এই রিডাইরেক্ট নিয়ন্ত্রণ করে, তাই Host বিশ্বাস করলে প্রতিটি কলব্যাক একটা open redirect হয়ে যেত। payment না মিললে প্ল্যাটফর্ম URL-ই একমাত্র নিরাপদ গন্তব্য। **নতুন কোনো gateway/কলব্যাক যোগ করলে একই নিয়ম মানতে হবে** — বিস্তারিত `custom_domain_context.md §15`, CONTEXT.md §৩২।
 
-Last updated: 2026-08-10 — **Phase 4: Phase 3-এর ডিজাইন user-এর কাছে যথেষ্ট মনে হয়নি ("ভাল লাগে নাই"), তাই আরেকবার সম্পূর্ণ visual concept upgrade করা হয়েছে, deploy + live-verify করা হয়েছে।** নিচে §8-এ implementation log। Phase 1/2/3 আগেই সম্পন্ন (§5, §6, §7)।
+Last updated: 2026-08-23 — **Phase 5: প্ল্যানিং শুরু (কোনো কোড লেখা হয়নি এখনো)।** user-এর আইডিয়া (order quota redesign, add-on/credit প্যাকেজ, landing page/storefront/tracking gating, ফিচার access control) থেকে পূর্ণ প্ল্যান নিচে §9-এ। Phase 1-4 (subscription upgrade/proration/invoice, SMS credit self-service purchase, PDF invoice, UI redesign) আগেই সম্পন্ন — §5-§8।
 
 ---
 
@@ -347,3 +347,127 @@ CONTEXT.md §22 (design consistency policy) অনুযায়ী `catv-panel
 ### 8.5 যা এই ফেজে করা হয়নি
 - Mobile viewport visual QA (Phase 3-এর মতোই একই tool সীমাবদ্ধতা)
 - Admin billing/sms-credit পেজের ডিজাইন touch করা হয়নি (শুধু seller-facing পেজ scope-এ ছিল)
+
+---
+
+## 9. Phase 5 প্ল্যান — Order Quota Redesign + Add-on/Credit System + Feature Access Control (2026-08-23, প্ল্যানিং)
+
+User request (সংক্ষেপে, ২০২৬-০৮-২৩): মাসিক অর্ডার লিমিট এখন অর্ডার-**তৈরির** সময় ব্লক করে — এটা বদলে অর্ডার-**প্রসেসিং**-এর সময় ব্লক করা (আনলিমিটেড pending রাখা যাবে), অতিরিক্ত অর্ডার-প্রসেসিং-এর জন্য Add-on ক্রেডিট প্যাকেজ কেনা যাবে, ল্যান্ডিং পেজ/স্টোরফ্রন্ট/ফেসবুক-ট্র্যাকিং-ও প্যাকেজভিত্তিক + Add-on দিয়ে আনলক করা যাবে, এবং পুরো প্ল্যাটফর্মের জন্য একটা ফিচার/মডিউল অ্যাক্সেস কন্ট্রোল সিস্টেম দরকার — সুপার অ্যাডমিন প্যাকেজ ও Add-on দুটোই তৈরি/পরিচালনা করতে পারবে।
+
+### 9.1 এই প্ল্যানের ভিত্তি — বর্তমান কোডবেস অডিট (গবেষণা করে যাচাই করা, অনুমান না)
+
+| যা দরকার | বর্তমান অবস্থা |
+|---|---|
+| Proration/invoice ইঞ্জিন | ✅ আছে — `SubscriptionInvoiceService` (§2-§5), reusable |
+| Package upgrade/downgrade/renewal lifecycle | ✅ আছে — `SubscriptionActivationService`, `ExpireSubscriptions` কমান্ড |
+| bKash dual payment path (manual + PGW/Tokenized, auto-verify + admin-approve queue) | ✅ আছে, দুইবার প্রমাণিত প্যাটার্ন (subscription §5, SMS credit §6) |
+| Wallet + ledger + self-service purchase প্যাটার্ন | ✅ আছে — SMS credit (`SmsCredit`, `SmsCreditHistory`, `SmsCreditPurchase`) হুবহু এই দরকারের টেমপ্লেট |
+| PDF ইনভয়েস | ✅ আছে — `InvoicePdfService`, generic (নতুন payment টাইপের জন্য সহজে এক্সটেন্ড করা যায়) |
+| Package-এ `features` (json) কলাম | ✅ কলাম আছে, admin CRUD-এও validate হয় (`AdminController::createPackage/updatePackage`) — **কিন্তু কোথাও enforce হয় না।** ফাঁকা placeholder |
+| Order quota enforcement | ⚠️ **আছে কিন্তু ভুল জায়গায়** — `OrderController::store()` লাইন ১৯৫-এ **অর্ডার তৈরির সময়** ব্লক করে (এই মাসের মোট অর্ডার ≥ `max_orders` হলে 402)। `OrderBulkImportController`-ও একই যুক্তি রিইউজ করে। User-এর নতুন আইডিয়া অনুযায়ী এটা **প্রসেসিং-এ সরাতে হবে** — `OrderController::updateStatus()`/`bulkStatus()` (লাইন ৪৪৭/৪৬৮) |
+| Landing page limit | ❌ কোনো লিমিট নেই — সেলার যত খুশি landing page বানাতে পারে, ফ্রি |
+| Landing page publish/unpublish state | ✅ `landing_pages.status` কলাম আগে থেকেই আছে (`draft` ইত্যাদি) — নতুন কলাম লাগবে না, শুধু নতুন state ব্যবহার (`unpublished_billing` বা বিদ্যমান enum রিইউজ) |
+| Storefront gating | ❌ সব সেলারই স্টোরফ্রন্ট ব্যবহার করতে পারে, প্যাকেজ-নির্বিশেষে |
+| Facebook tracking quota | ✅ `max_tracking_events_per_day` + `TrackingQuotaService` আছে (দৈনিক রিসেট) — কিন্তু **কোনো Add-on/top-up মেকানিজম নেই**, শুধু প্যাকেজ বদলে বাড়ানো যায় |
+| Fraud checker / Block list / FB Leads অ্যাক্সেস কন্ট্রোল | ❌ কিছুই নেই — সব সেলার সব ফিচার পায় |
+| Staff-permission মডিউল লিস্ট (তুলনার জন্য) | `StaffPermission::MODULE_KEYS` = orders, products, customers, courier, sms, accounting, analytics, landing_pages, fraud, facebook, tracking, payments, whatsapp — এটা "টিমের কে কী দেখবে", **প্যাকেজ ফিচার-গেট থেকে আলাদা ধারণা**, কিন্তু key-নাম পুনঃব্যবহার করলে সামঞ্জস্যপূর্ণ হবে |
+
+**সারকথা:** billing **ইঞ্জিন** (proration/invoice/payment/wallet) ইতিমধ্যে শক্ত ভিত্তি — নতুন করে বানাতে হবে না। যা নতুন লাগবে তা হলো (ক) quota enforcement-এর জায়গা বদলানো, (খ) সেই ইঞ্জিন রিইউজ করে একটা generalized **Add-on/credit** স্তর, আর (গ) একটা **ফিচার-গেট** স্তর।
+
+### 9.2 মূল আর্কিটেকচার সিদ্ধান্ত
+
+**A. Order quota — "place free, process metered"**
+- `OrderController::store()`/`OrderBulkImportController` থেকে বর্তমান creation-time 402 ব্লক **সরিয়ে ফেলা** — অর্ডার সবসময় `pending` হিসেবে তৈরি হবে, লিমিট নির্বিশেষে (কোনো লিড/অর্ডার হারানো যাবে না)।
+- নতুন চেক **`OrderController::updateStatus()`/`bulkStatus()`-এ**, শুধু তখন যখন `status` **`pending` থেকে অন্য কিছুতে** যাচ্ছে (প্রথমবার — `confirmed`/`processing`/`shipped` যেকোনোটাই "প্রসেসিং শুরু" গণ্য হবে, `pending→cancelled` এর ক্ষেত্রে গোনা হবে না, কারণ সেটা fulfillment না)।
+- মাসিক প্রসেসড-কাউন্ট = `Order::whereIn(shopUserIds)->whereYear/whereMonth(now)->where('status', '!=', 'pending')->count()` (একবার pending ছেড়ে গেলে সেই মাসের কোটাতেই গোনা থাকবে, পরে আবার pending-এ ফিরে গেলেও ডাবল-গণনা এড়াতে একটা `orders.quota_consumed_at` নতুন nullable timestamp কলাম রাখা ভালো — কাউন্ট এই কলামের উপর হবে, status string paর্স করার বদলে; race-condition নিরাপদ, `whereNull('quota_consumed_at')->lockForUpdate()` দিয়ে সেট করা যাবে)।
+- কোটা শেষ হলে ও `order_credit_wallets` (নিচে §9.3) balance না থাকলে → 402 `quota_exceeded_at_processing`, ফ্রন্টএন্ডে "Add-on কিনুন" CTA। Balance থাকলে → ১ ক্রেডিট auto-deduct করে প্রসেসিং চলতে দেওয়া (silent, sms-credit deduct-এর মতোই ট্রানজ্যাকশন-সেফ)।
+- **Bulk-status action-এ (`bulkStatus`)** একই লজিক row-by-row apply হবে — আংশিক সফল হতে পারে (কিছু row কোটার মধ্যে পড়বে, বাকিগুলো "কোটা শেষ" হিসেবে skip রিপোর্ট হবে, বাল্ক ইমপোর্টের `skipped_for_quota` প্যাটার্নের মতোই — নতুন কনভেনশন লাগবে না, এটাই প্রমাণিত UX)।
+
+**B. Add-on/Credit সিস্টেম — SMS-credit প্যাটার্নের generalization**
+- একটা নতুন সাধারণ (generic) জোড়া টেবিল: `addon_packages` (super-admin সংজ্ঞায়িত SKU) + `addon_purchases` (`subscription_payments`/`sms_credit_purchases`-এর সমান্তরাল — একই dual bKash flow reuse)। **কেন generic এবার:** SMS-credit episode-এ per-feature টেবিল pattern justify হয়েছিল কারণ SMS-এর নিজস্ব rate/wallet ইনফ্রা ছিল; এখানে ৪টা ভিন্ন addon-টাইপ (order credit, landing page, storefront, tracking) **পেমেন্ট/অ্যাপ্রুভাল/ইনভয়েস দিক থেকে হুবহু identical** — শুধু "approve হলে কী ঘটবে" (`apply()`) টাইপ-ভেদে আলাদা। তাই পেমেন্ট/লেজার স্তর এক টেবিলে (DRY), effect-লজিক প্রতি-টাইপ ছোট আলাদা মেথডে (established "ছোট duplication" নীতি effect-এ বজায় থাকছে, পুরো টেবিলে না)।
+  - `addon_packages`: `id, type (enum: order_credit|landing_page|storefront|tracking_boost), name, price, quantity (nullable — order_credit-এ কতগুলো অর্ডার-ক্রেডিট, tracking_boost-এ দৈনিক ইভেন্ট বোনাস কত; landing_page/storefront-এ ব্যবহৃত হয় না, সবসময় ১ ইউনিট), duration_days (nullable — order_credit-এর নিজস্ব মেয়াদ থাকে (user-এর আইডিয়া: ১ মাস); landing_page/storefront/tracking_boost **co-terminous** — মেইন সাবস্ক্রিপশনের bakি মেয়াদ অনুযায়ি চলে, নিজস্ব duration লাগে না), is_active`।
+  - `addon_purchases`: `subscription_payments`-এর কলাম হুবহু কপি (`user_id, addon_package_id, amount, payment_method, sender_bkash_number, trx_id, screenshot_path, bkash_payment_id, status, admin_note, reviewed_by, reviewed_at`) + `applied_at` (nullable — approve/auto-verify হওয়ার পর effect apply হলে সেট হয়, idempotency guard)।
+  - Payment routes/controllers: existing `SubscriptionController`/`SmsCreditPurchaseController` ও তাদের bKash controller-দ্বয়ের প্যাটার্ন **হুবহু কপি** (নতুন gateway client লাগবে না, `BkashPaymentGatewayClient`/PGW client রিইউজ)।
+  - Admin approve → `AddonApplyService::apply(AddonPurchase $purchase)` — `type` অনুযায়ী branch:
+    - `order_credit` → `order_credit_wallets` (user_id, balance, expires_at) আপডেট (নিচে ৯.৩-এ ব্যালেন্স/মেয়াদ নিয়ম)
+    - `landing_page` → seller-এর "included + addon" ল্যান্ডিং পেজ কোটা +১ (একটা কাউন্টার কলাম বা লাইভ কাউন্ট — নিচে দেখুন)
+    - `storefront` → `shop_profiles`/`storefront_settings`-এ একটা `storefront_unlocked_until` timestamp (মেইন সাবস্ক্রিপশনের `subscription_ends_at`-এর সাথে **সবসময় sync** থাকবে — renewal cron-এই রিফ্রেশ হবে, নিচে দেখুন)
+    - `tracking_boost` → `TrackingQuotaService`-এর দৈনিক লিমিট হিসাবে `max_tracking_events_per_day + বোনাস` (বোনাসও মেইন প্যাকেজের মেয়াদ অনুযায়ী co-terminous)
+
+**C. ল্যান্ডিং পেজ — "প্যাকেজ-ইনক্লুডেড + Add-on, মেইন-সাইকেল-সহ-এক্সপায়ার, আনপাবলিশ-না-ডিলিট"**
+- `subscription_packages`-এ নতুন `included_landing_pages` (int, default অনুযায়ি — উদাহরণ ১)।
+- সেলারের "মোট allowed" = `package.included_landing_pages + approved landing_page addon_purchases-এর সংখ্যা (যেগুলো এখনো active — নিচে দেখুন)`।
+- Landing page তৈরি/পাবলিশ করার সময় (`LandingPageController::store/publish`) চেক: বর্তমান published/active ল্যান্ডিং পেজ সংখ্যা < allowed হলেই পাবলিশ করতে দেবে, নাহলে "Add-on কিনুন" 402।
+- **Addon-এর নিজস্ব expiry নেই** — মেইন সাবস্ক্রিপশন renew না হলে (ExpireSubscriptions cron যেভাবে ইতিমধ্যে `subscription_status` expire করে), সেই মুহূর্তে allowed-count মেইন প্যাকেজের `included_landing_pages`-এ ফিরে যাবে (addon purchase row থেকে যায়, শুধু "active" গণনা বন্ধ হয়) — একটা নতুন cron ধাপ (`ExpireSubscriptions`-এই যোগ করা, নতুন কমান্ড না) allowed-count-এর বাইরে থাকা পাবলিশড ল্যান্ডিং পেজগুলোকে (created_at ক্রম অনুযায়ী পুরোনোগুলো priority, নাকি সবচেয়ে নতুনগুলো unpublish — এটা §9.5-এ একটা open decision হিসেবে রাখা হলো) `status = 'unpublished_billing'`-এ নামাবে — **ডিলিট না**, স্টোরফ্রন্টে ৪০৪ দেখাবে কিন্তু ড্যাশবোর্ডে সম্পাদনযোগ্য থাকবে, বিল দিলে এক ক্লিকে পুনরায় পাবলিশ।
+- Renewal-এর ইনভয়েসে ল্যান্ডিং পেজ addon-এর দামও automatic যোগ হবে (user-এর আইডিয়া অনুযায়ী) — এটা `SubscriptionInvoiceService::compute()`-এ ইতিমধ্যে থাকা `invoice_breakdown` লিস্টের ধাঁচেই একটা নতুন লাইন-আইটেম হিসেবে যোগ করা সহজ (সার্ভিস already একটা structured breakdown array রিটার্ন করে)।
+
+**D. স্টোরফ্রন্ট — বাইনারি gated module, কোটা না**
+- `subscription_packages.features` জসনে `"storefront": true/false` (ছোট প্যাকেজে false ডিফল্ট)।
+- Addon কিনলে বাইনারি আনলক (co-terminous, ✅/❌ কোনো কোটা লজিক লাগে না — landing page-এর চেয়ে সহজ)।
+- Enforcement: নতুন middleware `package_feature:storefront` (নিচে ৯.২-E) `/store/*` এবং `/dashboard/settings/storefront/*` route group-এ।
+- মেয়াদ শেষে/বিল না দিলে পুরো `/store/*` (public storefront) সেই সেলারের জন্য একটা "সাময়িক বন্ধ" পেজ দেখাবে — ডিলিট/ডেটা-লস কিছুই না, শুধু গেট বন্ধ।
+
+**E. ফিচার/মডিউল অ্যাক্সেস কন্ট্রোল — নতুন `package_feature` middleware (Pattern C)**
+- এই কোডবেসে ইতিমধ্যে দুইটা middleware প্যাটার্ন আছে: Pattern A `staff_permission:{module}` (টিমের কে কী দেখবে) ও Pattern B `owner_only` (owner-বনাম-staff)। এটা তৃতীয়, **অর্থোগোনাল** স্তর: "এই **shop**-এর প্যাকেজে এই ফিচার আছে কি না" — owner/staff নির্বিশেষে পুরো shop-এর জন্য প্রযোজ্য।
+- নতুন `EnsurePackageFeature` middleware (alias `package_feature:{key}`, ফাইল `feature_flags` কলামে — `features` display-bullet-list থেকে ইচ্ছাকৃতভাবে আলাদা, কারণ ওটা raw string বুলেট (admin-টাইপ করা মার্কেটিং কপি, কোনো lookup নেই), enforcement key না)। **Default-allow, default-deny না** — বাস্তবায়নের সময় ধরা পড়েছে (§9.7-এ verification log) যে এই কোডবেসের প্রতিটা বিদ্যমান প্যাকেজ-লিমিট (`max_orders`/`max_tracking_events_per_day`/`max_staff`) একই কনভেনশন মানে: প্যাকেজ/ফিল্ড না থাকলে **আনরেস্ট্রিক্টেড** ধরা হয়, ব্লক না। তাই এখানেও: `feature_flags[$key] === false` হলেই শুধু ব্লক (402 + `{error_code: 'feature_not_in_plan', feature: $key}`), key অনুপস্থিত/null হলে allow — admin কোনো প্যাকেজকে ফিচার থেকে explicitly **বাদ** দেয়, ইন করে না। এই সিদ্ধান্তটা মূল প্ল্যানের "default-deny" ধারণা থেকে সংশোধিত (নিচে §9.7 দেখুন কেন)।
+- ফিচার-কী লিস্ট **`StaffPermission::MODULE_KEYS`-এর সাথে যতটা সম্ভব নাম মেলানো** (সামঞ্জস্যের জন্য, যদিও ধারণা আলাদা): `facebook` (FB Pixel tracking + Leads), `fraud` (fraud checker), `block_list` (নতুন, block list এখন কোনো module key-তে নেই — এটাও যোগ করা লাগবে `StaffPermission::MODULE_KEYS`-এ যদি স্টাফ-লেভেলে আলাদা করে গেট করতে হয়), `storefront`, `bulk_import` (P3-এর bulk order import), ইত্যাদি — **কোন কোনগুলো আসলে gate করা হবে সেটা user-এর সাথে কনফার্ম করা দরকার (§9.5)**, সবগুলো module একসাথে গেট করা শুরু থেকেই বিভ্রান্তিকর হতে পারে।
+- Route-এ প্রয়োগ যেমন: `Route::middleware(['auth:sanctum','package_feature:facebook'])->group(...)` — বিদ্যমান রুট গ্রুপগুলোর উপরে একটা অতিরিক্ত middleware যোগ (existing `staff_permission:facebook` group-এর *ভেতরে* বসবে, দুটো ভিন্ন প্রশ্নের উত্তর দেয়: "টিমমেম্বারের access আছে?" + "shop-এর প্যাকেজে আছে?")।
+- ফ্রন্টএন্ড: `user-shell.tsx`-এর মেনু আইটেম প্যাকেজ `features` অনুযায়ী hide/lock-badge — dashboard bootstrap response-এ (যেটা এখন `subscriptionPackage` লোড করে) `features` অবজেক্টও পাঠাতে হবে যদি না ইতিমধ্যে যাচ্ছে (চেক করা লাগবে বিল্ড-টাইমে)।
+
+### 9.3 সিদ্ধান্ত — user কনফার্ম করেছেন (2026-08-23)
+
+1. **Order-credit ওয়ালেট মডেল** — ✅ **single-balance + refreshing মেয়াদ**: নতুন addon কেনার সাথে সাথে `balance += quantity`, `expires_at = now()->addDays(duration_days)` (আলাদা "লট"/FIFO ট্র্যাকিং না)।
+2. **অব্যবহৃত order-credit মাস শেষে** — ✅ মেয়াদ শেষে উবে যাবে, rollover/refund নেই।
+3. **কোটা "consume" হওয়ার মুহূর্ত** — ✅ `pending → confirmed` (প্রথম non-pending স্ট্যাটাসে ট্রানজিশনেই ১ কোটা/ক্রেডিট কাটবে)।
+4. **কোটা রিফান্ড** — ✅ **না, ফেরত হবে না** — একবার consume হলে অর্ডার পরে cancel/revert হলেও কোটা/ক্রেডিট ফেরত আসবে না (misuse-সুযোগ বন্ধ রাখার জন্য, ইচ্ছাকৃত সিদ্ধান্ত)।
+5. **প্রথম ধাপে কোন মডিউল ফিচার-গেট হবে** — ✅ **`storefront` + `facebook`** (FB tracking + FB leads) দিয়ে শুরু। `fraud`/`block_list` আপাতত gate করা হচ্ছে না (সব প্যাকেজে ফ্রি থাকবে — risk-reduction ফিচার সীমিত করলে উলটো COD-fraud ক্ষতি বাড়তে পারে)।
+6. **ল্যান্ডিং পেজ addon মেয়াদ শেষে unpublish selection** — এখনো খোলা, ধাপ ৫-এর আগে সিদ্ধান্ত নেওয়া হবে (§9.6)।
+
+### 9.4 সুপার অ্যাডমিন ম্যানেজমেন্ট সারফেস
+
+- **Package CRUD এক্সটেনশন** (বিদ্যমান `AdminController::createPackage/updatePackage`) — নতুন ফিল্ড: `included_landing_pages`, `features` (এখন থেকে আসলে enforce হবে, UI-তে checkbox গ্রিড হিসেবে দেখানো ভালো টেক্সট-জসনের বদলে)।
+- **নতুন Addon Package CRUD** (`AdminAddonPackageController` — `AdminController`-এর package মেথডগুলোর প্যাটার্ন হুবহু) — টাইপ অনুযায়ী ফর্ম (order_credit-এ quantity+duration, landing_page/storefront-এ শুধু নাম+দাম, tracking_boost-এ quantity)।
+- **নতুন Addon Purchase approve/reject queue** (`AdminAddonPurchaseController` — `AdminSubscriptionController::approvePayment/rejectPayment` প্যাটার্ন) — approve হলে `AddonApplyService::apply()` কল।
+- এই তিনটাই বিদ্যমান admin billing UI-এর (`/admin/billing`, `/admin/sms/credit`) পাশে নতুন ট্যাব/সেকশন হিসেবে ফিট করবে, নতুন আলাদা admin area লাগবে না।
+
+### 9.5 পেমেন্ট ফ্লো — কিছুই নতুন উদ্ভাবন না
+
+Addon purchase-এর পুরো পেমেন্ট পাইপলাইন (manual bKash + bKash PGW dual path, admin approve queue, PDF ইনভয়েস) **subscription ও SMS-credit-এ ইতিমধ্যে দুইবার প্রমাণিত** — তৃতীয়বার একই প্যাটার্ন কপি করাই সঠিক পথ, নতুন গেটওয়ে/ফ্লো ডিজাইন করার দরকার নেই।
+
+### 9.6 প্রস্তাবিত বিল্ড অর্ডার (priority)
+
+এই ফিচার-সেট নিজেই একাধিক sub-phase — নিচেরটা যুক্তিসঙ্গত ক্রম (প্রতিটার পর deploy + live-verify, এই সেশনের established discipline):
+
+1. **Feature-gate ফাউন্ডেশন** (§9.2-E) — `package_feature` middleware + `features` json কে সত্যিকারের enforcement দেওয়া। ছোট, স্বতন্ত্র, বাকি সবকিছু এর উপর নির্ভর করে।
+2. **Order quota redesign** (§9.2-A) — creation-time ব্লক সরিয়ে processing-time-এ আনা। এটা core order flow-তে behavior change, তাই আলাদাভাবে সাবধানে verify (regression risk সবচেয়ে বেশি এখানেই, কারণ এটা প্রোডাকশনে চলমান ফিচার বদলাচ্ছে, নতুন কিছু যোগ করছে না)।
+3. **Order-credit addon** (§9.2-B, order_credit টাইপ) — ধাপ ২-এর সাথে ব্যবসায়িকভাবে সরাসরি যুক্ত, একসাথেই সবচেয়ে বেশি অর্থবহ।
+4. **Generic addon infra + storefront addon** (§9.2-B/D) — সবচেয়ে সহজ টাইপ (বাইনারি, কোটা নেই) দিয়ে generic ফ্রেমওয়ার্ক প্রমাণ করা।
+5. **Landing page addon + auto-unpublish** (§9.2-C) — জটিলতম (কোটা + বেছে-নেওয়া লজিক + cron), তাই সবার শেষে।
+6. **Tracking boost addon** (§9.2-B, tracking_boost টাইপ) — landing page-এর প্যাটার্ন অনেকটা রিইউজ হবে, দ্রুত হওয়ার কথা।
+7. SMS প্যাকেজ — **ইতিমধ্যে সম্পূর্ণ (Phase 2, §6)**, নতুন কাজ লাগবে না যদি না bulk-discount tier pricing চান (আগে সিদ্ধান্ত হয়েছিল flat-rate-ই রাখা, §6.4)।
+
+প্রতিটা ধাপ শুরুর আগে §9.3-এর সংশ্লিষ্ট open question(গুলো) কনফার্ম করে নেওয়া — বিশেষ করে ধাপ ২/৩-এর আগে #1-#3, ধাপ ৫-এর আগে #4।
+
+### 9.7 ধাপ ১ — Implementation log (2026-08-23, feature-gate ফাউন্ডেশন সম্পন্ন)
+
+**যা তৈরি হয়েছে:**
+- নতুন migration `2026_08_23_072100_add_feature_flags_to_subscription_packages_table.php` — `subscription_packages.feature_flags` (json, nullable)। **`features` কলাম রিইউজ করা হয়নি** — বিল্ডের সময় ধরা পড়ে যে `features` আসলে raw display-bullet-list (admin-টাইপ করা string, `<span>{f}</span>` দিয়ে verbatim রেন্ডার হয়, কোনো lookup নেই) এবং production-এর প্রতিটা প্যাকেজেই ইতিমধ্যে ভিন্ন উদ্দেশ্যের স্ট্রিং আছে (`fraud_check`, `sms_automation` ইত্যাদি) — সেটাকে enforcement key হিসেবে পুনর্ব্যবহার করলে মার্কেটিং কপি এডিট করলেই access বদলে যেত। তাই আলাদা কলাম।
+- Migration-এর `up()`-এ **সব বিদ্যমান প্যাকেজ** (Trial/Free Trial/Starter/Growth/Business) explicitly `{"storefront": true, "facebook": true}`-এ grandfather করা হয়েছে — প্রোডাকশনে migrate করার পর সরাসরি `tinker`-এ কনফার্ম করা হয়েছে ৫টা প্যাকেজেই সঠিকভাবে বসেছে।
+- নতুন `app/Http/Middleware/EnsurePackageFeature.php` (alias `package_feature:{key}`)।
+- Route wiring: `storefront-settings` গ্রুপে `package_feature:storefront`; Facebook connect/pixel/tracking-destinations, tracking usage/events, facebook/leads গ্রুপগুলোতে `package_feature:facebook`।
+- `StorefrontCatalogController::home()`-এ (public, unauthenticated) সরাসরি ইনলাইন চেক — Sanctum middleware চালানোর কোনো session নেই বলে।
+- `AdminController::createPackage/updatePackage` — `feature_flags` validation যোগ।
+- `frontend/src/app/admin/packages/page.tsx` — Storefront/Facebook checkbox দুটো create ফর্ম ও edit modal দুটোতেই যোগ।
+
+**🔧 প্ল্যান থেকে সংশোধন — default-allow, default-deny না:** মূল প্ল্যানে (§9.2-E) "default-deny" লেখা ছিল (`EnsureStaffPermission`-এর মতো)। বিল্ডের সময় isolated schema-তে পুরো সুইট চালিয়ে ধরা পড়ে — ৪৯টা প্রি-এক্সিস্টিং টেস্ট রিগ্রেস করেছে (Facebook/Storefront/Tracking-সংশ্লিষ্ট সব টেস্ট, যেগুলো কোনো subscription package ছাড়াই `User::factory()->create()` ব্যবহার করে)। কারণ খুঁজে বের করে দেখা যায়: এই কোডবেসের **প্রতিটা বিদ্যমান প্যাকেজ-লিমিট** (`max_orders`, `max_tracking_events_per_day`, `max_staff` — `OrderController`/`TrackingQuotaService`/`StaffController`) already `null = আনরেস্ট্রিক্টেড` কনভেনশন মানে, প্যাকেজ না থাকলে ব্লক করে না। তাই সিদ্ধান্ত বদলে **default-allow**-এ আনা হয়েছে: `feature_flags[$key] === false` হলেই শুধু ব্লক, key/প্যাকেজ অনুপস্থিত হলে allow। এতে (ক) বাকি কোডবেসের সাথে সামঞ্জস্যপূর্ণ, (খ) admin এখন থেকে কোনো প্যাকেজকে ফিচার থেকে explicitly **বাদ** দেবে (নতুন প্যাকেজ ডিফল্টে ওপেন থাকবে)। §9.2-E ও §9.3-এর ওপরের টেক্সট এই সংশোধন অনুযায়ী আপডেট করা হয়েছে।
+
+**Verification:**
+- Isolated pgsql schema (`test_1787469757`): migration ক্লিন, প্রথম রানে ৫২টা রিগ্রেশন ধরা পড়ে (উপরের কারণে), default-allow-এ সংশোধনের পর পুনরায় রান — **শুধু ৩টা known baseline failure** (AuthApiTest, CourierFraudCheckApiTest, ProductMediaApiTest — অপরিবর্তিত), ৫২০ পাস।
+- নতুন `tests/Feature/EnsurePackageFeatureTest.php` (৮টা টেস্ট, সব পাস): no-package-allowed, null-flags-allowed, explicit-false-blocks (402 + error_code/feature), explicit-true-allowed, per-key-independence, staff-checked-against-owners-package (staff permission + plan gate দুটো আলাদা axis প্রমাণ), public storefront home locked/open।
+- `npx tsc --noEmit` clean, `deploy-safe.sh` 8/8 pass।
+- **লাইভ প্রোডাকশন ভেরিফিকেশন** (`bsol.zyrotechbd.com`, disposable test package+user+shop, tinker দিয়ে তৈরি, সেশন শেষে সব মুছে ফেলা হয়েছে): `feature_flags:{storefront:false}` সেট করা ইউজার দিয়ে `GET /storefront-settings` → `402 feature_not_in_plan/storefront` (সঠিক), একই ইউজারের `GET /facebook/pixel` (untouched key) → `200` (সঠিক, per-key independence প্রমাণিত), locked subdomain-এ `GET /public/storefront/home` → `402` (সঠিক)। সব টেস্ট ডেটা (user, package, shop profile, token) মুছে ফেলা হয়েছে এবং delete কনফার্ম করা হয়েছে।
+
+**যা এই ধাপে করা হয়নি (out of scope, পরে):**
+- Frontend UX পলিশ — `feature_not_in_plan` রেসপন্স পেলে dashboard-এর storefront settings/Facebook পেজগুলো এখনো generic error দেখাবে (crash করবে না, কিন্তু "আপগ্রেড করুন" ধরনের বিশেষ মেসেজ/CTA নেই)। `user-shell.tsx`-এ মেনু আইটেম হাইড/লক-ব্যাজও যোগ করা হয়নি। ফিচার এনফোর্সমেন্ট (ব্যাকএন্ড) সম্পূর্ণ কাজ করে, শুধু ফ্রন্টএন্ড মেসেজিং এখনো generic।
+- Admin প্যাকেজ লিস্ট টেবিলে feature-flag badge/কলাম (এডিট মোডালে দেখা যায়, লিস্ট ভিউতে না)।
+- ধাপ ২ (Order quota redesign) এখনো শুরু হয়নি।

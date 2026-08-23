@@ -577,9 +577,13 @@ Route::middleware('active_subscription')->group(function () {
     });
 
     // ── Storefront settings (homepage mode + theme) ────────────────────────
-    // Pattern B, owner-only — mirrors Shop Profile above.
+    // Pattern B, owner-only — mirrors Shop Profile above. Also package-gated
+    // (subscription_billing_context.md §9.2-D/E) — storefront is an
+    // opt-in-per-plan module; the public /store/* side is gated separately
+    // in StorefrontCatalogController::home() since that route has no
+    // Sanctum session to run this middleware against.
     // seller_storefront_context.md §5.1/§12 (S0).
-    Route::middleware('owner_only')->group(function () {
+    Route::middleware(['owner_only', 'package_feature:storefront'])->group(function () {
         Route::get('/storefront-settings', [StorefrontSettingController::class, 'show']);
         Route::put('/storefront-settings', [StorefrontSettingController::class, 'update']);
         Route::post('/storefront-settings/banners', [StorefrontSettingController::class, 'uploadBanner']);
@@ -679,8 +683,11 @@ Route::middleware('active_subscription')->group(function () {
     // Phase 2 module — staff_team_role_context.md §9. Connection/pixel are
     // Pattern B credentials (owner_only, like courier settings/subscription —
     // no internal controller change needed, same as those). Leads + reply
-    // templates are Pattern A shared (staff_permission:facebook).
-    Route::middleware('owner_only')->group(function () {
+    // templates are Pattern A shared (staff_permission:facebook). Also
+    // package-gated as a bundled "facebook" feature (FB tracking + FB leads,
+    // subscription_billing_context.md §9.2-E/§9.3) — smaller plans can have
+    // this switched off entirely.
+    Route::middleware(['owner_only', 'package_feature:facebook'])->group(function () {
         Route::prefix('facebook/connect')->group(function () {
             Route::get('/status', [FacebookConnectController::class, 'status']);
             Route::get('/redirect', [FacebookConnectController::class, 'redirect']);
@@ -708,13 +715,14 @@ Route::middleware('active_subscription')->group(function () {
 
     // Tracking usage + event log — Pattern A (team-shared, read-only).
     // Destination CRUD above stays owner_only forever (credentials); this is
-    // just "what happened" (tracking_capi_context.md §6.2, T7).
-    Route::middleware('staff_permission:tracking')->group(function () {
+    // just "what happened" (tracking_capi_context.md §6.2, T7). Bundled into
+    // the same "facebook" plan feature as the group above.
+    Route::middleware(['staff_permission:tracking', 'package_feature:facebook'])->group(function () {
         Route::get('/tracking/usage', [TrackingUsageController::class, 'show']);
         Route::get('/tracking/events', [TrackingEventController::class, 'index']);
     });
 
-    Route::middleware('staff_permission:facebook')->group(function () {
+    Route::middleware(['staff_permission:facebook', 'package_feature:facebook'])->group(function () {
         Route::prefix('facebook/leads')->group(function () {
             Route::get('/', [FacebookLeadController::class, 'index']);
             Route::get('/unread-count', [FacebookLeadController::class, 'unreadCount']);

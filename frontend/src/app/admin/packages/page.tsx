@@ -29,6 +29,7 @@ interface SubscriptionPackage {
   duration_days: number;
   max_orders: number | null;
   max_tracking_events_per_day: number | null;
+  feature_flags: Record<string, boolean> | null;
   is_active: boolean;
   created_at: string;
 }
@@ -40,6 +41,8 @@ interface PackageForm {
   price: string;
   validity_value: string;
   validity_unit: ValidityUnit;
+  feature_storefront: boolean;
+  feature_facebook: boolean;
 }
 
 interface EditPackageForm extends PackageForm {
@@ -58,6 +61,10 @@ const EMPTY_FORM: PackageForm = {
   price: "",
   validity_value: "1",
   validity_unit: "month",
+  // Default-allow, matches backend EnsurePackageFeature — a package that's
+  // never had these touched stays fully open; admin unchecks to restrict.
+  feature_storefront: true,
+  feature_facebook: true,
 };
 
 const EMPTY_DEFAULTS: RegistrationDefaults = {
@@ -102,6 +109,9 @@ const text = {
       maxOrdersHint: "ফাঁকা রাখলে আনলিমিটেড ধরা হবে",
       maxTrackingEvents: "দৈনিক ট্র্যাকিং ইভেন্ট লিমিট",
       maxTrackingEventsHint: "ফাঁকা = আনলিমিটেড, 0 = এই প্যাকেজে ট্র্যাকিং নেই",
+      featureFlagsTitle: "মডিউল অ্যাক্সেস",
+      featureStorefront: "স্টোরফ্রন্ট",
+      featureFacebook: "ফেসবুক ট্র্যাকিং + লিডস",
       price: "মূল্য (BDT)",
       validity: "ভ্যালিডিটি",
       defaultStatus: "ডিফল্ট ইউজার স্ট্যাটাস",
@@ -204,6 +214,9 @@ const text = {
       maxOrdersHint: "Leave empty to treat as unlimited",
       maxTrackingEvents: "Daily Tracking Event Limit",
       maxTrackingEventsHint: "Empty = unlimited, 0 = tracking not included",
+      featureFlagsTitle: "Module Access",
+      featureStorefront: "Storefront",
+      featureFacebook: "FB Tracking + Leads",
       price: "Price (BDT)",
       validity: "Validity",
       defaultStatus: "Default User Status",
@@ -505,6 +518,7 @@ export default function AdminPackagesPage() {
           max_orders: maxOrdersValue,
           max_tracking_events_per_day: maxTrackingValue,
           duration_days: validityToDays(validityValue, form.validity_unit),
+          feature_flags: { storefront: form.feature_storefront, facebook: form.feature_facebook },
           is_active: true,
         }),
       });
@@ -586,6 +600,8 @@ export default function AdminPackagesPage() {
       price: String(pkg.price),
       validity_value: isMonth ? String(days / 30) : String(days),
       validity_unit: isMonth ? "month" : "day",
+      feature_storefront: pkg.feature_flags?.storefront ?? true,
+      feature_facebook: pkg.feature_flags?.facebook ?? true,
       is_active: pkg.is_active,
     });
     setEditPkg(pkg);
@@ -639,6 +655,7 @@ export default function AdminPackagesPage() {
           duration_days: validityToDays(validity, editForm.validity_unit),
           max_orders: maxOrders,
           max_tracking_events_per_day: maxTracking,
+          feature_flags: { storefront: editForm.feature_storefront, facebook: editForm.feature_facebook },
           is_active: editForm.is_active,
         }),
       });
@@ -871,6 +888,30 @@ export default function AdminPackagesPage() {
           </div>
 
           <div className="md:col-span-2">
+            <label className={labelCls}>{t.form.featureFlagsTitle}</label>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                  checked={form.feature_storefront}
+                  onChange={(e) => setField("feature_storefront", e.target.checked)}
+                />
+                {t.form.featureStorefront}
+              </label>
+              <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                  checked={form.feature_facebook}
+                  onChange={(e) => setField("feature_facebook", e.target.checked)}
+                />
+                {t.form.featureFacebook}
+              </label>
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
             <button
               type="submit"
               disabled={submitting}
@@ -1059,6 +1100,29 @@ export default function AdminPackagesPage() {
                   <option value="day">{t.form.unitDay}</option>
                   <option value="month">{t.form.unitMonth}</option>
                 </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelCls}>{t.form.featureFlagsTitle}</label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                      checked={editForm.feature_storefront}
+                      onChange={(e) => setEditForm((p) => ({ ...p, feature_storefront: e.target.checked }))}
+                    />
+                    {t.form.featureStorefront}
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-[var(--foreground)]">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                      checked={editForm.feature_facebook}
+                      onChange={(e) => setEditForm((p) => ({ ...p, feature_facebook: e.target.checked }))}
+                    />
+                    {t.form.featureFacebook}
+                  </label>
+                </div>
               </div>
               <div className="flex items-center gap-2 md:col-span-2">
                 <input
