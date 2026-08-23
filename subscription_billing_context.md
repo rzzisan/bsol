@@ -421,7 +421,7 @@ User request (সংক্ষেপে, ২০২৬-০৮-২৩): মাস�
 3. **কোটা "consume" হওয়ার মুহূর্ত** — ✅ `pending → confirmed` (প্রথম non-pending স্ট্যাটাসে ট্রানজিশনেই ১ কোটা/ক্রেডিট কাটবে)।
 4. **কোটা রিফান্ড** — ✅ **না, ফেরত হবে না** — একবার consume হলে অর্ডার পরে cancel/revert হলেও কোটা/ক্রেডিট ফেরত আসবে না (misuse-সুযোগ বন্ধ রাখার জন্য, ইচ্ছাকৃত সিদ্ধান্ত)।
 5. **প্রথম ধাপে কোন মডিউল ফিচার-গেট হবে** — ✅ **`storefront` + `facebook`** (FB tracking + FB leads) দিয়ে শুরু। `fraud`/`block_list` আপাতত gate করা হচ্ছে না (সব প্যাকেজে ফ্রি থাকবে — risk-reduction ফিচার সীমিত করলে উলটো COD-fraud ক্ষতি বাড়তে পারে)।
-6. **ল্যান্ডিং পেজ addon মেয়াদ শেষে unpublish selection** — এখনো খোলা, ধাপ ৫-এর আগে সিদ্ধান্ত নেওয়া হবে (§9.6)।
+6. ~~ল্যান্ডিং পেজ addon মেয়াদ শেষে unpublish selection~~ — **বাতিল** (২০২৬-০৮-২৩, user-এর নির্দেশনায় স্কোপ সরলীকৃত): ল্যান্ডিং পেজে কোনো addon নেই, শুধু প্যাকেজ-ভিত্তিক ফ্ল্যাট মোট-সংখ্যা লিমিট (creation-time cap, unpublish/cron কিছুই নেই)। বিস্তারিত §১২।
 
 ### 9.4 সুপার অ্যাডমিন ম্যানেজমেন্ট সারফেস
 
@@ -538,4 +538,22 @@ Addon purchase-এর পুরো পেমেন্ট পাইপলাই�
 - Automated bKash gateway — আগের ধাপের মতোই manual-only।
 - `/dashboard/settings/storefront`-এ deep-link/CTA — locked অবস্থায় সেলার এখনো নিজে থেকে `/dashboard/storefront-addon`-এ যাওয়া লাগবে, সরাসরি লিঙ্ক করা হয়নি।
 
-**পরবর্তী ধাপ (§9.6):** Landing page addon + auto-unpublish (সবচেয়ে জটিল — কোটা + কোনগুলো unpublish হবে সেই সিদ্ধান্ত + cron, §9.3-এর বাকি open question #৬)।
+---
+
+## 12. ধাপ ৫ — Implementation log (2026-08-23, ল্যান্ডিং পেজ লিমিট সম্পন্ন, স্কোপ সরলীকৃত)
+
+**🔧 স্কোপ পরিবর্তন (user-এর সরাসরি নির্দেশনা):** মূল প্ল্যানের §9.2-C (ল্যান্ডিং পেজ addon + মেয়াদ-শেষে auto-unpublish + কোনগুলো unpublish হবে সেই সিদ্ধান্ত) **শেলফড** — user সরাসরি সহজ ভার্সন চেয়েছেন: **শুধু প্যাকেজ-ভিত্তিক একটা ফ্ল্যাট মোট-সংখ্যা লিমিট, কোনো addon না।** যেমন একটা প্যাকেজে ৫টা লিমিট থাকলে ৫টার বেশি ল্যান্ডিং পেজ তৈরিই করা যাবে না (draft+published একসাথে গোনা)। §9.3-এর open question #৬ (কোনগুলো auto-unpublish হবে) তাই আর প্রাসঙ্গিক না — বাতিল।
+
+**যা তৈরি হয়েছে:**
+- নতুন কলাম `subscription_packages.max_landing_pages` (nullable int, `null = আনলিমিটেড` — `max_orders`/`max_staff`/`max_tracking_events_per_day`-এর same কনভেনশন)।
+- `LandingPageController::store()`-এ নতুন `landingPageLimitResponse()` চেক (creation-time-এ, `subdomainMissingResponse()`-এর ঠিক পাশেই, একই response-shape কনভেনশন মেনে) — shop-এর মোট (draft+published, soft-deleted বাদে) landing page count প্যাকেজের `max_landing_pages`-এর সাথে তুলনা করে, পৌঁছালে `402 landing_page_limit_reached`। **আলাদা publish-time চেক লাগেনি** — যেহেতু creation-ই capped, কোনো over-limit draft কখনো তৈরিই হতে পারে না, তাই publish করার মতো "অতিরিক্ত" পেজ কখনো থাকে না।
+- Admin প্যাকেজ ফর্মে (`/admin/packages`) নতুন ফিল্ড (create+edit+list টেবিল, তিন জায়গাতেই)।
+- **বিদ্যমান সেলারদের retroactively স্পর্শ করা হয়নি** — কারো প্যাকেজের নতুন লিমিট তার বর্তমান পেজ-সংখ্যার চেয়ে কম হলেও, বিদ্যমান কোনো পেজ unpublish/delete হয় না; শুধু নতুন তৈরি ব্লক হয় (টেস্টে explicitly ভেরিফাই করা হয়েছে)।
+- **ফ্রন্টএন্ডে নতুন কিছু করতে হয়নি** — `landing-page-builder.tsx`-এর সেভ হ্যান্ডলার ইতিমধ্যেই `json.message` জেনেরিকভাবে দেখায় (৪০২ রেসপন্সও একইভাবে সঠিক মেসেজ সহ প্রদর্শিত হবে)।
+
+**Verification:**
+- Isolated pgsql schema: migration ক্লিন। নতুন `tests/Feature/LandingPageLimitTest.php` (৭টা — unlimited-when-null, blocks-at-limit, draft+published-counted-together, delete-frees-a-slot, shop-wide-across-staff, existing-sellers-never-retroactively-touched, admin-can-set-limit)। ফুল সুইট: ৫৬২ পাস — ৩টা known baseline + সমান্তরাল সেশনের একটা আলাদা uncommitted কাজ (`LandingPageCostPriceLeakTest`, `LandingPageController.php`-এ) সাময়িকভাবে `git stash` (শুধু ওই একটা ফাইল, path-scoped) করে আলাদা রাখা হয়েছিল যাতে দুই সেশনের কাজ mix না হয় — commit করার পর stash পপ করে ফেরত দেওয়া হয়েছে।
+- `npx tsc --noEmit` clean, `deploy-safe.sh` 8/8 pass।
+- **লাইভ প্রোডাকশন ভেরিফিকেশন** (disposable package (`max_landing_pages:2`) + seller + shop, tinker দিয়ে তৈরি): ২টা পেজ তৈরি (দুটোই `201`) → তৃতীয়টা → `402 landing_page_limit_reached` সঠিক মেসেজ সহ। সব টেস্ট ডেটা (৩টা পেজ, শপ প্রোফাইল, সেলার+টোকেন, প্যাকেজ) মুছে ফেলা হয়েছে।
+
+**পরবর্তী ধাপ (§9.6):** Tracking boost addon (শেষ ধাপ, ল্যান্ডিং পেজের প্যাটার্ন কিছুটা রিইউজ হবে)।

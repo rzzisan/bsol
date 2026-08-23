@@ -28,6 +28,7 @@ interface SubscriptionPackage {
   price: string;
   duration_days: number;
   max_orders: number | null;
+  max_landing_pages: number | null;
   max_tracking_events_per_day: number | null;
   feature_flags: Record<string, boolean> | null;
   is_active: boolean;
@@ -37,6 +38,7 @@ interface SubscriptionPackage {
 interface PackageForm {
   name: string;
   max_orders: string;
+  max_landing_pages: string;
   max_tracking_events_per_day: string;
   price: string;
   validity_value: string;
@@ -57,6 +59,7 @@ interface RegistrationDefaults {
 const EMPTY_FORM: PackageForm = {
   name: "",
   max_orders: "",
+  max_landing_pages: "",
   max_tracking_events_per_day: "",
   price: "",
   validity_value: "1",
@@ -107,6 +110,8 @@ const text = {
       name: "প্যাকেজ নাম",
       maxOrders: "সর্বোচ্চ অর্ডার লিমিট",
       maxOrdersHint: "ফাঁকা রাখলে আনলিমিটেড ধরা হবে",
+      maxLandingPages: "সর্বোচ্চ ল্যান্ডিং পেজ",
+      maxLandingPagesHint: "ফাঁকা রাখলে আনলিমিটেড ধরা হবে",
       maxTrackingEvents: "দৈনিক ট্র্যাকিং ইভেন্ট লিমিট",
       maxTrackingEventsHint: "ফাঁকা = আনলিমিটেড, 0 = এই প্যাকেজে ট্র্যাকিং নেই",
       featureFlagsTitle: "মডিউল অ্যাক্সেস",
@@ -129,6 +134,7 @@ const text = {
     table: {
       name: "নাম",
       maxOrders: "ম্যাক্স অর্ডার",
+      maxLandingPages: "ম্যাক্স ল্যান্ডিং পেজ",
       maxTrackingEvents: "ট্র্যাকিং/দিন",
       price: "মূল্য",
       validity: "ভ্যালিডিটি",
@@ -165,6 +171,7 @@ const text = {
       validityInvalid: "ভ্যালিডিটি ১ বা তার বেশি হতে হবে।",
       priceInvalid: "মূল্য ০ বা তার বেশি হতে হবে।",
       maxOrderInvalid: "অর্ডার লিমিট ০ বা তার বেশি হতে হবে।",
+      maxLandingPagesInvalid: "ল্যান্ডিং পেজ লিমিট ০ বা তার বেশি হতে হবে।",
       maxTrackingEventsInvalid: "ট্র্যাকিং ইভেন্ট লিমিট ০ বা তার বেশি হতে হবে।",
     },
     created: "প্যাকেজ সফলভাবে তৈরি হয়েছে।",
@@ -212,6 +219,8 @@ const text = {
       name: "Package Name",
       maxOrders: "Maximum Order Limit",
       maxOrdersHint: "Leave empty to treat as unlimited",
+      maxLandingPages: "Maximum Landing Pages",
+      maxLandingPagesHint: "Leave empty to treat as unlimited",
       maxTrackingEvents: "Daily Tracking Event Limit",
       maxTrackingEventsHint: "Empty = unlimited, 0 = tracking not included",
       featureFlagsTitle: "Module Access",
@@ -234,6 +243,7 @@ const text = {
     table: {
       name: "Name",
       maxOrders: "Max Orders",
+      maxLandingPages: "Max Landing Pages",
       maxTrackingEvents: "Tracking/Day",
       price: "Price",
       validity: "Validity",
@@ -270,6 +280,7 @@ const text = {
       validityInvalid: "Validity must be 1 or greater.",
       priceInvalid: "Price must be 0 or greater.",
       maxOrderInvalid: "Max order limit must be 0 or greater.",
+      maxLandingPagesInvalid: "Max landing pages must be 0 or greater.",
       maxTrackingEventsInvalid: "Tracking event limit must be 0 or greater.",
     },
     created: "Package created successfully.",
@@ -469,6 +480,7 @@ export default function AdminPackagesPage() {
     const validityValue = Number(form.validity_value);
     const priceValue = Number(form.price);
     const maxOrdersValue = form.max_orders.trim() ? Number(form.max_orders) : null;
+    const maxLandingPagesValue = form.max_landing_pages.trim() ? Number(form.max_landing_pages) : null;
     const maxTrackingValue = form.max_tracking_events_per_day.trim()
       ? Number(form.max_tracking_events_per_day)
       : null;
@@ -488,6 +500,14 @@ export default function AdminPackagesPage() {
       (!Number.isFinite(maxOrdersValue) || maxOrdersValue < 0)
     ) {
       setMessage({ type: "err", text: t.validation.maxOrderInvalid });
+      return;
+    }
+
+    if (
+      maxLandingPagesValue !== null &&
+      (!Number.isFinite(maxLandingPagesValue) || maxLandingPagesValue < 0)
+    ) {
+      setMessage({ type: "err", text: t.validation.maxLandingPagesInvalid });
       return;
     }
 
@@ -516,6 +536,7 @@ export default function AdminPackagesPage() {
           name: form.name.trim(),
           price: priceValue,
           max_orders: maxOrdersValue,
+          max_landing_pages: maxLandingPagesValue,
           max_tracking_events_per_day: maxTrackingValue,
           duration_days: validityToDays(validityValue, form.validity_unit),
           feature_flags: { storefront: form.feature_storefront, facebook: form.feature_facebook },
@@ -595,6 +616,7 @@ export default function AdminPackagesPage() {
     setEditForm({
       name: pkg.name,
       max_orders: pkg.max_orders !== null ? String(pkg.max_orders) : "",
+      max_landing_pages: pkg.max_landing_pages !== null ? String(pkg.max_landing_pages) : "",
       max_tracking_events_per_day:
         pkg.max_tracking_events_per_day !== null ? String(pkg.max_tracking_events_per_day) : "",
       price: String(pkg.price),
@@ -630,6 +652,11 @@ export default function AdminPackagesPage() {
       setMessage({ type: "err", text: t.validation.maxOrderInvalid });
       return;
     }
+    const maxLandingPages = editForm.max_landing_pages === "" ? null : Number(editForm.max_landing_pages);
+    if (maxLandingPages !== null && (!Number.isInteger(maxLandingPages) || maxLandingPages < 0)) {
+      setMessage({ type: "err", text: t.validation.maxLandingPagesInvalid });
+      return;
+    }
     const maxTracking =
       editForm.max_tracking_events_per_day === ""
         ? null
@@ -654,6 +681,7 @@ export default function AdminPackagesPage() {
           price,
           duration_days: validityToDays(validity, editForm.validity_unit),
           max_orders: maxOrders,
+          max_landing_pages: maxLandingPages,
           max_tracking_events_per_day: maxTracking,
           feature_flags: { storefront: editForm.feature_storefront, facebook: editForm.feature_facebook },
           is_active: editForm.is_active,
@@ -838,6 +866,19 @@ export default function AdminPackagesPage() {
           </div>
 
           <div>
+            <label className={labelCls}>{t.form.maxLandingPages}</label>
+            <input
+              type="number"
+              min={0}
+              className={inputCls}
+              value={form.max_landing_pages}
+              onChange={(e) => setField("max_landing_pages", e.target.value)}
+              placeholder={locale === "bn" ? "যেমন: 5" : "e.g. 5"}
+            />
+            <p className="mt-1 text-xs text-[var(--muted)]">{t.form.maxLandingPagesHint}</p>
+          </div>
+
+          <div>
             <label className={labelCls}>{t.form.maxTrackingEvents}</label>
             <input
               type="number"
@@ -948,6 +989,7 @@ export default function AdminPackagesPage() {
               <tr>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.name}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxOrders}</th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxLandingPages}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxTrackingEvents}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.price}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.validity}</th>
@@ -959,7 +1001,7 @@ export default function AdminPackagesPage() {
             <tbody>
               {loadingPackages && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
@@ -967,7 +1009,7 @@ export default function AdminPackagesPage() {
 
               {!loadingPackages && packages.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
@@ -979,6 +1021,9 @@ export default function AdminPackagesPage() {
                     <td className="border border-[#e5ebf5] px-3 py-2 font-medium text-[var(--foreground)]">{pkg.name}</td>
                     <td className="border border-[#e5ebf5] px-3 py-2 text-right">
                       {pkg.max_orders ?? t.unlimited}
+                    </td>
+                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                      {pkg.max_landing_pages ?? t.unlimited}
                     </td>
                     <td className="border border-[#e5ebf5] px-3 py-2 text-right">
                       {pkg.max_tracking_events_per_day ?? t.unlimited}
@@ -1065,6 +1110,17 @@ export default function AdminPackagesPage() {
                   placeholder={t.form.maxOrdersHint}
                   value={editForm.max_orders}
                   onChange={(e) => setEditForm((p) => ({ ...p, max_orders: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>{t.form.maxLandingPages}</label>
+                <input
+                  type="number"
+                  min={0}
+                  className={inputCls}
+                  placeholder={t.form.maxLandingPagesHint}
+                  value={editForm.max_landing_pages}
+                  onChange={(e) => setEditForm((p) => ({ ...p, max_landing_pages: e.target.value }))}
                 />
               </div>
               <div>

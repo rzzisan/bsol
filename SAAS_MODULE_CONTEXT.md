@@ -1307,4 +1307,6 @@ User-এর নিজের আইডিয়া থেকে শুরু হ�
 
 **ধাপ ৪ (Storefront add-on) ✅ সম্পন্ন:** বাইনারি আনলক, মেইন সাবস্ক্রিপশনের সাথে co-terminous — `users.storefront_addon_until` + `StorefrontAddonService`, `SubscriptionActivationService`-এ renewal-sync hook (রিনিউ করলে active addon-ও নতুন মেয়াদে extend হয়, lapsed হলে না)। `EnsurePackageFeature` middleware ও public storefront home() দুটোতেই override যোগ হয়েছে। সেলার-facing `/dashboard/storefront-addon`, admin-এর কিছু নতুন করতে হয়নি (generic approve queue আগে থেকেই কাজ করে, শুধু প্যাকেজ ফর্মে টাইপ-selector)। লাইভ ভেরিফিকেশনে renewal-sync সরাসরি টেস্ট করা হয়েছে (subscription+addon একসাথে extend)। বিস্তারিত: `subscription_billing_context.md §১১`।
 
-**পরবর্তী ধাপ:** Landing page addon + auto-unpublish (§9.6 ধাপ ৫)।
+**ধাপ ৫ (ল্যান্ডিং পেজ লিমিট) ✅ সম্পন্ন, স্কোপ সরলীকৃত:** user সরাসরি নির্দেশ দিয়েছেন addon বাদ দিয়ে শুধু প্যাকেজ-ভিত্তিক ফ্ল্যাট মোট-সংখ্যা লিমিট রাখতে (যেমন ৫টা প্যাকেজ = সর্বোচ্চ ৫টা ল্যান্ডিং পেজ, তার বেশি তৈরিই করা যাবে না)। নতুন `subscription_packages.max_landing_pages` (null=আনলিমিটেড) + `LandingPageController::store()`-এ creation-time চেক। বিদ্যমান সেলাররা retroactively স্পর্শ হয়নি। বিস্তারিত: `subscription_billing_context.md §১২`।
+
+**পরবর্তী ধাপ:** Tracking boost addon (§9.6 ধাপ ৬, শেষ ধাপ)।

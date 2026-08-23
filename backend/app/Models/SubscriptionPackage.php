@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['name', 'slug', 'price', 'duration_days', 'max_orders', 'max_staff', 'max_tracking_events_per_day', 'features', 'feature_flags', 'is_active'])]
+#[Fillable(['name', 'slug', 'price', 'duration_days', 'max_orders', 'max_landing_pages', 'max_staff', 'max_tracking_events_per_day', 'features', 'feature_flags', 'is_active'])]
 class SubscriptionPackage extends Model
 {
     protected function casts(): array

@@ -52,6 +52,36 @@ class LandingPageController extends Controller
         ], 422);
     }
 
+    /**
+     * Package-based total landing page cap (subscription_billing_context.md
+     * §9.6 step 5, simplified — no add-on, just a flat per-package limit).
+     * `null = unlimited`, same convention as max_orders/max_staff/
+     * max_tracking_events_per_day. Counts every non-deleted page (draft +
+     * published together) — a page can't be published beyond the cap
+     * because it can't even be *created* beyond it in the first place, so
+     * no separate publish-time check is needed.
+     *
+     * @param array<int, int> $shopUserIds
+     */
+    private function landingPageLimitResponse(array $shopUserIds): ?JsonResponse
+    {
+        $maxLandingPages = auth()->user()->shopOwner()->subscriptionPackage?->max_landing_pages;
+        if ($maxLandingPages === null) {
+            return null;
+        }
+
+        $current = LandingPage::whereIn('user_id', $shopUserIds)->count();
+        if ($current < $maxLandingPages) {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => "Your plan allows up to {$maxLandingPages} landing pages. Delete one or upgrade your plan to create more.",
+            'error_code' => 'landing_page_limit_reached',
+        ], 402);
+    }
+
     private function shopHasSubdomain(): bool
     {
         return ShopProfile::where('user_id', auth()->user()->shopOwnerId())
@@ -468,6 +498,10 @@ class LandingPageController extends Controller
 
         if (($data['status'] ?? null) === 'published' && ! $this->shopHasSubdomain()) {
             return $this->subdomainMissingResponse();
+        }
+
+        if ($response = $this->landingPageLimitResponse($shopUserIds)) {
+            return $response;
         }
 
         $page = DB::transaction(function () use ($data, $actingUserId, $shopUserIds) {
