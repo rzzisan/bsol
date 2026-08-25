@@ -640,3 +640,77 @@ a {
     justify-content: center;
   }
 }
+
+/* ---------------------------------------------------------------------
+   Marketing homepage animation utilities (src/app/page.tsx) — scroll-reveal
+   + hero entrance + decorative floating blobs. Kept generic/reusable
+   rather than page-scoped in case another public marketing page needs
+   the same treatment later.
+   --------------------------------------------------------------------- */
+@keyframes home-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes home-float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-2%, 3%) scale(1.05);
+  }
+}
+
+@keyframes home-count-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.home-hero-in {
+  animation: home-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.home-float {
+  animation: home-float 9s ease-in-out infinite;
+}
+
+/* Scroll-reveal: hidden until an IntersectionObserver adds .is-visible. */
+.home-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.home-stat-in {
+  animation: home-count-in 0.5s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-in,
+  .home-float,
+  .home-stat-in {
+    animation: none !important;
+  }
+  .home-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

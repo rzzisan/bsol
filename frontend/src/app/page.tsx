@@ -4,16 +4,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   BadgeCheck,
+  Boxes,
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  FileText,
   Languages,
-  LayoutGrid,
   LineChart,
   MessageCircle,
   Moon,
-  Package,
   ShieldAlert,
-  Smartphone,
+  ShoppingBag,
+  Store,
   Sun,
+  TrendingUp,
   Truck,
+  Users,
+  Wallet,
+  XCircle,
 } from "lucide-react";
 import {
   getStoredLocale,
@@ -39,56 +47,76 @@ const API_BASE_URL =
 const content = {
   bn: {
     brandName: "Zyrotech BSOL",
-    nav: { features: "ফিচার", roadmap: "রোডম্যাপ", login: "লগইন", signup: "ফ্রি অ্যাকাউন্ট" },
-    badge: "Hybrid Commerce SaaS Platform",
-    title: "বাংলাদেশি F-commerce ব্যবসার জন্য স্মার্ট অপারেশন প্ল্যাটফর্ম",
+    nav: { features: "ফিচার", how: "কীভাবে কাজ করে", payments: "পেমেন্ট", login: "লগইন", signup: "ফ্রি অ্যাকাউন্ট" },
+    badge: "বাংলাদেশের F-commerce ব্যবসার জন্য অল-ইন-ওয়ান প্ল্যাটফর্ম",
+    title: "অর্ডার থেকে প্রফিট — আপনার পুরো ব্যবসা এক ড্যাশবোর্ডে",
     subtitle:
-      "অর্ডার, কুরিয়ার, ফেইক অর্ডার রিস্ক, CRM এবং প্রফিট ট্র্যাকিং—সব এক জায়গায় এনে আপনার ব্যবসা চালান আরও দ্রুত ও নিরাপদভাবে।",
+      "অর্ডার, ৫টি কুরিয়ার, ফেইক-অর্ডার প্রোটেকশন, ৭টি পেমেন্ট গেটওয়ে, ফেসবুক/হোয়াটসঅ্যাপ/SMS মার্কেটিং, স্টোরফ্রন্ট আর রিয়েল প্রফিট ট্র্যাকিং — সব একসাথে। স্প্রেডশিট আর একাধিক অ্যাপের ঝামেলা ছাড়াই ব্যবসা চালান।",
     heroHighlights: [
       "সেটআপ শুরু করতে কোনো কার্ড লাগে না",
       "বাংলা ও ইংরেজি — দুই ভাষাতেই সম্পূর্ণ সাপোর্ট",
       "মোবাইল থেকেই পুরো ব্যবসা নিয়ন্ত্রণ করুন",
     ],
     ctaPrimary: "ফ্রি অ্যাকাউন্ট খুলুন",
-    ctaSecondary: "ফিচার দেখুন",
+    ctaSecondary: "সব ফিচার দেখুন",
     statStrip: [
-      { label: "কোর মডিউল", value: "৫+" },
-      { label: "ভাষা সাপোর্ট", value: "বাংলা + English" },
-      { label: "ডিজাইন", value: "মোবাইল-ফার্স্ট" },
+      { label: "কুরিয়ার পার্টনার", value: "৫+" },
+      { label: "পেমেন্ট গেটওয়ে", value: "৭+" },
+      { label: "কোর ফিচার মডিউল", value: "১৫+" },
       { label: "ড্যাশবোর্ড অ্যাক্সেস", value: "২৪/৭" },
     ],
-    sectionTitle: "কোর প্রোডাক্ট মডিউল",
-    sectionDescription:
-      "আপনার প্রতিদিনের অপারেশন সহজ করতে প্রতিটি মডিউল বাস্তব ব্যবসার প্রয়োজন মাথায় রেখে ডিজাইন করা হয়েছে।",
-    benefitsTitle: "কেন BSOL বেছে নেবেন",
-    benefitsDescription:
-      "একটি শক্ত ফাউন্ডেশনের উপর তৈরি — যাতে আপনার টিম প্রথম দিন থেকেই স্বাচ্ছন্দ্যে কাজ শুরু করতে পারে।",
+
+    problemsTitle: "যে সমস্যাগুলো প্রতিদিন আপনার সময় ও টাকা নষ্ট করছে",
+    problemsDescription: "F-commerce ব্যবসায় এই চ্যালেঞ্জগুলো পরিচিত? BSOL প্রতিটার জন্য একটা সরাসরি সমাধান দেয়।",
+    problems: [
+      {
+        problem: "ফেইক/প্র্যাংক অর্ডারে কুরিয়ার খরচ ও সময় নষ্ট হয়",
+        solution: "৫টা কুরিয়ারের রিটার্ন-হিস্টোরি একসাথে চেক করে ঝুঁকিপূর্ণ অর্ডার আগেই ধরে ফেলুন",
+      },
+      {
+        problem: "একাধিক কুরিয়ার আর স্প্রেডশিটে অর্ডার ট্র্যাক করা কঠিন",
+        solution: "সব অর্ডার, সব কুরিয়ারের স্ট্যাটাস — এক ড্যাশবোর্ড থেকে বুকিং, ট্র্যাকিং, ওয়েবিল",
+      },
+      {
+        problem: "বিজ্ঞাপনের টাকায় আসলে কতটা লাভ হচ্ছে বোঝা যায় না",
+        solution: "অ্যাড স্পেন্ড, প্রোডাক্ট কস্ট, ডেলিভারি চার্জ মিলিয়ে রিয়েল নেট প্রফিট দেখুন",
+      },
+      {
+        problem: "মেসেঞ্জার/হোয়াটসঅ্যাপে কাস্টমার মেসেজ মিস হয়ে সেল হারানো",
+        solution: "লিড ইনবক্স + হোয়াটসঅ্যাপ/SMS অটোমেশন দিয়ে কখনো ফলো-আপ মিস হবে না",
+      },
+    ],
+
+    sectionTitle: "আপনার ব্যবসার জন্য যা যা লাগবে — সব এখানে আছে",
+    sectionDescription: "প্রতিটা মডিউল বাস্তব দিনের-পর-দিনের অপারেশনের কথা মাথায় রেখে তৈরি — যাতে ব্যবসা চালানো সহজ হয়, জটিল না।",
+
+    paymentsTitle: "যেসব পেমেন্ট গেটওয়ে সাপোর্ট করে",
+    paymentsDescription: "মার্চেন্ট অ্যাকাউন্ট থাকলে অটোমেটেড গেটওয়ে, না থাকলে পার্সোনাল নম্বরেই সেন্ড-অ্যান্ড-ভেরিফাই — দুই পথই খোলা।",
+    payments: ["SSLCommerz", "bKash", "Nagad", "AamarPay", "ZiniPay", "ShurjoPay", "EPS"],
+    paymentsWalletNote: "মার্চেন্ট অ্যাকাউন্ট ছাড়াই — পার্সোনাল bKash / Nagad / Rocket নম্বরে সেন্ড মানি করেও কাস্টমার পেমেন্ট করতে পারবে",
+
+    couriersTitle: "কুরিয়ার পার্টনার",
+    couriers: ["Pathao", "Steadfast", "RedX", "Carrybee", "Paperfly"],
+
+    benefitsTitle: "কেন ব্যবসায়ীরা BSOL বেছে নেবেন",
+    benefitsDescription: "একটা শক্ত ফাউন্ডেশনের উপর তৈরি — ব্যবসায় স্বচ্ছতা আনে, সময় বাঁচায়, আর প্রতিটা সিদ্ধান্ত ডেটা দিয়ে নিতে সাহায্য করে।",
     readyItems: [
-      "মোবাইল-ফার্স্ট UI কাঠামো",
-      "ডার্ক / লাইট থিম সুইচার",
-      "বাংলা / English language toggle",
-      "Feature-based modular layout",
-      "নিরাপদ, API-ভিত্তিক ব্যাকএন্ড আর্কিটেকচার",
+      { title: "ব্যবসায় সম্পূর্ণ স্বচ্ছতা", detail: "প্রতিটা অর্ডারের real profit/loss, কে কী পরিবর্তন করলো — সবকিছুর হিসাব রাখা।" },
+      { title: "প্রতিদিন সময় বাঁচায়", detail: "ম্যানুয়াল কুরিয়ার এন্ট্রি, SMS পাঠানো, ফলো-আপ — সব অটোমেটেড।" },
+      { title: "ফ্রড থেকে সুরক্ষা", detail: "রিটার্ন-হিস্ট্রি ও কাস্টমার রিস্ক প্রোফাইল দিয়ে টাকা ও সময় বাঁচান।" },
+      { title: "মোবাইল-ফার্স্ট, ২৪/৭", detail: "অফিসে বসে থাকা লাগবে না — ফোন থেকেই পুরো ব্যবসা চালান।" },
+      { title: "টিমের জন্য তৈরি", detail: "স্টাফ যোগ করুন, প্রতিটা মডিউলে আলাদা করে অ্যাক্সেস নিয়ন্ত্রণ করুন।" },
+      { title: "বাড়ার সাথে বাড়ে", detail: "ছোট শপ থেকে মাল্টি-স্টাফ অপারেশন — প্যাকেজ বদলে স্কেল করুন।" },
     ],
-    roadmapTitle: "MVP রোডম্যাপ",
-    roadmapDescription: "ধাপে ধাপে প্রোডাক্ট বিল্ড ও রিলিজ করার জন্য পরিকল্পিত পাইপলাইন।",
-    roadmap: [
-      {
-        phase: "Phase 1",
-        title: "Order + Courier Core",
-        detail: "ম্যানুয়াল অর্ডার এন্ট্রি, কুরিয়ার API কানেক্টর, ট্র্যাকিং টাইমলাইন, ইনভয়েস প্রিভিউ।",
-      },
-      {
-        phase: "Phase 2",
-        title: "Risk Engine + CRM",
-        detail: "ফেইক-অর্ডার স্কোরিং, কাস্টমার রেটিং, ইনবক্স লেবেল, টার্গেটেড ব্রডকাস্ট সেগমেন্ট।",
-      },
-      {
-        phase: "Phase 3",
-        title: "Analytics + ROI Intelligence",
-        detail: "অ্যাড স্পেন্ড সিঙ্ক, টিম ওয়ার্কফ্লো, নেট প্রফিট ভিজিবিলিটি, ইনভেন্টরি ইনসাইট।",
-      },
+
+    howTitle: "মাত্র ৩ ধাপে শুরু করুন",
+    howDescription: "কার্ড ছাড়া, কোনো টেকনিক্যাল সেটআপ ছাড়াই — কয়েক মিনিটেই বিক্রি শুরু করা যায়।",
+    howSteps: [
+      { title: "ফ্রি রেজিস্ট্রেশন করুন", detail: "নাম, ফোন, ইমেইল দিয়ে অ্যাকাউন্ট খুলুন — কোনো কার্ড বা পেমেন্ট লাগে না।" },
+      { title: "কুরিয়ার ও পেমেন্ট কানেক্ট করুন", detail: "আপনার পছন্দের কুরিয়ার আর পেমেন্ট গেটওয়ে কয়েক ক্লিকে যুক্ত করুন।" },
+      { title: "অর্ডার নিন, ট্র্যাক করুন, লাভ দেখুন", detail: "ড্যাশবোর্ড থেকেই অর্ডার প্রসেস, ডেলিভারি ট্র্যাক আর প্রফিট রিপোর্ট — সব এক জায়গায়।" },
     ],
+
     ctaBandTitle: "আজই আপনার ব্যবসা BSOL-এ নিয়ে আসুন",
     ctaBandSubtitle: "কয়েক মিনিটেই একাউন্ট তৈরি করে অর্ডার, কুরিয়ার এবং কাস্টমার ম্যানেজমেন্ট শুরু করুন।",
     ctaBandButton: "ফ্রি অ্যাকাউন্ট তৈরি করুন",
@@ -131,56 +159,76 @@ const content = {
   },
   en: {
     brandName: "Zyrotech BSOL",
-    nav: { features: "Features", roadmap: "Roadmap", login: "Login", signup: "Free account" },
-    badge: "Hybrid Commerce SaaS Platform",
-    title: "Smart operations platform for Bangladesh F-commerce businesses",
+    nav: { features: "Features", how: "How it works", payments: "Payments", login: "Login", signup: "Free account" },
+    badge: "The all-in-one platform for Bangladesh F-commerce businesses",
+    title: "From order to profit — your whole business in one dashboard",
     subtitle:
-      "Unify orders, couriers, fake-order risk checks, CRM, and profitability tracking in one place — and run your business faster and safer.",
+      "Orders, 5 couriers, fake-order protection, 7 payment gateways, Facebook/WhatsApp/SMS marketing, a full storefront, and real profit tracking — all together. Run your business without spreadsheets or juggling five different apps.",
     heroHighlights: [
       "No card required to get started",
       "Fully supported in Bangla and English",
       "Run your entire business from your phone",
     ],
     ctaPrimary: "Create free account",
-    ctaSecondary: "See features",
+    ctaSecondary: "See all features",
     statStrip: [
-      { label: "Core modules", value: "5+" },
-      { label: "Language support", value: "Bangla + English" },
-      { label: "Design", value: "Mobile-first" },
+      { label: "Courier partners", value: "5+" },
+      { label: "Payment gateways", value: "7+" },
+      { label: "Core feature modules", value: "15+" },
       { label: "Dashboard access", value: "24/7" },
     ],
-    sectionTitle: "Core Product Modules",
-    sectionDescription:
-      "Every module is designed around real day-to-day operations, so running your business gets simpler, not more complex.",
-    benefitsTitle: "Why choose BSOL",
-    benefitsDescription:
-      "Built on a solid foundation — so your team can get comfortable and productive from day one.",
+
+    problemsTitle: "The problems quietly costing you time and money",
+    problemsDescription: "Sound familiar? BSOL has a direct answer for each one.",
+    problems: [
+      {
+        problem: "Fake/prank orders waste courier fees and your time",
+        solution: "Check return-history across 5 couriers at once and catch risky orders before you ship",
+      },
+      {
+        problem: "Tracking orders across couriers and spreadsheets is a mess",
+        solution: "Every order, every courier's status — booking, tracking, and waybills from one dashboard",
+      },
+      {
+        problem: "You can't tell how much your ad spend is actually earning",
+        solution: "See real net profit — ad spend, product cost, and delivery charge combined automatically",
+      },
+      {
+        problem: "Missed Messenger/WhatsApp messages mean lost sales",
+        solution: "A lead inbox plus WhatsApp/SMS automation means no follow-up ever slips through",
+      },
+    ],
+
+    sectionTitle: "Everything your business needs — all in one place",
+    sectionDescription: "Every module is built around real day-to-day operations, so running your business gets simpler, not more complex.",
+
+    paymentsTitle: "Payment gateways we support",
+    paymentsDescription: "Have a merchant account? Use an automated gateway. Don't? Accept send-and-verify on your personal number instead — both paths are open.",
+    payments: ["SSLCommerz", "bKash", "Nagad", "AamarPay", "ZiniPay", "ShurjoPay", "EPS"],
+    paymentsWalletNote: "No merchant account needed — customers can also pay via send-money to your personal bKash / Nagad / Rocket number",
+
+    couriersTitle: "Courier partners",
+    couriers: ["Pathao", "Steadfast", "RedX", "Carrybee", "Paperfly"],
+
+    benefitsTitle: "Why sellers choose BSOL",
+    benefitsDescription: "Built on a solid foundation — it brings transparency to your business, saves time every day, and helps you decide with real data.",
     readyItems: [
-      "Mobile-first UI structure",
-      "Dark / light theme switcher",
-      "Bangla / English language toggle",
-      "Feature-based modular layout",
-      "Secure, API-first backend architecture",
+      { title: "Full business transparency", detail: "Real profit/loss per order and a clear audit trail of who changed what." },
+      { title: "Saves time every day", detail: "Manual courier entry, SMS sending, follow-ups — all automated." },
+      { title: "Protection from fraud", detail: "Return-history and customer risk profiles save you money and time." },
+      { title: "Mobile-first, 24/7", detail: "No need to be at a desk — run the whole business from your phone." },
+      { title: "Built for teams", detail: "Add staff and control access to every module individually." },
+      { title: "Grows with you", detail: "From a small shop to a multi-staff operation — scale by changing plans." },
     ],
-    roadmapTitle: "MVP Roadmap",
-    roadmapDescription: "A phased pipeline for building and shipping the product step by step.",
-    roadmap: [
-      {
-        phase: "Phase 1",
-        title: "Order + Courier Core",
-        detail: "Manual order entry, courier API connector wrappers, tracking timeline, invoice preview.",
-      },
-      {
-        phase: "Phase 2",
-        title: "Risk Engine + CRM",
-        detail: "Fake-order scoring, customer rating graph, inbox labels, targeted broadcast segments.",
-      },
-      {
-        phase: "Phase 3",
-        title: "Analytics + ROI Intelligence",
-        detail: "Ad spend sync, team workflows, net profit visibility, and inventory insights.",
-      },
+
+    howTitle: "Get started in just 3 steps",
+    howDescription: "No card, no technical setup — you can be selling within minutes.",
+    howSteps: [
+      { title: "Register for free", detail: "Sign up with your name, phone, and email — no card or payment needed." },
+      { title: "Connect courier & payment", detail: "Add your preferred courier and payment gateway in a few clicks." },
+      { title: "Take orders, track, profit", detail: "Process orders, track deliveries, and see profit reports — all from one dashboard." },
     ],
+
     ctaBandTitle: "Bring your business to BSOL today",
     ctaBandSubtitle: "Create your account in minutes and start managing orders, couriers, and customers.",
     ctaBandButton: "Create free account",
@@ -223,64 +271,180 @@ const content = {
   },
 };
 
-const modules = {
+// ---------------------------------------------------------------------------
+// Feature categories (icons kept outside the localized text, matched by index)
+// ---------------------------------------------------------------------------
+const categoryIcons = [Truck, ShieldAlert, MessageCircle, Store, LineChart, Users, Boxes];
+
+const featureCategories = {
   bn: [
     {
-      icon: Truck,
-      title: "অটোমেটেড অর্ডার + কুরিয়ার",
-      description: "একটি single form থেকে Pathao / Steadfast / RedX integration-ready dispatch pipeline।",
+      title: "অর্ডার ও কুরিয়ার",
+      items: [
+        "ম্যানুয়াল, বাল্ক CSV ও WooCommerce থেকে অটো অর্ডার সিঙ্ক",
+        "৫টি কুরিয়ার — এক ড্যাশবোর্ড থেকে বুকিং ও ট্র্যাকিং",
+        "বাল্ক পার্সেল বুকিং ও ওয়েবিল/স্টিকার প্রিন্ট",
+        "রিয়েল-টাইম ডেলিভারি স্ট্যাটাস আপডেট",
+      ],
     },
     {
-      icon: ShieldAlert,
-      title: "ফেইক অর্ডার ফিল্টারিং",
-      description: "ফোন নম্বর history, return behavior, এবং shared customer trust score ভিত্তিক risk indicator।",
+      title: "ফ্রড ও রিস্ক প্রোটেকশন",
+      items: [
+        "কুরিয়ার রিটার্ন-হিস্টোরি অ্যাগ্রিগেট করা ফেইক-অর্ডার স্কোর",
+        "কাস্টমার ব্ল্যাকলিস্ট ও ফোন-নম্বর রিস্ক প্রোফাইল",
+        "অর্ডার কনফার্মেশনে OTP ভেরিফিকেশন",
+      ],
     },
     {
-      icon: LineChart,
-      title: "সেলস + ROI ইন্টেলিজেন্স",
-      description: "Ad spend, conversion insights, operational visibility, এবং profit-driven decision support।",
+      title: "মার্কেটিং, CRM ও অটোমেশন",
+      items: [
+        "Facebook Pixel + Conversions API (সার্ভার-সাইড)",
+        "Messenger লিড ইনবক্স + অটো-রিপ্লাই টেমপ্লেট",
+        "WhatsApp Business — অর্ডার-স্ট্যাটাস অটোমেশন + ইনবক্স",
+        "SMS অটোমেশন + অ্যাবানডন্ড চেকআউট রিকভারি",
+      ],
     },
     {
-      icon: Package,
-      title: "ইনভেন্টরি + Ads ROI",
-      description: "Ad spend, cost of goods, delivery cost, এবং net margin analytics এক জায়গায়।",
+      title: "স্টোরফ্রন্ট ও ল্যান্ডিং পেজ",
+      items: [
+        "প্রতি-প্রোডাক্ট হাই-কনভার্টিং ল্যান্ডিং পেজ বিল্ডার",
+        "পূর্ণাঙ্গ ব্রাউজেবল স্টোরফ্রন্ট — ক্যাটাগরি, সার্চ, কার্ট, রিভিউ",
+        "নিজস্ব ব্র্যান্ডেড সাবডোমেইন (yourshop.zyrotechbd.com)",
+        "ডিজিটাল প্রোডাক্ট ডেলিভারি (e-book, কোর্স, সফটওয়্যার)",
+      ],
     },
     {
-      icon: MessageCircle,
-      title: "মেসেঞ্জার CRM + ব্রডকাস্ট",
-      description: "Customer labels, follow-up queue, personalized promotion broadcast workflow।",
+      title: "অ্যাকাউন্টিং ও ইনসাইট",
+      items: [
+        "অ্যাড স্পেন্ড, COGS, ডেলিভারি চার্জ মিলিয়ে রিয়েল নেট প্রফিট",
+        "সব সোর্সের পেমেন্ট কালেকশন হিস্ট্রি এক জায়গায়",
+        "ইনভয়েস ও ওয়েবিল PDF",
+      ],
+    },
+    {
+      title: "টিম ও অ্যাক্সেস কন্ট্রোল",
+      items: [
+        "স্টাফ অ্যাকাউন্ট যোগ করুন, মডিউল-ভিত্তিক পারমিশন",
+        "প্রতিটা অ্যাকশনের অডিট ট্রেইল",
+        "WordPress/WooCommerce প্লাগইন কানেক্টর",
+      ],
+    },
+    {
+      title: "প্ল্যাটফর্ম",
+      items: [
+        "বাংলা ও ইংরেজি — সম্পূর্ণ দ্বিভাষিক UI",
+        "ডার্ক / লাইট থিম, মোবাইল-ফার্স্ট ডিজাইন",
+        "প্যাকেজ অনুযায়ী স্কেল করার সুবিধা",
+      ],
     },
   ],
   en: [
     {
-      icon: Truck,
-      title: "Automated Order + Courier",
-      description: "A single order form feeding integration-ready dispatch flows for Pathao / Steadfast / RedX.",
+      title: "Orders & Courier",
+      items: [
+        "Manual entry, bulk CSV import, and WooCommerce auto-sync",
+        "5 couriers — booking and tracking from one dashboard",
+        "Bulk parcel booking and waybill/sticker printing",
+        "Real-time delivery status updates",
+      ],
     },
     {
-      icon: ShieldAlert,
-      title: "Fake Order Filtering",
-      description: "Phone-history, return behavior, and shared customer trust score driven risk indicators.",
+      title: "Fraud & Risk Protection",
+      items: [
+        "Fake-order score aggregated from courier return history",
+        "Customer blacklist and phone-number risk profiles",
+        "OTP verification at order confirmation",
+      ],
     },
     {
-      icon: LineChart,
-      title: "Sales + ROI Intelligence",
-      description: "Ad spend, conversion insights, operational visibility, and profit-driven decision support.",
+      title: "Marketing, CRM & Automation",
+      items: [
+        "Facebook Pixel + Conversions API (server-side)",
+        "Messenger lead inbox + auto-reply templates",
+        "WhatsApp Business — order-status automation + inbox",
+        "SMS automation + abandoned checkout recovery",
+      ],
     },
     {
-      icon: Package,
-      title: "Inventory + Ads ROI",
-      description: "Unified analytics for ad spend, cost of goods, delivery charge, and real net margin.",
+      title: "Storefront & Landing Pages",
+      items: [
+        "Per-product, high-converting landing page builder",
+        "A full browsable storefront — categories, search, cart, reviews",
+        "Your own branded subdomain (yourshop.zyrotechbd.com)",
+        "Digital product delivery (e-books, courses, software)",
+      ],
     },
     {
-      icon: MessageCircle,
-      title: "Messenger CRM + Broadcast",
-      description: "Customer labels, follow-up pipeline, and personalized promotional broadcasting workflow.",
+      title: "Accounting & Insights",
+      items: [
+        "Real net profit — ad spend, COGS, and delivery charge combined",
+        "Payment collection history from every source in one place",
+        "Invoice and waybill PDFs",
+      ],
+    },
+    {
+      title: "Team & Access Control",
+      items: [
+        "Add staff accounts with module-based permissions",
+        "A full audit trail for every action",
+        "WordPress/WooCommerce plugin connector",
+      ],
+    },
+    {
+      title: "Platform",
+      items: [
+        "Bangla and English — fully bilingual UI",
+        "Dark / light theme, mobile-first design",
+        "Scales with you as you upgrade plans",
+      ],
     },
   ],
 };
 
-const benefitIcons = [Smartphone, Moon, Languages, LayoutGrid, BadgeCheck];
+const benefitIcons = [BadgeCheck, Clock3, ShieldAlert, ShoppingBag, Users, TrendingUp];
+const paymentIcons = [CreditCard, Wallet, Wallet, CreditCard, CreditCard, CreditCard, CreditCard];
+
+// ---------------------------------------------------------------------------
+// Scroll-reveal wrapper (IntersectionObserver, CSS-driven — see globals.css)
+// ---------------------------------------------------------------------------
+function Reveal({
+  children,
+  className = "",
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.12 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={`home-reveal ${visible ? "is-visible" : ""} ${className}`}
+      style={{ transitionDelay: visible ? `${delay}ms` : "0ms" }}
+    >
+      {children}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Input component
@@ -660,6 +824,7 @@ export default function Home() {
   const [locale, setLocale] = useState<Locale>("en");
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [authTab, setAuthTab] = useState<AuthTab>("login");
+  const [heroReady, setHeroReady] = useState(false);
   const [legalLinks, setLegalLinks] = useState<{
     terms_link_label_bn?: string | null;
     terms_link_label_en?: string | null;
@@ -669,11 +834,15 @@ export default function Home() {
 
   const authRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
-  const roadmapRef = useRef<HTMLDivElement>(null);
+  const paymentsRef = useRef<HTMLDivElement>(null);
+  const howRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLocale(getStoredLocale());
     setTheme(getStoredTheme());
+    // Hero entrance animation fires once on first paint (not gated behind
+    // IntersectionObserver like the rest of the page — it's always in view).
+    setHeroReady(true);
   }, []);
 
   useEffect(() => {
@@ -698,7 +867,7 @@ export default function Home() {
   }, []);
 
   const text = useMemo(() => content[locale], [locale]);
-  const cards = useMemo(() => modules[locale], [locale]);
+  const categories = useMemo(() => featureCategories[locale], [locale]);
   const year = new Date().getFullYear();
 
   function goToAuth(tab: AuthTab) {
@@ -718,7 +887,7 @@ export default function Home() {
     (locale === "bn" ? "গোপনীয়তা নীতি" : "Privacy Policy");
 
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full overflow-x-hidden">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--background)]/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
@@ -746,10 +915,17 @@ export default function Home() {
             </button>
             <button
               type="button"
-              onClick={() => scrollTo(roadmapRef)}
+              onClick={() => scrollTo(paymentsRef)}
               className="text-sm font-medium text-[var(--muted)] transition hover:text-[var(--foreground)]"
             >
-              {text.nav.roadmap}
+              {text.nav.payments}
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollTo(howRef)}
+              className="text-sm font-medium text-[var(--muted)] transition hover:text-[var(--foreground)]"
+            >
+              {text.nav.how}
             </button>
           </nav>
 
@@ -791,8 +967,22 @@ export default function Home() {
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
         {/* Hero */}
-        <section className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:gap-10">
-          <div className="space-y-5">
+        <section className="relative grid gap-8 overflow-hidden lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:gap-10">
+          {/* Decorative floating gradient blobs — purely visual, kept subtle
+              (low opacity) and off to the sides so they never reduce
+              contrast under the heading/subtitle text sitting on top. */}
+          <div
+            aria-hidden
+            className="home-float pointer-events-none absolute -left-32 -top-32 -z-10 h-72 w-72 rounded-full blur-3xl"
+            style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)" }}
+          />
+          <div
+            aria-hidden
+            className="home-float pointer-events-none absolute -right-20 top-20 -z-10 h-64 w-64 rounded-full blur-3xl"
+            style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)", animationDelay: "2s" }}
+          />
+
+          <div className={`relative space-y-5 ${heroReady ? "home-hero-in" : "opacity-0"}`}>
             <span className="inline-flex rounded-full border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-1 text-xs font-semibold tracking-wide text-[var(--muted)] sm:text-sm">
               {text.badge}
             </span>
@@ -835,7 +1025,8 @@ export default function Home() {
           {/* Auth card */}
           <div
             ref={authRef}
-            className="scroll-mt-24 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-lg shadow-black/5 sm:p-6"
+            className={`relative scroll-mt-24 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-lg shadow-black/5 sm:p-6 ${heroReady ? "home-hero-in" : "opacity-0"}`}
+            style={{ animationDelay: "150ms" }}
           >
             <h2 className="text-lg font-semibold text-[var(--foreground)] sm:text-xl">
               {text.auth.authSectionTitle}
@@ -848,46 +1039,138 @@ export default function Home() {
         </section>
 
         {/* Stat strip */}
-        <section className="mt-8 grid grid-cols-2 gap-3 rounded-3xl border border-[var(--border)] bg-[var(--surface-soft)] p-5 sm:grid-cols-4 sm:p-6">
-          {text.statStrip.map((stat) => (
-            <div key={stat.label} className="text-center sm:text-left">
+        <Reveal className="mt-8 grid grid-cols-2 gap-3 rounded-3xl border border-[var(--border)] bg-[var(--surface-soft)] p-5 sm:grid-cols-4 sm:p-6">
+          {text.statStrip.map((stat, idx) => (
+            <div key={stat.label} className="home-stat-in text-center sm:text-left" style={{ animationDelay: `${idx * 90}ms` }}>
               <p className="text-lg font-bold text-[var(--foreground)] sm:text-2xl">{stat.value}</p>
               <p className="mt-0.5 text-xs text-[var(--muted)] sm:text-sm">{stat.label}</p>
             </div>
           ))}
+        </Reveal>
+
+        {/* Problems -> Solutions */}
+        <section className="mt-16">
+          <Reveal className="max-w-2xl">
+            <h3 className="text-2xl font-bold tracking-tight text-[var(--foreground)] sm:text-3xl">
+              {text.problemsTitle}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">{text.problemsDescription}</p>
+          </Reveal>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {text.problems.map((item, idx) => (
+              <Reveal key={item.problem} delay={idx * 80}>
+                <div className="h-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-red-400">
+                      <XCircle size={14} />
+                    </span>
+                    <p className="text-sm leading-6 text-[var(--muted)]">{item.problem}</p>
+                  </div>
+                  <div className="mt-3 flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
+                      <CheckCircle2 size={14} />
+                    </span>
+                    <p className="text-sm font-medium leading-6 text-[var(--foreground)]">{item.solution}</p>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </section>
 
         {/* Features */}
         <section ref={featuresRef} id="features" className="mt-16 scroll-mt-20">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <h3 className="text-2xl font-bold tracking-tight text-[var(--foreground)] sm:text-3xl">
               {text.sectionTitle}
             </h3>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">{text.sectionDescription}</p>
-          </div>
+          </Reveal>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {cards.map((item) => {
-              const Icon = item.icon;
+            {categories.map((cat, idx) => {
+              const Icon = categoryIcons[idx % categoryIcons.length];
               return (
-                <article
-                  key={item.title}
-                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--accent)]/40 hover:shadow-md"
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)]/12 text-[var(--accent)]">
-                    <Icon size={20} />
-                  </span>
-                  <h4 className="mt-3.5 text-base font-semibold text-[var(--foreground)]">{item.title}</h4>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.description}</p>
-                </article>
+                <Reveal key={cat.title} delay={(idx % 3) * 80}>
+                  <article className="h-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--accent)]/40 hover:shadow-md">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)]/12 text-[var(--accent)]">
+                      <Icon size={20} />
+                    </span>
+                    <h4 className="mt-3.5 text-base font-semibold text-[var(--foreground)]">{cat.title}</h4>
+                    <ul className="mt-2.5 space-y-1.5">
+                      {cat.items.map((line) => (
+                        <li key={line} className="flex items-start gap-2 text-sm leading-6 text-[var(--muted)]">
+                          <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[var(--accent)]" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                </Reveal>
               );
             })}
+          </div>
+        </section>
+
+        {/* Payments + Couriers */}
+        <section ref={paymentsRef} id="payments" className="mt-16 scroll-mt-20">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Reveal className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-7">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)]/12 text-[var(--accent)]">
+                <Wallet size={20} />
+              </span>
+              <h3 className="mt-3.5 text-xl font-bold tracking-tight text-[var(--foreground)]">{text.paymentsTitle}</h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{text.paymentsDescription}</p>
+              <div className="mt-5 flex flex-wrap gap-2.5">
+                {text.payments.map((name, idx) => {
+                  const Icon = paymentIcons[idx % paymentIcons.length];
+                  return (
+                    <span
+                      key={name}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]"
+                    >
+                      <Icon size={14} className="text-[var(--accent)]" />
+                      {name}
+                    </span>
+                  );
+                })}
+              </div>
+              <p className="mt-4 text-xs leading-5 text-[var(--muted)]">{text.paymentsWalletNote}</p>
+            </Reveal>
+
+            <Reveal delay={100} className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-7">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)]/12 text-[var(--accent)]">
+                <Truck size={20} />
+              </span>
+              <h3 className="mt-3.5 text-xl font-bold tracking-tight text-[var(--foreground)]">{text.couriersTitle}</h3>
+              <div className="mt-5 flex flex-wrap gap-2.5">
+                {text.couriers.map((name) => (
+                  <span
+                    key={name}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]"
+                  >
+                    <Truck size={14} className="text-[var(--accent)]" />
+                    {name}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-6 flex items-center gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/12 text-[var(--accent)]">
+                  <FileText size={16} />
+                </span>
+                <p className="text-xs leading-5 text-[var(--muted)] sm:text-sm">
+                  {locale === "bn"
+                    ? "ওয়েবিল, স্টিকার ও ইনভয়েস — সব PDF-এ প্রিন্ট-রেডি"
+                    : "Waybills, stickers, and invoices — all print-ready as PDF"}
+                </p>
+              </div>
+            </Reveal>
           </div>
         </section>
 
         {/* Benefits */}
         <section className="mt-16 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8">
           <div className="grid gap-8 lg:grid-cols-2 lg:items-center lg:gap-10">
-            <div>
+            <Reveal>
               <h3 className="text-2xl font-bold tracking-tight text-[var(--foreground)] sm:text-3xl">
                 {text.benefitsTitle}
               </h3>
@@ -897,21 +1180,24 @@ export default function Home() {
                   const Icon = benefitIcons[idx % benefitIcons.length];
                   return (
                     <li
-                      key={item}
+                      key={item.title}
                       className="flex items-start gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3.5"
                     >
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/12 text-[var(--accent)]">
                         <Icon size={16} />
                       </span>
-                      <span className="text-sm leading-6 text-[var(--foreground)]">{item}</span>
+                      <span className="text-sm leading-6 text-[var(--foreground)]">
+                        <span className="font-semibold">{item.title}</span>
+                        <span className="block text-[var(--muted)]">{item.detail}</span>
+                      </span>
                     </li>
                   );
                 })}
               </ul>
-            </div>
+            </Reveal>
 
             {/* Decorative abstract dashboard illustration */}
-            <div className="relative hidden aspect-[4/3] w-full overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface-soft)] lg:block">
+            <Reveal delay={120} className="relative hidden aspect-[4/3] w-full overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface-soft)] lg:block">
               <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)]/15 via-transparent to-[var(--accent)]/5" />
               <div className="absolute left-6 right-6 top-6 h-8 rounded-lg bg-[var(--surface)] shadow-sm" />
               <div className="absolute left-6 top-20 h-24 w-[46%] rounded-2xl bg-[var(--surface)] shadow-sm" />
@@ -927,39 +1213,35 @@ export default function Home() {
                   ))}
                 </div>
               </div>
-            </div>
+            </Reveal>
           </div>
         </section>
 
-        {/* Roadmap */}
-        <section ref={roadmapRef} id="roadmap" className="mt-16 scroll-mt-20">
-          <div className="max-w-2xl">
+        {/* How it works */}
+        <section ref={howRef} id="how" className="mt-16 scroll-mt-20">
+          <Reveal className="max-w-2xl">
             <h3 className="text-2xl font-bold tracking-tight text-[var(--foreground)] sm:text-3xl">
-              {text.roadmapTitle}
+              {text.howTitle}
             </h3>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">{text.roadmapDescription}</p>
-          </div>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)] sm:text-base">{text.howDescription}</p>
+          </Reveal>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            {text.roadmap.map((item, idx) => (
-              <div
-                key={item.phase}
-                className="relative rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-bold text-white">
-                  {idx + 1}
-                </span>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                  {item.phase}
-                </p>
-                <h4 className="mt-1 text-base font-semibold text-[var(--foreground)]">{item.title}</h4>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.detail}</p>
-              </div>
+            {text.howSteps.map((item, idx) => (
+              <Reveal key={item.title} delay={idx * 100}>
+                <div className="relative h-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-bold text-white">
+                    {idx + 1}
+                  </span>
+                  <h4 className="mt-3 text-base font-semibold text-[var(--foreground)]">{item.title}</h4>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.detail}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </section>
 
         {/* CTA band */}
-        <section className="mt-16 overflow-hidden rounded-3xl border border-[var(--border)] bg-gradient-to-br from-[var(--accent)] to-[var(--accent)]/80 p-6 text-center sm:p-10">
+        <Reveal className="mt-16 overflow-hidden rounded-3xl border border-[var(--border)] bg-gradient-to-br from-[var(--accent)] to-[var(--accent)]/80 p-6 text-center sm:p-10">
           <h3 className="text-xl font-bold text-white sm:text-2xl">{text.ctaBandTitle}</h3>
           <p className="mx-auto mt-2 max-w-xl text-sm text-white/85 sm:text-base">{text.ctaBandSubtitle}</p>
           <button
@@ -969,7 +1251,7 @@ export default function Home() {
           >
             {text.ctaBandButton}
           </button>
-        </section>
+        </Reveal>
       </main>
 
       {/* Footer */}
@@ -998,8 +1280,13 @@ export default function Home() {
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => scrollTo(roadmapRef)} className="hover:text-[var(--foreground)]">
-                  {text.nav.roadmap}
+                <button type="button" onClick={() => scrollTo(paymentsRef)} className="hover:text-[var(--foreground)]">
+                  {text.nav.payments}
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={() => scrollTo(howRef)} className="hover:text-[var(--foreground)]">
+                  {text.nav.how}
                 </button>
               </li>
             </ul>

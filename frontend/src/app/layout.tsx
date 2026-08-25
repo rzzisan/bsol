@@ -12,10 +12,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = "https://bsol.zyrotechbd.com";
+const OG_IMAGE = `${SITE_URL}/app-icon-1024.png`;
+const OG_TITLE = "BSOL — বাংলাদেশি F-commerce ব্যবসার জন্য অল-ইন-ওয়ান প্ল্যাটফর্ম";
+const OG_DESCRIPTION =
+  "অর্ডার, ৫টি কুরিয়ার, ফেইক-অর্ডার প্রোটেকশন, ৭টি পেমেন্ট গেটওয়ে, ফেসবুক/হোয়াটসঅ্যাপ মার্কেটিং ও প্রফিট ট্র্যাকিং — সব এক জায়গায়। কার্ড ছাড়াই ফ্রি অ্যাকাউন্ট খুলুন।";
+
 export const metadata: Metadata = {
-  title: "Hybrid Commerce SaaS",
-  description:
-    "Foundation UI for a bilingual, mobile-first F-commerce operations SaaS platform.",
+  metadataBase: new URL(SITE_URL),
+  title: OG_TITLE,
+  description: OG_DESCRIPTION,
+  openGraph: {
+    title: OG_TITLE,
+    description: OG_DESCRIPTION,
+    url: SITE_URL,
+    siteName: "BSOL",
+    images: [{ url: OG_IMAGE, width: 1024, height: 1024, alt: "BSOL" }],
+    locale: "bn_BD",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: OG_TITLE,
+    description: OG_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
 };
 
 export default function RootLayout({
