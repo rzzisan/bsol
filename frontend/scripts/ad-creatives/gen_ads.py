@@ -310,6 +310,84 @@ def render_thumbnail(w, h, theme, style):
 </svg>'''
 
 # ---------------------------------------------------------------------------
+# Layout: Facebook Page profile picture (square, displayed as a circle —
+# keep everything inside a centered "circle-safe" zone so the round crop
+# never clips it).
+# ---------------------------------------------------------------------------
+def render_profile(w, h, style):
+    c = colors(style)
+    cx, cy = w / 2, h / 2
+    r = min(w, h) / 2
+
+    # Inscribed-square side length for this circle, times a further margin
+    # so the mark sits well clear of the crop edge rather than touching it.
+    safe = r * math.sqrt(2) * 0.72
+    logo_size = safe
+    logo_x, logo_y = cx - logo_size / 2, cy - logo_size / 2
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" xml:space="preserve">
+  <defs>
+    <radialGradient id="pbg" cx="50%" cy="42%" r="70%">
+      <stop offset="0%" stop-color="{c['bg2']}"/>
+      <stop offset="100%" stop-color="{c['bg1']}"/>
+    </radialGradient>
+    <clipPath id="plogo"><rect x="0" y="0" width="{logo_size}" height="{logo_size}" rx="{logo_size*0.22}"/></clipPath>
+  </defs>
+  <rect width="{w}" height="{h}" fill="url(#pbg)"/>
+  <g transform="translate({logo_x:.1f},{logo_y:.1f})">
+    <g clip-path="url(#plogo)"><image href="data:image/png;base64,{LOGO_B64}" width="{logo_size}" height="{logo_size}"/></g>
+  </g>
+</svg>'''
+
+# ---------------------------------------------------------------------------
+# Layout: Facebook Page cover photo (820x312 — wide and short). The Page's
+# profile picture visually overlaps the bottom-left corner on both desktop
+# and mobile, so all content here is deliberately kept clear of a left
+# margin sized for that, and it's a single compact line stack (no room for
+# a hero + chips + CTA the way the 1200x630 landscape layout has).
+# ---------------------------------------------------------------------------
+def render_cover(w, h, theme, style):
+    c = colors(style)
+    accent = c["accent_bright"]
+    SAFETY = 1.18
+    safe_left = int(w * 0.27)  # clears the profile-picture overlap zone
+    right_margin = int(w * 0.05)
+    avail_w = w - safe_left - right_margin
+    cx = safe_left + avail_w / 2
+
+    badge_font = max(12, int(h * 0.05))
+    while seg_width(theme["badge"], badge_font, True) * SAFETY + 36 > avail_w and badge_font > 10:
+        badge_font -= 1
+    badge_w = min(avail_w, seg_width(theme["badge"], badge_font, True) * SAFETY + 36)
+    badge_h = badge_font + 16
+    badge_y = int(h * 0.12)
+    badge_x = cx - badge_w / 2
+
+    # Shrink-to-fit: 820x312 is far too tight to fit a full two-clause
+    # headline at a size proportional to height alone (that's what the
+    # first pass did, and it overflowed both edges) — cap the font so the
+    # *widest* estimated line actually fits avail_w.
+    headline = theme["cover_headline"]
+    head_font = int(h * 0.155)
+    while headline_plain_width(headline, head_font) * SAFETY > avail_w and head_font > 14:
+        head_font -= 1
+    head_y = badge_y + badge_h + int(h * 0.13) + head_font * 0.8
+
+    subtext = theme.get("cover_subtext", " · ".join(theme["chips"][:2]))
+    sub_font = int(h * 0.058)
+    while seg_width(subtext, sub_font, True) * SAFETY > avail_w and sub_font > 11:
+        sub_font -= 1
+    sub_y = head_y + int(h * 0.15)
+
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" xml:space="preserve">
+  {defs_block(c, w, h)}
+  <rect x="{badge_x:.1f}" y="{badge_y}" width="{badge_w:.1f}" height="{badge_h}" rx="{badge_h/2:.1f}" fill="{c['badge_bg']}" stroke="{c['badge_border']}"/>
+  <text x="{cx}" y="{badge_y+badge_h/2+badge_font*0.35:.1f}" text-anchor="middle" font-family="{FONT}" font-size="{badge_font}" font-weight="700" fill="{c['badge_text']}">{theme['badge']}</text>
+  <text x="{cx}" y="{head_y:.1f}" text-anchor="middle" font-family="{FONT}" font-size="{head_font}" font-weight="800">{headline_tspans(headline, accent, c['fg'], cx)}</text>
+  <text x="{cx}" y="{sub_y:.1f}" text-anchor="middle" font-family="{FONT}" font-size="{sub_font}" font-weight="600" fill="{c['muted']}">{subtext}</text>
+</svg>'''
+
+# ---------------------------------------------------------------------------
 # Themes (all copy grounded in actually-shipped features — payment gateway
 # and courier names cross-checked against PaymentGatewayFactory/CourierFactory
 # the same way the homepage redesign was, homepage_redesign_context.md).
@@ -320,6 +398,7 @@ THEMES = {
         badge="বাংলাদেশের F-commerce ব্যবসার জন্য অল-ইন-ওয়ান প্ল্যাটফর্ম",
         headline=["অর্ডার থেকে |প্রফিট| —", "পুরো ব্যবসা এক ড্যাশবোর্ডে"],
         tag=["অর্ডার থেকে", "|প্রফিট|"],
+        cover_headline="অর্ডার থেকে |প্রফিট| — পুরো ব্যবসা এক ড্যাশবোর্ডে",
         chips=["৫টি কুরিয়ার", "৭টি পেমেন্ট গেটওয়ে", "ফেইক-অর্ডার প্রোটেকশন", "Facebook + WhatsApp মার্কেটিং"],
         stats=[("৫+", "কুরিয়ার পার্টনার"), ("৭+", "পেমেন্ট গেটওয়ে"), ("২৪/৭", "ড্যাশবোর্ড অ্যাক্সেস")],
         cta="ফ্রি অ্যাকাউন্ট খুলুন →",
@@ -391,6 +470,11 @@ MANIFEST = [
 
     # Compact thumbnail 400x400 — small placements/previews
     ("thumbnail-master-dark", 400, 400, "master", "dark", "thumbnail"),
+
+    # Facebook Page assets
+    ("fb-page-profile-dark",  500, 500, "master", "dark",  "profile"),
+    ("fb-page-cover-dark",    820, 312, "master", "dark",  "cover"),
+    ("fb-page-cover-light",   820, 312, "master", "light", "cover"),
 ]
 
 os.makedirs(SVG_DIR, exist_ok=True)
@@ -400,6 +484,10 @@ for name, w, h, theme_key, style, layout in MANIFEST:
         svg = render_landscape(w, h, theme, style)
     elif layout == "thumbnail":
         svg = render_thumbnail(w, h, theme, style)
+    elif layout == "profile":
+        svg = render_profile(w, h, style)
+    elif layout == "cover":
+        svg = render_cover(w, h, theme, style)
     else:
         svg = render_stack(w, h, theme, style)
     with open(f"{SVG_DIR}/{name}.svg", "w") as f:
