@@ -15,10 +15,11 @@ class PlatformFacebookSetting extends Model
 {
     protected $fillable = [
         'app_id', 'login_config_id', 'app_secret', 'webhook_verify_token',
+        'marketing_pixel_id', 'marketing_capi_access_token', 'marketing_test_event_code',
     ];
 
     protected $hidden = [
-        'app_secret', 'webhook_verify_token',
+        'app_secret', 'webhook_verify_token', 'marketing_capi_access_token',
     ];
 
     protected function casts(): array
@@ -26,6 +27,7 @@ class PlatformFacebookSetting extends Model
         return [
             'app_secret' => 'encrypted',
             'webhook_verify_token' => 'encrypted',
+            'marketing_capi_access_token' => 'encrypted',
         ];
     }
 
@@ -42,6 +44,9 @@ class PlatformFacebookSetting extends Model
             'login_config_id' => $this->login_config_id,
             'app_secret_set' => filled($this->app_secret),
             'webhook_verify_token_set' => filled($this->webhook_verify_token),
+            'marketing_pixel_id' => $this->marketing_pixel_id,
+            'marketing_capi_access_token_set' => filled($this->marketing_capi_access_token),
+            'marketing_test_event_code' => $this->marketing_test_event_code,
         ];
     }
 
@@ -75,5 +80,27 @@ class PlatformFacebookSetting extends Model
     public static function resolvedGraphVersion(): string
     {
         return config('services.facebook.graph_version', 'v21.0');
+    }
+
+    /**
+     * BSOL's own acquisition-funnel Pixel — platform_marketing_tracking_context.md.
+     * Deliberately separate concept from app_id/app_secret above (those are
+     * OAuth credentials for the seller Page-connect flow); this is a
+     * Pixel ID + CAPI access token pasted from Meta Events Manager, same as
+     * a seller's own facebook_pixel_settings row, just platform-scoped.
+     */
+    public static function resolvedMarketingPixelId(): ?string
+    {
+        return static::getSetting()->marketing_pixel_id ?: config('services.facebook.marketing_pixel_id');
+    }
+
+    public static function resolvedMarketingCapiAccessToken(): ?string
+    {
+        return static::getSetting()->marketing_capi_access_token ?: config('services.facebook.marketing_capi_access_token');
+    }
+
+    public static function resolvedMarketingTestEventCode(): ?string
+    {
+        return static::getSetting()->marketing_test_event_code ?: config('services.facebook.marketing_test_event_code');
     }
 }

@@ -21,6 +21,20 @@ type Settings = {
   login_config_id: string;
   app_secret_set: boolean;
   webhook_verify_token_set: boolean;
+  marketing_pixel_id: string;
+  marketing_capi_access_token_set: boolean;
+  marketing_test_event_code: string;
+};
+
+type MarketingEvent = {
+  id: number;
+  event_name: string;
+  event_id: string;
+  status: string;
+  response_code: number | null;
+  error_message: string | null;
+  sent_at: string | null;
+  created_at: string;
 };
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -43,6 +57,13 @@ const labels = {
     setPlaceholder: "সেট করা আছে — বদলাতে নতুন মান লিখুন",
     notSetPlaceholder: "সেট করা নেই",
     webhookUrlLabel: "Webhook Callback URL (Meta App-এ এটা বসান)",
+    marketingTitle: "মার্কেটিং পিক্সেল",
+    marketingSubtitle: "এই SaaS নিজেই বিক্রির জন্য ফেসবুক বিজ্ঞাপন চালানোর ট্র্যাকিং — সেলারদের স্টোরফ্রন্ট পিক্সেল থেকে আলাদা। CompleteRegistration (সাইনআপ) ও Subscribe (পেইড কনভার্সন) ইভেন্ট এখান থেকে পাঠানো হয়।",
+    marketingPixelId: "Pixel ID",
+    marketingAccessToken: "Conversions API Access Token",
+    marketingTestEventCode: "Test Event Code (ঐচ্ছিক — লাইভ যাচাইয়ের জন্য)",
+    marketingEventsTitle: "সাম্প্রতিক ইভেন্ট",
+    noEvents: "এখনো কোনো ইভেন্ট পাঠানো হয়নি",
     setupTitle: "সেটআপ ধাপ",
     setupSteps: [
       "developers.facebook.com-এ একটা Business App তৈরি করুন",
@@ -92,6 +113,13 @@ const labels = {
     setPlaceholder: "Currently set — type a new value to change",
     notSetPlaceholder: "Not set",
     webhookUrlLabel: "Webhook Callback URL (put this in the Meta App)",
+    marketingTitle: "Marketing Pixel",
+    marketingSubtitle: "Ad-tracking for selling this SaaS itself — separate from any seller's storefront pixel. CompleteRegistration (signup) and Subscribe (paid conversion) events are sent from here.",
+    marketingPixelId: "Pixel ID",
+    marketingAccessToken: "Conversions API Access Token",
+    marketingTestEventCode: "Test Event Code (optional — for live verification)",
+    marketingEventsTitle: "Recent events",
+    noEvents: "No events sent yet",
     setupTitle: "Setup steps",
     setupSteps: [
       "Create a Business App at developers.facebook.com",
@@ -136,6 +164,10 @@ export default function AdminFacebookSettingsPage() {
   const [loginConfigId, setLoginConfigId] = useState("");
   const [appSecret, setAppSecret] = useState("");
   const [webhookToken, setWebhookToken] = useState("");
+  const [marketingPixelId, setMarketingPixelId] = useState("");
+  const [marketingAccessToken, setMarketingAccessToken] = useState("");
+  const [marketingTestEventCode, setMarketingTestEventCode] = useState("");
+  const [events, setEvents] = useState<MarketingEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -178,6 +210,8 @@ export default function AdminFacebookSettingsPage() {
           setCurrent(data.data);
           setAppId(data.data.app_id ?? "");
           setLoginConfigId(data.data.login_config_id ?? "");
+          setMarketingPixelId(data.data.marketing_pixel_id ?? "");
+          setMarketingTestEventCode(data.data.marketing_test_event_code ?? "");
           setMessage(t.loaded);
         }
       } finally {
@@ -185,7 +219,18 @@ export default function AdminFacebookSettingsPage() {
       }
     };
 
+    const loadEvents = async () => {
+      const res = await fetch(`${API}/admin/settings/facebook/marketing-events`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data?.data?.recent) {
+        setEvents(data.data.recent as MarketingEvent[]);
+      }
+    };
+
     void load();
+    void loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -205,6 +250,9 @@ export default function AdminFacebookSettingsPage() {
           login_config_id: loginConfigId,
           app_secret: appSecret,
           webhook_verify_token: webhookToken,
+          marketing_pixel_id: marketingPixelId,
+          marketing_capi_access_token: marketingAccessToken,
+          marketing_test_event_code: marketingTestEventCode,
         }),
       });
       const data = await res.json();
@@ -215,6 +263,7 @@ export default function AdminFacebookSettingsPage() {
       setCurrent(data.data);
       setAppSecret("");
       setWebhookToken("");
+      setMarketingAccessToken("");
       setMessage(t.updated);
     } finally {
       setLoading(false);
@@ -298,6 +347,74 @@ export default function AdminFacebookSettingsPage() {
               />
             </label>
           </div>
+        </section>
+
+        <section className="catv-panel p-5">
+          <h2 className="text-xl font-bold">{t.marketingTitle}</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">{t.marketingSubtitle}</p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.marketingPixelId}</span>
+              <input
+                value={marketingPixelId}
+                onChange={(e) => setMarketingPixelId(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+              />
+            </label>
+            <label>
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.marketingTestEventCode}</span>
+              <input
+                value={marketingTestEventCode}
+                onChange={(e) => setMarketingTestEventCode(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="sm:col-span-2">
+              <span className="mb-1 block text-xs text-[var(--muted)]">{t.marketingAccessToken}</span>
+              <input
+                type="password"
+                value={marketingAccessToken}
+                onChange={(e) => setMarketingAccessToken(e.target.value)}
+                placeholder={current?.marketing_capi_access_token_set ? t.setPlaceholder : t.notSetPlaceholder}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+
+          {events.length > 0 ? (
+            <div className="mt-5">
+              <h3 className="text-sm font-semibold text-[var(--foreground)]">{t.marketingEventsTitle}</h3>
+              <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--border)]">
+                <table className="w-full text-left text-xs">
+                  <tbody>
+                    {events.map((event) => (
+                      <tr key={event.id} className="border-b border-[var(--border)] last:border-0">
+                        <td className="px-3 py-2 font-medium">{event.event_name}</td>
+                        <td className="px-3 py-2 text-[var(--muted)]">{event.event_id}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={
+                              event.status === "sent"
+                                ? "text-green-600"
+                                : event.status === "failed"
+                                  ? "text-red-600"
+                                  : "text-[var(--muted)]"
+                            }
+                          >
+                            {event.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-[var(--muted)]">{event.error_message ?? ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 text-xs text-[var(--muted)]">{t.noEvents}</p>
+          )}
         </section>
 
         <section className="catv-panel p-5">

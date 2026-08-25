@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import MetaPixelScript from "@/components/meta-pixel-script";
 
 const API_BASE_URL =
   (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
@@ -73,6 +74,10 @@ export default function VerifyPhonePage() {
         }
       } else {
         setSuccess(true);
+        // Shares the same event id the server-side CompleteRegistration CAPI
+        // event uses ('reg_' + token, OtpController::verifyRegistrationOtp) —
+        // Meta's documented dedup pattern, platform_marketing_tracking_context.md.
+        window.fbq?.("track", "CompleteRegistration", {}, { eventID: `reg_${token}` });
         sessionStorage.removeItem("otp_token");
         sessionStorage.removeItem("otp_mobile");
         sessionStorage.removeItem("otp_resend_cooldown");
@@ -133,6 +138,7 @@ export default function VerifyPhonePage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4">
+      <MetaPixelScript />
       <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-lg">
         {/* Icon */}
         <div className="mb-5 flex justify-center">

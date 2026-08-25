@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PlatformFacebookSetting;
+use App\Models\PlatformMarketingEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,16 +27,22 @@ class PlatformFacebookSettingsController extends Controller
             'login_config_id' => ['nullable', 'string', 'max:100'],
             'app_secret' => ['nullable', 'string', 'max:255'],
             'webhook_verify_token' => ['nullable', 'string', 'max:255'],
+            'marketing_pixel_id' => ['nullable', 'string', 'max:100'],
+            'marketing_capi_access_token' => ['nullable', 'string', 'max:1000'],
+            'marketing_test_event_code' => ['nullable', 'string', 'max:100'],
         ]);
 
         $setting = PlatformFacebookSetting::getSetting();
 
-        // Blank app_secret/webhook_verify_token in the request means "leave
-        // unchanged" (the frontend never receives the real value back to
-        // re-submit) — only overwrite when a new value was actually typed.
+        // Blank app_secret/webhook_verify_token/marketing_capi_access_token in
+        // the request means "leave unchanged" (the frontend never receives the
+        // real value back to re-submit) — only overwrite when a new value was
+        // actually typed.
         $updates = [
             'app_id' => $data['app_id'] ?? null,
             'login_config_id' => $data['login_config_id'] ?? null,
+            'marketing_pixel_id' => $data['marketing_pixel_id'] ?? null,
+            'marketing_test_event_code' => $data['marketing_test_event_code'] ?? null,
         ];
         if (filled($data['app_secret'] ?? null)) {
             $updates['app_secret'] = $data['app_secret'];
@@ -43,9 +50,30 @@ class PlatformFacebookSettingsController extends Controller
         if (filled($data['webhook_verify_token'] ?? null)) {
             $updates['webhook_verify_token'] = $data['webhook_verify_token'];
         }
+        if (filled($data['marketing_capi_access_token'] ?? null)) {
+            $updates['marketing_capi_access_token'] = $data['marketing_capi_access_token'];
+        }
 
         $setting->update($updates);
 
         return response()->json(['success' => true, 'data' => $setting->fresh()->masked()]);
+    }
+
+    /** Last ~30 acquisition-funnel events + per-event-name send counts, for debugging match quality without DB access. */
+    public function marketingEvents(): JsonResponse
+    {
+        $recent = PlatformMarketingEvent::query()
+            ->latest('id')
+            ->limit(30)
+            ->get(['id', 'event_name', 'event_id', 'status', 'response_code', 'error_message', 'sent_at', 'created_at']);
+
+        $counts = PlatformMarketingEvent::query()
+            ->selectRaw('event_name, status, count(*) as total')
+            ->groupBy('event_name', 'status')
+            ->get()
+            ->groupBy('event_name')
+            ->map(fn ($rows) => $rows->pluck('total', 'status'));
+
+        return response()->json(['success' => true, 'data' => ['recent' => $recent, 'counts' => $counts]]);
     }
 }

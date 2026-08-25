@@ -72,6 +72,7 @@ use App\Http\Controllers\Api\Admin\LandingTemplateController as AdminLandingTemp
 use App\Http\Controllers\Api\Admin\LandingPageAdminController;
 use App\Http\Controllers\Api\Admin\CourierCacheController;
 use App\Http\Controllers\Api\Admin\AdminTrackingController;
+use App\Http\Controllers\Api\PublicMarketingPixelController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\PublicTrackingController;
 use App\Http\Controllers\Api\OnlinePaymentController;
@@ -137,6 +138,7 @@ Route::post('/password/reset',        [PasswordResetController::class, 'resetPas
 
 // SaaS attribution footer + /terms page content — platform-wide, not per-merchant.
 Route::get('/public/platform-settings', [PublicPlatformSettingsController::class, 'show']);
+Route::get('/public/marketing-pixel', [PublicMarketingPixelController::class, 'show']);
 
 // BSOL Connect plugin zip — no secrets in it, safe as a plain public download link.
 Route::get('/wordpress/plugin-download', [WordpressApiKeyController::class, 'downloadPlugin'])
@@ -897,6 +899,7 @@ Route::middleware('active_subscription')->group(function () {
         Route::put('/settings/platform-branding', [PlatformSettingsController::class, 'update']);
         Route::get('/settings/facebook', [PlatformFacebookSettingsController::class, 'show']);
         Route::put('/settings/facebook', [PlatformFacebookSettingsController::class, 'update']);
+        Route::get('/settings/facebook/marketing-events', [PlatformFacebookSettingsController::class, 'marketingEvents']);
 
         // Landing page templates — authored by converting a seller's landing
         // page into a reusable template (replaces the old CartFlows/Elementor

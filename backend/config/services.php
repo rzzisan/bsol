@@ -51,6 +51,12 @@ return [
         'app_secret' => env('FACEBOOK_APP_SECRET'),
         'webhook_verify_token' => env('FACEBOOK_WEBHOOK_VERIFY_TOKEN'),
         'graph_version' => env('FACEBOOK_GRAPH_VERSION', 'v21.0'),
+        // BSOL's own acquisition-funnel Pixel — platform_marketing_tracking_context.md.
+        // DB value in platform_facebook_settings wins when set (admin UI),
+        // these are only the env fallback.
+        'marketing_pixel_id' => env('META_PIXEL_ID'),
+        'marketing_capi_access_token' => env('META_CAPI_ACCESS_TOKEN'),
+        'marketing_test_event_code' => env('META_CAPI_TEST_EVENT_CODE'),
     ],
 
     // bKash Payment Gateway (Tokenized Checkout) — platform's own merchant

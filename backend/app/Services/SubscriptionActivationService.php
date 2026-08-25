@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\SubscriptionPayment;
+use App\Services\Marketing\PlatformMarketingEventService;
 use App\Services\NotificationDispatchService;
 
 /**
@@ -17,6 +18,7 @@ class SubscriptionActivationService
     public function __construct(
         private readonly NotificationDispatchService $notificationDispatchService,
         private readonly StorefrontAddonService $storefrontAddonService,
+        private readonly PlatformMarketingEventService $marketingEventService,
     ) {}
 
     public function activate(SubscriptionPayment $payment): void
@@ -55,6 +57,30 @@ class SubscriptionActivationService
         // kept in sync here on every renewal/upgrade. No-op if the seller
         // never had it, or it already lapsed.
         $this->storefrontAddonService->extendToMatchIfActive($user, $newEndsAt);
+
+        // BSOL's own acquisition-funnel Subscribe event
+        // (platform_marketing_tracking_context.md) — the real conversion
+        // signal for ad optimization/lookalikes, since a signup alone
+        // (CompleteRegistration, fired at registration) doesn't prove
+        // someone became a paying customer. Uses the first-touch fbp/fbc
+        // stored on the user at signup, so a payment approved weeks later
+        // still attributes to the original ad.
+        $this->marketingEventService->track(
+            eventName: 'Subscribe',
+            eventId: 'sub_' . $payment->id,
+            rawUserData: [
+                'ph' => $user->mobile,
+                'em' => $user->email,
+                'fn' => $user->name,
+                'fbp' => $user->signup_fbp,
+                'fbc' => $user->signup_fbc,
+            ],
+            customData: [
+                'currency' => 'BDT',
+                'value' => (float) $payment->amount,
+            ],
+            userId: $user->id,
+        );
 
         try {
             $this->notificationDispatchService->dispatch($user, 'subscription_payment_approved', $user->mobile, $user->email, [

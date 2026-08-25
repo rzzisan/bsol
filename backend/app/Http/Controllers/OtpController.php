@@ -7,7 +7,9 @@ use App\Models\PhoneOtpVerification;
 use App\Models\RegistrationSetting;
 use App\Models\SubscriptionPackage;
 use App\Models\User;
+use App\Services\Marketing\PlatformMarketingEventService;
 use App\Services\NotificationDispatchService;
+use App\Services\Tracking\TrackingUserDataBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
@@ -20,7 +22,7 @@ class OtpController extends Controller
     /**
      * Step 1 – Validate registration data, store pending record, send OTP.
      */
-    public function sendRegistrationOtp(Request $request): JsonResponse
+    public function sendRegistrationOtp(Request $request, TrackingUserDataBuilder $userData): JsonResponse
     {
         $validated = $request->validate([
             'name'     => ['required', 'string', 'max:255'],
@@ -29,6 +31,18 @@ class OtpController extends Controller
             'mobile'   => ['required', 'string', 'max:20', 'regex:/^[0-9+\-\s]{7,20}$/', Rule::unique('users', 'mobile')->whereNull('deleted_at')],
             'email'    => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->whereNull('deleted_at')],
             'password' => ['required', 'string', 'confirmed', Password::min(8)],
+            // Ad-attribution, all optional — platform_marketing_tracking_context.md.
+            // Captured client-side (first-touch, from the homepage) and carried
+            // through unchanged to the User row at verifyRegistrationOtp().
+            'utm_source'   => ['nullable', 'string', 'max:255'],
+            'utm_medium'   => ['nullable', 'string', 'max:255'],
+            'utm_campaign' => ['nullable', 'string', 'max:255'],
+            'utm_content'  => ['nullable', 'string', 'max:255'],
+            'utm_term'     => ['nullable', 'string', 'max:255'],
+            'fbp'          => ['nullable', 'string', 'max:255'],
+            'fbc'          => ['nullable', 'string', 'max:255'],
+            'fbclid'       => ['nullable', 'string', 'max:255'],
+            'landing_path' => ['nullable', 'string', 'max:255'],
         ]);
 
         $normalizedMobile = $this->normalizeMobile($validated['mobile']);
@@ -81,6 +95,20 @@ class OtpController extends Controller
                 'mobile_raw' => $validated['mobile'],
                 'email'    => $validated['email'],
                 'password' => Hash::make($validated['password']),
+                // Ad-attribution — never trust client IP/UA, always read from
+                // the request itself. fbc falls back to a synthesized value
+                // from fbclid (same formula Meta's own Pixel uses) when the
+                // _fbc cookie hadn't been set yet at submit time.
+                'signup_utm_source'   => $validated['utm_source'] ?? null,
+                'signup_utm_medium'   => $validated['utm_medium'] ?? null,
+                'signup_utm_campaign' => $validated['utm_campaign'] ?? null,
+                'signup_utm_content'  => $validated['utm_content'] ?? null,
+                'signup_utm_term'     => $validated['utm_term'] ?? null,
+                'signup_fbp'          => $validated['fbp'] ?? null,
+                'signup_fbc'          => $validated['fbc'] ?? $userData->fbcFromClickId($validated['fbclid'] ?? null),
+                'signup_landing_path' => $validated['landing_path'] ?? null,
+                'signup_ip'           => $request->ip(),
+                'signup_user_agent'   => $request->userAgent(),
             ],
             'resend_count' => 0,
             'last_sent_at' => now(),
@@ -119,7 +147,7 @@ class OtpController extends Controller
     /**
      * Step 2 – Verify OTP and complete registration.
      */
-    public function verifyRegistrationOtp(Request $request): JsonResponse
+    public function verifyRegistrationOtp(Request $request, PlatformMarketingEventService $marketing): JsonResponse
     {
         $validated = $request->validate([
             'token' => ['required', 'string'],
@@ -209,6 +237,14 @@ class OtpController extends Controller
                 'subscription_started_at' => $defaultPackage ? now() : null,
                 'subscription_ends_at' => $defaultPackage ? now()->addDays($defaultPackage->duration_days) : null,
                 'mobile_verified_at' => now(),
+                'signup_utm_source'   => $pendingData['signup_utm_source'] ?? null,
+                'signup_utm_medium'   => $pendingData['signup_utm_medium'] ?? null,
+                'signup_utm_campaign' => $pendingData['signup_utm_campaign'] ?? null,
+                'signup_utm_content'  => $pendingData['signup_utm_content'] ?? null,
+                'signup_utm_term'     => $pendingData['signup_utm_term'] ?? null,
+                'signup_fbp'          => $pendingData['signup_fbp'] ?? null,
+                'signup_fbc'          => $pendingData['signup_fbc'] ?? null,
+                'signup_landing_path' => $pendingData['signup_landing_path'] ?? null,
             ]);
         } catch (UniqueConstraintViolationException $e) {
             // The checks above can still lose a race with a second submit of
@@ -223,6 +259,21 @@ class OtpController extends Controller
         }
 
         $record->update(['verified_at' => now()]);
+
+        $marketing->track(
+            eventName: 'CompleteRegistration',
+            eventId: 'reg_' . $validated['token'],
+            rawUserData: [
+                'ph' => $user->mobile,
+                'em' => $user->email,
+                'fn' => $user->name,
+                'fbp' => $pendingData['signup_fbp'] ?? null,
+                'fbc' => $pendingData['signup_fbc'] ?? null,
+                'client_ip_address' => $pendingData['signup_ip'] ?? null,
+                'client_user_agent' => $pendingData['signup_user_agent'] ?? null,
+            ],
+            userId: $user->id,
+        );
 
         $this->logOtpActivity(
             mobile: $record->mobile,

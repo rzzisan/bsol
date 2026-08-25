@@ -35,11 +35,59 @@ import {
   type Locale,
   type ThemeMode,
 } from "@/lib/dashboard-client";
+import MetaPixelScript from "@/components/meta-pixel-script";
 
 type AuthTab = "login" | "register";
 
 const API_BASE_URL =
   (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
+
+// ---------------------------------------------------------------------------
+// Ad attribution (platform_marketing_tracking_context.md) — first-touch
+// UTM/click-id capture for BSOL's own acquisition funnel. Written once per
+// browser (never overwritten by a later visit) and read back into the
+// registration request so a signup — and later a paid conversion — can be
+// attributed to the ad that actually brought the person in.
+// ---------------------------------------------------------------------------
+const ATTRIBUTION_STORAGE_KEY = "bsol_attribution";
+
+function captureAttribution() {
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem(ATTRIBUTION_STORAGE_KEY)) return; // first touch only
+
+  const params = new URLSearchParams(window.location.search);
+  const fields = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "fbclid"] as const;
+  const captured: Record<string, string> = {};
+  for (const field of fields) {
+    const value = params.get(field);
+    if (value) captured[field] = value;
+  }
+
+  if (Object.keys(captured).length === 0) return; // nothing to remember — organic visit
+  captured.landing_path = window.location.pathname;
+  localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(captured));
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function readAttributionForRegister(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const stored = localStorage.getItem(ATTRIBUTION_STORAGE_KEY);
+  const attribution: Record<string, string> = stored ? JSON.parse(stored) : {};
+
+  // Meta's Pixel writes these cookies itself once loaded — prefer them over
+  // anything captured manually, they're the source of truth for fbp/fbc.
+  const fbp = readCookie("_fbp");
+  const fbc = readCookie("_fbc");
+  if (fbp) attribution.fbp = fbp;
+  if (fbc) attribution.fbc = fbc;
+
+  return attribution;
+}
 
 // ---------------------------------------------------------------------------
 // Content
@@ -521,6 +569,7 @@ function AuthSection({
     if (storedUser && storedToken) {
       setUser(storedUser);
     }
+    captureAttribution();
   }, []);
 
   function clearErrors() {
@@ -598,6 +647,7 @@ function AuthSection({
           email: regEmail,
           password: regPassword,
           password_confirmation: regConfirm,
+          ...readAttributionForRegister(),
         }),
       });
       const data = await res.json();
@@ -888,6 +938,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden">
+      <MetaPixelScript />
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--background)]/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
