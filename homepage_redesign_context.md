@@ -17,7 +17,18 @@ The previous homepage was written at MVP stage — 5 generic "modules", a stale 
 - **Replaced the stale "MVP Roadmap"** (3 build-phase cards, meaningless to a visitor) **with "How it works"** — 3 actual onboarding steps (register → connect courier/payment → sell), which is what a visitor/ad-click actually needs.
 - **Scroll-reveal animation** — new reusable `Reveal` component (IntersectionObserver + CSS transition, `globals.css`'s `.home-reveal`/`.is-visible`), applied to every section below the fold; respects `prefers-reduced-motion` (motion fully disabled, content stays visible).
 - **Auth card / login / registration flow — untouched**, copied verbatim (already working, no reason to touch).
-- **OG/Twitter metadata** added to `app/layout.tsx` (previously generic placeholder title/description) — Bangla title+description matching the new positioning, `og:image` pointing at the existing app icon (no dedicated 1200×630 banner exists yet — noted as a possible follow-up, not blocking). Verified live via curl that the tags render correctly, so a Facebook ad linking to the homepage gets a proper preview card.
+- **OG/Twitter metadata** added to `app/layout.tsx` (previously generic placeholder title/description) — Bangla title+description matching the new positioning. `og:image` now points at a purpose-built `frontend/public/og-banner.png` (1200×630 exactly, see §"1200×630 banner" below) rather than the square app icon that shipped first.
+
+## 1200×630 OG/ad banner (added 2026-08-25)
+
+No image-generation tool or headless browser was available for this. Built via a local SVG → raster pipeline instead, entirely on-server:
+
+- `frontend/node_modules/sharp` (already a transitive Next.js dependency, bundles its own SVG rasterizer) rendering a hand-written SVG — no Puppeteer/Chromium install needed.
+- The SVG mirrors the homepage hero's design language (dark gradient, teal glow blobs, grid texture, brand mark, headline, 4 feature chips, 3 stats, CTA pill) with the same Bangla copy as the hero.
+- **Bangla glyphs**: `sharp`'s rasterizer has no Bangla-capable font by default (confirmed via `fc-list` — none installed system-wide). Reused the `NotoSansBengali-{Regular,Bold}.ttf` files already sitting in `backend/storage/fonts/` (downloaded earlier for the PDF-invoice feature, subscription_billing_context.md §7.1) — copied them into `~/.local/share/fonts/`. The `fc-cache`/`fc-list` CLI tools aren't installed on this box (no sudo access to install them), but `libfontconfig1` itself is, and it still discovers fonts in standard XDG directories via a live directory scan even without a prebuilt cache — confirmed working by inspecting the rendered output, not just assumed.
+- Chip pill widths are hand-computed (proportional to each string's character count) rather than auto-sized — SVG `<text>` has no intrinsic-width layout the way HTML/CSS does. Iterated once: the first pass overflowed the canvas on the longest chip ("Facebook + WhatsApp মার্কেটিং"), caught by visually inspecting the rendered PNG (via the `Read` tool, which can view images) and re-tuned.
+- Generator script: `gen_banner.py` (scratchpad, not checked in — a one-off build tool, not part of the app) embeds the existing `app-icon-1024.png` as a base64 `<image>` inside the SVG, then `sharp(...).resize(1200,630).png().toFile(...)`. Output copied to `frontend/public/og-banner.png` (153KB).
+- Verified live: `curl`'d the deployed PNG and confirmed exactly 1200×630 via `sharp().metadata()`, and confirmed `og:image`/`og:image:width`/`og:image:height` in the served HTML point at it.
 
 ## Verification
 
@@ -28,6 +39,5 @@ The previous homepage was written at MVP stage — 5 generic "modules", a stale 
 
 ## Not done in this pass
 
-- No dedicated 1200×630 OG banner image — reusing the square app icon as a fallback.
 - No A/B copy testing — this is a single reasoned pass, not iterated against real ad performance data.
 - Feature-category bullet copy is intentionally compressed (3-4 lines per category out of a much longer real feature list) to stay skimmable; the full detail lives in each dashboard module, not this page.
