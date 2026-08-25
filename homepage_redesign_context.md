@@ -30,6 +30,24 @@ No image-generation tool or headless browser was available for this. Built via a
 - Generator script: `gen_banner.py` (scratchpad, not checked in — a one-off build tool, not part of the app) embeds the existing `app-icon-1024.png` as a base64 `<image>` inside the SVG, then `sharp(...).resize(1200,630).png().toFile(...)`. Output copied to `frontend/public/og-banner.png` (153KB).
 - Verified live: `curl`'d the deployed PNG and confirmed exactly 1200×630 via `sharp().metadata()`, and confirmed `og:image`/`og:image:width`/`og:image:height` in the served HTML point at it.
 
+## Facebook/Instagram ad creative set (added 2026-08-25)
+
+Following user request for a full ad-creative library — multiple sizes, platforms, feature-focused variants, and visual styles. Generalized the OG-banner pipeline above into a reusable generator: `frontend/scripts/ad-creatives/` (`gen_ads.py` + `rasterize.js`, `README.md` has full usage/rationale). 12 PNGs delivered directly to the user (not committed — one-off marketing assets, `svg`/`png` build output is gitignored within that directory):
+
+| # | File | Size | Platform | Feature focus |
+|---|---|---|---|---|
+| 1-4 | `landscape-*` | 1200×630 | FB feed link/image ad | courier, fraud protection, payments, marketing |
+| 5-7 | `square-*` | 1080×1080 | FB/IG feed | master (dark), master (light — style variety), free-signup CTA |
+| 8-9 | `portrait-*` | 1080×1350 | IG feed portrait | master, payments+courier combined |
+| 10-11 | `story-*` | 1080×1920 | FB/IG Stories & Reels | master, free-signup CTA |
+| 12 | `thumbnail-*` | 400×400 | compact/small placements | master |
+
+**Two real layout bugs caught by visually inspecting the rendered PNGs** (via the `Read` tool, not assumed correct from the SVG source):
+1. The first square render had the headline overflowing both canvas edges and merging two words together with no gap ("থেকেপ্রফিট"). Two separate causes: (a) hand-computing `x = cx - estimatedWidth/2` for centering broke badly on multi-conjunct Bangla strings, whose true rendered width a simple per-character estimate can't predict — fixed by switching headlines to `text-anchor="middle"` at a fixed `x`, which needs no width estimate at all; (b) SVG collapses whitespace at tspan boundaries by default, silently eating the space around the accent-colored word — fixed with `xml:space="preserve"` on the SVG root.
+2. The thumbnail had the "Zyrotech BSOL" caption rendering directly underneath (visually merged into) the CTA button. Root cause: that text and the CTA button were positioned from independent fixed-fraction-of-canvas-height anchors instead of flowing one after the other — fixed by computing each element's y from the previous element's actual bottom.
+
+Both are documented in the tool's `README.md` (§"Text sizing — read before editing copy") so a future edit to the copy doesn't reintroduce them.
+
 ## Verification
 
 - `npx tsc --noEmit` clean (twice — once after the initial write, once after the blob-opacity fix).
