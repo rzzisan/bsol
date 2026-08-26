@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PlatformFacebookSetting;
-use App\Models\PlatformMarketingEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -57,23 +56,5 @@ class PlatformFacebookSettingsController extends Controller
         $setting->update($updates);
 
         return response()->json(['success' => true, 'data' => $setting->fresh()->masked()]);
-    }
-
-    /** Last ~30 acquisition-funnel events + per-event-name send counts, for debugging match quality without DB access. */
-    public function marketingEvents(): JsonResponse
-    {
-        $recent = PlatformMarketingEvent::query()
-            ->latest('id')
-            ->limit(30)
-            ->get(['id', 'event_name', 'event_id', 'status', 'response_code', 'error_message', 'sent_at', 'created_at']);
-
-        $counts = PlatformMarketingEvent::query()
-            ->selectRaw('event_name, status, count(*) as total')
-            ->groupBy('event_name', 'status')
-            ->get()
-            ->groupBy('event_name')
-            ->map(fn ($rows) => $rows->pluck('total', 'status'));
-
-        return response()->json(['success' => true, 'data' => ['recent' => $recent, 'counts' => $counts]]);
     }
 }

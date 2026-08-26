@@ -66,6 +66,7 @@ use App\Http\Controllers\Api\Admin\AdminSupportController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
 use App\Http\Controllers\Api\Admin\ImpersonationController;
 use App\Http\Controllers\Api\Admin\PlatformFacebookSettingsController;
+use App\Http\Controllers\Api\Admin\PlatformMarketingEventController;
 use App\Http\Controllers\Api\Admin\ReservedSubdomainController;
 use App\Http\Controllers\Api\Admin\PlatformSettingsController;
 use App\Http\Controllers\Api\Admin\LandingTemplateController as AdminLandingTemplateController;
@@ -899,7 +900,7 @@ Route::middleware('active_subscription')->group(function () {
         Route::put('/settings/platform-branding', [PlatformSettingsController::class, 'update']);
         Route::get('/settings/facebook', [PlatformFacebookSettingsController::class, 'show']);
         Route::put('/settings/facebook', [PlatformFacebookSettingsController::class, 'update']);
-        Route::get('/settings/facebook/marketing-events', [PlatformFacebookSettingsController::class, 'marketingEvents']);
+        Route::get('/marketing-events', [PlatformMarketingEventController::class, 'index']);
 
         // Landing page templates — authored by converting a seller's landing
         // page into a reusable template (replaces the old CartFlows/Elementor

@@ -26,17 +26,6 @@ type Settings = {
   marketing_test_event_code: string;
 };
 
-type MarketingEvent = {
-  id: number;
-  event_name: string;
-  event_id: string;
-  status: string;
-  response_code: number | null;
-  error_message: string | null;
-  sent_at: string | null;
-  created_at: string;
-};
-
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
 const labels = {
@@ -62,8 +51,7 @@ const labels = {
     marketingPixelId: "Pixel ID",
     marketingAccessToken: "Conversions API Access Token",
     marketingTestEventCode: "Test Event Code (ঐচ্ছিক — লাইভ যাচাইয়ের জন্য)",
-    marketingEventsTitle: "সাম্প্রতিক ইভেন্ট",
-    noEvents: "এখনো কোনো ইভেন্ট পাঠানো হয়নি",
+    marketingEventsLink: "সব ইভেন্ট লগ দেখুন →",
     setupTitle: "সেটআপ ধাপ",
     setupSteps: [
       "developers.facebook.com-এ একটা Business App তৈরি করুন",
@@ -94,6 +82,8 @@ const labels = {
       productMediaSettings: "Product Media",
       platformBranding: "প্ল্যাটফর্ম ব্র্যান্ডিং",
       facebookSettings: "ফেসবুক অ্যাপ",
+      tracking: "ট্র্যাকিং ব্যবহার",
+      marketingEvents: "মার্কেটিং ইভেন্ট",
     },
   },
   en: {
@@ -118,8 +108,7 @@ const labels = {
     marketingPixelId: "Pixel ID",
     marketingAccessToken: "Conversions API Access Token",
     marketingTestEventCode: "Test Event Code (optional — for live verification)",
-    marketingEventsTitle: "Recent events",
-    noEvents: "No events sent yet",
+    marketingEventsLink: "View full event log →",
     setupTitle: "Setup steps",
     setupSteps: [
       "Create a Business App at developers.facebook.com",
@@ -150,6 +139,8 @@ const labels = {
       productMediaSettings: "Product Media",
       platformBranding: "Platform Branding",
       facebookSettings: "Facebook App",
+      tracking: "Tracking Usage",
+      marketingEvents: "Marketing Events",
     },
   },
 };
@@ -167,7 +158,6 @@ export default function AdminFacebookSettingsPage() {
   const [marketingPixelId, setMarketingPixelId] = useState("");
   const [marketingAccessToken, setMarketingAccessToken] = useState("");
   const [marketingTestEventCode, setMarketingTestEventCode] = useState("");
-  const [events, setEvents] = useState<MarketingEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -219,18 +209,7 @@ export default function AdminFacebookSettingsPage() {
       }
     };
 
-    const loadEvents = async () => {
-      const res = await fetch(`${API}/admin/settings/facebook/marketing-events`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok && data?.data?.recent) {
-        setEvents(data.data.recent as MarketingEvent[]);
-      }
-    };
-
     void load();
-    void loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -382,39 +361,9 @@ export default function AdminFacebookSettingsPage() {
             </label>
           </div>
 
-          {events.length > 0 ? (
-            <div className="mt-5">
-              <h3 className="text-sm font-semibold text-[var(--foreground)]">{t.marketingEventsTitle}</h3>
-              <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--border)]">
-                <table className="w-full text-left text-xs">
-                  <tbody>
-                    {events.map((event) => (
-                      <tr key={event.id} className="border-b border-[var(--border)] last:border-0">
-                        <td className="px-3 py-2 font-medium">{event.event_name}</td>
-                        <td className="px-3 py-2 text-[var(--muted)]">{event.event_id}</td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={
-                              event.status === "sent"
-                                ? "text-green-600"
-                                : event.status === "failed"
-                                  ? "text-red-600"
-                                  : "text-[var(--muted)]"
-                            }
-                          >
-                            {event.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-[var(--muted)]">{event.error_message ?? ""}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-4 text-xs text-[var(--muted)]">{t.noEvents}</p>
-          )}
+          <a href="/admin/marketing-events" className="mt-4 inline-block text-sm font-medium text-[var(--accent)] hover:underline">
+            {t.marketingEventsLink}
+          </a>
         </section>
 
         <section className="catv-panel p-5">

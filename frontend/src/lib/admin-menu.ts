@@ -29,6 +29,7 @@ export type AdminMenuLabels = {
   courierCache?: string;
   support?: string;
   tracking?: string;
+  marketingEvents?: string;
 };
 
 export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
@@ -131,6 +132,12 @@ export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
       label: labels.tracking ?? "Tracking Usage",
       icon: "🎯",
       href: "/admin/tracking",
+    },
+    {
+      key: "marketing-events",
+      label: labels.marketingEvents ?? "Marketing Events",
+      icon: "📣",
+      href: "/admin/marketing-events",
     },
     {
       key: "support",
