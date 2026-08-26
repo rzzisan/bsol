@@ -1309,8 +1309,12 @@ User-এর নিজের আইডিয়া থেকে শুরু হ�
 
 **ধাপ ৫ (ল্যান্ডিং পেজ লিমিট) ✅ সম্পন্ন, স্কোপ সরলীকৃত:** user সরাসরি নির্দেশ দিয়েছেন addon বাদ দিয়ে শুধু প্যাকেজ-ভিত্তিক ফ্ল্যাট মোট-সংখ্যা লিমিট রাখতে (যেমন ৫টা প্যাকেজ = সর্বোচ্চ ৫টা ল্যান্ডিং পেজ, তার বেশি তৈরিই করা যাবে না)। নতুন `subscription_packages.max_landing_pages` (null=আনলিমিটেড) + `LandingPageController::store()`-এ creation-time চেক। বিদ্যমান সেলাররা retroactively স্পর্শ হয়নি। বিস্তারিত: `subscription_billing_context.md §১২`।
 
-## 25. BSOL নিজের অ্যাকুইজিশন ফানেল ট্র্যাকিং (Facebook Pixel + CAPI) — ✅ সম্পন্ন (২০২৬-০৮-২৫)
+## 25. BSOL নিজের অ্যাকুইজিশন ফানেল ট্র্যাকিং (Facebook Pixel + CAPI) — ✅ সম্পন্ন (২০২৬-০৮-২৫, extended ২০২৬-০৮-২৬)
 
-User-এর প্রশ্ন: "সেলারদের জন্য এত সুবিধা করলাম, নিজেদের জন্য কি করলাম? বিজ্ঞাপন দিতে হলে ট্র্যাকিং কীভাবে করব?" — `tracking_capi_context.md`-এর সেলার-facing পাইপলাইন থেকে ইচ্ছাকৃতভাবে আলাদা, ছোট একটা নতুন পাইপলাইন (একটাই অ্যাডভার্টাইজার — প্ল্যাটফর্ম নিজে, কোনো কোটা নেই): `CompleteRegistration` (সাইনআপ) আর `Subscribe` (পেইড activation, real value-সহ) — দুটোই first-touch UTM/fbp/fbc অ্যাট্রিবিউশন বহন করে যা `users.signup_*` কলামে সংরক্ষিত। ক্রেডেনশিয়াল বিদ্যমান `PlatformFacebookSetting` মডেলেই (নতুন ৩ কলাম)। Admin → Settings → Facebook → "Marketing Pixel" সেকশনে সেট করা যায়, লাইভ ইভেন্ট লিস্টও দেখা যায়। বিস্তারিত + Ads Manager-এ কীভাবে Lookalike Audience বানাবেন: `platform_marketing_tracking_context.md`।
+User-এর প্রশ্ন: "সেলারদের জন্য এত সুবিধা করলাম, নিজেদের জন্য কি করলাম? বিজ্ঞাপন দিতে হলে ট্র্যাকিং কীভাবে করব?" — `tracking_capi_context.md`-এর সেলার-facing পাইপলাইন থেকে ইচ্ছাকৃতভাবে আলাদা, ছোট একটা নতুন পাইপলাইন (একটাই অ্যাডভার্টাইজার — প্ল্যাটফর্ম নিজে, কোনো কোটা নেই): `CompleteRegistration` (সাইনআপ) আর `Subscribe` (পেইড activation, real value-সহ) — দুটোই first-touch UTM/fbp/fbc অ্যাট্রিবিউশন বহন করে যা `users.signup_*` কলামে সংরক্ষিত। ক্রেডেনশিয়াল বিদ্যমান `PlatformFacebookSetting` মডেলেই (নতুন ৩ কলাম), লাইভ Dataset `BSOL_PLATFROM` কনফিগার করা আছে।
+
+**০৮-২৬ এক্সটেনশন:** (১) super-admin ইভেন্ট লগ `/admin/marketing-events` — সেলার-facing tracking log-এর হুবহু কাউন্টারপার্ট। (২) anonymous ভিজিটরদের জন্য এনগেজমেন্ট সিগন্যাল — `PageView`/`ViewContent`/`ScrollDepth`/`Lead`, retargeting/lookalike audience-এর জন্য। (৩) ad-blocker fallback — লাইভে ধরা পড়েছিল `connect.facebook.net` (Pixel-এর নিজের ডোমেইন) সবচেয়ে বেশি ব্লক করা ট্র্যাকিং ডোমেইনগুলোর একটা; সেলার ল্যান্ডিং-পেজ পাইপলাইনের existing same-origin-relay প্যাটার্ন (`frontend/src/lib/tracking.ts`) কপি করে সমাধান — প্রতিটা এনগেজমেন্ট ইভেন্ট এখন `fbq(...)` + `POST /api/public/marketing-track` দুইভাবে যায়, dedup event_id দিয়ে।
+
+Admin → Settings → Facebook → "Marketing Pixel" সেকশনে ক্রেডেনশিয়াল সেট করা যায়। বিস্তারিত + Ads Manager-এ কীভাবে Lookalike Audience বানাবেন: `platform_marketing_tracking_context.md`।
 
 **পরবর্তী ধাপ:** Tracking boost addon (§9.6 ধাপ ৬, শেষ ধাপ)।
