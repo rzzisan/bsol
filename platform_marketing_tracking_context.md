@@ -33,8 +33,17 @@ Master context: `SAAS_MODULE_CONTEXT.md §25`। ডিজাইন করা �
 3. সেই Custom Conversion থেকে একটা **Lookalike Audience** বানান — এতে Meta শুধু ক্লিক-করা মানুষ না, বরং যারা আসলে পেইড সেলার হয়েছে তাদের মতো মানুষ খুঁজে বের করবে।
 4. প্রথম কয়েক সপ্তাহ Test Events (`marketing_test_event_code`) দিয়ে ভেরিফাই করুন — তারপর সেটা admin UI থেকে খালি করে দিন (test code সেট থাকলে real campaign-এ কাউন্ট হয় না)।
 
-## ৫. এই রাউন্ডে যা নেই
+## ৫. এনগেজমেন্ট সিগন্যাল (added 2026-08-26) — ভিজিটর যারা রেজিস্টার করেনি
 
-- `Lead`/`ViewContent` ইভেন্ট (শুধু CompleteRegistration/Subscribe — ফানেলের শুরু আর আসল conversion, মাঝেরটা স্কিপ করা হয়েছে scope রাখতে)।
+সম্পূর্ণ ব্রাউজার-সাইড, `PlatformMarketingEventService`/CAPI-এর সাথে সম্পর্কহীন — anonymous ভিজিটরের কোনো PII নেই হ্যাশ করার মতো, তাই সার্ভার রাউন্ড-ট্রিপ লাগে না। `frontend/src/lib/homepage-engagement-tracking.ts`:
+
+- **`ViewContent`** (Meta standard) — Problems/Features/Payments/How-it-works সেকশনে ~৫০% দৃশ্যমান হয়ে ~১ সেকেন্ড থাকলে একবার ফায়ার (`content_name` দিয়ে কোন সেকশন)। দ্রুত স্ক্রল-করে-চলে-যাওয়া বাউন্স স্বয়ংক্রিয়ভাবে বাদ পড়ে।
+- **`ScrollDepth`** (custom event) — পেজের ৭৫%/৯০% পর্যন্ত স্ক্রল করলে একবার।
+- **`Lead`** (Meta standard) — রেজিস্ট্রেশন ট্যাব খুললে (CTA বাটন বা AuthSection-এর নিজস্ব ট্যাব — দুটো পথই `authTab === "register"` effect দিয়ে একসাথে কভার করা)।
+
+**ব্যবহার:** এই তিনটা দিয়ে Ads Manager-এ একটা "engaged visitor" Custom Audience বানিয়ে retargeting চালানো যায় (ভিজিট করেছে, রেজিস্টার করেনি), এবং Subscribe-এর চেয়ে বড় sample থেকে একটা broader lookalike বানানো যায় prospecting-এর জন্য যতদিন না Subscribe sample যথেষ্ট বড় হয়।
+
+## ৬. এই রাউন্ডে যা নেই
+
 - GA4/অন্য কোনো analytics provider — শুধু Meta।
-- `platform_marketing_events`-এর জন্য কোনো purge/retention policy (৯০ দিন পর মুছে ফেলার মতো `tracking_events`-এর যা আছে তা এখানে নেই — ভলিউম অনেক কম বলে এখনই দরকার নেই)।
+- `platform_marketing_events`-এর জন্য কোনো purge/retention policy (৯০ দিন পর মুছে ফেলার মতো `tracking_events`-এর যা আছে তা এখানে নেই — ভলিউম অনেক কম বলে এখনই দরকার নেই)। এনগেজমেন্ট ইভেন্ট (§৫) আরও ছোট স্কোপ — সেগুলো `platform_marketing_events`-এ লগও হয় না, শুধু ব্রাউজার→Meta সরাসরি।

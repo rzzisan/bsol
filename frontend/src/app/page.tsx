@@ -36,6 +36,7 @@ import {
   type ThemeMode,
 } from "@/lib/dashboard-client";
 import MetaPixelScript from "@/components/meta-pixel-script";
+import { trackLead, useScrollDepthTracking, useViewContentOnVisible } from "@/lib/homepage-engagement-tracking";
 
 type AuthTab = "login" | "register";
 
@@ -883,9 +884,18 @@ export default function Home() {
   } | null>(null);
 
   const authRef = useRef<HTMLDivElement>(null);
+  const problemsRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
   const paymentsRef = useRef<HTMLDivElement>(null);
   const howRef = useRef<HTMLDivElement>(null);
+
+  // Engagement signals for retargeting/lookalike audiences — anonymous
+  // visitors, so browser-only, no CAPI round trip (homepage_redesign_context.md).
+  useViewContentOnVisible(problemsRef, "problems");
+  useViewContentOnVisible(featuresRef, "features");
+  useViewContentOnVisible(paymentsRef, "payments");
+  useViewContentOnVisible(howRef, "how_it_works");
+  useScrollDepthTracking();
 
   useEffect(() => {
     setLocale(getStoredLocale());
@@ -924,6 +934,13 @@ export default function Home() {
     setAuthTab(tab);
     authRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  useEffect(() => {
+    // Covers every path into the register tab (CTA buttons via goToAuth,
+    // or AuthSection's own tab click via onTabChange) in one place — genuine
+    // intent shown before an account actually exists (CompleteRegistration).
+    if (authTab === "register") trackLead("register_tab");
+  }, [authTab]);
 
   function scrollTo(ref: React.RefObject<HTMLDivElement | null>) {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1100,7 +1117,7 @@ export default function Home() {
         </Reveal>
 
         {/* Problems -> Solutions */}
-        <section className="mt-16">
+        <section ref={problemsRef} className="mt-16">
           <Reveal className="max-w-2xl">
             <h3 className="text-2xl font-bold tracking-tight text-[var(--foreground)] sm:text-3xl">
               {text.problemsTitle}
