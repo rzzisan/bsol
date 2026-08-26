@@ -4,22 +4,84 @@ import { useEffect } from "react";
 
 /**
  * Engagement signals for BSOL's own homepage — platform_marketing_tracking_context.md.
- * Browser-only (no CAPI/server round trip, no PII to hash): a visitor is
- * anonymous at this point, so these exist purely to build retargeting/
- * lookalike Custom Audiences in Ads Manager, not to feed the CompleteRegistration/
- * Subscribe conversion pipeline (OtpController/SubscriptionActivationService).
+ * No PII to hash (a visitor is anonymous at this point) — these exist to
+ * build retargeting/lookalike Custom Audiences, not to feed the
+ * CompleteRegistration/Subscribe conversion pipeline.
  *
- * Each signal is naturally bounce-resistant on its own — no page-wide dwell
- * timer needed: ViewContent requires ~1s of continuous visibility (filters a
- * fast scroll-past), ScrollDepth only fires once actually reached, Lead is
- * click-triggered. `firedEvents` is a module-level dedupe set (per page
- * load) so re-scrolling a section in/out never double-counts it.
+ * Each signal fires two ways with the same event_id, mirroring the seller
+ * landing-page pattern (frontend/src/lib/tracking.ts's sendEvent()):
+ *  1. window.fbq(...) directly — works when nothing blocks the browser Pixel.
+ *  2. A same-origin POST to /api/public/marketing-track, relayed to Meta
+ *     server-side by PublicMarketingTrackController. Verified empirically
+ *     that connect.facebook.net (the Pixel script's own domain) is one of
+ *     the most commonly ad-blocked requests on the web — general internet
+ *     and even graph.facebook.com stayed reachable while that one domain
+ *     specifically failed. A same-origin request to our own domain isn't a
+ *     recognizable tracking endpoint, so it goes through regardless, and
+ *     Meta dedupes the pair on event_id if both arrive.
+ *
+ * Each signal is also naturally bounce-resistant on its own — no page-wide
+ * dwell timer needed: ViewContent requires ~1s of continuous visibility
+ * (filters a fast scroll-past), ScrollDepth only fires once actually
+ * reached, Lead is click-triggered. `firedEvents` is a module-level dedupe
+ * set (per page load) so re-scrolling a section in/out never double-counts it.
  */
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
+
 const firedEvents = new Set<string>();
 
+function randomEventId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `id_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function relayToServer(eventName: string, eventId: string, customData?: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+
+  const fbc = readCookie("_fbc");
+  const fbclid = fbc ? null : new URLSearchParams(window.location.search).get("fbclid");
+
+  fetch(`${API_BASE_URL}/public/marketing-track`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      event_name: eventName,
+      event_id: eventId,
+      event_source_url: window.location.href,
+      custom_data: customData ?? null,
+      user_data: { fbp: readCookie("_fbp"), fbc, fbclid },
+    }),
+    keepalive: true, // survives a navigation right after (e.g. Lead → clicking into the register form)
+  }).catch(() => {});
+}
+
 function track(eventName: string, customData?: Record<string, unknown>) {
-  if (typeof window === "undefined" || !window.fbq) return;
-  window.fbq("track", eventName, customData);
+  const eventId = randomEventId();
+  if (typeof window !== "undefined" && window.fbq) {
+    window.fbq("track", eventName, customData, { eventID: eventId });
+  }
+  relayToServer(eventName, eventId, customData);
+}
+
+/**
+ * Fires PageView once on mount — the homepage's base Pixel script has its
+ * own auto-fire suppressed (see MetaPixelScript's `autoPageView` prop) so
+ * this one call is the single source of truth, dual-fired like every other
+ * signal here.
+ */
+export function usePageViewTracking() {
+  useEffect(() => {
+    track("PageView");
+    // Fires once per mount by design — a dependency here would re-fire on
+    // an unrelated re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }
 
 /**

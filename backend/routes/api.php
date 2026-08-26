@@ -75,6 +75,7 @@ use App\Http\Controllers\Api\Admin\CourierCacheController;
 use App\Http\Controllers\Api\Admin\AdminTrackingController;
 use App\Http\Controllers\Api\PublicMarketingPixelController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
+use App\Http\Controllers\Api\PublicMarketingTrackController;
 use App\Http\Controllers\Api\PublicTrackingController;
 use App\Http\Controllers\Api\OnlinePaymentController;
 use App\Http\Controllers\Api\OrderBulkImportController;
@@ -162,6 +163,11 @@ Route::get('/public/landing-pages/{slug}', [LandingPageController::class, 'publi
 // tracking_capi_context.md §8.0/§8.8). No API key: the seller's own
 // subdomain is same-origin to the browser already.
 Route::post('/public/track', [PublicTrackingController::class, 'ingest'])
+    ->middleware('throttle:300,1');
+// Same-origin relay for BSOL's own homepage engagement events — reaches
+// Meta even when the browser blocks connect.facebook.net directly
+// (platform_marketing_tracking_context.md).
+Route::post('/public/marketing-track', [PublicMarketingTrackController::class, 'ingest'])
     ->middleware('throttle:300,1');
 Route::post('/public/landing-pages/{slug}/order', [LandingPageController::class, 'publicSubmitOrder'])
     ->middleware(['track_landing_page_visit', 'throttle:15,1']);

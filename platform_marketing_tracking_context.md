@@ -43,7 +43,19 @@ Master context: `SAAS_MODULE_CONTEXT.md §25`। ডিজাইন করা �
 
 **ব্যবহার:** এই তিনটা দিয়ে Ads Manager-এ একটা "engaged visitor" Custom Audience বানিয়ে retargeting চালানো যায় (ভিজিট করেছে, রেজিস্টার করেনি), এবং Subscribe-এর চেয়ে বড় sample থেকে একটা broader lookalike বানানো যায় prospecting-এর জন্য যতদিন না Subscribe sample যথেষ্ট বড় হয়।
 
-## ৬. এই রাউন্ডে যা নেই
+## ৬. Ad-blocker mitigation (added 2026-08-26) — `connect.facebook.net` ব্লক হলে
+
+লাইভ পরীক্ষায় ধরা পড়েছে: `connect.facebook.net` (Pixel script-এর নিজের ডোমেইন) হলো ওয়েবের সবচেয়ে বেশি ad-blocker-blocklisted ডোমেইনগুলোর একটা — verify করা হয়েছে যে সাধারণ ইন্টারনেট এমনকি `graph.facebook.com`-ও চলে, কিন্তু ওই একটা ডোমেইন specifically ব্লক হয়ে যায়। বাস্তব ভিজিটরদের ~১৫-৩০% ad-blocker ব্যবহার করে — তাদের browser Pixel কখনোই কাজ করবে না।
+
+**সমাধান — same-origin relay, সেলারদের জন্য যা আগে থেকেই আছে তার হুবহু কপি:** `frontend/src/lib/tracking.ts`-এর `sendEvent()` (সেলারের ল্যান্ডিং পেজ) প্রতিটা ইভেন্ট দুইভাবে পাঠায় — `fbq(...)` সরাসরি (ব্লক হলে হারায়) **এবং** নিজের ডোমেইনে (`/api/public/track`) একটা POST, যেটা `PublicTrackingController` → `TrackingIngestService` হয়ে সার্ভার-সাইড Meta-তে যায়। same-origin request কোনো পরিচিত ট্র্যাকিং ডোমেইন না বলে ad-blocker এটা ধরতে পারে না — তাই ব্রাউজার Pixel ব্লক থাকলেও ইভেন্ট পৌঁছায়।
+
+BSOL-এর নিজের হোমপেজেও এখন হুবহু এই প্যাটার্ন প্রয়োগ করা হয়েছে (`frontend/src/lib/homepage-engagement-tracking.ts`):
+- প্রতিটা engagement ইভেন্ট (PageView/ViewContent/ScrollDepth/Lead) একটা shared `event_id`-সহ দুইবার পাঠানো হয় — `fbq(...)` + নতুন `POST /api/public/marketing-track`।
+- নতুন `PublicMarketingTrackController` — Host-based owner resolution লাগে না (একটাই advertiser, প্ল্যাটফর্ম নিজে) — সরাসরি বিদ্যমান `PlatformMarketingEventService::track()` কল করে, তাই dedup/logging/admin-log সব একই পাইপলাইনে যায়।
+- Meta `event_id` মিলিয়ে দুই কপি ডিডুপ করে — ব্লক-না-হওয়া ভিজিটরের জন্য duplicate count হয় না, ব্লক-হওয়া ভিজিটরের জন্য শুধু relay কপিটাই পৌঁছায় (fbp/fbc দুর্বল — Pixel-ই লোড হয়নি বলে সেই কুকি সেট হয়নি — কিন্তু IP/UA দিয়ে ইভেন্টটা তবু গণনা হয়)।
+- `MetaPixelScript`-এর base snippet-এর নিজস্ব auto-PageView সাপ্রেস করা হয়েছে (`autoPageView={false}`, হোমপেজে) — নাহলে non-blocked ভিজিটরের PageView দুইবার (আলাদা event_id-এ) গোনা হতো।
+
+## ৭. এই রাউন্ডে যা নেই
 
 - GA4/অন্য কোনো analytics provider — শুধু Meta।
 - `platform_marketing_events`-এর জন্য কোনো purge/retention policy (৯০ দিন পর মুছে ফেলার মতো `tracking_events`-এর যা আছে তা এখানে নেই — ভলিউম অনেক কম বলে এখনই দরকার নেই)। এনগেজমেন্ট ইভেন্ট (§৫) আরও ছোট স্কোপ — সেগুলো `platform_marketing_events`-এ লগও হয় না, শুধু ব্রাউজার→Meta সরাসরি।

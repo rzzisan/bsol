@@ -36,7 +36,12 @@ import {
   type ThemeMode,
 } from "@/lib/dashboard-client";
 import MetaPixelScript from "@/components/meta-pixel-script";
-import { trackLead, useScrollDepthTracking, useViewContentOnVisible } from "@/lib/homepage-engagement-tracking";
+import {
+  trackLead,
+  usePageViewTracking,
+  useScrollDepthTracking,
+  useViewContentOnVisible,
+} from "@/lib/homepage-engagement-tracking";
 
 type AuthTab = "login" | "register";
 
@@ -891,6 +896,7 @@ export default function Home() {
 
   // Engagement signals for retargeting/lookalike audiences — anonymous
   // visitors, so browser-only, no CAPI round trip (homepage_redesign_context.md).
+  usePageViewTracking();
   useViewContentOnVisible(problemsRef, "problems");
   useViewContentOnVisible(featuresRef, "features");
   useViewContentOnVisible(paymentsRef, "payments");
@@ -955,7 +961,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden">
-      <MetaPixelScript />
+      <MetaPixelScript autoPageView={false} />
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--background)]/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">

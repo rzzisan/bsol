@@ -18,8 +18,14 @@ const API_BASE_URL =
  * env var, so an admin entering it in Admin → Settings → Facebook takes
  * effect immediately, no frontend rebuild needed. Renders nothing while
  * unset — silent no-op until an admin configures one.
+ *
+ * `autoPageView=false` (the homepage's choice) suppresses the base code's
+ * own PageView — same reasoning frontend/src/lib/tracking.ts documents for
+ * the seller pipeline: every event, including the first PageView, needs an
+ * eventID so it can be dual-fired (fbq + same-origin relay, see
+ * homepage-engagement-tracking.ts) without Meta double-counting it.
  */
-export default function MetaPixelScript() {
+export default function MetaPixelScript({ autoPageView = true }: { autoPageView?: boolean } = {}) {
   const [pixelId, setPixelId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,7 +57,7 @@ export default function MetaPixelScript() {
         s.parentNode.insertBefore(t,s)}(window, document,'script',
         'https://connect.facebook.net/en_US/fbevents.js');
         fbq('init', '${pixelId}');
-        fbq('track', 'PageView');
+        ${autoPageView ? "fbq('track', 'PageView');" : ""}
       `}
     </Script>
   );

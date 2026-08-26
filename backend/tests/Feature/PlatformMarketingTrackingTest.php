@@ -229,4 +229,54 @@ class PlatformMarketingTrackingTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.pixel_id', null);
     }
+
+    // -- Same-origin relay (ad-blocker fallback) -----------------------------
+
+    public function test_the_relay_endpoint_ingests_an_allowed_event(): void
+    {
+        $this->configurePixel();
+        Http::fake(['graph.facebook.com/*' => Http::response(['events_received' => 1], 200)]);
+
+        $this->postJson('/api/public/marketing-track', [
+            'event_name' => 'ViewContent',
+            'event_id' => 'relay_1',
+            'event_source_url' => 'https://bsol.zyrotechbd.com/',
+            'custom_data' => ['content_name' => 'features'],
+            'user_data' => ['fbp' => 'fb.1.1.1'],
+        ])->assertOk()->assertJson(['success' => true]);
+
+        $event = PlatformMarketingEvent::sole();
+        $this->assertSame('ViewContent', $event->event_name);
+        $this->assertSame('relay_1', $event->event_id);
+        $this->assertNull($event->user_id); // anonymous visitor
+        $this->assertSame('fb.1.1.1', $event->user_data_hashed['fbp']);
+        $this->assertSame(PlatformMarketingEvent::STATUS_SENT, $event->status);
+    }
+
+    public function test_the_relay_endpoint_rejects_an_event_name_outside_the_allowlist(): void
+    {
+        $this->postJson('/api/public/marketing-track', [
+            'event_name' => 'Purchase', // never client-triggerable — only OtpController/SubscriptionActivationService may fire real conversions
+            'event_id' => 'relay_2',
+        ])->assertStatus(422);
+
+        $this->assertSame(0, PlatformMarketingEvent::count());
+    }
+
+    public function test_the_relay_endpoint_synthesizes_fbc_from_fbclid_when_no_cookie_was_present(): void
+    {
+        $this->configurePixel();
+        Http::fake(['graph.facebook.com/*' => Http::response(['events_received' => 1], 200)]);
+
+        $this->postJson('/api/public/marketing-track', [
+            'event_name' => 'ScrollDepth',
+            'event_id' => 'relay_3',
+            'custom_data' => ['percentage' => 75],
+            'user_data' => ['fbclid' => 'clickid456'],
+        ])->assertOk();
+
+        $stored = PlatformMarketingEvent::sole()->user_data_hashed;
+        $this->assertStringContainsString('fb.1.', $stored['fbc']);
+        $this->assertStringContainsString('clickid456', $stored['fbc']);
+    }
 }
