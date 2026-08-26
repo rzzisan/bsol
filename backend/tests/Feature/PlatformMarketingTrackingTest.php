@@ -107,13 +107,18 @@ class PlatformMarketingTrackingTest extends TestCase
         $this->assertSame('CompleteRegistration', $event->event_name);
         $this->assertSame('reg_' . $token, $event->event_id);
         $this->assertSame($user->id, $event->user_id);
+        $this->assertSame('website', $event->action_source);
         $this->assertSame(PlatformMarketingEvent::STATUS_SENT, $event->status);
         $this->assertSame('fb.1.111.222', $event->user_data_hashed['fbp']);
         $this->assertSame([hash('sha256', '8801700000001')], $event->user_data_hashed['ph']);
+        $this->assertSame([hash('sha256', (string) $user->id)], $event->user_data_hashed['external_id']);
+        $this->assertStringContainsString('/', $event->custom_data['event_source_url']);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/px_marketing_123/events')
             && $request['access_token'] === 'marketing-secret-token'
-            && $request['data'][0]['event_id'] === 'reg_' . $token);
+            && $request['data'][0]['event_id'] === 'reg_' . $token
+            && $request['data'][0]['action_source'] === 'website'
+            && ! empty($request['data'][0]['event_source_url']));
     }
 
     // -- Dedup ----------------------------------------------------------------------
@@ -161,6 +166,11 @@ class PlatformMarketingTrackingTest extends TestCase
         $this->assertEquals(999.0, $event->custom_data['value']);
         $this->assertSame('BDT', $event->custom_data['currency']);
         $this->assertSame('fb.1.999.111', $event->user_data_hashed['fbp']);
+        $this->assertSame([hash('sha256', (string) $user->id)], $event->user_data_hashed['external_id']);
+        $this->assertStringContainsString('/dashboard/settings/subscription', $event->custom_data['event_source_url']);
+        // Not a live browser request (admin/webhook triggered) — must not
+        // claim 'website' without the client_user_agent that requires.
+        $this->assertSame('system_generated', $event->action_source);
         $this->assertSame(PlatformMarketingEvent::STATUS_SENT, $event->status);
     }
 

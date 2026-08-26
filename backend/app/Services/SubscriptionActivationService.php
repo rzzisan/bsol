@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\SubscriptionPayment;
 use App\Services\Marketing\PlatformMarketingEventService;
 use App\Services\NotificationDispatchService;
+use App\Support\FrontendUrl;
 
 /**
  * Activates a user's subscription from an approved payment — shared by
@@ -65,6 +66,13 @@ class SubscriptionActivationService
         // someone became a paying customer. Uses the first-touch fbp/fbc
         // stored on the user at signup, so a payment approved weeks later
         // still attributes to the original ad.
+        //
+        // action_source: 'system_generated', not 'website' — activation
+        // runs from admin approval or a payment-gateway webhook, never a
+        // live browser request, so there's no client_user_agent to send
+        // truthfully. Meta requires action_source to be accurate; claiming
+        // 'website' without the client_user_agent it requires would violate
+        // that (Conversions API best practices, platform_marketing_tracking_context.md §2).
         $this->marketingEventService->track(
             eventName: 'Subscribe',
             eventId: 'sub_' . $payment->id,
@@ -72,6 +80,7 @@ class SubscriptionActivationService
                 'ph' => $user->mobile,
                 'em' => $user->email,
                 'fn' => $user->name,
+                'external_id' => (string) $user->id,
                 'fbp' => $user->signup_fbp,
                 'fbc' => $user->signup_fbc,
             ],
@@ -80,6 +89,8 @@ class SubscriptionActivationService
                 'value' => (float) $payment->amount,
             ],
             userId: $user->id,
+            eventSourceUrl: FrontendUrl::platform() . '/dashboard/settings/subscription',
+            actionSource: 'system_generated',
         );
 
         try {

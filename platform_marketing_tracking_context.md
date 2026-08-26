@@ -52,7 +52,8 @@ BSOL-এর নিজের হোমপেজেও হুবহু এই প�
 ## ৫. ফাইল ম্যাপ
 
 **Backend:**
-- Migration ৩টা — `users.signup_*`, `platform_facebook_settings`-এ নতুন কলাম, নতুন `platform_marketing_events` টেবিল।
+- Migration ৪টা — `users.signup_*`, `platform_facebook_settings`-এ নতুন কলাম, নতুন `platform_marketing_events` টেবিল, `platform_marketing_events.action_source`।
+- সেলার পাইপলাইনে টাচ করা ফাইল (external_id fix) — `Jobs/SendFacebookCapiPurchaseEventJob.php` (`Models/Customer.php` লুকআপ)।
 - মডেল/সার্ভিস/জব — `PlatformFacebookSetting.php`, `PlatformMarketingEvent.php`, `Services/Marketing/PlatformMarketingEventService.php`, `Jobs/SendPlatformMarketingEventJob.php`।
 - Conversion ওয়্যারিং — `OtpController.php` (দুই মেথডেই), `SubscriptionActivationService.php`।
 - Admin — `Api/Admin/PlatformFacebookSettingsController.php` (Pixel/token CRUD), `Api/Admin/PlatformMarketingEventController.php` (ইভেন্ট লগ, নতুন)।
@@ -76,7 +77,19 @@ BSOL-এর নিজের হোমপেজেও হুবহু এই প�
 4. Subscribe sample যথেষ্ট বড় না হওয়া পর্যন্ত, `ViewContent`/`Lead` (§৩) থেকে একটা broader "engaged visitor" Custom Audience/Lookalike দিয়ে prospecting চালিয়ে যান — retargeting-এর জন্যও এই audience সরাসরি ব্যবহারযোগ্য।
 5. প্রথম কয়েক সপ্তাহ Test Events (`marketing_test_event_code`) দিয়ে ভেরিফাই করুন — তারপর সেটা admin UI থেকে খালি করে দিন (test code সেট থাকলে real campaign-এ কাউন্ট হয় না)।
 
-## ৭. এই রাউন্ডে যা নেই
+## ৭. Meta-র Conversions API best-practices অনুযায়ী compliance fix (added 2026-08-26)
+
+`developers.facebook.com/documentation/ads-commerce/conversions-api`-এর গাইডলাইন পড়ে ৩টা real gap পাওয়া গেছে, প্ল্যাটফর্ম ও সেলার দুই পাইপলাইনেই ফিক্স করা হয়েছে:
+
+1. **`action_source` accuracy** — Meta-র নিয়ম: `action_source: website` হলে `client_user_agent` **required**। `Subscribe` ইভেন্ট ফায়ার হয় admin approval/payment webhook থেকে (কোনো লাইভ ব্রাউজার রিকোয়েস্ট নেই), তাই এখন `action_source: system_generated` — fabricate করা UA-এর চেয়ে বেশি accurate। `CompleteRegistration` (সত্যিকারের ওয়েবসাইট ফর্ম সাবমিশন, IP/UA আছে) `website`-ই থাকে।
+2. **`event_source_url`** — Meta-র নিয়ম: ওয়েবসাইট ইভেন্টের জন্য required, কিন্তু `CompleteRegistration`/`Subscribe` কোনোটাই আগে পাঠাচ্ছিল না। এখন `FrontendUrl::platform()` থেকে বসানো — CompleteRegistration-এ signup-এর landing path, Subscribe-এ `/dashboard/settings/subscription`।
+3. **`external_id`** — Meta-র প্রথম সারির recommended field, phone/email হ্যাশের থেকে আলাদা একটা distinct matching signal দেয় (dedup + cross-device matching-এ সাহায্য করে)। `TrackingUserDataBuilder`-এ আগে থেকেই সাপোর্ট ছিল, শুধু কোনো কল সাইট এটা পাস করছিল না — এখন প্ল্যাটফর্মে `user_id` (CompleteRegistration/Subscribe দুটোতেই), সেলার পাইপলাইনে `SendFacebookCapiPurchaseEventJob`-এ ওই ফোন নম্বরের জন্য শপের নিজস্ব `Customer.id` (যদি `Customer::syncFromOrder()` দিয়ে সিঙ্ক হয়ে থাকে)।
+
+`platform_marketing_events`-এ নতুন `action_source` কলাম (default `website`) — `SendPlatformMarketingEventJob` এখন হার্ডকোড না করে রো থেকে পড়ে।
+
+`PlatformMarketingEventService::track()`-এর সিগনেচারে নতুন `actionSource` param (default `'website'`, backward-compatible)।
+
+## ৮. এই রাউন্ডে যা নেই
 
 - GA4/অন্য কোনো analytics provider — শুধু Meta।
 - `platform_marketing_events`-এর জন্য কোনো purge/retention policy (৯০ দিন পর মুছে ফেলার মতো `tracking_events`-এর যা আছে তা এখানে নেই)। এনগেজমেন্ট রিলে চালু হওয়ার পর ভলিউম উল্লেখযোগ্যভাবে বাড়বে (প্রতিটা হোমপেজ ভিজিটে সম্ভাব্য ৪-৫টা রো) — ট্রাফিক বাড়লে এটা পুনর্বিবেচনা করা উচিত।

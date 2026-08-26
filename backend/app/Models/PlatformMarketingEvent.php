@@ -23,7 +23,7 @@ class PlatformMarketingEvent extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
-        'user_id', 'event_name', 'event_id', 'custom_data', 'user_data_hashed',
+        'user_id', 'event_name', 'event_id', 'action_source', 'custom_data', 'user_data_hashed',
         'status', 'response_code', 'error_message', 'sent_at',
     ];
 

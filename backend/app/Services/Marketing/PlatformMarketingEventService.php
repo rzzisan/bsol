@@ -31,6 +31,7 @@ class PlatformMarketingEventService
         array $customData = [],
         ?int $userId = null,
         ?string $eventSourceUrl = null,
+        string $actionSource = 'website',
     ): void {
         // Checked before attempting the insert — same reasoning as
         // TrackingIngestService::ingest(): the common repeat call (a retried
@@ -47,6 +48,7 @@ class PlatformMarketingEventService
                 'user_id' => $userId,
                 'event_name' => $eventName,
                 'event_id' => $eventId,
+                'action_source' => $actionSource,
                 'custom_data' => array_filter([
                     ...$customData,
                     'event_source_url' => $eventSourceUrl,

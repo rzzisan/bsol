@@ -66,7 +66,7 @@ class SendPlatformMarketingEventJob implements ShouldQueue
                 'event_name' => $event->event_name,
                 'event_time' => $event->created_at->timestamp,
                 'event_id' => $event->event_id,
-                'action_source' => 'website',
+                'action_source' => $event->action_source,
                 'event_source_url' => $eventSourceUrl,
                 'user_data' => $event->user_data_hashed ?: null,
                 'custom_data' => $customData !== [] ? $customData : null,

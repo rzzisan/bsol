@@ -258,6 +258,40 @@ class TrackingDispatchTest extends TestCase
         $this->assertEquals(1500.0, $event->custom_data['value']);
     }
 
+    /** external_id is a distinct match-quality signal from the phone hash — this shop's own Customer.id for that phone. */
+    public function test_the_purchase_job_carries_the_matching_customer_as_external_id(): void
+    {
+        $user = $this->seller();
+        $this->destination($user);
+        $order = $this->orderWithItem($user);
+        // Customer.phone matches Order.customer_phone verbatim (Customer::syncFromOrder
+        // stores it raw, unnormalized) — '01712345678' here, not the E.164 form
+        // used for the ph hash below.
+        $customer = \App\Models\Customer::create(['user_id' => $user->id, 'phone' => '01712345678']);
+
+        Http::fake(['graph.facebook.com/*' => Http::response(['events_received' => 1], 200)]);
+
+        SendFacebookCapiPurchaseEventJob::dispatch($order->id, null, null, 'https://zareen.zyrotechbd.com/thank-you');
+
+        $stored = TrackingEvent::sole()->user_data_hashed;
+        $this->assertSame([hash('sha256', (string) $customer->id)], $stored['external_id']);
+    }
+
+    /** No matching Customer row (e.g. it hasn't synced yet) — external_id is simply absent, not a broken/empty value. */
+    public function test_the_purchase_job_omits_external_id_with_no_matching_customer(): void
+    {
+        $user = $this->seller();
+        $this->destination($user);
+        $order = $this->orderWithItem($user);
+
+        Http::fake(['graph.facebook.com/*' => Http::response(['events_received' => 1], 200)]);
+
+        SendFacebookCapiPurchaseEventJob::dispatch($order->id, null, null, 'https://zareen.zyrotechbd.com/thank-you');
+
+        $stored = TrackingEvent::sole()->user_data_hashed;
+        $this->assertArrayNotHasKey('external_id', $stored);
+    }
+
     /** No pixel configured — silent no-op, exactly like the job's previous behavior. */
     /** fbp/fbc come from the order row (persisted at checkout time), not this job's constructor. */
     public function test_the_purchase_job_carries_the_orders_persisted_fbp_and_fbc(): void

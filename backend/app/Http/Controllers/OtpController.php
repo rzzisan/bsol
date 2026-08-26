@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Marketing\PlatformMarketingEventService;
 use App\Services\NotificationDispatchService;
 use App\Services\Tracking\TrackingUserDataBuilder;
+use App\Support\FrontendUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
@@ -267,12 +268,17 @@ class OtpController extends Controller
                 'ph' => $user->mobile,
                 'em' => $user->email,
                 'fn' => $user->name,
+                'external_id' => (string) $user->id,
                 'fbp' => $pendingData['signup_fbp'] ?? null,
                 'fbc' => $pendingData['signup_fbc'] ?? null,
                 'client_ip_address' => $pendingData['signup_ip'] ?? null,
                 'client_user_agent' => $pendingData['signup_user_agent'] ?? null,
             ],
             userId: $user->id,
+            // The registration form itself is on the platform homepage —
+            // landing_path (captured client-side, first-touch) is the exact
+            // page they arrived at, falling back to the homepage itself.
+            eventSourceUrl: FrontendUrl::platform() . ($pendingData['signup_landing_path'] ?? '/'),
         );
 
         $this->logOtpActivity(

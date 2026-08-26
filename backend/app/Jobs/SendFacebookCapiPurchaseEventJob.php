@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Customer;
 use App\Models\Order;
 use App\Services\Tracking\TrackingIngestService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -66,6 +67,15 @@ class SendFacebookCapiPurchaseEventJob implements ShouldQueue
                 // it the same way this job used to do inline — see its
                 // docblock for why that has to stay in exact lockstep.
                 'ph' => $order->customer_phone,
+                // Meta's own recommended match-quality field, distinct
+                // signal from the phone hash above: this shop's internal
+                // Customer.id for this phone number (Customer::syncFromOrder,
+                // already run before this job dispatches). Lets Meta bucket
+                // a repeat customer's events together even on a run where
+                // the phone hash itself doesn't match for some reason.
+                'external_id' => (string) Customer::where('user_id', $order->user_id)
+                    ->where('phone', $order->customer_phone)
+                    ->value('id') ?: null,
                 'client_ip_address' => $this->clientIp,
                 'client_user_agent' => $this->userAgent,
                 // Persisted on the order at checkout time (LandingPageController/
