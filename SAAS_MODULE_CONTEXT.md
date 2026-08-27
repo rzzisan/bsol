@@ -1327,4 +1327,12 @@ Backend-vs-frontend gap অডিটে ধরা পড়েছিল: `/admin
 
 সমাধান: `AdminController::dashboardSummary()` এক্সটেন্ড করা হয়েছে বাস্তব ডেটা দিয়ে — active/inactive সেলার সংখ্যা, এই মাসের নতুন রেজিস্ট্রেশন, প্যাকেজ-অনুযায়ী সেলার বণ্টন (নতুন `SubscriptionPackage::users()` relation), গত ৬ মাসের রেজিস্ট্রেশন ট্রেন্ড, সাম্প্রতিক ৫ জন সেলার। পুরনো fake "Pending/Processing Tickets/Tasks" রো-এর জায়গায় real "needs your attention" queue — pending subscription payments/SMS credit purchases/addon purchases (প্রতিটা `status='pending'` কাউন্ট, সরাসরি respective admin approval পেজে লিংক করা) + unread support messages (বিদ্যমান `/admin/support/unread-count` রিইউজ)। ফ্রন্টএন্ড লাইভ ভেরিফাই করা হয়েছে — সব সংখ্যা রিয়েল প্রোডাকশন ডেটা।
 
+## 28. প্যাকেজ পেজ অডিট — `max_staff` + `features` এডিট করার উপায় যোগ ✅ সম্পন্ন (২০২৬-০৮-২৭)
+
+একই backend-vs-frontend অডিট প্যাকেজ পেজে চালিয়ে ২টা real গ্যাপ পাওয়া গেছে। `SubscriptionPackage`-এর `#[Fillable]`-এ `max_staff`/`features` দুটোই ছিল, কিন্তু:
+- `max_staff` — `AdminController::createPackage()`/`updatePackage()`-এর validation whitelist-এই ছিল না, তাই admin form-এ থাকলেও API লেভেলে কখনো গ্রহণ হতো না। অথচ `StaffController` এটা সত্যিকারের কোটা হিসেবে এনফোর্স করে। লাইভ চেক করে দেখা গেছে সব প্যাকেজেই এখন `NULL` (আনলিমিটেড)।
+- `features` (সেলার `dashboard/settings/subscription`-এ upgrade-এর সময় যে বুলেট লিস্ট দেখে) — backend validation গ্রহণ করত, কিন্তু admin form কখনো পাঠাতো না। লাইভ ডেটায় "Trial" প্যাকেজের features `null` ছিল — খালি লিস্ট দেখাচ্ছিল সেলারকে।
+
+ফিক্স: `max_staff` কে validation whitelist-এ যোগ করা হয়েছে (দুই মেথডেই), `features.*` validation যোগ। Admin ফর্মে (create + edit দুই জায়গায়) `max_staff` নাম্বার ইনপুট আর `features`-এর জন্য line-per-bullet টেক্সটএরিয়া (সেলার সাইডে যেভাবে array-কে সরাসরি `<li>` হিসেবে রেন্ডার করে, ঠিক সেভাবেই — কোনো key-mapping নেই বলে এই ফরম্যাটই সবচেয়ে সরল ও সঠিক)। প্যাকেজ টেবিলে নতুন "ম্যাক্স স্টাফ" কলাম।
+
 **পরবর্তী ধাপ:** Tracking boost addon (§9.6 ধাপ ৬, শেষ ধাপ)।

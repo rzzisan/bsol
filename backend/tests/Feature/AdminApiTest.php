@@ -64,21 +64,28 @@ class AdminApiTest extends TestCase
             'price' => 499,
             'duration_days' => 30,
             'max_orders' => 100,
+            'max_staff' => 3,
             'features' => ['analytics', 'crm'],
             'is_active' => true,
         ], [
             'Authorization' => 'Bearer '.$token,
-        ])->assertCreated();
+        ])
+            ->assertCreated()
+            ->assertJsonPath('package.max_staff', 3);
 
         $packageId = $createResponse->json('package.id');
 
         $this->putJson('/api/admin/packages/'.$packageId, [
             'price' => 599,
+            'max_staff' => 5,
+            'features' => ['analytics', 'crm', 'priority_support'],
         ], [
             'Authorization' => 'Bearer '.$token,
         ])
             ->assertOk()
-            ->assertJsonPath('package.price', '599.00');
+            ->assertJsonPath('package.price', '599.00')
+            ->assertJsonPath('package.max_staff', 5)
+            ->assertJsonPath('package.features', ['analytics', 'crm', 'priority_support']);
 
         $this->deleteJson('/api/admin/packages/'.$packageId, [], [
             'Authorization' => 'Bearer '.$token,

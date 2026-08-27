@@ -30,6 +30,8 @@ interface SubscriptionPackage {
   max_orders: number | null;
   max_landing_pages: number | null;
   max_tracking_events_per_day: number | null;
+  max_staff: number | null;
+  features: string[] | null;
   feature_flags: Record<string, boolean> | null;
   is_active: boolean;
   created_at: string;
@@ -40,6 +42,12 @@ interface PackageForm {
   max_orders: string;
   max_landing_pages: string;
   max_tracking_events_per_day: string;
+  max_staff: string;
+  // One bullet per line — matches exactly how dashboard/settings/subscription
+  // renders package.features to a seller (each array entry as its own <li>,
+  // no translation/key lookup), so a plain line-per-item textarea round-trips
+  // without any hidden mapping to get wrong.
+  features_text: string;
   price: string;
   validity_value: string;
   validity_unit: ValidityUnit;
@@ -61,6 +69,8 @@ const EMPTY_FORM: PackageForm = {
   max_orders: "",
   max_landing_pages: "",
   max_tracking_events_per_day: "",
+  max_staff: "",
+  features_text: "",
   price: "",
   validity_value: "1",
   validity_unit: "month",
@@ -114,6 +124,10 @@ const text = {
       maxLandingPagesHint: "ফাঁকা রাখলে আনলিমিটেড ধরা হবে",
       maxTrackingEvents: "দৈনিক ট্র্যাকিং ইভেন্ট লিমিট",
       maxTrackingEventsHint: "ফাঁকা = আনলিমিটেড, 0 = এই প্যাকেজে ট্র্যাকিং নেই",
+      maxStaff: "সর্বোচ্চ স্টাফ সংখ্যা",
+      maxStaffHint: "ফাঁকা রাখলে আনলিমিটেড ধরা হবে",
+      featuresText: "ফিচার বুলেট লিস্ট (সেলার upgrade পেজে দেখবে)",
+      featuresTextHint: "প্রতি লাইনে একটা ফিচার লিখুন",
       featureFlagsTitle: "মডিউল অ্যাক্সেস",
       featureStorefront: "স্টোরফ্রন্ট",
       featureFacebook: "ফেসবুক ট্র্যাকিং + লিডস",
@@ -136,6 +150,7 @@ const text = {
       maxOrders: "ম্যাক্স অর্ডার",
       maxLandingPages: "ম্যাক্স ল্যান্ডিং পেজ",
       maxTrackingEvents: "ট্র্যাকিং/দিন",
+      maxStaff: "ম্যাক্স স্টাফ",
       price: "মূল্য",
       validity: "ভ্যালিডিটি",
       status: "স্ট্যাটাস",
@@ -173,6 +188,7 @@ const text = {
       maxOrderInvalid: "অর্ডার লিমিট ০ বা তার বেশি হতে হবে।",
       maxLandingPagesInvalid: "ল্যান্ডিং পেজ লিমিট ০ বা তার বেশি হতে হবে।",
       maxTrackingEventsInvalid: "ট্র্যাকিং ইভেন্ট লিমিট ০ বা তার বেশি হতে হবে।",
+      maxStaffInvalid: "স্টাফ সংখ্যা ০ বা তার বেশি হতে হবে।",
     },
     created: "প্যাকেজ সফলভাবে তৈরি হয়েছে।",
     defaultsSaved: "ডিফল্ট রেজিস্ট্রেশন সেটিংস সংরক্ষণ হয়েছে।",
@@ -223,6 +239,10 @@ const text = {
       maxLandingPagesHint: "Leave empty to treat as unlimited",
       maxTrackingEvents: "Daily Tracking Event Limit",
       maxTrackingEventsHint: "Empty = unlimited, 0 = tracking not included",
+      maxStaff: "Maximum Staff Seats",
+      maxStaffHint: "Leave empty to treat as unlimited",
+      featuresText: "Feature bullet list (shown to sellers on the upgrade page)",
+      featuresTextHint: "One feature per line",
       featureFlagsTitle: "Module Access",
       featureStorefront: "Storefront",
       featureFacebook: "FB Tracking + Leads",
@@ -245,6 +265,7 @@ const text = {
       maxOrders: "Max Orders",
       maxLandingPages: "Max Landing Pages",
       maxTrackingEvents: "Tracking/Day",
+      maxStaff: "Max Staff",
       price: "Price",
       validity: "Validity",
       status: "Status",
@@ -282,6 +303,7 @@ const text = {
       maxOrderInvalid: "Max order limit must be 0 or greater.",
       maxLandingPagesInvalid: "Max landing pages must be 0 or greater.",
       maxTrackingEventsInvalid: "Tracking event limit must be 0 or greater.",
+      maxStaffInvalid: "Max staff must be 0 or greater.",
     },
     created: "Package created successfully.",
     defaultsSaved: "Default registration settings saved.",
@@ -484,6 +506,11 @@ export default function AdminPackagesPage() {
     const maxTrackingValue = form.max_tracking_events_per_day.trim()
       ? Number(form.max_tracking_events_per_day)
       : null;
+    const maxStaffValue = form.max_staff.trim() ? Number(form.max_staff) : null;
+    const featuresValue = form.features_text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
 
     if (!Number.isFinite(validityValue) || validityValue < 1) {
       setMessage({ type: "err", text: t.validation.validityInvalid });
@@ -519,6 +546,11 @@ export default function AdminPackagesPage() {
       return;
     }
 
+    if (maxStaffValue !== null && (!Number.isFinite(maxStaffValue) || maxStaffValue < 0)) {
+      setMessage({ type: "err", text: t.validation.maxStaffInvalid });
+      return;
+    }
+
     const token = getStoredToken();
     if (!token) return;
 
@@ -538,6 +570,8 @@ export default function AdminPackagesPage() {
           max_orders: maxOrdersValue,
           max_landing_pages: maxLandingPagesValue,
           max_tracking_events_per_day: maxTrackingValue,
+          max_staff: maxStaffValue,
+          features: featuresValue,
           duration_days: validityToDays(validityValue, form.validity_unit),
           feature_flags: { storefront: form.feature_storefront, facebook: form.feature_facebook },
           is_active: true,
@@ -619,6 +653,8 @@ export default function AdminPackagesPage() {
       max_landing_pages: pkg.max_landing_pages !== null ? String(pkg.max_landing_pages) : "",
       max_tracking_events_per_day:
         pkg.max_tracking_events_per_day !== null ? String(pkg.max_tracking_events_per_day) : "",
+      max_staff: pkg.max_staff !== null ? String(pkg.max_staff) : "",
+      features_text: (pkg.features ?? []).join("\n"),
       price: String(pkg.price),
       validity_value: isMonth ? String(days / 30) : String(days),
       validity_unit: isMonth ? "month" : "day",
@@ -665,6 +701,15 @@ export default function AdminPackagesPage() {
       setMessage({ type: "err", text: t.validation.maxTrackingEventsInvalid });
       return;
     }
+    const maxStaff = editForm.max_staff === "" ? null : Number(editForm.max_staff);
+    if (maxStaff !== null && (!Number.isInteger(maxStaff) || maxStaff < 0)) {
+      setMessage({ type: "err", text: t.validation.maxStaffInvalid });
+      return;
+    }
+    const features = editForm.features_text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
     const token = getStoredToken();
     if (!token) return;
     setEditSubmitting(true);
@@ -683,6 +728,8 @@ export default function AdminPackagesPage() {
           max_orders: maxOrders,
           max_landing_pages: maxLandingPages,
           max_tracking_events_per_day: maxTracking,
+          max_staff: maxStaff,
+          features,
           feature_flags: { storefront: editForm.feature_storefront, facebook: editForm.feature_facebook },
           is_active: editForm.is_active,
         }),
@@ -892,6 +939,19 @@ export default function AdminPackagesPage() {
           </div>
 
           <div>
+            <label className={labelCls}>{t.form.maxStaff}</label>
+            <input
+              type="number"
+              min={0}
+              className={inputCls}
+              value={form.max_staff}
+              onChange={(e) => setField("max_staff", e.target.value)}
+              placeholder={locale === "bn" ? "যেমন: 3" : "e.g. 3"}
+            />
+            <p className="mt-1 text-xs text-[var(--muted)]">{t.form.maxStaffHint}</p>
+          </div>
+
+          <div>
             <label className={labelCls}>{t.form.price}</label>
             <input
               type="number"
@@ -926,6 +986,18 @@ export default function AdminPackagesPage() {
                 <option value="month">{t.form.unitMonth}</option>
               </select>
             </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className={labelCls}>{t.form.featuresText}</label>
+            <textarea
+              rows={5}
+              className={inputCls}
+              value={form.features_text}
+              onChange={(e) => setField("features_text", e.target.value)}
+              placeholder={locale === "bn" ? "অর্ডার ম্যানেজমেন্ট\nকুরিয়ার ইন্টিগ্রেশন\n..." : "Order management\nCourier integration\n..."}
+            />
+            <p className="mt-1 text-xs text-[var(--muted)]">{t.form.featuresTextHint}</p>
           </div>
 
           <div className="md:col-span-2">
@@ -991,6 +1063,7 @@ export default function AdminPackagesPage() {
                 <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxOrders}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxLandingPages}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxTrackingEvents}</th>
+                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxStaff}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.price}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.validity}</th>
                 <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.status}</th>
@@ -1001,7 +1074,7 @@ export default function AdminPackagesPage() {
             <tbody>
               {loadingPackages && (
                 <tr>
-                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={10} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
@@ -1009,7 +1082,7 @@ export default function AdminPackagesPage() {
 
               {!loadingPackages && packages.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={10} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
@@ -1027,6 +1100,9 @@ export default function AdminPackagesPage() {
                     </td>
                     <td className="border border-[#e5ebf5] px-3 py-2 text-right">
                       {pkg.max_tracking_events_per_day ?? t.unlimited}
+                    </td>
+                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                      {pkg.max_staff ?? t.unlimited}
                     </td>
                     <td className="border border-[#e5ebf5] px-3 py-2 text-right">
                       BDT {Number(pkg.price).toFixed(2)}
@@ -1137,6 +1213,17 @@ export default function AdminPackagesPage() {
                 />
               </div>
               <div>
+                <label className={labelCls}>{t.form.maxStaff}</label>
+                <input
+                  type="number"
+                  min={0}
+                  className={inputCls}
+                  placeholder={t.form.maxStaffHint}
+                  value={editForm.max_staff}
+                  onChange={(e) => setEditForm((p) => ({ ...p, max_staff: e.target.value }))}
+                />
+              </div>
+              <div>
                 <label className={labelCls}>{t.form.validityValue}</label>
                 <input
                   type="number"
@@ -1156,6 +1243,16 @@ export default function AdminPackagesPage() {
                   <option value="day">{t.form.unitDay}</option>
                   <option value="month">{t.form.unitMonth}</option>
                 </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className={labelCls}>{t.form.featuresText}</label>
+                <textarea
+                  rows={5}
+                  className={inputCls}
+                  value={editForm.features_text}
+                  onChange={(e) => setEditForm((p) => ({ ...p, features_text: e.target.value }))}
+                />
+                <p className="mt-1 text-xs text-[var(--muted)]">{t.form.featuresTextHint}</p>
               </div>
               <div className="md:col-span-2">
                 <label className={labelCls}>{t.form.featureFlagsTitle}</label>

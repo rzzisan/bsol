@@ -217,7 +217,13 @@ class AdminController extends Controller
             'max_landing_pages' => ['nullable', 'integer', 'min:0'],
             // null = unlimited, 0 = tracking not included on this package.
             'max_tracking_events_per_day' => ['nullable', 'integer', 'min:0'],
+            // null = unlimited — enforced in StaffController::store() against
+            // owner->subscriptionPackage->max_staff. Was in the model's own
+            // Fillable list already but never actually reachable from this
+            // admin endpoint, so every package silently stayed unlimited.
+            'max_staff' => ['nullable', 'integer', 'min:0'],
             'features' => ['nullable', 'array'],
+            'features.*' => ['string', 'max:255'],
             'feature_flags' => ['nullable', 'array'],
             'feature_flags.*' => ['boolean'],
             'is_active' => ['sometimes', 'boolean'],
@@ -245,7 +251,9 @@ class AdminController extends Controller
             'max_orders' => ['nullable', 'integer', 'min:0'],
             'max_landing_pages' => ['nullable', 'integer', 'min:0'],
             'max_tracking_events_per_day' => ['nullable', 'integer', 'min:0'],
+            'max_staff' => ['nullable', 'integer', 'min:0'],
             'features' => ['nullable', 'array'],
+            'features.*' => ['string', 'max:255'],
             'feature_flags' => ['nullable', 'array'],
             'feature_flags.*' => ['boolean'],
             'is_active' => ['sometimes', 'boolean'],
