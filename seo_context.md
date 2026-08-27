@@ -49,7 +49,15 @@
 - `/terms`, `/privacy` — নিজস্ব bilingual title কনফার্মড (আর হোমপেজের title inherit করছে না)।
 - `zareen.zyrotechbd.com/en` — অন্য যেকোনো non-existent landing slug-এর মতোই 404 (seller-subdomain রাউটিং অপরিবর্তিত, `/en` route addition-এর কোনো সাইড-ইফেক্ট নেই)।
 
-## ৬. যা এই রাউন্ডে নেই
+## ৬. Google Search Console — verified ও sitemap সাবমিট (২০২৬-০৮-২৭)
+
+`https://bsol.zyrotechbd.com` (URL-prefix property, `www`/অন্য সাবডোমেইন কভার করে না — সেলার সাবডোমেইনগুলো আলাদা বিজনেস, আলাদা SEO স্কোপ) — **HTML tag** মেথডে verify করা হয়েছে। ট্যাগ `frontend/src/app/layout.tsx`-এর root metadata-তে `verification.google` হিসেবে বসানো (সব পেজে render হয়, কোনো child page override করে না — `openGraph`/`twitter`-এর মতো এটা wholesale replace হয় না)।
+
+`sitemap.xml` সাবমিট করা হয়েছে Search Console-এ। প্রথম চেকে status "Couldn't fetch" দেখাচ্ছিল — এটা সাবমিশনের ঠিক পরপরই সাধারণ, curl দিয়ে যাচাই করে নিশ্চিত হওয়া গেছে যে URL নিজেই সম্পূর্ণ সঠিক (HTTP 200, `Content-Type: application/xml`) — Google-এর নিজের crawler কয়েক মিনিট থেকে কয়েক ঘণ্টার মধ্যে actually fetch করবে, এটা এখনই fix করার কিছু নেই।
+
+**Verification tag হারানো থেকে সাবধান:** `frontend/src/app/layout.tsx`-এর `verification.google` মান কখনো সরানো/বদলানো যাবে না, নাহলে verification হারাবে।
+
+## ৭. যা এই রাউন্ডে নেই
 
 - Full i18n framework migration (`[locale]` segment) — শুধু হোমপেজ split করা হয়েছে, `/terms`/`/privacy` client-toggle-ই থাকছে।
 - `<html lang>` attribute crawler-এর প্রথম পাসেই সঠিক দেখানো (Next.js App Router-এর একটামাত্র root `<html>` ট্যাগের সীমাবদ্ধতা — §৩ দেখুন)।

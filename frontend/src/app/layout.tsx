@@ -26,6 +26,13 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: OG_TITLE,
   description: OG_DESCRIPTION,
+  // Google Search Console property verification (seo_context.md) —
+  // ownership of https://bsol.zyrotechbd.com, URL-prefix property, HTML
+  // tag method. Renders as <meta name="google-site-verification" .../> on
+  // every page (root layout, not overridden by any child page's metadata).
+  verification: {
+    google: "ZYDo1PXdKZzOPpCwOqAY4HfTJiXIV1hWtzY3jN6IdwY",
+  },
   openGraph: {
     title: OG_TITLE,
     description: OG_DESCRIPTION,
