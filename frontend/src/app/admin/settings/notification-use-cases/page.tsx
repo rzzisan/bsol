@@ -521,32 +521,32 @@ export default function NotificationUseCasesPage() {
             <table className="min-w-full border-collapse text-sm">
               <thead className="bg-[#2f7ec1] text-white">
                 <tr>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.useCase}</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">SMS</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">Email</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.priority}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.useCase}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">SMS</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">Email</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.priority}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                    <td colSpan={4} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                       {t.loading}
                     </td>
                   </tr>
                 ) : bindings.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                    <td colSpan={4} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                       No binding found.
                     </td>
                   </tr>
                 ) : (
                   bindings.map((row) => (
-                    <tr key={row.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]">
-                      <td className="border border-[#e5ebf5] px-3 py-2">{row.use_case_key}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2 text-xs">{row.sms_template?.name ?? "-"}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2 text-xs">{row.email_template?.name ?? "-"}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2 uppercase">{row.priority_channel}</td>
+                    <tr key={row.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10">
+                      <td className="border border-[var(--border)] px-3 py-2">{row.use_case_key}</td>
+                      <td className="border border-[var(--border)] px-3 py-2 text-xs">{row.sms_template?.name ?? "-"}</td>
+                      <td className="border border-[var(--border)] px-3 py-2 text-xs">{row.email_template?.name ?? "-"}</td>
+                      <td className="border border-[var(--border)] px-3 py-2 uppercase">{row.priority_channel}</td>
                     </tr>
                   ))
                 )}

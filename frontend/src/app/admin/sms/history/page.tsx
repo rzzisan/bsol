@@ -339,21 +339,21 @@ export default function AdminSmsHistoryPage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.id}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.type}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.date}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.gateway}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.phone}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.message}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.status}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.code}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.response}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.id}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.type}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.date}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.gateway}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.phone}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.message}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.status}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.code}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.response}</th>
               </tr>
             </thead>
             <tbody>
               {loadingRows && (
                 <tr>
-                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={9} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
@@ -361,7 +361,7 @@ export default function AdminSmsHistoryPage() {
 
               {!loadingRows && error && (
                 <tr>
-                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-red-600">
+                  <td colSpan={9} className="border border-[var(--border)] px-4 py-6 text-center text-red-600">
                     {error}
                   </td>
                 </tr>
@@ -369,32 +369,32 @@ export default function AdminSmsHistoryPage() {
 
               {!loadingRows && !error && rows.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={9} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
               )}
 
               {!loadingRows && !error && rows.map((row) => (
-                <tr key={row.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]">
-                  <td className="border border-[#e5ebf5] px-3 py-2">{row.id}</td>
-                  <td className="border border-[#e5ebf5] px-3 py-2">
+                <tr key={row.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10">
+                  <td className="border border-[var(--border)] px-3 py-2">{row.id}</td>
+                  <td className="border border-[var(--border)] px-3 py-2">
                     <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
                       {row.event_type ?? "sms_send"}
                     </span>
                   </td>
-                  <td className="border border-[#e5ebf5] px-3 py-2 whitespace-nowrap">
+                  <td className="border border-[var(--border)] px-3 py-2 whitespace-nowrap">
                     {new Date(row.created_at ?? row.sent_at ?? Date.now()).toLocaleString()}
                   </td>
-                  <td className="border border-[#e5ebf5] px-3 py-2">
+                  <td className="border border-[var(--border)] px-3 py-2">
                     {row.gateway_name ?? "-"}
                     {row.provider ? <span className="ml-1 text-xs text-[var(--muted)]">({row.provider})</span> : null}
                   </td>
-                  <td className="border border-[#e5ebf5] px-3 py-2">{row.phone_number}</td>
-                  <td className="border border-[#e5ebf5] px-3 py-2">
+                  <td className="border border-[var(--border)] px-3 py-2">{row.phone_number}</td>
+                  <td className="border border-[var(--border)] px-3 py-2">
                     <div className="max-w-[260px] whitespace-pre-wrap break-words">{row.message}</div>
                   </td>
-                  <td className="border border-[#e5ebf5] px-3 py-2">
+                  <td className="border border-[var(--border)] px-3 py-2">
                     <span
                       className={`rounded px-2 py-1 text-xs font-semibold ${
                         row.status === "sent" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
@@ -403,8 +403,8 @@ export default function AdminSmsHistoryPage() {
                       {row.status}
                     </span>
                   </td>
-                  <td className="border border-[#e5ebf5] px-3 py-2">{row.http_status_code ?? "-"}</td>
-                  <td className="border border-[#e5ebf5] px-3 py-2">
+                  <td className="border border-[var(--border)] px-3 py-2">{row.http_status_code ?? "-"}</td>
+                  <td className="border border-[var(--border)] px-3 py-2">
                     <div className="max-w-[300px] whitespace-pre-wrap break-words text-xs">
                       {row.error_message || row.response_body || "-"}
                     </div>

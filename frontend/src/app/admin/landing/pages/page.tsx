@@ -511,19 +511,19 @@ export default function AdminLandingPagesPage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.seller}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.page}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.status}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.products}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.lockStatus}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.createdAt}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-center font-semibold">{t.table.actions}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.seller}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.page}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.status}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.table.products}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.lockStatus}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.createdAt}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-center font-semibold">{t.table.actions}</th>
               </tr>
             </thead>
             <tbody>
               {loadingRows && (
                 <tr>
-                  <td colSpan={7} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={7} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
@@ -531,7 +531,7 @@ export default function AdminLandingPagesPage() {
 
               {!loadingRows && rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={7} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
@@ -539,8 +539,8 @@ export default function AdminLandingPagesPage() {
 
               {!loadingRows &&
                 rows.map((row) => (
-                  <tr key={row.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff] align-top">
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                  <tr key={row.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10 align-top">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <div className="font-medium text-[var(--foreground)]">
                         {row.seller?.name ?? t.noSeller}
                       </div>
@@ -548,11 +548,11 @@ export default function AdminLandingPagesPage() {
                         {[row.seller?.mobile, row.seller?.email].filter(Boolean).join(" · ")}
                       </div>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <div className="font-medium text-[var(--foreground)]">{row.title}</div>
                       <div className="text-xs text-[var(--muted)]">/{row.slug}</div>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span
                         className={`rounded px-2 py-1 text-xs font-semibold ${
                           row.status === "published"
@@ -563,8 +563,8 @@ export default function AdminLandingPagesPage() {
                         {row.status === "published" ? t.statusPublished : t.statusDraft}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">{row.product_count}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">{row.product_count}</td>
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span
                         className={`rounded px-2 py-1 text-xs font-semibold ${
                           row.admin_locked
@@ -594,15 +594,15 @@ export default function AdminLandingPagesPage() {
                         </div>
                       )}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">{formatDate(row.created_at)}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-center">
+                    <td className="border border-[var(--border)] px-3 py-2">{formatDate(row.created_at)}</td>
+                    <td className="border border-[var(--border)] px-3 py-2 text-center">
                       <div className="flex flex-col items-center justify-center gap-2">
                         {row.status === "published" && (
                           <a
                             href={row.public_url ?? "#"}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100"
+                            className="rounded px-2 py-1 text-xs font-semibold bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20"
                           >
                             {t.viewPublic}
                           </a>

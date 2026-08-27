@@ -216,58 +216,58 @@ export default function AdminTrackingUsagePage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colSeller}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colPackage}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colUsage}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colDropped}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colOverage}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colFailed}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colDestinations}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colSeller}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colPackage}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colUsage}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colDropped}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colOverage}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colFailed}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colDestinations}</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={7} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
               )}
               {!loading && sellers.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={7} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.noSellers}
                   </td>
                 </tr>
               )}
               {!loading &&
                 sellers.map((s) => (
-                  <tr key={s.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]">
-                    <td className="border border-[#e5ebf5] px-3 py-2 font-medium">
+                  <tr key={s.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10">
+                    <td className="border border-[var(--border)] px-3 py-2 font-medium">
                       <span>{s.name}</span>
                       <span className="ml-2 text-xs text-[var(--muted)]">{s.email}</span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">{s.package_name ?? t.noPackage}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2">{s.package_name ?? t.noPackage}</td>
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       <span
                         className={`rounded px-2 py-1 text-xs font-bold ${
-                          s.accepted > 0 ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-500"
+                          s.accepted > 0 ? "bg-[var(--accent)]/15 text-[var(--accent)]" : "bg-[var(--muted)]/15 text-[var(--muted)]"
                         }`}
                       >
                         {s.accepted.toLocaleString()}
                         {s.daily_limit !== null ? ` / ${s.daily_limit.toLocaleString()}` : ` / ${t.unlimited}`}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       {s.dropped > 0 ? <span className="text-orange-600">{s.dropped.toLocaleString()}</span> : "—"}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       {s.overage > 0 ? <span className="text-red-600">{s.overage.toLocaleString()}</span> : "—"}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       {s.failed > 0 ? <span className="text-red-600">{s.failed.toLocaleString()}</span> : "—"}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">{s.destinations_count}</td>
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">{s.destinations_count}</td>
                   </tr>
                 ))}
             </tbody>

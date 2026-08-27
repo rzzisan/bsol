@@ -1059,22 +1059,22 @@ export default function AdminPackagesPage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.name}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxOrders}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxLandingPages}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxTrackingEvents}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.maxStaff}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.table.price}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.validity}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.status}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.createdAt}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-center font-semibold">{t.table.actions}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.name}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.table.maxOrders}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.table.maxLandingPages}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.table.maxTrackingEvents}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.table.maxStaff}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.table.price}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.validity}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.status}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.createdAt}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-center font-semibold">{t.table.actions}</th>
               </tr>
             </thead>
             <tbody>
               {loadingPackages && (
                 <tr>
-                  <td colSpan={10} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={10} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
@@ -1082,7 +1082,7 @@ export default function AdminPackagesPage() {
 
               {!loadingPackages && packages.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={10} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
@@ -1090,25 +1090,25 @@ export default function AdminPackagesPage() {
 
               {!loadingPackages &&
                 packages.map((pkg) => (
-                  <tr key={pkg.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]">
-                    <td className="border border-[#e5ebf5] px-3 py-2 font-medium text-[var(--foreground)]">{pkg.name}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                  <tr key={pkg.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10">
+                    <td className="border border-[var(--border)] px-3 py-2 font-medium text-[var(--foreground)]">{pkg.name}</td>
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       {pkg.max_orders ?? t.unlimited}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       {pkg.max_landing_pages ?? t.unlimited}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       {pkg.max_tracking_events_per_day ?? t.unlimited}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       {pkg.max_staff ?? t.unlimited}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       BDT {Number(pkg.price).toFixed(2)}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">{formatValidity(pkg.duration_days)}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">{formatValidity(pkg.duration_days)}</td>
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span
                         className={`rounded px-2 py-1 text-xs font-semibold ${
                           pkg.is_active
@@ -1119,18 +1119,18 @@ export default function AdminPackagesPage() {
                         {pkg.is_active ? t.statusActive : t.statusInactive}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {new Intl.DateTimeFormat(locale === "bn" ? "bn-BD" : "en-GB", {
                         day: "2-digit",
                         month: "2-digit",
                         year: "numeric",
                       }).format(new Date(pkg.created_at))}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-center">
+                    <td className="border border-[var(--border)] px-3 py-2 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => openEditModal(pkg)}
-                          className="rounded px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100"
+                          className="rounded px-2 py-1 text-xs font-semibold bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20"
                         >
                           {t.editBtn}
                         </button>

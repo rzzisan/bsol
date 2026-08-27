@@ -716,37 +716,37 @@ export default function SmsCreditPage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colName}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colMobile}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colRole}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colBalance}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-center font-semibold">{t.colActions}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colName}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colMobile}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colRole}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colBalance}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-center font-semibold">{t.colActions}</th>
               </tr>
             </thead>
             <tbody>
               {usersLoading && (
                 <tr>
-                  <td colSpan={5} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={5} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
               )}
               {!usersLoading && users.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={5} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.noUsers}
                   </td>
                 </tr>
               )}
               {!usersLoading &&
                 users.map((u) => (
-                  <tr key={u.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]">
-                    <td className="border border-[#e5ebf5] px-3 py-2 font-medium">
+                  <tr key={u.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10">
+                    <td className="border border-[var(--border)] px-3 py-2 font-medium">
                       <span>{u.name}</span>
                       <span className="ml-2 text-xs text-[var(--muted)]">{u.email}</span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">{u.mobile ?? "-"}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">{u.mobile ?? "-"}</td>
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span
                         className={`rounded px-2 py-1 text-xs font-semibold ${
                           u.role === "admin"
@@ -757,18 +757,18 @@ export default function SmsCreditPage() {
                         {u.role}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       <span
                         className={`rounded px-2 py-1 text-xs font-bold ${
                           u.sms_balance > 0
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-500"
+                            ? "bg-[var(--accent)]/15 text-[var(--accent)]"
+                            : "bg-[var(--muted)]/15 text-[var(--muted)]"
                         }`}
                       >
                         {u.sms_balance.toLocaleString()}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-center">
+                    <td className="border border-[var(--border)] px-3 py-2 text-center">
                       <button
                         type="button"
                         onClick={() => openRecharge(u)}
@@ -791,25 +791,25 @@ export default function SmsCreditPage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colUser}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colCreditsAmt}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colAmount}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colTrx}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colStatus}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colActionsHeader}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colUser}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colCreditsAmt}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colAmount}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colTrx}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colStatus}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colActionsHeader}</th>
               </tr>
             </thead>
             <tbody>
               {purchasesLoading && (
                 <tr>
-                  <td colSpan={6} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={6} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
               )}
               {!purchasesLoading && purchases.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={6} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.noPurchases}
                   </td>
                 </tr>
@@ -817,17 +817,17 @@ export default function SmsCreditPage() {
               {!purchasesLoading &&
                 purchases.map((p) => (
                   <tr key={p.id}>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {p.user?.name ?? "-"}
                       {p.user?.mobile ? <span className="text-[var(--muted)]"> ({p.user.mobile})</span> : null}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">{p.credits.toLocaleString()}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">৳{Number(p.amount).toLocaleString()}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">{p.trx_id ?? "-"}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">{p.credits.toLocaleString()}</td>
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">৳{Number(p.amount).toLocaleString()}</td>
+                    <td className="border border-[var(--border)] px-3 py-2">{p.trx_id ?? "-"}</td>
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {p.status === "pending" ? t.statusPending : p.status === "approved" ? t.statusApproved : t.statusRejected}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <div className="flex gap-2">
                         <button
                           type="button"
@@ -864,41 +864,41 @@ export default function SmsCreditPage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colUser}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colType}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colCredits}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colBefore}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">{t.colAfter}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colNote}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colBy}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.colDate}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colUser}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colType}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colCredits}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colBefore}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colAfter}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colNote}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colBy}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colDate}</th>
               </tr>
             </thead>
             <tbody>
               {historyLoading && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={8} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
               )}
               {!historyLoading && history.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={8} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.noHistory}
                   </td>
                 </tr>
               )}
               {!historyLoading &&
                 history.map((h) => (
-                  <tr key={h.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]">
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                  <tr key={h.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span className="font-medium">{h.user_name ?? "-"}</span>
                       {h.user_mobile && (
                         <span className="ml-1 text-xs text-[var(--muted)]">{h.user_mobile}</span>
                       )}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span
                         className={`rounded px-2 py-1 text-xs font-semibold ${
                           h.type === "recharge"
@@ -909,24 +909,24 @@ export default function SmsCreditPage() {
                         {h.type === "recharge" ? t.typeRecharge : t.typeDeduct}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right font-semibold">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right font-semibold">
                       <span className={h.type === "recharge" ? "text-emerald-600" : "text-red-500"}>
                         {h.type === "recharge" ? "+" : "-"}{h.credits.toLocaleString()}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right text-[var(--muted)]">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right text-[var(--muted)]">
                       {h.balance_before.toLocaleString()}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right font-medium">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right font-medium">
                       {h.balance_after.toLocaleString()}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-xs text-[var(--muted)]">
+                    <td className="border border-[var(--border)] px-3 py-2 text-xs text-[var(--muted)]">
                       {h.note ?? "-"}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-xs">
+                    <td className="border border-[var(--border)] px-3 py-2 text-xs">
                       {h.recharged_by_name ?? "-"}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-xs text-[var(--muted)]">
+                    <td className="border border-[var(--border)] px-3 py-2 text-xs text-[var(--muted)]">
                       {new Date(h.created_at).toLocaleString()}
                     </td>
                   </tr>

@@ -946,37 +946,37 @@ export default function ActiveCustomersPage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.id}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.name}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.email}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.mobile}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.role}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.status}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.package}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.gateway}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-right font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">
                   {t.table.credit}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.date}
                 </th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.actions}
                 </th>
               </tr>
@@ -986,7 +986,7 @@ export default function ActiveCustomersPage() {
                 <tr>
                   <td
                     colSpan={11}
-                    className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]"
+                    className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]"
                   >
                     {t.loading}
                   </td>
@@ -996,7 +996,7 @@ export default function ActiveCustomersPage() {
                 <tr>
                   <td
                     colSpan={11}
-                    className="border border-[#e5ebf5] px-4 py-6 text-center text-red-600"
+                    className="border border-[var(--border)] px-4 py-6 text-center text-red-600"
                   >
                     {error}
                   </td>
@@ -1006,7 +1006,7 @@ export default function ActiveCustomersPage() {
                 <tr>
                   <td
                     colSpan={11}
-                    className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]"
+                    className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]"
                   >
                     {t.empty}
                   </td>
@@ -1017,21 +1017,21 @@ export default function ActiveCustomersPage() {
                 rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]"
+                    className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10"
                   >
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {row.id}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 font-medium">
+                    <td className="border border-[var(--border)] px-3 py-2 font-medium">
                       {row.name}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {row.email}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {row.mobile ?? "-"}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span
                         className={`rounded px-2 py-1 text-xs font-semibold ${
                           row.role === "admin"
@@ -1042,7 +1042,7 @@ export default function ActiveCustomersPage() {
                         {row.role}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span
                         className={`rounded px-2 py-1 text-xs font-semibold ${statusBadgeCls(
                           row.user_status,
@@ -1051,7 +1051,7 @@ export default function ActiveCustomersPage() {
                         {statusLabel(row.user_status)}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {row.subscription_package_id ? (
                         <span className="rounded bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-700">
                           {packageLabel(row)}
@@ -1062,9 +1062,9 @@ export default function ActiveCustomersPage() {
                         </span>
                       )}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {row.sms_gateway_id ? (
-                        <span className="rounded bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
+                        <span className="rounded bg-[var(--accent)]/15 px-2 py-1 text-xs font-semibold text-[var(--accent)]">
                           {gatewayLabel(row)}
                         </span>
                       ) : (
@@ -1073,15 +1073,15 @@ export default function ActiveCustomersPage() {
                         </span>
                       )}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-right">
+                    <td className="border border-[var(--border)] px-3 py-2 text-right">
                       <span className="rounded bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700">
                         {(row.sms_balance ?? 0).toLocaleString()}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {formatDate(row.created_at)}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <div className="flex gap-1.5">
                         <button
                           type="button"

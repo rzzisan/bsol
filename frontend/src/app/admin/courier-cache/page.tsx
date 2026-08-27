@@ -458,10 +458,10 @@ export default function AdminCourierCachePage() {
           <table className="min-w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className="border border-[#d7e1ee] bg-[#2f7ec1] px-3 py-2 text-left font-semibold text-white">{t.table.phone}</th>
-                <th className="border border-[#d7e1ee] bg-[#2f7ec1] px-3 py-2 text-left font-semibold text-white">{t.table.lastChecked}</th>
+                <th className="border border-[var(--border)] bg-[#2f7ec1] px-3 py-2 text-left font-semibold text-white">{t.table.phone}</th>
+                <th className="border border-[var(--border)] bg-[#2f7ec1] px-3 py-2 text-left font-semibold text-white">{t.table.lastChecked}</th>
                 {COURIERS.map((c) => (
-                  <th key={c} className={`border border-[#d7e1ee] px-3 py-2 text-center font-semibold text-white ${COURIER_META[c].header}`}>
+                  <th key={c} className={`border border-[var(--border)] px-3 py-2 text-center font-semibold text-white ${COURIER_META[c].header}`}>
                     {COURIER_META[c].label}
                   </th>
                 ))}
@@ -470,7 +470,7 @@ export default function AdminCourierCachePage() {
             <tbody>
               {loadingRows && (
                 <tr>
-                  <td colSpan={2 + COURIERS.length} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={2 + COURIERS.length} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.loading}
                   </td>
                 </tr>
@@ -478,7 +478,7 @@ export default function AdminCourierCachePage() {
 
               {!loadingRows && rows.length === 0 && (
                 <tr>
-                  <td colSpan={2 + COURIERS.length} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={2 + COURIERS.length} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
@@ -486,13 +486,13 @@ export default function AdminCourierCachePage() {
 
               {!loadingRows &&
                 rows.map((row) => (
-                  <tr key={row.phone_number} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff] align-middle">
-                    <td className="border border-[#e5ebf5] px-3 py-2 font-mono">{row.phone_number}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 whitespace-nowrap text-xs text-[var(--muted)]">
+                  <tr key={row.phone_number} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10 align-middle">
+                    <td className="border border-[var(--border)] px-3 py-2 font-mono">{row.phone_number}</td>
+                    <td className="border border-[var(--border)] px-3 py-2 whitespace-nowrap text-xs text-[var(--muted)]">
                       {formatDate(row.last_checked_at)}
                     </td>
                     {COURIERS.map((c) => (
-                      <td key={c} className="border border-[#e5ebf5] px-2 py-1">
+                      <td key={c} className="border border-[var(--border)] px-2 py-1">
                         <CourierCellView cell={row.couriers[c]} locale={locale} t={t} />
                       </td>
                     ))}

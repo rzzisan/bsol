@@ -230,20 +230,20 @@ export default function UserSmsHistoryPage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.id}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.gateway}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.phone}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.message}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.status}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.code}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.response}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.date}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.id}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.gateway}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.phone}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.message}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.status}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.code}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.response}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.date}</th>
               </tr>
             </thead>
             <tbody>
               {loadingRows && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={8} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.filters.loading}
                   </td>
                 </tr>
@@ -251,7 +251,7 @@ export default function UserSmsHistoryPage() {
 
               {!loadingRows && error && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-red-600">
+                  <td colSpan={8} className="border border-[var(--border)] px-4 py-6 text-center text-red-600">
                     {error}
                   </td>
                 </tr>
@@ -259,7 +259,7 @@ export default function UserSmsHistoryPage() {
 
               {!loadingRows && !error && rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={8} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {t.empty}
                   </td>
                 </tr>
@@ -268,16 +268,16 @@ export default function UserSmsHistoryPage() {
               {!loadingRows &&
                 !error &&
                 rows.map((row) => (
-                  <tr key={row.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]">
-                    <td className="border border-[#e5ebf5] px-3 py-2">{row.id}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                  <tr key={row.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10">
+                    <td className="border border-[var(--border)] px-3 py-2">{row.id}</td>
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {row.gateway_name ? `${row.gateway_name} (${row.provider ?? "-"})` : "-"}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">{row.phone_number}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 max-w-[280px] truncate" title={row.message}>
+                    <td className="border border-[var(--border)] px-3 py-2">{row.phone_number}</td>
+                    <td className="border border-[var(--border)] px-3 py-2 max-w-[280px] truncate" title={row.message}>
                       {row.message}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span
                         className={`rounded px-2 py-1 text-xs font-semibold ${
                           row.status === "sent"
@@ -288,14 +288,14 @@ export default function UserSmsHistoryPage() {
                         {row.status}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">{row.http_status_code ?? "-"}</td>
+                    <td className="border border-[var(--border)] px-3 py-2">{row.http_status_code ?? "-"}</td>
                     <td
-                      className="border border-[#e5ebf5] px-3 py-2 max-w-[320px] truncate"
+                      className="border border-[var(--border)] px-3 py-2 max-w-[320px] truncate"
                       title={row.error_message ?? row.response_body ?? "-"}
                     >
                       {row.error_message ?? row.response_body ?? "-"}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {new Date(row.created_at ?? row.sent_at ?? "").toLocaleString()}
                     </td>
                   </tr>

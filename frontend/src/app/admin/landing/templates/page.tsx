@@ -266,23 +266,23 @@ export default function AdminLandingTemplatesPage() {
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-[#2f7ec1] text-white">
               <tr>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.screenshot}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.name}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.source}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.status}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.createdAt}</th>
-                <th className="border border-[#d7e1ee] px-3 py-2 text-center font-semibold">{t.table.actions}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.screenshot}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.name}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.source}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.status}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.createdAt}</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-center font-semibold">{t.table.actions}</th>
               </tr>
             </thead>
             <tbody>
               {loadingTemplates ? (
-                <tr><td colSpan={6} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">{t.loading}</td></tr>
+                <tr><td colSpan={6} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">{t.loading}</td></tr>
               ) : templates.length === 0 ? (
-                <tr><td colSpan={6} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">{t.empty}</td></tr>
+                <tr><td colSpan={6} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">{t.empty}</td></tr>
               ) : (
                 templates.map((tpl) => (
-                  <tr key={tpl.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff] align-top">
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                  <tr key={tpl.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10 align-top">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {tpl.preview_image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={tpl.preview_image} alt="" className="h-14 w-20 rounded-lg border border-[var(--border)] object-cover" />
@@ -290,30 +290,30 @@ export default function AdminLandingTemplatesPage() {
                         <span className="text-xs text-[var(--muted)]">—</span>
                       )}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <div className="font-medium text-[var(--foreground)]">
                         {locale === "bn" ? tpl.name_bn : tpl.name_en ?? tpl.name_bn}
                       </div>
                       <div className="text-xs text-[var(--muted)]">{tpl.code}</div>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       {tpl.source_landing_page ? (
                         <span className="text-xs text-[var(--muted)]">{tpl.source_landing_page.title}</span>
                       ) : (
                         <span className="text-xs text-[var(--muted)]">{t.noSource}</span>
                       )}
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">
+                    <td className="border border-[var(--border)] px-3 py-2">
                       <span className={`rounded px-2 py-1 text-xs font-semibold ${tpl.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700"}`}>
                         {tpl.is_active ? t.active : t.inactive}
                       </span>
                     </td>
-                    <td className="border border-[#e5ebf5] px-3 py-2">{new Date(tpl.created_at).toLocaleDateString()}</td>
-                    <td className="border border-[#e5ebf5] px-3 py-2 text-center">
+                    <td className="border border-[var(--border)] px-3 py-2">{new Date(tpl.created_at).toLocaleDateString()}</td>
+                    <td className="border border-[var(--border)] px-3 py-2 text-center">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Link
                           href={`/admin/landing/templates/builder/${tpl.id}`}
-                          className="rounded px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100"
+                          className="rounded px-2 py-1 text-xs font-semibold bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20"
                         >
                           {t.edit}
                         </Link>

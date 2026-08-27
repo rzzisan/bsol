@@ -4,6 +4,8 @@
 
 Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground-truth audit, §16 আগের প্রায়োরিটি লিস্ট — এই ফাইলের সাথে ওভারল্যাপ আছে, এই ফাইলটা business/commercial angle-এ বেশি ফোকাসড এবং নতুন কিছু আইটেমও যোগ করে)।
 
+📄 **নতুন সহ-ডকুমেন্ট (2026-08-27):** প্রোডাকশনে mass-launch-এর আগে ফিচার-বাগ/নিরাপত্তা/ডিজাইন-UI-UX/ফ্রন্টএন্ড ঘষামাজার জন্য মডিউল-ভিত্তিক checklist — `pre_launch_polish_context.md`। এটা নতুন ফিচার-রোডম্যাপ না, বরং existing মডিউলের quality/polish pass ট্র্যাক করে।
+
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
 Last updated: 2026-08-23 (৫) — **SaaS বিলিং ধাপ ৫ (ল্যান্ডিং পেজ লিমিট) ✅ সম্পন্ন ও লাইভ, স্কোপ সরলীকৃত** — user-এর নির্দেশে addon বাদ, শুধু প্যাকেজ-ভিত্তিক ফ্ল্যাট মোট-সংখ্যা লিমিট। বিস্তারিত `subscription_billing_context.md §১২`। পরবর্তী: Tracking boost addon (শেষ ধাপ)। Older entries kept as-is:

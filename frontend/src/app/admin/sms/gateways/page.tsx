@@ -577,42 +577,42 @@ export default function AdminSmsGatewaysPage() {
             <table className="min-w-full border-collapse text-sm">
               <thead className="bg-[#2f7ec1] text-white">
                 <tr>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.name}</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.provider}</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.endpoint}</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.sender}</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.api}</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.secret}</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.status}</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.active}</th>
-                  <th className="border border-[#d7e1ee] px-3 py-2 text-left font-semibold">{t.table.action}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.name}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.provider}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.endpoint}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.sender}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.api}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.secret}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.status}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.active}</th>
+                  <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.action}</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingRows ? (
                   <tr>
-                    <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                    <td colSpan={9} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                       {t.loading}
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="border border-[#e5ebf5] px-4 py-6 text-center text-[var(--muted)]">
+                    <td colSpan={9} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                       {t.empty}
                     </td>
                   </tr>
                 ) : (
                   rows.map((row) => (
-                    <tr key={row.id} className="bg-white even:bg-[#f8fbff] hover:bg-[#eaf4ff]">
-                      <td className="border border-[#e5ebf5] px-3 py-2 font-medium">{row.name}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">{row.provider}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">
+                    <tr key={row.id} className="bg-[var(--surface)] even:bg-[var(--surface-soft)] hover:bg-[var(--accent)]/10">
+                      <td className="border border-[var(--border)] px-3 py-2 font-medium">{row.name}</td>
+                      <td className="border border-[var(--border)] px-3 py-2">{row.provider}</td>
+                      <td className="border border-[var(--border)] px-3 py-2">
                         <span className="line-clamp-1 max-w-[220px]">{row.endpoint_url ?? "-"}</span>
                       </td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">{row.sender_id ?? "-"}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">{row.api_key_masked ?? "-"}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">{row.secret_key_masked ?? "-"}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">
+                      <td className="border border-[var(--border)] px-3 py-2">{row.sender_id ?? "-"}</td>
+                      <td className="border border-[var(--border)] px-3 py-2">{row.api_key_masked ?? "-"}</td>
+                      <td className="border border-[var(--border)] px-3 py-2">{row.secret_key_masked ?? "-"}</td>
+                      <td className="border border-[var(--border)] px-3 py-2">
                         <span
                           className={`rounded px-2 py-1 text-xs font-semibold ${
                             row.is_enabled ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
@@ -621,13 +621,13 @@ export default function AdminSmsGatewaysPage() {
                           {row.is_enabled ? t.enabled : t.disabled}
                         </span>
                       </td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">{row.is_active ? t.yes : t.no}</td>
-                      <td className="border border-[#e5ebf5] px-3 py-2">
+                      <td className="border border-[var(--border)] px-3 py-2">{row.is_active ? t.yes : t.no}</td>
+                      <td className="border border-[var(--border)] px-3 py-2">
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             onClick={() => beginEdit(row)}
-                            className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white"
+                            className="rounded bg-[var(--accent)] px-2 py-1 text-xs font-semibold text-white"
                           >
                             {t.edit}
                           </button>
