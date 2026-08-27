@@ -16,7 +16,11 @@ class AdminApiTest extends TestCase
     public function test_admin_can_view_dashboard_summary(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        User::factory()->count(2)->create();
+        $package = SubscriptionPackage::create([
+            'name' => 'Pro', 'slug' => 'pro-' . uniqid(), 'price' => 999, 'duration_days' => 30, 'is_active' => true,
+        ]);
+        User::factory()->count(2)->create(['user_status' => 'active', 'subscription_package_id' => $package->id]);
+        User::factory()->create(['user_status' => 'inactive']);
 
         $token = $admin->createToken('test-suite')->plainTextToken;
 
@@ -25,9 +29,17 @@ class AdminApiTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonStructure([
-                'totals' => ['users', 'admins', 'active_packages'],
+                'totals' => ['sellers', 'active_sellers', 'inactive_sellers', 'new_sellers_this_month', 'admins', 'active_packages'],
+                'pending_actions' => ['subscription_payments', 'sms_credit_purchases', 'addon_purchases'],
+                'package_distribution',
+                'monthly_registrations',
                 'recent_users',
-            ]);
+            ])
+            ->assertJsonPath('totals.sellers', 3)
+            ->assertJsonPath('totals.active_sellers', 2)
+            ->assertJsonPath('totals.inactive_sellers', 1)
+            ->assertJsonPath('totals.admins', 1)
+            ->assertJsonCount(6, 'monthly_registrations'); // this month + previous 5
     }
 
     public function test_non_admin_cannot_access_admin_apis(): void

@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AddonPurchase;
 use App\Models\EmailOtpVerification;
 use App\Models\RegistrationSetting;
+use App\Models\SmsCreditPurchase;
 use App\Models\SubscriptionPackage;
 use App\Models\SmsGateway;
+use App\Models\SubscriptionPayment;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -16,15 +20,68 @@ class AdminController extends Controller
 {
     private const USER_STATUSES = ['pending', 'active', 'inactive', 'expired', 'left'];
 
+    /**
+     * The admin dashboard homepage's real data source — previously unused,
+     * the frontend rendered hardcoded numbers and literal "chart placeholder"
+     * text instead of calling this (SAAS_MODULE_CONTEXT.md admin-dashboard
+     * audit). Every figure here is grounded in what the platform actually
+     * tracks — no fabricated "zones"/"tickets" concepts that don't exist
+     * anywhere else in the codebase.
+     */
     public function dashboardSummary(): JsonResponse
     {
+        // Sellers only (role=user) — an admin account isn't "a customer" for
+        // any of these counts, same distinction listUsers()/createUser()
+        // already draw elsewhere in this controller.
+        $sellers = User::where('role', 'user');
+
+        $monthStart = now()->startOfMonth();
+
+        $monthlyRegistrations = User::where('role', 'user')
+            ->where('created_at', '>=', now()->subMonths(5)->startOfMonth())
+            ->selectRaw("to_char(created_at, 'YYYY-MM') as month, count(*) as total")
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get()
+            ->keyBy('month');
+
+        // Fill in months with zero registrations — a real gap is a real
+        // data point, not an absence the frontend has to guess at.
+        $monthlySeries = collect(range(5, 0))->map(function (int $offset) use ($monthlyRegistrations) {
+            $month = now()->subMonths($offset);
+            $key = $month->format('Y-m');
+
+            return [
+                'month' => $key,
+                'label' => $month->translatedFormat('M'),
+                'total' => (int) ($monthlyRegistrations[$key]->total ?? 0),
+            ];
+        })->values();
+
         return response()->json([
             'totals' => [
-                'users' => User::count(),
+                'sellers' => (clone $sellers)->count(),
+                'active_sellers' => (clone $sellers)->where('user_status', 'active')->count(),
+                'inactive_sellers' => (clone $sellers)->whereIn('user_status', ['inactive', 'expired'])->count(),
+                'new_sellers_this_month' => (clone $sellers)->where('created_at', '>=', $monthStart)->count(),
                 'admins' => User::where('role', 'admin')->count(),
                 'active_packages' => SubscriptionPackage::where('is_active', true)->count(),
             ],
-            'recent_users' => User::latest()->take(5)->get(['id', 'name', 'email', 'mobile', 'role', 'created_at']),
+            // Real "needs your attention" queue — replaces the old mock
+            // Pending/Processing Tickets/Tasks rows, which weren't backed by
+            // anything: every approval flow this admin panel actually has.
+            'pending_actions' => [
+                'subscription_payments' => SubscriptionPayment::where('status', 'pending')->count(),
+                'sms_credit_purchases' => SmsCreditPurchase::where('status', 'pending')->count(),
+                'addon_purchases' => AddonPurchase::where('status', 'pending')->count(),
+            ],
+            'package_distribution' => SubscriptionPackage::where('is_active', true)
+                ->withCount(['users' => fn ($q) => $q->where('role', 'user')])
+                ->orderByDesc('users_count')
+                ->get(['id', 'name'])
+                ->map(fn (SubscriptionPackage $p) => ['name' => $p->name, 'sellers' => $p->users_count]),
+            'monthly_registrations' => $monthlySeries,
+            'recent_users' => (clone $sellers)->latest()->take(5)->get(['id', 'name', 'email', 'mobile', 'user_status', 'created_at']),
         ]);
     }
 

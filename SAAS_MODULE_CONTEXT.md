@@ -1321,4 +1321,10 @@ Admin → Settings → Facebook → "Marketing Pixel" সেকশনে ক্�
 
 User-এর প্রশ্ন: "আমাদের এই সাস এর SEO করতে হবে। যেন সার্চ ইন্জিনে আমাদের সাস প্রডাক্ট এর কাস্টমার পাওয়া যায়।" সবচেয়ে বড় গ্যাপ: bn/en টগল ছিল পুরোপুরি client-side (আলাদা URL নেই) — Google একসাথে শুধু একটা ভাষার কন্টেন্ট ইনডেক্স করতে পারত, বাংলা কন্টেন্ট (আসল target market) কার্যত অদৃশ্য ছিল। সমাধান: হোমপেজের bn/en প্রতিটার নিজস্ব real URL (`/` ও `/en`), নিজস্ব `metadata`/hreflang alternates/JSON-LD (SoftwareApplication + Organization) — পুরো i18n-framework migration না করে শুধু হোমপেজ স্কোপে (`/terms`/`/privacy` client-toggle-ই থাকছে, organic-search value প্রায় শূন্য বলে)। সাথে `sitemap.ts`/`robots.ts` cleanup আর `/terms`/`/privacy`-এর নিজস্ব title fix (আগে হোমপেজের title inherit করত)। বিস্তারিত: `seo_context.md`।
 
+## 27. সুপার-অ্যাডমিন ড্যাশবোর্ড হোমপেজ — আসল ডেটা ✅ সম্পন্ন (২০২৬-০৮-২৭)
+
+Backend-vs-frontend gap অডিটে ধরা পড়েছিল: `/admin` (ড্যাশবোর্ড হোমপেজ) কোনো API-ই কল করত না — স্ট্যাট কার্ডে হার্ডকোড করা সংখ্যা (`"5584"`), আর দুটো চার্টের জায়গায় সরাসরি "Pie chart placeholder"/"Donut chart placeholder" লেখা। বাকি সব admin backend endpoint-এর ফ্রন্টএন্ড ছিল, শুধু এই একটাই fake ছিল।
+
+সমাধান: `AdminController::dashboardSummary()` এক্সটেন্ড করা হয়েছে বাস্তব ডেটা দিয়ে — active/inactive সেলার সংখ্যা, এই মাসের নতুন রেজিস্ট্রেশন, প্যাকেজ-অনুযায়ী সেলার বণ্টন (নতুন `SubscriptionPackage::users()` relation), গত ৬ মাসের রেজিস্ট্রেশন ট্রেন্ড, সাম্প্রতিক ৫ জন সেলার। পুরনো fake "Pending/Processing Tickets/Tasks" রো-এর জায়গায় real "needs your attention" queue — pending subscription payments/SMS credit purchases/addon purchases (প্রতিটা `status='pending'` কাউন্ট, সরাসরি respective admin approval পেজে লিংক করা) + unread support messages (বিদ্যমান `/admin/support/unread-count` রিইউজ)। ফ্রন্টএন্ড লাইভ ভেরিফাই করা হয়েছে — সব সংখ্যা রিয়েল প্রোডাকশন ডেটা।
+
 **পরবর্তী ধাপ:** Tracking boost addon (§9.6 ধাপ ৬, শেষ ধাপ)।
