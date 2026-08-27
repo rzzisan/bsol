@@ -20,9 +20,24 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   const isShop = headerList.get("x-bsol-shop-subdomain") !== null;
 
   if (!isShop) {
-    // Platform host — dashboard/admin/auth are never meant to be indexed.
+    // Platform host — dashboard/admin/auth are never meant to be indexed,
+    // nor are the thin transactional/token-guarded pages below (seo_context.md).
     return {
-      rules: [{ userAgent: "*", disallow: ["/dashboard", "/admin", "/auth", "/onboarding"] }],
+      rules: [
+        {
+          userAgent: "*",
+          disallow: [
+            "/dashboard",
+            "/admin",
+            "/auth",
+            "/onboarding",
+            "/verify-phone",
+            "/verify-email",
+            "/forgot-password",
+            "/d",
+          ],
+        },
+      ],
       sitemap: `${baseUrl}/sitemap.xml`,
     };
   }

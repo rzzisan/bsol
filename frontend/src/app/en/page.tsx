@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import HomeContent from "@/components/marketing/home-content";
 import { buildOrganizationJsonLd, buildSoftwareApplicationJsonLd } from "@/lib/seo";
 
-const TITLE = "BSOL — বাংলাদেশি F-commerce ব্যবসার জন্য অল-ইন-ওয়ান প্ল্যাটফর্ম";
+const TITLE = "BSOL — The All-in-One Platform for Bangladesh F-commerce Businesses";
 const DESCRIPTION =
-  "অর্ডার, ৫টি কুরিয়ার, ফেইক-অর্ডার প্রোটেকশন, ৭টি পেমেন্ট গেটওয়ে, ফেসবুক/হোয়াটসঅ্যাপ মার্কেটিং ও প্রফিট ট্র্যাকিং — সব এক জায়গায়। কার্ড ছাড়াই ফ্রি অ্যাকাউন্ট খুলুন।";
+  "Orders, 5 couriers, fake-order protection, 7 payment gateways, Facebook/WhatsApp marketing, and profit tracking — all in one place. Create a free account, no card required.";
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: {
-    canonical: "/",
+    canonical: "/en",
     languages: {
       "bn-BD": "/",
       en: "/en",
@@ -20,10 +20,10 @@ export const metadata: Metadata = {
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,
-    url: "/",
+    url: "/en",
     siteName: "BSOL",
     images: [{ url: "/og-banner.png", width: 1200, height: 630, alt: "BSOL" }],
-    locale: "bn_BD",
+    locale: "en_US",
     type: "website",
   },
   twitter: {
@@ -34,18 +34,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootPage() {
+export default function EnglishHomePage() {
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildSoftwareApplicationJsonLd("bn")) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildSoftwareApplicationJsonLd("en")) }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(buildOrganizationJsonLd()) }}
       />
-      <HomeContent initialLocale="bn" />
+      <HomeContent initialLocale="en" />
     </>
   );
 }

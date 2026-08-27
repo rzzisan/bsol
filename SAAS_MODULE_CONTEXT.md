@@ -1317,4 +1317,8 @@ User-এর প্রশ্ন: "সেলারদের জন্য এত �
 
 Admin → Settings → Facebook → "Marketing Pixel" সেকশনে ক্রেডেনশিয়াল সেট করা যায়। বিস্তারিত + Ads Manager-এ কীভাবে Lookalike Audience বানাবেন: `platform_marketing_tracking_context.md`।
 
+## 26. হোমপেজ SEO — bn/en URL split, structured data ✅ সম্পন্ন (২০২৬-০৮-২৭)
+
+User-এর প্রশ্ন: "আমাদের এই সাস এর SEO করতে হবে। যেন সার্চ ইন্জিনে আমাদের সাস প্রডাক্ট এর কাস্টমার পাওয়া যায়।" সবচেয়ে বড় গ্যাপ: bn/en টগল ছিল পুরোপুরি client-side (আলাদা URL নেই) — Google একসাথে শুধু একটা ভাষার কন্টেন্ট ইনডেক্স করতে পারত, বাংলা কন্টেন্ট (আসল target market) কার্যত অদৃশ্য ছিল। সমাধান: হোমপেজের bn/en প্রতিটার নিজস্ব real URL (`/` ও `/en`), নিজস্ব `metadata`/hreflang alternates/JSON-LD (SoftwareApplication + Organization) — পুরো i18n-framework migration না করে শুধু হোমপেজ স্কোপে (`/terms`/`/privacy` client-toggle-ই থাকছে, organic-search value প্রায় শূন্য বলে)। সাথে `sitemap.ts`/`robots.ts` cleanup আর `/terms`/`/privacy`-এর নিজস্ব title fix (আগে হোমপেজের title inherit করত)। বিস্তারিত: `seo_context.md`।
+
 **পরবর্তী ধাপ:** Tracking boost addon (§9.6 ধাপ ৬, শেষ ধাপ)।

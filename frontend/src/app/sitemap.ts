@@ -31,8 +31,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const isShop = headerList.get("x-bsol-shop-subdomain") !== null;
 
   if (!isShop) {
-    // Platform host itself — a minimal, static entry rather than nothing.
-    return [{ url: baseUrl, changeFrequency: "weekly", priority: 1 }];
+    // Platform host itself — the marketing homepage in both languages
+    // (seo_context.md) plus the two static legal pages. Everything else
+    // (dashboard/admin/auth/onboarding) is robots.ts-disallowed already.
+    return [
+      { url: baseUrl, changeFrequency: "weekly", priority: 1 },
+      { url: `${baseUrl}/en`, changeFrequency: "weekly", priority: 0.9 },
+      { url: `${baseUrl}/terms`, changeFrequency: "monthly", priority: 0.2 },
+      { url: `${baseUrl}/privacy`, changeFrequency: "monthly", priority: 0.2 },
+    ];
   }
 
   let data: SitemapData | null = null;
