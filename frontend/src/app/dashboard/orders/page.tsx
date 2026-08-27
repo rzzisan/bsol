@@ -468,7 +468,7 @@ export default function OrdersPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
-          { label: txt.totalOrders,     value: stats.total,     color: "bg-[#0f7c7b]" },
+          { label: txt.totalOrders,     value: stats.total,     color: "bg-[var(--accent)]" },
           { label: txt.todayOrders,     value: stats.today,     color: "bg-[#2f7ec1]" },
           { label: txt.pendingOrders,   value: stats.pending,   color: "bg-[#b8860b]" },
           { label: txt.deliveredOrders, value: stats.delivered, color: "bg-[#196c40]" },

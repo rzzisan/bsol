@@ -440,8 +440,8 @@ export default function AdminCourierCachePage() {
           <table className="min-w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className="border border-[var(--border)] bg-[#2f7ec1] px-3 py-2 text-left font-semibold text-white">{t.table.phone}</th>
-                <th className="border border-[var(--border)] bg-[#2f7ec1] px-3 py-2 text-left font-semibold text-white">{t.table.lastChecked}</th>
+                <th className="border border-[var(--border)] bg-[var(--accent)] px-3 py-2 text-left font-semibold text-white">{t.table.phone}</th>
+                <th className="border border-[var(--border)] bg-[var(--accent)] px-3 py-2 text-left font-semibold text-white">{t.table.lastChecked}</th>
                 {COURIERS.map((c) => (
                   <th key={c} className={`border border-[var(--border)] px-3 py-2 text-center font-semibold text-white ${COURIER_META[c].header}`}>
                     {COURIER_META[c].label}

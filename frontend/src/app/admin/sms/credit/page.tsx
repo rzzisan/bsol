@@ -699,7 +699,7 @@ export default function SmsCreditPage() {
         <h2 className="mb-4 text-base font-bold text-[var(--foreground)]">{t.usersTitle}</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-sm">
-            <thead className="bg-[#2f7ec1] text-white">
+            <thead className="bg-[var(--accent)] text-white">
               <tr>
                 <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colName}</th>
                 <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colMobile}</th>
@@ -774,7 +774,7 @@ export default function SmsCreditPage() {
         <h2 className="mb-4 text-base font-bold text-[var(--foreground)]">{t.purchasesTitle}</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-sm">
-            <thead className="bg-[#2f7ec1] text-white">
+            <thead className="bg-[var(--accent)] text-white">
               <tr>
                 <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colUser}</th>
                 <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">{t.colCreditsAmt}</th>
@@ -847,7 +847,7 @@ export default function SmsCreditPage() {
         <h2 className="mb-4 text-base font-bold text-[var(--foreground)]">{t.historyTitle}</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-sm">
-            <thead className="bg-[#2f7ec1] text-white">
+            <thead className="bg-[var(--accent)] text-white">
               <tr>
                 <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colUser}</th>
                 <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.colType}</th>

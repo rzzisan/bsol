@@ -226,7 +226,7 @@ export default function AdminDashboardPage() {
 
   const stats = summary
     ? [
-        { label: t.statLabels.activeSellers, value: summary.totals.active_sellers, tone: "bg-[#0f7c7b]" },
+        { label: t.statLabels.activeSellers, value: summary.totals.active_sellers, tone: "bg-[var(--accent)]" },
         { label: t.statLabels.inactiveSellers, value: summary.totals.inactive_sellers, tone: "bg-[#4c8bd6]" },
         { label: t.statLabels.newThisMonth, value: summary.totals.new_sellers_this_month, tone: "bg-[#ff7a59]" },
         { label: t.statLabels.activePackages, value: summary.totals.active_packages, tone: "bg-[#2f7ec1]" },

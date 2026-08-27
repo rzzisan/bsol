@@ -929,7 +929,7 @@ export default function ActiveCustomersPage() {
 
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-sm">
-            <thead className="bg-[#2f7ec1] text-white">
+            <thead className="bg-[var(--accent)] text-white">
               <tr>
                 <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">
                   {t.table.id}

@@ -165,7 +165,7 @@ export default function CollectionHistoryPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <article className="rounded-2xl bg-[#0f7c7b] p-4 text-white">
+        <article className="rounded-2xl bg-[var(--accent)] p-4 text-white">
           <p className="text-xs text-white/80">{txt.thisMonth}</p>
           <p className="mt-1 text-2xl font-bold">৳{summary.grand_total.toLocaleString()}</p>
         </article>

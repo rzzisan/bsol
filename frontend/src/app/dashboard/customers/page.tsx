@@ -144,7 +144,7 @@ export default function CustomersPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
-          { label: txt.totalCustomers, value: stats.total,             color: "bg-[#0f7c7b]" },
+          { label: txt.totalCustomers, value: stats.total,             color: "bg-[var(--accent)]" },
           { label: txt.vipCount,       value: stats.vip,               color: "bg-[#7b3fbd]" },
           { label: txt.highRisk,       value: stats.high_risk,         color: "bg-[#c0392b]" },
           { label: txt.repeat,         value: stats.repeat_customers,  color: "bg-[#2f7ec1]" },

@@ -134,7 +134,7 @@ export default function UserDashboardPage() {
     n == null ? "—" : Number(n).toLocaleString(locale === "bn" ? "bn-BD" : "en");
 
   const cards = [
-    { label: locale === "bn" ? "আজকের অর্ডার" : "Today's Orders",   value: fmt(orderStats?.today),        hint: locale === "bn" ? "আজ" : "today",            color: "bg-[#0f7c7b]" },
+    { label: locale === "bn" ? "আজকের অর্ডার" : "Today's Orders",   value: fmt(orderStats?.today),        hint: locale === "bn" ? "আজ" : "today",            color: "bg-[var(--accent)]" },
     { label: locale === "bn" ? "মোট অর্ডার" : "Total Orders",        value: fmt(orderStats?.total),        hint: locale === "bn" ? "সর্বমোট" : "all time",    color: "bg-[#2f7ec1]" },
     { label: locale === "bn" ? "পেন্ডিং" : "Pending",                value: fmt(orderStats?.pending),      hint: locale === "bn" ? "অপেক্ষারত" : "awaiting",  color: "bg-[#ff7a59]" },
     { label: locale === "bn" ? "হাই রিস্ক" : "High Risk",            value: fmt(orderStats?.high_risk),    hint: locale === "bn" ? "সন্দেহজনক" : "suspicious", color: "bg-[#c0392b]" },

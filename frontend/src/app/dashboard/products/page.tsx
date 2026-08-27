@@ -330,7 +330,7 @@ export default function ProductsPage() {
       {/* Stat bar */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: txt.totalProducts, value: stats.total, color: "bg-[#0f7c7b]" },
+          { label: txt.totalProducts, value: stats.total, color: "bg-[var(--accent)]" },
           { label: txt.activeProducts, value: stats.active, color: "bg-[#2f7ec1]" },
           { label: txt.lowStockAlert,  value: stats.lowStock, color: "bg-[#c0392b]" },
         ].map(c => (
