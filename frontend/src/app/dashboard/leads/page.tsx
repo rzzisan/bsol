@@ -196,7 +196,7 @@ const statusBadgeClass: Record<Lead["status"], string> = {
 };
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const tr = t[locale];
 
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -447,7 +447,7 @@ export default function Page() {
   const unreadCount = useMemo(() => leads.filter((l) => !l.is_read).length, [leads]);
 
   return (
-    <UserShell activeKey="facebook-leads" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="facebook-leads" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
       <div className="space-y-4">
         {/* Funnel summary */}
         {stats && (

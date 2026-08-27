@@ -198,7 +198,7 @@ type MediaPolicy = {
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken() ?? "";
 
@@ -445,7 +445,7 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <UserShell activeKey="product-list" defaultExpandedKey="products" pageTitle={{ bn: "পণ্য", en: "Products" }}>
+      <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="product-list" defaultExpandedKey="products" pageTitle={{ bn: "পণ্য", en: "Products" }}>
         <p className="py-16 text-center text-[var(--muted)]">{txt.loading}</p>
       </UserShell>
     );
@@ -453,14 +453,14 @@ export default function ProductDetailPage() {
 
   if (!product) {
     return (
-      <UserShell activeKey="product-list" defaultExpandedKey="products" pageTitle={{ bn: "পণ্য", en: "Products" }}>
+      <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="product-list" defaultExpandedKey="products" pageTitle={{ bn: "পণ্য", en: "Products" }}>
         <p className="py-16 text-center text-[var(--muted)]">{txt.notFound}</p>
       </UserShell>
     );
   }
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="product-list"
       defaultExpandedKey="products"
       pageTitle={{ bn: product.name, en: product.name }}

@@ -221,7 +221,7 @@ const text = {
 };
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const t = useMemo(() => text[locale], [locale]);
 
   const [plans, setPlans] = useState<Package[]>([]);
@@ -564,7 +564,7 @@ export default function Page() {
   }, [plans]);
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="subscription"
       defaultExpandedKey="settings"
       pageTitle={{ bn: text.bn.title, en: text.en.title }}

@@ -76,7 +76,7 @@ type Status = {
 type PurchaseRow = { id: number; amount: string; status: "pending" | "approved" | "rejected"; created_at: string };
 
 export default function StorefrontAddonPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = t[locale];
   const token = getStoredToken();
   const authHeaders = { Authorization: `Bearer ${token}` };
@@ -144,7 +144,7 @@ export default function StorefrontAddonPage() {
   const isUnlocked = status?.included_in_plan || status?.addon_active;
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="storefront-addon"
       defaultExpandedKey="settings"
       pageTitle={{ bn: t.bn.title, en: t.en.title }}

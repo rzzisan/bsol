@@ -84,7 +84,7 @@ const text = {
 };
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const t = useMemo(() => text[locale], [locale]);
 
   const [connection, setConnection] = useState<ConnectionInfo | null>(null);
@@ -198,7 +198,7 @@ export default function Page() {
   const isConnected = connection?.status === "connected" && connection.access_token_set;
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="whatsapp-connect"
       defaultExpandedKey="settings"
       pageTitle={{ bn: text.bn.title, en: text.en.title }}

@@ -73,7 +73,7 @@ const text = {
 };
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const t = useMemo(() => text[locale], [locale]);
 
   const [loading, setLoading] = useState(true);
@@ -128,7 +128,7 @@ export default function Page() {
   const money = (n: number) => `৳${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="daily-report"
       defaultExpandedKey="accounting"
       pageTitle={{ bn: text.bn.title, en: text.en.title }}

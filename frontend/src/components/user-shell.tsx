@@ -440,6 +440,18 @@ type UserShellProps = {
   pageTitle?: { bn: string; en: string };
   /** Optional page subtitle override */
   pageSubtitle?: { bn: string; en: string };
+  /**
+   * Controlled locale override. Pages that render their own body content
+   * from a separately-tracked `locale` state (the vast majority — see
+   * pre_launch_polish_context.md §থ) must pass their own `locale` +
+   * `onToggleLocale` here. Without this, UserShell manages an internal
+   * locale that's completely disconnected from the page's own — clicking
+   * the topbar language toggle then instantly changes the sidebar/topbar
+   * but leaves the page body in the old language until the next
+   * navigation remounts it and re-reads localStorage.
+   */
+  locale?: Locale;
+  onToggleLocale?: () => void;
   children: React.ReactNode;
 };
 
@@ -450,6 +462,8 @@ export default function UserShell({
   defaultExpandedKey,
   pageTitle,
   pageSubtitle,
+  locale: localeProp,
+  onToggleLocale: onToggleLocaleProp,
   children,
 }: UserShellProps) {
   // Support session banner (custom_domain_context.md §11.5). Rendered from
@@ -475,7 +489,11 @@ export default function UserShell({
   }
 
   const router = useRouter();
-  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  // Internal fallback state, used only when the calling page doesn't pass
+  // a controlled `locale`/`onToggleLocale` pair (see UserShellProps above).
+  const [internalLocale, setInternalLocale] = useState<Locale>(getStoredLocale);
+  const locale = localeProp ?? internalLocale;
+  const toggleLocale = onToggleLocaleProp ?? (() => setInternalLocale((prev) => (prev === "bn" ? "en" : "bn")));
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
@@ -484,7 +502,7 @@ export default function UserShell({
   const [whatsappUnread, setWhatsappUnread] = useState(0);
 
   useEffect(() => {
-    setLocale(getStoredLocale());
+    setInternalLocale(getStoredLocale());
     setTheme(getStoredTheme());
   }, []);
 
@@ -709,7 +727,7 @@ export default function UserShell({
         t={t}
         locale={locale}
         theme={theme}
-        onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
+        onToggleLocale={toggleLocale}
         onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         onSuccess={(updatedUser) => {
           setStoredUser(updatedUser);
@@ -734,7 +752,7 @@ export default function UserShell({
       menu={menu}
       activeKey={activeKey}
       defaultExpandedKey={defaultExpandedKey ?? null}
-      onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
+      onToggleLocale={toggleLocale}
       onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
     >
       {impersonating && (

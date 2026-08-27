@@ -121,7 +121,7 @@ type Customer = {
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -201,21 +201,21 @@ export default function CustomerDetailPage() {
     : txt.never;
 
   if (loading) return (
-    <UserShell activeKey="customer-list" defaultExpandedKey="customers"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="customer-list" defaultExpandedKey="customers"
       pageTitle={{ bn: "কাস্টমার প্রোফাইল", en: "Customer Profile" }}>
       <p className="text-center py-16 text-[var(--muted)]">{txt.loading}</p>
     </UserShell>
   );
 
   if (!customer) return (
-    <UserShell activeKey="customer-list" defaultExpandedKey="customers"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="customer-list" defaultExpandedKey="customers"
       pageTitle={{ bn: "কাস্টমার প্রোফাইল", en: "Customer Profile" }}>
       <p className="text-center py-16 text-[var(--muted)]">{txt.notFound}</p>
     </UserShell>
   );
 
   return (
-    <UserShell activeKey="customer-list" defaultExpandedKey="customers"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="customer-list" defaultExpandedKey="customers"
       pageTitle={{ bn: customer.name ?? customer.phone, en: customer.name ?? customer.phone }}>
 
       <Link href="/dashboard/customers" className="mb-4 inline-block text-sm text-[var(--accent)] hover:underline">{txt.back}</Link>

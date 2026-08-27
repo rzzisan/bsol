@@ -143,7 +143,7 @@ export default function UserDashboardPage() {
   ];
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="dashboard"
       pageTitle={{ bn: text.bn.pageTitle, en: text.en.pageTitle }}
       pageSubtitle={{ bn: text.bn.pageSubtitle, en: text.en.pageSubtitle }}

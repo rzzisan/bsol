@@ -70,7 +70,7 @@ type PreviewResult = { total_rows: number; valid_count: number; invalid_count: n
 type CommitResult = { created_count: number; skipped: { row_number: number; errors: string[] }[] };
 
 export default function BulkImportOrdersPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = t[locale];
   const token = getStoredToken();
   const authHeaders = { Authorization: `Bearer ${token}` };
@@ -147,7 +147,7 @@ export default function BulkImportOrdersPage() {
   };
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="bulk-import-orders"
       defaultExpandedKey="orders"
       pageTitle={{ bn: t.bn.title, en: t.en.title }}

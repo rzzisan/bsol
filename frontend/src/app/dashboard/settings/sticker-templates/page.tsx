@@ -59,7 +59,7 @@ type CatalogItem = { key: string; label_bn: string; label_en: string; size_label
 type Override = { courier: string; template_key: string };
 
 export default function StickerTemplatesPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = t[locale];
   const token = getStoredToken();
 
@@ -127,7 +127,7 @@ export default function StickerTemplatesPage() {
   };
 
   return (
-    <UserShell activeKey="sticker-templates" defaultExpandedKey="settings"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="sticker-templates" defaultExpandedKey="settings"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       <div className="catv-panel max-w-4xl p-5">

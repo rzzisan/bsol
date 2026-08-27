@@ -75,7 +75,7 @@ const text = {
 };
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const t = useMemo(() => text[locale], [locale]);
 
   const [rules, setRules] = useState<WhatsappAutomationRule[]>([]);
@@ -209,7 +209,7 @@ export default function Page() {
   };
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="whatsapp-automation"
       defaultExpandedKey="sms"
       pageTitle={{ bn: text.bn.pageTitle, en: text.en.pageTitle }}

@@ -37,7 +37,7 @@ const t = {
 type Customer = { id: number; name: string | null; phone: string; total_orders: number; total_spent: number; last_order_at: string | null; tags: string[] };
 
 export default function VipPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -68,7 +68,7 @@ export default function VipPage() {
     : txt.never;
 
   return (
-    <UserShell activeKey="vip-customers" defaultExpandedKey="customers"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="vip-customers" defaultExpandedKey="customers"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
       <div className="catv-panel overflow-x-auto">
         <table className="w-full text-sm">

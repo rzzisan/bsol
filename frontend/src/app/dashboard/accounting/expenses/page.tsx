@@ -38,7 +38,7 @@ const text = {
 };
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const t = useMemo(() => text[locale], [locale]);
 
   const [rows, setRows] = useState<Txn[]>([]);
@@ -141,7 +141,7 @@ export default function Page() {
   };
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="expenses"
       defaultExpandedKey="accounting"
       pageTitle={{ bn: text.bn.title, en: text.en.title }}

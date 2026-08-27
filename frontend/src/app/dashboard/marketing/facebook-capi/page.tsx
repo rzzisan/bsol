@@ -158,7 +158,7 @@ type TrackingUsage = {
 };
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const tr = t[locale];
 
   const [destinations, setDestinations] = useState<Destination[]>([]);
@@ -311,7 +311,7 @@ export default function Page() {
   }
 
   return (
-    <UserShell activeKey="facebook-capi" defaultExpandedKey="marketing" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="facebook-capi" defaultExpandedKey="marketing" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
       <div className="mx-auto max-w-2xl space-y-4">
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">{tr.capiTitle}</h3>

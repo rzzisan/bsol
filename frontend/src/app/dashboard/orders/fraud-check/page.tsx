@@ -100,7 +100,7 @@ type FraudResult = {
 };
 
 export default function FraudCheckPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -189,7 +189,7 @@ export default function FraudCheckPage() {
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(locale === "bn" ? "bn-BD" : "en-GB");
 
   return (
-    <UserShell activeKey="fraud-check" defaultExpandedKey="orders"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="fraud-check" defaultExpandedKey="orders"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       <div className="grid gap-4 lg:grid-cols-3">

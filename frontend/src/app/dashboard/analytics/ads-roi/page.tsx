@@ -6,10 +6,10 @@ import ModulePlaceholder from "@/components/module-placeholder";
 import { getStoredLocale, type Locale } from "@/lib/dashboard-client";
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="ads-roi"
       defaultExpandedKey="analytics"
       pageTitle={{ bn: "Ads ROI ট্র্যাকার", en: "Ads ROI Tracker" }}

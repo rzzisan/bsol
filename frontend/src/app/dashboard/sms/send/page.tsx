@@ -109,7 +109,7 @@ const text = {
 };
 
 export default function UserSmsSendPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
 
   const [gateways, setGateways] = useState<SmsGatewayOption[]>([]);
   const [loadingGateways, setLoadingGateways] = useState(true);
@@ -252,7 +252,7 @@ export default function UserSmsSendPage() {
   }
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="sms-send"
       defaultExpandedKey="sms"
       pageTitle={{ bn: "SMS পাঠান", en: "Send SMS" }}

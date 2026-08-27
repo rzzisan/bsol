@@ -241,7 +241,7 @@ const t = {
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
   const orderId = params.id as string;
@@ -417,7 +417,7 @@ export default function OrderDetailPage() {
 
   if (loading) {
     return (
-      <UserShell activeKey="all-orders" defaultExpandedKey="orders"
+      <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="all-orders" defaultExpandedKey="orders"
         pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
         <div className="catv-panel p-10 text-center text-[var(--muted)]">{txt.loading}</div>
       </UserShell>
@@ -426,7 +426,7 @@ export default function OrderDetailPage() {
 
   if (!order) {
     return (
-      <UserShell activeKey="all-orders" defaultExpandedKey="orders"
+      <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="all-orders" defaultExpandedKey="orders"
         pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
         <div className="catv-panel p-10 text-center text-[var(--muted)]">{txt.notFound}</div>
       </UserShell>
@@ -434,7 +434,7 @@ export default function OrderDetailPage() {
   }
 
   return (
-    <UserShell activeKey="all-orders" defaultExpandedKey="orders"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="all-orders" defaultExpandedKey="orders"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       {/* Toast */}

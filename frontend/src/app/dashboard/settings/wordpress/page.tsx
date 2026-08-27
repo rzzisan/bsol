@@ -98,7 +98,7 @@ type Site = {
 };
 
 export default function WordpressConnectPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const tr = t[locale];
 
   const [sites, setSites] = useState<Site[]>([]);
@@ -227,7 +227,7 @@ export default function WordpressConnectPage() {
   }
 
   return (
-    <UserShell activeKey="wordpress-connect" defaultExpandedKey="settings" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="wordpress-connect" defaultExpandedKey="settings" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
       <div className="mx-auto max-w-2xl space-y-4">
         <p className="text-sm text-[var(--muted)]">{tr.intro}</p>
 

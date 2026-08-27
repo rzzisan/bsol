@@ -96,7 +96,7 @@ const sourceColor: Record<string, string> = {
 };
 
 export default function CollectionHistoryPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -158,7 +158,7 @@ export default function CollectionHistoryPage() {
   const clearFilters = () => { setFilterSource("all"); setFilterCollector("all"); setSearch(""); setFromDate(""); setToDate(""); };
 
   return (
-    <UserShell activeKey="collection-history" defaultExpandedKey="accounting"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="collection-history" defaultExpandedKey="accounting"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       <p className="mb-4 text-sm text-[var(--muted)]">{txt.subtitle}</p>

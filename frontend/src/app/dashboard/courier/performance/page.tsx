@@ -113,7 +113,7 @@ function stringify(value: unknown): string {
 }
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -255,7 +255,7 @@ export default function Page() {
   const filteredPolice = policeStations.filter(item => stringify(item.name ?? item.station_name ?? item.thana_name ?? item.bn_name).toLowerCase().includes(policeSearch.toLowerCase()));
 
   return (
-    <UserShell activeKey="courier-perf" defaultExpandedKey="courier" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="courier-perf" defaultExpandedKey="courier" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
       <div className="mb-4 flex items-start justify-between gap-3 catv-panel p-4">
         <div>
           <h2 className="text-lg font-bold">{txt.pageTitle}</h2>

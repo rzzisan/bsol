@@ -170,10 +170,10 @@ type StaffMember = {
 type SeatUsage = { used: number; max_staff: number | null };
 
 export default function StaffManagementPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="staff-management"
       defaultExpandedKey="settings"
       pageTitle={{ bn: "টিম / স্টাফ", en: "Staff & Team" }}

@@ -129,7 +129,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function TrackingLogPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const tr = t[locale];
 
   const [usage, setUsage] = useState<TrackingUsage | null>(null);
@@ -201,7 +201,7 @@ export default function TrackingLogPage() {
   };
 
   return (
-    <UserShell activeKey="tracking-log" defaultExpandedKey="analytics" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="tracking-log" defaultExpandedKey="analytics" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
       <div className="mx-auto max-w-5xl space-y-4">
         {/* Usage meter — same figures as Marketing → Facebook CAPI, shown here too since staff can open this page without owner-only destination access. */}
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">

@@ -47,7 +47,7 @@ type Product = {
 };
 
 export default function StockPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -97,7 +97,7 @@ export default function StockPage() {
   };
 
   return (
-    <UserShell activeKey="stock-management" defaultExpandedKey="products"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="stock-management" defaultExpandedKey="products"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       <div className="catv-panel overflow-x-auto">

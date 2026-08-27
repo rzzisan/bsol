@@ -54,7 +54,7 @@ type Customer = {
 };
 
 export default function RiskyPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -89,7 +89,7 @@ export default function RiskyPage() {
     : txt.never;
 
   return (
-    <UserShell activeKey="risky-customers" defaultExpandedKey="customers"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="risky-customers" defaultExpandedKey="customers"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
       <div className="catv-panel overflow-x-auto">
         <table className="w-full text-sm">

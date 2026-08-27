@@ -114,7 +114,7 @@ const text = {
 };
 
 export default function UserSmsHistoryPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
 
   const [rows, setRows] = useState<SmsHistoryRow[]>([]);
   const [loadingRows, setLoadingRows] = useState(true);
@@ -183,7 +183,7 @@ export default function UserSmsHistoryPage() {
   }, []);
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="sms-history"
       defaultExpandedKey="sms"
       pageTitle={{ bn: "SMS হিস্টোরি", en: "SMS History" }}

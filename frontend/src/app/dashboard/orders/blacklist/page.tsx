@@ -52,7 +52,7 @@ const t = {
 type BLEntry = { id: number; phone: string; reason: string | null; blocked_at: string };
 
 export default function BlacklistPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -119,7 +119,7 @@ export default function BlacklistPage() {
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(locale === "bn" ? "bn-BD" : "en-GB");
 
   return (
-    <UserShell activeKey="blacklist" defaultExpandedKey="orders"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="blacklist" defaultExpandedKey="orders"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       {/* Toolbar */}

@@ -60,7 +60,7 @@ const text = {
 };
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const t = useMemo(() => text[locale], [locale]);
 
   const [messages, setMessages] = useState<WhatsappMessage[]>([]);
@@ -161,7 +161,7 @@ export default function Page() {
   };
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="whatsapp-inbox"
       pageTitle={{ bn: text.bn.pageTitle, en: text.en.pageTitle }}
       pageSubtitle={{ bn: text.bn.pageSubtitle, en: text.en.pageSubtitle }}

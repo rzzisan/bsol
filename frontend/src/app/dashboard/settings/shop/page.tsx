@@ -344,7 +344,7 @@ function SubdomainPanel({
 }
 
 export default function ShopProfilePage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = t[locale];
   const token = getStoredToken();
 
@@ -462,7 +462,7 @@ export default function ShopProfilePage() {
   const canSave = form.shop_name.trim().length > 0 && form.phone.trim().length > 0 && form.address.trim().length > 0;
 
   return (
-    <UserShell activeKey="shop-profile" defaultExpandedKey="settings"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="shop-profile" defaultExpandedKey="settings"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       <div className="catv-panel max-w-2xl p-5">

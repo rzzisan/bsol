@@ -55,7 +55,7 @@ type Category = { id: number; name: string; slug: string; description: string | 
 type FormState = { name: string; description: string; sort_order: number };
 
 export default function CategoriesPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -134,7 +134,7 @@ export default function CategoriesPage() {
   };
 
   return (
-    <UserShell activeKey="product-categories" defaultExpandedKey="products"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="product-categories" defaultExpandedKey="products"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       <div className="flex justify-end mb-4">

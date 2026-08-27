@@ -372,14 +372,14 @@ export default function StorefrontSettingsPage() {
 
   if (loading) {
     return (
-      <UserShell activeKey="storefront-settings" defaultExpandedKey="settings">
+      <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="storefront-settings" defaultExpandedKey="settings">
         <p className="py-16 text-center text-[var(--muted)]">{txt.loading}</p>
       </UserShell>
     );
   }
 
   return (
-    <UserShell activeKey="storefront-settings" defaultExpandedKey="settings">
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="storefront-settings" defaultExpandedKey="settings">
       <main className="mx-auto min-h-screen w-full max-w-2xl px-4 py-8">
         <h1 className="text-xl font-bold sm:text-2xl">{txt.pageTitle}</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">{txt.intro}</p>

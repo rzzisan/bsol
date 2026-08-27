@@ -71,7 +71,7 @@ type Claim = {
 };
 
 export default function OnlinePaymentVerificationPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -138,7 +138,7 @@ export default function OnlinePaymentVerificationPage() {
     new Date(d).toLocaleString(locale === "bn" ? "bn-BD" : "en-US", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
   return (
-    <UserShell activeKey="online-payment-verification" defaultExpandedKey="accounting"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="online-payment-verification" defaultExpandedKey="accounting"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       <p className="mb-4 text-sm text-[var(--muted)]">{txt.subtitle}</p>

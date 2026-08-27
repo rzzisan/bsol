@@ -84,7 +84,7 @@ export default function Page() {
 }
 
 function FacebookSettingsPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const tr = t[locale];
   const searchParams = useSearchParams();
 
@@ -232,7 +232,7 @@ function FacebookSettingsPage() {
   }
 
   return (
-    <UserShell activeKey="facebook-connect" defaultExpandedKey="settings" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="facebook-connect" defaultExpandedKey="settings" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
       <div className="mx-auto max-w-2xl space-y-4">
         <p className="text-sm text-[var(--muted)]">{tr.intro}</p>
 

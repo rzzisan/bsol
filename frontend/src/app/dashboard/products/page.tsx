@@ -150,7 +150,7 @@ const statusBadge: Record<string, string> = {
 };
 
 export default function ProductsPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -324,7 +324,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <UserShell activeKey="product-list" defaultExpandedKey="products"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="product-list" defaultExpandedKey="products"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       {/* Stat bar */}

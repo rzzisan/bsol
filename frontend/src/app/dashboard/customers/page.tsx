@@ -76,7 +76,7 @@ type Customer = {
 type Stats = { total: number; vip: number; high_risk: number; repeat_customers: number };
 
 export default function CustomersPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -138,7 +138,7 @@ export default function CustomersPage() {
     : txt.never;
 
   return (
-    <UserShell activeKey="customer-list" defaultExpandedKey="customers"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="customer-list" defaultExpandedKey="customers"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       {/* Stats */}

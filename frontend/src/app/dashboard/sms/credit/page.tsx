@@ -184,7 +184,7 @@ const text = {
 };
 
 export default function Page() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const t = useMemo(() => text[locale], [locale]);
 
   const [rateInfo, setRateInfo] = useState<RateInfo | null>(null);
@@ -542,7 +542,7 @@ export default function Page() {
   const manualVisible = showManualForm || !rateInfo?.bkash_gateway_enabled;
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="sms-credit"
       defaultExpandedKey="sms"
       pageTitle={{ bn: text.bn.title, en: text.en.title }}

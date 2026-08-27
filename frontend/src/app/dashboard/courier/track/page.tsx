@@ -68,7 +68,7 @@ type Order = {
 };
 
 export default function TrackPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -158,7 +158,7 @@ export default function TrackPage() {
   };
 
   return (
-    <UserShell activeKey="track-parcel" defaultExpandedKey="courier"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="track-parcel" defaultExpandedKey="courier"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       {/* Toolbar */}

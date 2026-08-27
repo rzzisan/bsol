@@ -209,7 +209,7 @@ type BulkForm = {
 };
 
 export default function BookParcelPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
   // COD amount is auto-set from the order's due balance and locked for
@@ -612,7 +612,7 @@ export default function BookParcelPage() {
   };
 
   return (
-    <UserShell activeKey="book-parcel" defaultExpandedKey="courier"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="book-parcel" defaultExpandedKey="courier"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       <div className="catv-panel mb-4 flex flex-wrap items-center gap-3 p-3">

@@ -104,7 +104,7 @@ type LandingPageOption = { id: number; title: string };
 type WpSite = { id: number; domain: string; status: string };
 
 export default function AbandonedCheckoutsPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -232,7 +232,7 @@ export default function AbandonedCheckoutsPage() {
   };
 
   return (
-    <UserShell activeKey="abandoned-checkouts" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="abandoned-checkouts" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[

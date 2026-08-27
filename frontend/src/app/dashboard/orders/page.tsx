@@ -214,7 +214,7 @@ type PaymentEntry = {
 };
 
 export default function OrdersPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -462,7 +462,7 @@ export default function OrdersPage() {
   }, [paymentSummary, paymentForm.amount, paymentForm.discount]);
 
   return (
-    <UserShell activeKey="all-orders" defaultExpandedKey="orders"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="all-orders" defaultExpandedKey="orders"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       {/* Stats */}

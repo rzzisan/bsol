@@ -84,7 +84,7 @@ type Balance = {
 };
 
 export default function OrderCreditsPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = t[locale];
   const token = getStoredToken();
   const authHeaders = { Authorization: `Bearer ${token}` };
@@ -153,7 +153,7 @@ export default function OrderCreditsPage() {
     s === "approved" ? "text-emerald-500 bg-emerald-500/10" : s === "rejected" ? "text-red-400 bg-red-500/10" : "text-amber-500 bg-amber-500/10";
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="order-credits"
       defaultExpandedKey="settings"
       pageTitle={{ bn: t.bn.title, en: t.en.title }}

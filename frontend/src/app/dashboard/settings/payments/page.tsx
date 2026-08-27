@@ -254,7 +254,7 @@ const EMPTY_FORM: Form = {
 };
 
 export default function PaymentGatewaySettingsPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -409,7 +409,7 @@ export default function PaymentGatewaySettingsPage() {
   const currentGatewayConfig = GATEWAY_PROVIDERS.find((g) => g.provider === activeTab);
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="online-payment-settings"
       defaultExpandedKey="settings"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}

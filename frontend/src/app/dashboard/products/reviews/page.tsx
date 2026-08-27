@@ -44,7 +44,7 @@ type Review = {
 };
 
 export default function ProductReviewsPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const token = getStoredToken() ?? "";
   const txt = t[locale];
 
@@ -82,7 +82,7 @@ export default function ProductReviewsPage() {
   }
 
   return (
-    <UserShell activeKey="reviews" defaultExpandedKey="products" pageTitle={{ bn: "রিভিউ", en: "Reviews" }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="reviews" defaultExpandedKey="products" pageTitle={{ bn: "রিভিউ", en: "Reviews" }}>
       <div className="p-4 sm:p-5">
         <h1 className="text-xl font-bold sm:text-2xl">{txt.pageTitle}</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">{txt.intro}</p>

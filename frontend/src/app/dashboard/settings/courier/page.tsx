@@ -285,7 +285,7 @@ const EMPTY_FORM: Form = {
 };
 
 export default function CourierSettingsPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -682,7 +682,7 @@ export default function CourierSettingsPage() {
   };
 
   return (
-    <UserShell activeKey="settings-courier" defaultExpandedKey="settings"
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="settings-courier" defaultExpandedKey="settings"
       pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
 
       {loading ? (

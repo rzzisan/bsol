@@ -50,7 +50,7 @@ export default function LandingPageAnalyticsDashboard() {
   const params = useParams();
   const landingPageId = params?.landingPageId as string;
 
-  const [locale, setLocale] = useState<Locale>('bn');
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const [stats, setStats] = useState<Stats | null>(null);
   const [visitors, setVisitors] = useState<VisitorResponse | null>(null);
   const [countryStats, setCountryStats] = useState<CountryStats[]>([]);
@@ -156,7 +156,7 @@ export default function LandingPageAnalyticsDashboard() {
 
   if (loading) {
     return (
-      <UserShell activeKey="landing-pages" pageTitle={{ bn: 'স্ট্যাটিস্টিক্স লোড হচ্ছে...', en: 'Loading Statistics...' }}>
+      <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="landing-pages" pageTitle={{ bn: 'স্ট্যাটিস্টিক্স লোড হচ্ছে...', en: 'Loading Statistics...' }}>
         <div className="flex items-center justify-center min-h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         </div>
@@ -166,7 +166,7 @@ export default function LandingPageAnalyticsDashboard() {
 
   if (error) {
     return (
-      <UserShell activeKey="landing-pages" pageTitle={{ bn: 'স্ট্যাটিস্টিক্স', en: 'Statistics' }}>
+      <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="landing-pages" pageTitle={{ bn: 'স্ট্যাটিস্টিক্স', en: 'Statistics' }}>
         <div className="p-4 bg-red-50 text-red-700 rounded-lg">
           <strong>Error:</strong> {error}
         </div>
@@ -175,7 +175,7 @@ export default function LandingPageAnalyticsDashboard() {
   }
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="landing-pages"
       pageTitle={{
         bn: `${landingPageTitle} - স্ট্যাটিস্টিক্স`,

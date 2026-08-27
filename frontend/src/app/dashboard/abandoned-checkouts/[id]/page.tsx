@@ -140,7 +140,7 @@ type AbandonedCheckoutDetail = {
 export default function AbandonedCheckoutDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const txt = useMemo(() => t[locale], [locale]);
   const token = getStoredToken();
 
@@ -264,13 +264,13 @@ export default function AbandonedCheckoutDetailPage() {
   const subtotal = items.reduce((sum, i) => sum + i.quantity * Number(i.unit_price), 0);
 
   if (loading) return (
-    <UserShell activeKey="abandoned-checkouts" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="abandoned-checkouts" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
       <p className="py-16 text-center text-[var(--muted)]">{txt.loading}</p>
     </UserShell>
   );
 
   if (!checkout) return (
-    <UserShell activeKey="abandoned-checkouts" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="abandoned-checkouts" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
       <p className="py-16 text-center text-[var(--muted)]">{txt.notFound}</p>
     </UserShell>
   );
@@ -279,7 +279,7 @@ export default function AbandonedCheckoutDetailPage() {
   const editable = checkout.status !== "converted";
 
   return (
-    <UserShell activeKey="abandoned-checkouts" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="abandoned-checkouts" pageTitle={{ bn: t.bn.pageTitle, en: t.en.pageTitle }}>
       <Link href="/dashboard/abandoned-checkouts" className="mb-4 inline-block text-sm text-[var(--accent)] hover:underline">
         {txt.back}
       </Link>

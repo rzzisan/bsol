@@ -9,7 +9,7 @@ import { LANDING_API_BASE } from "@/lib/landing-pages";
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
 export default function CreateOrderPage() {
-  const [locale] = useState<Locale>(getStoredLocale);
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const token = getStoredToken();
 
   // "Convert to Order" from an abandoned checkout: ?from_abandoned_checkout=<id>.
@@ -89,7 +89,7 @@ export default function CreateOrderPage() {
   }, []);
 
   return (
-    <UserShell
+    <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="create-order"
       defaultExpandedKey="orders"
       pageTitle={{ bn: "নতুন অর্ডার", en: "New Order" }}
