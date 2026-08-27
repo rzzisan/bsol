@@ -289,4 +289,50 @@ class PlatformMarketingTrackingTest extends TestCase
         $this->assertStringContainsString('fb.1.', $stored['fbc']);
         $this->assertStringContainsString('clickid456', $stored['fbc']);
     }
+
+    // -- Acquisition channel breakdown ---------------------------------------
+
+    public function test_the_channels_endpoint_buckets_signups_by_first_touch_utm_source(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+
+        $package = SubscriptionPackage::create(['name' => 'Pro', 'slug' => 'pro-'.uniqid(), 'price' => 500, 'duration_days' => 30]);
+
+        // A Facebook-ad-acquired seller who paid.
+        $adSeller = User::factory()->create([
+            'role' => 'user',
+            'signup_utm_source' => 'facebook',
+            'signup_utm_campaign' => 'winter_push',
+        ]);
+        SubscriptionPayment::create([
+            'user_id' => $adSeller->id, 'package_id' => $package->id, 'amount' => 500,
+            'base_amount' => 500, 'status' => 'approved',
+        ]);
+
+        // An offline-acquired seller — no utm_source captured at all — who also paid.
+        $offlineSeller = User::factory()->create(['role' => 'user', 'signup_utm_source' => null]);
+        SubscriptionPayment::create([
+            'user_id' => $offlineSeller->id, 'package_id' => $package->id, 'amount' => 500,
+            'base_amount' => 500, 'status' => 'approved',
+        ]);
+
+        // A second ad-acquired seller who never converted — should count toward signups only.
+        User::factory()->create(['role' => 'user', 'signup_utm_source' => 'facebook', 'signup_utm_campaign' => 'winter_push']);
+
+        $response = $this->getJson('/api/admin/marketing-events/channels')->assertOk();
+
+        $channels = collect($response->json('channels'))->keyBy('channel');
+        $this->assertSame(2, $channels['facebook']['signups']);
+        $this->assertSame(1, $channels['facebook']['paying_customers']);
+        $this->assertEquals(500, $channels['facebook']['revenue']);
+        $this->assertSame(1, $channels['organic_direct']['signups']);
+        $this->assertSame(1, $channels['organic_direct']['paying_customers']);
+        $this->assertEquals(500, $channels['organic_direct']['revenue']);
+
+        $campaign = collect($response->json('campaigns'))->sole();
+        $this->assertSame('facebook', $campaign['source']);
+        $this->assertSame('winter_push', $campaign['campaign']);
+        $this->assertSame(2, $campaign['signups']);
+        $this->assertEquals(500, $campaign['revenue']);
+    }
 }

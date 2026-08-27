@@ -907,6 +907,7 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/settings/facebook', [PlatformFacebookSettingsController::class, 'show']);
         Route::put('/settings/facebook', [PlatformFacebookSettingsController::class, 'update']);
         Route::get('/marketing-events', [PlatformMarketingEventController::class, 'index']);
+        Route::get('/marketing-events/channels', [PlatformMarketingEventController::class, 'channels']);
 
         // Landing page templates — authored by converting a seller's landing
         // page into a reusable template (replaces the old CartFlows/Elementor

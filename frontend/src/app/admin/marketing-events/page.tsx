@@ -33,6 +33,19 @@ const labels = {
     matchFbp: "ব্রাউজার কুকি (fbp)",
     matchFbc: "অ্যাড ক্লিক (fbc)",
     matchPhone: "ফোন নম্বর",
+    channelsTitle: "অ্যাকুইজিশন চ্যানেল",
+    channelsIntro: "কে কোন চ্যানেল থেকে রেজিস্টার করেছে — প্রথম ভিজিটেই ক্যাপচার হওয়া UTM অনুযায়ী। যাদের কোনো UTM নেই (অফলাইন লিড, সরাসরি URL) তারা 'organic_direct'-এ পড়ে — তারাও প্রতিটা ইভেন্টে পিক্সেল ডেটাসেটে যোগ হয়, শুধু কোনো নির্দিষ্ট ক্যাম্পেইনের ক্রেডিট পায় না।",
+    channelOrganic: "অর্গানিক / অফলাইন / ডাইরেক্ট",
+    colChannel: "চ্যানেল",
+    colSignups: "রেজিস্ট্রেশন",
+    colPaying: "পেয়িং কাস্টমার",
+    colRevenue: "রেভিনিউ",
+    campaignsTitle: "টপ ক্যাম্পেইন",
+    campaignsIntro: "কোন নির্দিষ্ট ক্যাম্পেইন সবচেয়ে বেশি পেয়িং কাস্টমার আনছে — সেটাই স্কেল করার মতো ক্যাম্পেইন।",
+    colCampaign: "ক্যাম্পেইন",
+    colSource: "সোর্স",
+    noChannels: "এখনো কোনো রেজিস্ট্রেশন নেই।",
+    noCampaigns: "এখনো কোনো ক্যাম্পেইন-ট্যাগড রেজিস্ট্রেশন নেই।",
     countsTitle: "মোট সংখ্যা",
     logTitle: "ইভেন্ট লগ",
     filterAllStatus: "সব স্ট্যাটাস",
@@ -90,6 +103,19 @@ const labels = {
     matchFbp: "Browser cookie (fbp)",
     matchFbc: "Ad click (fbc)",
     matchPhone: "Phone number",
+    channelsTitle: "Acquisition Channels",
+    channelsIntro: "Who registered through which channel — bucketed by the UTM captured on their very first visit. Anyone with no UTM (offline lead, direct URL) falls into 'organic_direct' — they still feed every event into the pixel dataset, they just don't get credited to a specific campaign.",
+    channelOrganic: "Organic / Offline / Direct",
+    colChannel: "Channel",
+    colSignups: "Signups",
+    colPaying: "Paying Customers",
+    colRevenue: "Revenue",
+    campaignsTitle: "Top Campaigns",
+    campaignsIntro: "Which specific campaign is actually producing paying customers — that's the one worth scaling.",
+    colCampaign: "Campaign",
+    colSource: "Source",
+    noChannels: "No registrations yet.",
+    noCampaigns: "No campaign-tagged registrations yet.",
     countsTitle: "Totals",
     logTitle: "Event Log",
     filterAllStatus: "All statuses",
@@ -137,6 +163,9 @@ const labels = {
 
 type MatchQuality = { sampled: number; fbp_rate: number | null; fbc_rate: number | null; phone_rate: number | null };
 
+type ChannelRow = { channel: string; signups: number; paying_customers: number; revenue: number };
+type CampaignRow = { source: string; campaign: string; signups: number; revenue: number };
+
 type EventRow = {
   id: number;
   event_name: string;
@@ -168,6 +197,9 @@ export default function AdminMarketingEventsPage() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [matchQuality, setMatchQuality] = useState<MatchQuality | null>(null);
   const [counts, setCounts] = useState<Record<string, Record<string, number>>>({});
+  const [channels, setChannels] = useState<ChannelRow[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
+  const [channelsLoading, setChannelsLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
   const [eventNameFilter, setEventNameFilter] = useState("");
@@ -227,9 +259,31 @@ export default function AdminMarketingEventsPage() {
     }
   }, [token, page, statusFilter, eventNameFilter]);
 
+  const loadChannels = useCallback(async () => {
+    if (!token) return;
+    setChannelsLoading(true);
+    try {
+      const res = await fetch(`${API}/admin/marketing-events/channels`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setChannels(json.channels ?? []);
+        setCampaigns(json.campaigns ?? []);
+      }
+    } catch {
+      // silent — sections just stay empty, retry on next visit
+    } finally {
+      setChannelsLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
-    if (state === "ready") void loadEvents();
-  }, [state, loadEvents]);
+    if (state === "ready") {
+      void loadEvents();
+      void loadChannels();
+    }
+  }, [state, loadEvents, loadChannels]);
 
   useEffect(() => {
     setPage(1);
@@ -295,6 +349,76 @@ export default function AdminMarketingEventsPage() {
             </div>
           </section>
         )}
+
+        <section className="catv-panel p-5">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">{t.channelsTitle}</h2>
+          <p className="mt-1 mb-3 text-xs text-[var(--muted)]">{t.channelsIntro}</p>
+
+          {channelsLoading ? (
+            <p className="text-sm text-[var(--muted)]">{t.loading}</p>
+          ) : channels.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">{t.noChannels}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-left text-[var(--muted)]">
+                    <th className="px-2 py-2 font-medium">{t.colChannel}</th>
+                    <th className="px-2 py-2 font-medium">{t.colSignups}</th>
+                    <th className="px-2 py-2 font-medium">{t.colPaying}</th>
+                    <th className="px-2 py-2 font-medium">{t.colRevenue}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {channels.map((row) => (
+                    <tr key={row.channel} className="border-b border-[var(--border)]/50">
+                      <td className="px-2 py-2 font-medium text-[var(--foreground)]">
+                        {row.channel === "organic_direct" ? t.channelOrganic : row.channel}
+                      </td>
+                      <td className="px-2 py-2 text-[var(--muted)]">{row.signups}</td>
+                      <td className="px-2 py-2 text-[var(--muted)]">{row.paying_customers}</td>
+                      <td className="px-2 py-2 text-[var(--muted)]">{row.revenue.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="catv-panel p-5">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">{t.campaignsTitle}</h2>
+          <p className="mt-1 mb-3 text-xs text-[var(--muted)]">{t.campaignsIntro}</p>
+
+          {channelsLoading ? (
+            <p className="text-sm text-[var(--muted)]">{t.loading}</p>
+          ) : campaigns.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">{t.noCampaigns}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-left text-[var(--muted)]">
+                    <th className="px-2 py-2 font-medium">{t.colCampaign}</th>
+                    <th className="px-2 py-2 font-medium">{t.colSource}</th>
+                    <th className="px-2 py-2 font-medium">{t.colSignups}</th>
+                    <th className="px-2 py-2 font-medium">{t.colRevenue}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((row) => (
+                    <tr key={`${row.source}|${row.campaign}`} className="border-b border-[var(--border)]/50">
+                      <td className="px-2 py-2 font-medium text-[var(--foreground)]">{row.campaign}</td>
+                      <td className="px-2 py-2 text-[var(--muted)]">{row.source}</td>
+                      <td className="px-2 py-2 text-[var(--muted)]">{row.signups}</td>
+                      <td className="px-2 py-2 text-[var(--muted)]">{row.revenue.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         <section className="catv-panel p-5">
           <h2 className="text-sm font-semibold text-[var(--foreground)]">{t.matchTitle}</h2>
