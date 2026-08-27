@@ -212,7 +212,7 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## থ. Cross-cutting Design/UI/UX Consistency (`CONTEXT.md` §22 অনুযায়ী পূর্ণ সুইপ)
+## থ. Cross-cutting Design/UI/UX Consistency (`CONTEXT.md` §22 অনুযায়ী পূর্ণ সুইপ) — ✅ মূল sweep সম্পন্ন (2026-08-27)
 
 কোনো নির্দিষ্ট মডিউলের বাগ না, পুরো অ্যাপ জুড়ে একবার পূর্ণ sweep দরকার — মাসের পর মাস আলাদা সেশনে ফিচার যোগ হয়েছে, design drift জমেছে হতে পারে:
 
