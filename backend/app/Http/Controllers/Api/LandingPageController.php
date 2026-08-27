@@ -23,6 +23,7 @@ use App\Models\User;
 use App\Support\ProductVariantFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -97,13 +98,14 @@ class LandingPageController extends Controller
             ->with(['template', 'products.product.images', 'products.variant.optionValues.option'])
             ->firstOrFail();
 
-        // Product has no model-level $hidden (the seller's own dashboard
-        // needs every column) — but this is the one place an anonymous
-        // visitor sees the raw row. digital_external_url IS the paid
-        // product itself for external_url deliveries; leaking it here
+        // Product/ProductVariant have no model-level $hidden (the seller's
+        // own dashboard needs every column) — but this is the one place an
+        // anonymous visitor sees the raw row. digital_external_url IS the
+        // paid product itself for external_url deliveries; leaking it here
         // would let anyone download for free without ever paying.
         // digital_file_path is a private-disk path, not directly useful,
-        // but no reason to expose server-internal detail either.
+        // but no reason to expose server-internal detail either. cost_price
+        // is the seller's internal margin on both models — never public.
         // product_type/digital_delivery_channels stay visible — the
         // checkout UI needs them to gate COD/shipping for digital carts.
         foreach ($page->products as $landingProduct) {
@@ -111,7 +113,9 @@ class LandingPageController extends Controller
                 'digital_file_path',
                 'digital_external_url',
                 'digital_file_mime_type',
+                'cost_price',
             ]);
+            $landingProduct->variant?->makeHidden(['cost_price']);
         }
 
         return response()->json([
@@ -434,7 +438,14 @@ class LandingPageController extends Controller
 
         $variant->load('optionValues.option');
 
-        return response()->json(['success' => true, 'data' => ProductVariantFormatter::format($variant)]);
+        // ProductVariantFormatter is shared with the merchant-facing
+        // ProductVariantController dashboard, which legitimately needs
+        // cost_price — strip it here since this endpoint is unauthenticated
+        // and reachable from any live checkout page.
+        return response()->json([
+            'success' => true,
+            'data' => Arr::except(ProductVariantFormatter::format($variant), ['cost_price']),
+        ]);
     }
 
     /** Product must belong to a published page and actually be attached to it. */
