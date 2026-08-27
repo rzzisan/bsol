@@ -161,7 +161,7 @@ export default function DigitalProductSettingsPage() {
     void load();
   }, [token, t.loaded]);
 
-  const menus = useMemo(() => buildAdminMenu({ ...t.menu }), [t]);
+  const menus = useMemo(() => buildAdminMenu(locale), [t]);
 
   const update = (k: keyof Settings, v: string | number | boolean | string[]) =>
     setForm((p) => ({ ...p, [k]: v }));

@@ -50,8 +50,8 @@ const inputCls =
 const labelCls = "mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]";
 
 export default function AdminAddonPackagesPage() {
-  const [locale, setLocale] = useState<Locale>("bn");
-  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
   const [packages, setPackages] = useState<AddonPackageRow[]>([]);
@@ -89,23 +89,7 @@ export default function AdminAddonPackagesPage() {
 
   const menu = useMemo(
     () =>
-      buildAdminMenu({
-        dashboard: locale === "bn" ? "ড্যাশবোর্ড" : "Dashboard",
-        customers: locale === "bn" ? "গ্রাহক" : "Customers",
-        activeCustomers: locale === "bn" ? "অ্যাকটিভ গ্রাহক" : "Active Customers",
-        pendingCustomers: locale === "bn" ? "পেন্ডিং গ্রাহক" : "Pending Customers",
-        sms: "SMS",
-        smsGateway: "SMS Gateway",
-        smsSend: "Send SMS",
-        smsHistory: "SMS History",
-        smsCredit: "SMS Credit",
-        packages: locale === "bn" ? "প্যাকেজ" : "Packages",
-        addonPackages: locale === "bn" ? "অ্যাড-অন প্যাকেজ" : "Add-on Packages",
-        billing: "Billing",
-        reports: "Reports",
-        settings: "Settings",
-        emailSettings: "Email Settings",
-      }),
+      buildAdminMenu(locale),
     [locale],
   );
 

@@ -884,7 +884,7 @@ function AuthSection({
 // ---------------------------------------------------------------------------
 export default function HomeContent({ initialLocale }: { initialLocale: Locale }) {
   const [locale, setLocale] = useState<Locale>(initialLocale);
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [authTab, setAuthTab] = useState<AuthTab>("login");
   const [heroReady, setHeroReady] = useState(false);
   const [legalLinks, setLegalLinks] = useState<{

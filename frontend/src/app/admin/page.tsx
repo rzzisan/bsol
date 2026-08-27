@@ -201,22 +201,7 @@ export default function AdminDashboardPage() {
   const t = useMemo(() => text[locale], [locale]);
   const menus = useMemo(
     () =>
-      buildAdminMenu({
-        dashboard: t.menu.dashboard,
-        customers: t.menu.customers,
-        activeCustomers: t.menu.activeCustomers,
-        pendingCustomers: t.menu.pendingCustomers,
-        sms: t.menu.sms,
-        smsGateway: t.menu.smsGateway,
-        smsSend: t.menu.smsSend,
-        smsHistory: t.menu.smsHistory,
-        smsCredit: t.menu.smsCredit,
-        packages: t.menu.packages,
-        billing: t.menu.billing,
-        reports: t.menu.reports,
-        settings: t.menu.settings,
-        emailSettings: t.menu.emailSettings,
-      }),
+      buildAdminMenu(locale),
     [t],
   );
 

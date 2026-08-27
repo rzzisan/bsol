@@ -213,7 +213,7 @@ export default function AdminFacebookSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const menus = useMemo(() => buildAdminMenu({ ...t.menu }), [t]);
+  const menus = useMemo(() => buildAdminMenu(locale), [t]);
   const webhookUrl = typeof window !== "undefined" ? `${window.location.origin}/api/facebook/webhook` : "";
 
   const submit = async () => {

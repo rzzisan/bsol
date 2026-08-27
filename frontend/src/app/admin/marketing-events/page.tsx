@@ -295,7 +295,7 @@ export default function AdminMarketingEventsPage() {
     failed: t.statusFailed,
   };
 
-  const menus = useMemo(() => buildAdminMenu({ ...t.menu }), [t]);
+  const menus = useMemo(() => buildAdminMenu(locale), [t]);
 
   if (state !== "ready") {
     return (

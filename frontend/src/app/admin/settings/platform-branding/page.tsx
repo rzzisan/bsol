@@ -230,7 +230,7 @@ export default function PlatformBrandingSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const menus = useMemo(() => buildAdminMenu({ ...t.menu }), [t]);
+  const menus = useMemo(() => buildAdminMenu(locale), [t]);
 
   const update = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm((p) => ({ ...p, [k]: v }));
 

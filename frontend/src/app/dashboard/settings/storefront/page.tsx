@@ -157,7 +157,7 @@ type Settings = {
 };
 
 export default function StorefrontSettingsPage() {
-  const [locale, setLocale] = useState<Locale>("bn");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pages, setPages] = useState<LandingPageOption[]>([]);

@@ -161,9 +161,7 @@ export default function ProductMediaSettingsPage() {
 
   const menus = useMemo(
     () =>
-      buildAdminMenu({
-        ...t.menu,
-      }),
+      buildAdminMenu(locale),
     [t],
   );
 

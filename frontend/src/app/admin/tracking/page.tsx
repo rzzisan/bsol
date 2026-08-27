@@ -159,23 +159,7 @@ export default function AdminTrackingUsagePage() {
 
   const menu = useMemo(
     () =>
-      buildAdminMenu({
-        dashboard: t.menuDashboard,
-        customers: t.menuCustomers,
-        activeCustomers: t.menuActive,
-        pendingCustomers: t.menuPending,
-        sms: t.menuSms,
-        smsGateway: t.menuSmsGateway,
-        smsSend: t.menuSmsSend,
-        smsHistory: t.menuSmsHistory,
-        smsCredit: t.menuSmsCredit,
-        packages: t.menuPackages,
-        billing: t.menuBilling,
-        reports: t.menuReports,
-        settings: t.menuSettings,
-        emailSettings: t.menuEmailSettings,
-        tracking: t.menuTracking,
-      }),
+      buildAdminMenu(locale),
     [t],
   );
 

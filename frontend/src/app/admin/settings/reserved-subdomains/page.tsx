@@ -101,7 +101,7 @@ export default function ReservedSubdomainsPage() {
     return stored && normalizeRole(stored) === "admin" ? stored : null;
   });
   const txt = t[locale];
-  const menus = useMemo(() => buildAdminMenu(MENU_LABELS[locale]), [locale]);
+  const menus = useMemo(() => buildAdminMenu(locale), [locale]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

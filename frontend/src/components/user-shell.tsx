@@ -475,8 +475,8 @@ export default function UserShell({
   }
 
   const router = useRouter();
-  const [locale, setLocale] = useState<Locale>("bn");
-  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
   const [subscription, setSubscription] = useState<{ status: string; days_left: number | null; is_expired: boolean } | null>(null);

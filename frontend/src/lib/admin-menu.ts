@@ -1,156 +1,132 @@
 import type { ShellMenuItem } from "@/components/catv-shell";
+import type { Locale } from "@/lib/dashboard-client";
 
-export type AdminMenuLabels = {
-  dashboard: string;
-  customers: string;
-  activeCustomers: string;
-  pendingCustomers: string;
-  sms: string;
-  smsGateway: string;
-  smsSend: string;
-  smsHistory: string;
-  smsCredit: string;
-  packages: string;
-  addonPackages?: string;
-  billing: string;
-  reports: string;
-  settings: string;
-  emailSettings: string;
-  notificationTemplates?: string;
-  notificationUseCases?: string;
-  notificationLogs?: string;
-  productMediaSettings?: string;
-  digitalProductSettings?: string;
-  reservedSubdomains?: string;
-  landingTemplates?: string;
-  landingPages?: string;
-  platformBranding?: string;
-  facebookSettings?: string;
-  courierCache?: string;
-  support?: string;
-  tracking?: string;
-  marketingEvents?: string;
+// Single source of truth for every admin sidebar label, both languages.
+// Previously each admin page passed its own partial `labels` object here,
+// and any key a page forgot to translate silently fell back to a
+// hardcoded English string below — that's why the sidebar used to show a
+// different mix of bn/en per page. Centralizing it here means a menu
+// item's wording can never again depend on which page happened to render
+// it. See `pre_launch_polish_context.md` §থ for the bug writeup.
+const ADMIN_MENU_TEXT: Record<Locale, Record<string, string>> = {
+  bn: {
+    dashboard: "ড্যাশবোর্ড",
+    customers: "গ্রাহক",
+    activeCustomers: "সক্রিয় গ্রাহক",
+    pendingCustomers: "পেন্ডিং গ্রাহক",
+    sms: "এসএমএস",
+    smsGateway: "এসএমএস গেটওয়ে",
+    smsSend: "এসএমএস পাঠান",
+    smsHistory: "এসএমএস হিস্টোরি",
+    smsCredit: "এসএমএস ক্রেডিট",
+    packages: "প্যাকেজ",
+    addonPackages: "অ্যাড-অন প্যাকেজ",
+    billing: "বিলিং",
+    reports: "রিপোর্ট",
+    settings: "সেটিংস",
+    emailSettings: "ইমেইল সেটিংস",
+    notificationTemplates: "নোটিফিকেশন টেমপ্লেট",
+    notificationUseCases: "ইউজকেস ম্যাপিং",
+    notificationLogs: "নোটিফিকেশন লগ",
+    productMediaSettings: "প্রোডাক্ট মিডিয়া",
+    digitalProductSettings: "ডিজিটাল প্রোডাক্ট",
+    reservedSubdomains: "সংরক্ষিত সাবডোমেইন",
+    landingTemplates: "ল্যান্ডিং টেমপ্লেট",
+    landingPages: "ল্যান্ডিং পেজ",
+    platformBranding: "প্ল্যাটফর্ম ব্র্যান্ডিং",
+    facebookSettings: "ফেসবুক অ্যাপ",
+    courierCache: "কুরিয়ার ক্যাশ",
+    support: "সাপোর্ট",
+    tracking: "ট্র্যাকিং ব্যবহার",
+    marketingEvents: "মার্কেটিং ইভেন্ট",
+  },
+  en: {
+    dashboard: "Dashboard",
+    customers: "Customers",
+    activeCustomers: "Active Customers",
+    pendingCustomers: "Pending Customers",
+    sms: "SMS",
+    smsGateway: "SMS Gateway",
+    smsSend: "Send SMS",
+    smsHistory: "SMS History",
+    smsCredit: "SMS Credit",
+    packages: "Packages",
+    addonPackages: "Add-on Packages",
+    billing: "Billing",
+    reports: "Reports",
+    settings: "Settings",
+    emailSettings: "Email Settings",
+    notificationTemplates: "Notification Templates",
+    notificationUseCases: "Use-case Mapping",
+    notificationLogs: "Notification Logs",
+    productMediaSettings: "Product Media",
+    digitalProductSettings: "Digital Products",
+    reservedSubdomains: "Reserved Subdomains",
+    landingTemplates: "Landing Templates",
+    landingPages: "Landing Pages",
+    platformBranding: "Platform Branding",
+    facebookSettings: "Facebook App",
+    courierCache: "Courier Cache",
+    support: "Support",
+    tracking: "Tracking Usage",
+    marketingEvents: "Marketing Events",
+  },
 };
 
-export function buildAdminMenu(labels: AdminMenuLabels): ShellMenuItem[] {
-  const notificationTemplatesLabel = labels.notificationTemplates ?? "Notification Templates";
-  const notificationUseCasesLabel = labels.notificationUseCases ?? "Use-case Mapping";
+export function buildAdminMenu(locale: Locale): ShellMenuItem[] {
+  const l = ADMIN_MENU_TEXT[locale];
 
   const settingsChildren: Array<{ key: string; label: string; href?: string }> = [
-    { key: "settings-email", label: labels.emailSettings, href: "/admin/settings/email" },
-    {
-      key: "settings-product-media",
-      label: labels.productMediaSettings ?? "Product Media",
-      href: "/admin/settings/product-media",
-    },
-    {
-      key: "settings-digital-products",
-      label: labels.digitalProductSettings ?? "Digital Products",
-      href: "/admin/settings/digital-products",
-    },
-    {
-      key: "settings-platform-branding",
-      label: labels.platformBranding ?? "Platform Branding",
-      href: "/admin/settings/platform-branding",
-    },
-    {
-      key: "settings-reserved-subdomains",
-      label: labels.reservedSubdomains ?? "Reserved Subdomains",
-      href: "/admin/settings/reserved-subdomains",
-    },
-    {
-      key: "settings-facebook",
-      label: labels.facebookSettings ?? "Facebook App",
-      href: "/admin/settings/facebook",
-    },
-    {
-      key: "settings-notification-templates",
-      label: notificationTemplatesLabel,
-      href: "/admin/settings/notification-templates",
-    },
-    {
-      key: "settings-notification-use-cases",
-      label: notificationUseCasesLabel,
-      href: "/admin/settings/notification-use-cases",
-    },
+    { key: "settings-email", label: l.emailSettings, href: "/admin/settings/email" },
+    { key: "settings-product-media", label: l.productMediaSettings, href: "/admin/settings/product-media" },
+    { key: "settings-digital-products", label: l.digitalProductSettings, href: "/admin/settings/digital-products" },
+    { key: "settings-platform-branding", label: l.platformBranding, href: "/admin/settings/platform-branding" },
+    { key: "settings-reserved-subdomains", label: l.reservedSubdomains, href: "/admin/settings/reserved-subdomains" },
+    { key: "settings-facebook", label: l.facebookSettings, href: "/admin/settings/facebook" },
+    { key: "settings-notification-templates", label: l.notificationTemplates, href: "/admin/settings/notification-templates" },
+    { key: "settings-notification-use-cases", label: l.notificationUseCases, href: "/admin/settings/notification-use-cases" },
+    { key: "settings-notification-logs", label: l.notificationLogs, href: "/admin/settings/notification-logs" },
   ];
 
-  if (labels.notificationLogs) {
-    settingsChildren.push({
-      key: "settings-notification-logs",
-      label: labels.notificationLogs,
-      href: "/admin/settings/notification-logs",
-    });
-  }
-
   return [
-    { key: "dashboard", label: labels.dashboard, icon: "🏠", href: "/admin" },
+    { key: "dashboard", label: l.dashboard, icon: "🏠", href: "/admin" },
     {
       key: "customers",
-      label: labels.customers,
+      label: l.customers,
       icon: "👥",
       children: [
-        { key: "customers-active", label: labels.activeCustomers, href: "/admin/customers/active" },
-        { key: "customers-pending", label: labels.pendingCustomers },
+        { key: "customers-active", label: l.activeCustomers, href: "/admin/customers/active" },
+        { key: "customers-pending", label: l.pendingCustomers },
       ],
     },
     {
       key: "sms",
-      label: labels.sms,
+      label: l.sms,
       icon: "✉️",
       children: [
-        { key: "sms-gateway", label: labels.smsGateway, href: "/admin/sms/gateways" },
-        { key: "sms-send", label: labels.smsSend, href: "/admin/sms/send" },
-        { key: "sms-history", label: labels.smsHistory, href: "/admin/sms/history" },
-        { key: "sms-credit", label: labels.smsCredit, href: "/admin/sms/credit" },
+        { key: "sms-gateway", label: l.smsGateway, href: "/admin/sms/gateways" },
+        { key: "sms-send", label: l.smsSend, href: "/admin/sms/send" },
+        { key: "sms-history", label: l.smsHistory, href: "/admin/sms/history" },
+        { key: "sms-credit", label: l.smsCredit, href: "/admin/sms/credit" },
       ],
     },
-    { key: "packages", label: labels.packages, icon: "📦", href: "/admin/packages" },
-    { key: "addon-packages", label: labels.addonPackages ?? "Add-on Packages", icon: "➕", href: "/admin/addon-packages" },
-    { key: "billing", label: labels.billing, icon: "💳", href: "/admin/billing" },
+    { key: "packages", label: l.packages, icon: "📦", href: "/admin/packages" },
+    { key: "addon-packages", label: l.addonPackages, icon: "➕", href: "/admin/addon-packages" },
+    { key: "billing", label: l.billing, icon: "💳", href: "/admin/billing" },
     {
       key: "landing",
-      label: labels.landingPages ?? "Landing Pages",
+      label: l.landingPages,
       icon: "🧩",
       children: [
-        { key: "landing-pages-all", label: labels.landingPages ?? "Landing Pages", href: "/admin/landing/pages" },
-        {
-          key: "landing-templates",
-          label: labels.landingTemplates ?? "Landing Templates",
-          href: "/admin/landing/templates",
-        },
+        { key: "landing-pages-all", label: l.landingPages, href: "/admin/landing/pages" },
+        { key: "landing-templates", label: l.landingTemplates, href: "/admin/landing/templates" },
       ],
     },
-    {
-      key: "courier-cache",
-      label: labels.courierCache ?? "Courier Cache",
-      icon: "🚚",
-      href: "/admin/courier-cache",
-    },
-    {
-      key: "tracking",
-      label: labels.tracking ?? "Tracking Usage",
-      icon: "🎯",
-      href: "/admin/tracking",
-    },
-    {
-      key: "marketing-events",
-      label: labels.marketingEvents ?? "Marketing Events",
-      icon: "📣",
-      href: "/admin/marketing-events",
-    },
-    {
-      key: "support",
-      label: labels.support ?? "Support",
-      icon: "💬",
-      href: "/admin/support",
-    },
-    { key: "reports", label: labels.reports, icon: "📊" },
-    {
-      key: "settings",
-      label: labels.settings,
-      icon: "⚙️",
-      children: settingsChildren,
-    },
+    { key: "courier-cache", label: l.courierCache, icon: "🚚", href: "/admin/courier-cache" },
+    { key: "tracking", label: l.tracking, icon: "🎯", href: "/admin/tracking" },
+    { key: "marketing-events", label: l.marketingEvents, icon: "📣", href: "/admin/marketing-events" },
+    { key: "support", label: l.support, icon: "💬", href: "/admin/support" },
+    { key: "reports", label: l.reports, icon: "📊" },
+    { key: "settings", label: l.settings, icon: "⚙️", children: settingsChildren },
   ];
 }

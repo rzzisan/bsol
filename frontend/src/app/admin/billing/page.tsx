@@ -141,8 +141,8 @@ const text = {
 };
 
 export default function AdminBillingPage() {
-  const [locale, setLocale] = useState<Locale>("bn");
-  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [locale, setLocale] = useState<Locale>(getStoredLocale);
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
   const [tab, setTab] = useState<PaymentStatus | "all">("pending");
@@ -200,22 +200,7 @@ export default function AdminBillingPage() {
 
   const menu = useMemo(
     () =>
-      buildAdminMenu({
-        dashboard: t.menuDashboard,
-        customers: t.menuCustomers,
-        activeCustomers: t.menuActive,
-        pendingCustomers: t.menuPending,
-        sms: t.menuSms,
-        smsGateway: t.menuSmsGateway,
-        smsSend: t.menuSmsSend,
-        smsHistory: t.menuSmsHistory,
-        smsCredit: t.menuSmsCredit,
-        packages: t.menuPackages,
-        billing: t.menuBilling,
-        reports: t.menuReports,
-        settings: t.menuSettings,
-        emailSettings: t.menuEmailSettings,
-      }),
+      buildAdminMenu(locale),
     [t],
   );
 
