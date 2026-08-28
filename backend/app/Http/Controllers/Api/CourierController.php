@@ -440,6 +440,42 @@ class CourierController extends Controller
         ]);
     }
 
+    public function testRedxConnection(): JsonResponse
+    {
+        $svc = new RedxService();
+        $userId = auth()->user()->shopOwnerId();
+        if (! $svc->hasCredentials($userId)) {
+            return response()->json(['success' => false, 'message' => 'RedX credentials not configured. Go to Settings → Courier.'], 422);
+        }
+        $result = $svc->getPickupStores($userId);
+        if (empty($result['success'])) {
+            return response()->json(['success' => false, 'message' => $result['message'] ?? 'Failed to connect to RedX. Check your API key.'], 422);
+        }
+        return response()->json([
+            'success' => true,
+            'message' => 'RedX connection successful.',
+            'data'    => ['pickup_store_count' => count($result['data'] ?? [])],
+        ]);
+    }
+
+    public function testCarrybeeConnection(): JsonResponse
+    {
+        $svc = new CarrybeeService();
+        $userId = auth()->user()->shopOwnerId();
+        if (! $svc->hasCredentials($userId)) {
+            return response()->json(['success' => false, 'message' => 'CarryBee credentials not configured. Go to Settings → Courier.'], 422);
+        }
+        $result = $svc->getStores($userId);
+        if (empty($result['success'])) {
+            return response()->json(['success' => false, 'message' => $result['message'] ?? 'Failed to connect to CarryBee. Check your credentials.'], 422);
+        }
+        return response()->json([
+            'success' => true,
+            'message' => 'CarryBee connection successful.',
+            'data'    => ['store_count' => count($result['data'] ?? [])],
+        ]);
+    }
+
     // ── Pathao Stores ──────────────────────────────────────────────────────────
 
     public function pathaoStores(): JsonResponse
@@ -589,7 +625,7 @@ class CourierController extends Controller
     public function bookBulk(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'courier'            => 'required|in:pathao,steadfast,redx,paperfly',
+            'courier'            => 'required|in:pathao,steadfast,redx,paperfly,carrybee',
             'order_ids'          => 'required|array|min:2|max:200',
             'order_ids.*'        => 'integer',
             'store_id'           => 'nullable|integer',
@@ -604,10 +640,14 @@ class CourierController extends Controller
             'parcel_weight_kg'   => 'nullable|numeric|min:0.01',
             'delivery_area'      => 'nullable|string|max:100',
         ]);
-        // CarryBee is intentionally excluded from bulk booking — like RedX's area
-        // pick, it needs a per-order location search that the bulk UI doesn't
-        // support yet. Paperfly needs no such per-order lookup (storeName comes
-        // from the seller's default in Settings → Courier), so it's bulk-eligible.
+        // CarryBee bulk-eligible since 2026-08-28 (pre_launch_polish_context.md
+        // §গ): no per-order location-search UI exists in the bulk modal, so
+        // CarrybeeCourierProvider::book() now auto-resolves each order's
+        // city/zone from its own customer_address (CarryBee's own top area
+        // suggestion — same trust level the WooCommerce/connect booking path
+        // already relies on) when delivery_city_id/zone_id aren't supplied.
+        // Paperfly needs no such per-order lookup at all (storeName comes
+        // from the seller's default in Settings → Courier).
 
         $orders = Order::whereIn('user_id', auth()->user()->shopUserIds())
             ->whereIn('id', $data['order_ids'])

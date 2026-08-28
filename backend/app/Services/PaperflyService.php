@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Courier\Concerns\CourierHttpRetry;
 use App\Models\CourierSetting;
 use Illuminate\Support\Facades\Http;
 
@@ -13,8 +14,15 @@ use Illuminate\Support\Facades\Http;
  * password) plus a static `paperflykey` header issued per merchant on the
  * Developer Guide page (go.paperfly.com.bd/merchant/developer-guide).
  */
+// pre_launch_polish_context.md §গ — retry/backoff applied only to
+// trackOrder (a read despite Paperfly's tracking endpoint being a POST),
+// never to createOrder/cancelOrder: those aren't idempotent, and retrying
+// a request whose response was merely lost to a network blip risks
+// double-booking a real parcel.
 class PaperflyService
 {
+    use CourierHttpRetry;
+
     private const BASE = 'https://api.paperfly.com.bd';
 
     /** @return array{username:string,password:string,api_key:string,store_name:?string}|null */
@@ -94,7 +102,7 @@ class PaperflyService
         }
 
         try {
-            $response = $this->client($creds)->post(self::BASE . '/API-Order-Tracking', [
+            $response = $this->client($creds)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->post(self::BASE . '/API-Order-Tracking', [
                 'ReferenceNumber' => $referenceNumber,
             ]);
             $body = $response->json();

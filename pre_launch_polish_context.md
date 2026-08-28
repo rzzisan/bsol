@@ -57,20 +57,21 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## গ. Courier Integration
+## গ. Courier Integration — ✅ মূল আইটেম সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.3, §17.3, §17.8 item 9, `courier_status_sync_context.md`, `courier_waybill_context.md`
 
-- ☐ Pathao-তে দুইটা আলাদা, ডাইভার্জড token-fetch implementation (`PathaoService` vs `PathaoLocationService`) — maintenance trap, unify করা
-- ☐ Carrybee bulk-booking থেকে এখনো বাদ (per-order area-search UI দরকার) — এটা করলে ৪ provider পূর্ণ parity পাবে
-- ☐ RedX/Carrybee-এর জন্য test-connection endpoint এখনো নেই
-- ☐ Carrybee/Paperfly tracking-refresh UI-তে নেই কোনো provider-এই (শুধু manual booking/cancel আছে)
-- ☐ Paperfly — schema-লেভেলে column আছে কিন্তু service/route নেই, **product decision দরকার**: সম্পূর্ণ করা বা schema বাদ দেওয়া
-- ☐ কোনো provider-এ retry/backoff নেই, status sync purely on-demand + hourly scheduled job (webhook নেই কোনো courier-এর)
+- ✅ **(2026-08-28) Pathao token-fetch unification** — `PathaoLocationService` নিজের ডাইভার্জড token flow (ভুল endpoint `/external/login`, client_id/secret-কে username/password হিসেবে পাঠাত — কখনো documented Pathao API-ই ছিল না, শুধু `pathao_locations` cache আগে থেকে populated থাকলেই "কাজ করত") বাদ দিয়ে এখন `PathaoService::getToken()`-এর উপর delegate করে — একটাই সোর্স অফ ট্রুথ। সাথে `PathaoService::hasCredentials()`-এর নিজস্ব বাগও ফিক্স হয়েছে (username/password ছাড়া শুধু still-valid cached token থাকলেও "usable" গণ্য করে না — যেটা `getToken()` আসলে serve করতে পারে তার সাথে সামঞ্জস্যহীন ছিল)। ৭টা নতুন টেস্ট (`CourierTestConnectionTest.php`)
+- ✅ **(2026-08-28) RedX/Carrybee test-connection endpoint যোগ** — `POST /courier/settings/test-redx` (pickup-stores probe), `POST /courier/settings/test-carrybee` (stores probe), Pathao-র প্যাটার্ন অনুসরণ করে। কুরিয়ার সেটিং পেজে প্রতিটার নিজস্ব "Test" বাটন
+- ✅ **(2026-08-28) Retry/backoff যোগ হয়েছে সব প্রোভাইডারে, কিন্তু শুধু read-only lookup-এ** — Pathao/RedX/CarryBee/Paperfly/Steadfast, `->retry(2, 300, connectionFailureOnly, throw: false)`। **ইচ্ছাকৃতভাবে বাদ**: createOrder/createStore/createBulkOrders/cancelOrder-জাতীয় non-idempotent কল — একটা network blip-এ response হারালে retry করলে বাস্তবে ডুপ্লিকেট পার্সেল বুক হয়ে যাওয়ার ঝুঁকি আছে। শেয়ার্ড policy `App\Services\Courier\Concerns\CourierHttpRetry` ট্রেইটে
+- ✅ **(2026-08-28) Carrybee bulk-booking যোগ** — `CarrybeeCourierProvider::book()` এখন `delivery_city_id`/`zone_id` না দেওয়া থাকলে অর্ডারের নিজের `customer_address` থেকে অটো-রিজলভ করে (CarryBee-র নিজের top area-suggestion বিশ্বাস করে, ঠিক যেমন WooCommerce/connect বুকিং পাথ আগে থেকেই করে) — এতে বাল্ক মোডালে কোনো per-order area-search UI ছাড়াই বাল্ক বুকিং কাজ করে। `bookBulk` validation-এ `carrybee` যোগ, ফ্রন্টএন্ড বাল্ক-মোডাল ড্রপডাউনে CarryBee + Paperfly যোগ (RedX বাদ রাখা হয়েছে ইচ্ছাকৃতভাবে — ওটার বুকিং এখনো pre-resolved `redx_area_id` কলামের উপর নির্ভর করে, যেটা বাল্ক-এ সেট করার কোনো UI নেই)। ৩টা নতুন টেস্ট (`CourierBulkBookingTest.php`) + `CarrybeeBookingApiTest.php`-এ ৩টা টেস্ট আপডেট/যোগ
+- ✅ **(2026-08-28) স্টেল আইটেম যাচাই করে বাতিল করা হয়েছে (কোনো কোড পরিবর্তন লাগেনি):**
+  - "Paperfly schema আছে কিন্তু service/route নেই" — ভুল, `PaperflyService`+`PaperflyCourierProvider` সম্পূর্ণ আছে এবং `CourierFactory`-র মাধ্যমে generic `/courier/book/{order}`, `/track/{order}`, `/cancel/{order}`, `bookBulk` সব এন্ডপয়েন্টে already wired — কোনো Paperfly-specific route দরকারই নেই
+  - "Carrybee/Paperfly-র জন্য tracking-refresh UI নেই" — ভুল, `/dashboard/courier/track` পেজের রিফ্রেশ বাটন ৫টা কুরিয়ারের (steadfast/pathao/redx/carrybee/paperfly) জন্যই already রেন্ডার হয়, generic `/courier/track/{order}` এন্ডপয়েন্ট ব্যবহার করে
 
-**UI/UX অডিট:**
-- ☐ ৪-৫টা courier provider-এর settings ফর্ম UI consistency (field label, validation message বাংলা/ইংরেজি দুটোতেই)
-- ☐ Multi-courier rate/ETA compare UI আছে কিনা যাচাই (§16.5 — booking-এর আগে পাশাপাশি compare করার UX এখনো uncertain, verify করে দরকার হলে বানানো)
+**এখনো বাকি (আলাদা, বড় স্কোপ ফিচার হিসেবে):**
+- ☐ Multi-courier rate/ETA compare UI — **verify করা হয়েছে, সত্যিই নেই** কোনো ইউনিফায়েড কম্পেয়ার UI (backend-এ Pathao-র `calculatePrice`/RedX-র `calculateCharge` আলাদা আলাদা আছে, কিন্তু একটা ফর্মে পাশাপাশি দেখানোর কোনো ফ্রন্টএন্ড পেজ নেই) — নতুন ফিচার হিসেবে আলাদা ব্যাচে করা উচিত
+- ☐ ৪-৫টা courier provider settings ফর্ম UI consistency — হালকা spot-check করা হয়েছে (label/style সামঞ্জস্যপূর্ণ মনে হয়েছে), কিন্তু ফুল বাংলা/ইংরেজি validation-message-level অডিট এখনো বাকি
 
 ---
 

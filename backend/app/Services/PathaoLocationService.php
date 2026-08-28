@@ -2,56 +2,66 @@
 
 namespace App\Services;
 
+use App\Services\Courier\Concerns\CourierHttpRetry;
 use App\Models\CourierSetting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Cache;
 
+/**
+ * City/zone/area dropdown lookups for Pathao, backed by a shared
+ * `pathao_locations` cache table (this reference data is identical for
+ * every merchant, so one seller's account can populate it for everyone).
+ *
+ * Token issuance used to be duplicated here against a different endpoint
+ * (`/aladdin/api/v1/external/login`, client_id/secret passed as
+ * username/password) than `PathaoService` (`/aladdin/api/v1/issue-token`,
+ * the real merchant username/password). That second endpoint was never a
+ * documented Pathao API — it only "worked" as long as `pathao_locations`
+ * already had cached rows from before, so a seller with correct
+ * credentials but a cold cache would still see empty dropdowns. Fixed by
+ * delegating all token handling to `PathaoService`, the one implementation
+ * that has actually been exercised against Pathao's real API.
+ * See `pre_launch_polish_context.md` §গ.
+ */
 class PathaoLocationService
 {
+    use CourierHttpRetry;
+
     private const BASE = 'https://api-hermes.pathao.com';
-    private const TOKEN_TTL = 3600;
 
-    private function getCredentials(?int $userId = null): ?array
-    {
-        $settings = null;
-        if ($userId) {
-            $settings = CourierSetting::where('user_id', $userId)
-                ->whereNotNull('pathao_client_id')
-                ->whereNotNull('pathao_client_secret')
-                ->first();
-        }
-        if (! $settings) {
-            $settings = CourierSetting::whereNotNull('pathao_client_id')
-                ->whereNotNull('pathao_client_secret')
-                ->first();
-        }
-        if (! $settings) return null;
-        return ['client_id' => $settings->pathao_client_id, 'client_secret' => $settings->pathao_client_secret];
-    }
+    public function __construct(
+        private readonly PathaoService $pathaoService = new PathaoService(),
+    ) {}
 
-    private function getToken(string $clientId, string $clientSecret): ?string
+    /**
+     * A user id whose CourierSetting has a full, usable Pathao credential
+     * set: the requested user if configured, else any other seller's
+     * (location data is shared reference data, not seller-specific).
+     */
+    private function resolveCredentialOwner(?int $userId): ?int
     {
-        $cacheKey = 'pathao_token_' . md5($clientId);
-        return Cache::remember($cacheKey, self::TOKEN_TTL - 60, function () use ($clientId, $clientSecret) {
-            $res = Http::timeout(15)->post(self::BASE . '/aladdin/api/v1/external/login', [
-                'username'      => $clientId,
-                'password'      => $clientSecret,
-                'grant_type'    => 'password',
-                'client_id'     => $clientId,
-                'client_secret' => $clientSecret,
-            ]);
-            return $res->successful() ? $res->json('access_token') : null;
-        });
+        if ($userId && $this->pathaoService->hasCredentials($userId)) {
+            return $userId;
+        }
+
+        $settings = CourierSetting::whereNotNull('pathao_client_id')
+            ->whereNotNull('pathao_client_secret')
+            ->whereNotNull('pathao_username')
+            ->whereNotNull('pathao_password')
+            ->first();
+
+        return $settings?->user_id;
     }
 
     private function fetchFromPathao(string $endpoint, ?int $userId = null): ?array
     {
-        $creds = $this->getCredentials($userId);
-        if (! $creds) return null;
-        $token = $this->getToken($creds['client_id'], $creds['client_secret']);
+        $ownerId = $this->resolveCredentialOwner($userId);
+        if (! $ownerId) return null;
+
+        $token = $this->pathaoService->getToken($ownerId);
         if (! $token) return null;
-        $res = Http::timeout(15)->withToken($token)->get(self::BASE . $endpoint);
+
+        $res = Http::timeout(15)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->withToken($token)->get(self::BASE . $endpoint);
         return $res->successful() ? $res->json('data.data') : null;
     }
 
@@ -116,6 +126,6 @@ class PathaoLocationService
 
     public function hasCredentials(?int $userId = null): bool
     {
-        return $this->getCredentials($userId) !== null;
+        return $this->resolveCredentialOwner($userId) !== null;
     }
 }

@@ -25,15 +25,32 @@ class CarrybeeCourierProvider extends AbstractCourierProvider
             return ['success' => false, 'message' => 'CarryBee pickup store is required. Configure a default in Settings → Courier or select one when booking.'];
         }
 
-        $cityId = $data['delivery_city_id'] ?? null;
-        $zoneId = $data['delivery_zone_id'] ?? null;
-        if (! $cityId || ! $zoneId) {
-            return ['success' => false, 'message' => 'CarryBee delivery city/zone is required. Search and select the customer\'s area when booking.'];
-        }
-
         $address = $this->customerAddress($order);
         if (strlen($address) < 10) {
             return ['success' => false, 'message' => 'Customer address is too short for CarryBee booking (min 10 chars).'];
+        }
+
+        $cityId = $data['delivery_city_id'] ?? null;
+        $zoneId = $data['delivery_zone_id'] ?? null;
+        $areaId = $data['delivery_area_id'] ?? null;
+
+        // Bulk booking has no per-order area-search UI to have supplied
+        // these explicitly — fall back to the same address-based
+        // auto-resolve CourierLocationResolverService already uses for
+        // WooCommerce-synced orders (pre_launch_polish_context.md §গ),
+        // trusting CarryBee's own top suggestion rather than re-scoring it
+        // locally, exactly like that resolver does.
+        if (! $cityId || ! $zoneId) {
+            $suggestion = $this->service()->searchAreas($order->user_id, $address);
+            $item = $suggestion['data'][0] ?? null;
+            if ($item) {
+                $cityId ??= $item['city_id'] ?? $item['cityId'] ?? null;
+                $zoneId ??= $item['zone_id'] ?? $item['zoneId'] ?? null;
+                $areaId ??= $item['area_id'] ?? $item['areaId'] ?? null;
+            }
+        }
+        if (! $cityId || ! $zoneId) {
+            return ['success' => false, 'message' => 'Could not determine CarryBee delivery city/zone from the customer address. Search and select the area manually when booking.'];
         }
 
         $weightKg = (float) ($data['parcel_weight_kg'] ?? 0.5);
@@ -52,7 +69,7 @@ class CarrybeeCourierProvider extends AbstractCourierProvider
             'collectable_amount' => (int) $this->resolveCodAmount($order, $data),
         ];
 
-        if (! empty($data['delivery_area_id'])) $payload['area_id'] = (int) $data['delivery_area_id'];
+        if (! empty($areaId)) $payload['area_id'] = (int) $areaId;
 
         $instruction = $data['note'] ?? $order->notes ?? '';
         if ($instruction !== '') {

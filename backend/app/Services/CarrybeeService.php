@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Courier\Concerns\CourierHttpRetry;
 use App\Models\CourierSetting;
 use Illuminate\Support\Facades\Http;
 
@@ -10,8 +11,15 @@ use Illuminate\Support\Facades\Http;
  * distinct from CarrybeeFraudCheckService which scrapes the merchant panel login.
  * Auth is three static headers issued per business per environment.
  */
+// pre_launch_polish_context.md §গ — retry/backoff applied only to read-only
+// lookups (cities/zones/areas/search/stores list), never to
+// createStore/createOrder/cancelOrder: those aren't idempotent, and
+// retrying a request whose response was merely lost to a network blip
+// risks double-booking a real parcel.
 class CarrybeeService
 {
+    use CourierHttpRetry;
+
     private function baseUrl(string $environment): string
     {
         return $environment === 'sandbox'
@@ -67,7 +75,7 @@ class CarrybeeService
         }
 
         try {
-            $response = $this->client($creds)->get($creds['base_url'] . '/api/v2/cities');
+            $response = $this->client($creds)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . '/api/v2/cities');
             $body = $response->json();
 
             if ($response->successful() && ! ($body['error'] ?? true)) {
@@ -88,7 +96,7 @@ class CarrybeeService
         }
 
         try {
-            $response = $this->client($creds)->get($creds['base_url'] . "/api/v2/cities/{$cityId}/zones");
+            $response = $this->client($creds)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . "/api/v2/cities/{$cityId}/zones");
             $body = $response->json();
 
             if ($response->successful() && ! ($body['error'] ?? true)) {
@@ -109,7 +117,7 @@ class CarrybeeService
         }
 
         try {
-            $response = $this->client($creds)->get($creds['base_url'] . "/api/v2/cities/{$cityId}/zones/{$zoneId}/areas");
+            $response = $this->client($creds)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . "/api/v2/cities/{$cityId}/zones/{$zoneId}/areas");
             $body = $response->json();
 
             if ($response->successful() && ! ($body['error'] ?? true)) {
@@ -131,7 +139,7 @@ class CarrybeeService
         }
 
         try {
-            $response = $this->client($creds)->get($creds['base_url'] . '/api/v2/area-suggestion', ['search' => $search]);
+            $response = $this->client($creds)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . '/api/v2/area-suggestion', ['search' => $search]);
             $body = $response->json();
 
             if ($response->successful() && ! ($body['error'] ?? true)) {
@@ -184,7 +192,7 @@ class CarrybeeService
         }
 
         try {
-            $response = $this->client($creds)->get($creds['base_url'] . '/api/v2/stores');
+            $response = $this->client($creds)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . '/api/v2/stores');
             $body = $response->json();
 
             if ($response->successful() && ! ($body['error'] ?? true)) {

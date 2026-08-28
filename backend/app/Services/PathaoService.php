@@ -2,13 +2,25 @@
 
 namespace App\Services;
 
+use App\Services\Courier\Concerns\CourierHttpRetry;
 use App\Models\CourierSetting;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * pre_launch_polish_context.md §গ — retry/backoff policy: `->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)`
+ * (up to 3 attempts, only on connection-level failures — Laravel's Http
+ * client doesn't retry on a plain non-2xx response unless told to) is
+ * applied to token issuance and every read-only lookup, but deliberately
+ * NOT to createStore/createOrder/createBulkOrders — those aren't
+ * idempotent, and retrying a request whose response was merely lost to a
+ * network blip risks double-booking a real courier parcel.
+ */
 class PathaoService
 {
+    use CourierHttpRetry;
+
     const BASE_URL = 'https://api-hermes.pathao.com';
     const TOKEN_ENDPOINT = '/aladdin/api/v1/issue-token';
 
@@ -69,7 +81,7 @@ class PathaoService
     private function issueTokenFromPassword(string $clientId, string $clientSecret, string $username, string $password): ?array
     {
         try {
-            $response = Http::post(self::BASE_URL . self::TOKEN_ENDPOINT, [
+            $response = Http::retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->post(self::BASE_URL . self::TOKEN_ENDPOINT, [
                 'client_id'     => $clientId,
                 'client_secret' => $clientSecret,
                 'grant_type'    => 'password',
@@ -89,7 +101,7 @@ class PathaoService
     private function issueTokenFromRefresh(string $clientId, string $clientSecret, string $refreshToken): ?array
     {
         try {
-            $response = Http::post(self::BASE_URL . self::TOKEN_ENDPOINT, [
+            $response = Http::retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->post(self::BASE_URL . self::TOKEN_ENDPOINT, [
                 'client_id'     => $clientId,
                 'client_secret' => $clientSecret,
                 'grant_type'    => 'refresh_token',
@@ -128,7 +140,7 @@ class PathaoService
         if (! $token) return ['success' => false, 'message' => 'Pathao credentials not configured or invalid.'];
 
         try {
-            $response = Http::withToken($token)->get(self::BASE_URL . '/aladdin/api/v1/stores');
+            $response = Http::retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->withToken($token)->get(self::BASE_URL . '/aladdin/api/v1/stores');
             $data = $response->json();
             if ($response->successful()) {
                 return ['success' => true, 'data' => $data['data']['data'] ?? []];
@@ -218,7 +230,7 @@ class PathaoService
         if (! $token) return ['success' => false, 'message' => 'Pathao credentials not configured.'];
 
         try {
-            $response = Http::withToken($token)->get(self::BASE_URL . "/aladdin/api/v1/orders/{$consignmentId}/info");
+            $response = Http::retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->withToken($token)->get(self::BASE_URL . "/aladdin/api/v1/orders/{$consignmentId}/info");
             $body = $response->json();
             if ($response->successful()) {
                 return ['success' => true, 'data' => $body['data'] ?? $body];
@@ -240,7 +252,7 @@ class PathaoService
         if (! $token) return ['success' => false, 'message' => 'Pathao credentials not configured.'];
 
         try {
-            $response = Http::withToken($token)->post(self::BASE_URL . '/aladdin/api/v1/merchant/price-plan', $data);
+            $response = Http::retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->withToken($token)->post(self::BASE_URL . '/aladdin/api/v1/merchant/price-plan', $data);
             $body = $response->json();
             if ($response->successful()) {
                 return ['success' => true, 'data' => $body['data'] ?? $body];
@@ -259,7 +271,7 @@ class PathaoService
         if (! $token) return [];
 
         try {
-            $response = Http::withToken($token)->get(self::BASE_URL . '/aladdin/api/v1/city-list');
+            $response = Http::retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->withToken($token)->get(self::BASE_URL . '/aladdin/api/v1/city-list');
             if ($response->successful()) {
                 return $response->json()['data']['data'] ?? [];
             }
@@ -275,7 +287,7 @@ class PathaoService
         if (! $token) return [];
 
         try {
-            $response = Http::withToken($token)->get(self::BASE_URL . "/aladdin/api/v1/cities/{$cityId}/zone-list");
+            $response = Http::retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->withToken($token)->get(self::BASE_URL . "/aladdin/api/v1/cities/{$cityId}/zone-list");
             if ($response->successful()) {
                 return $response->json()['data']['data'] ?? [];
             }
@@ -291,7 +303,7 @@ class PathaoService
         if (! $token) return [];
 
         try {
-            $response = Http::withToken($token)->get(self::BASE_URL . "/aladdin/api/v1/zones/{$zoneId}/area-list");
+            $response = Http::retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->withToken($token)->get(self::BASE_URL . "/aladdin/api/v1/zones/{$zoneId}/area-list");
             if ($response->successful()) {
                 return $response->json()['data']['data'] ?? [];
             }
@@ -304,15 +316,28 @@ class PathaoService
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Check if user has Pathao credentials configured.
+     * Whether this user currently has a usable way to get a Pathao token —
+     * matches getToken()'s own fallback order (valid cached token, then
+     * refresh_token, then username/password), not just "username/password
+     * are set". A legacy/imported setting with only a still-valid cached
+     * token is usable even with no stored username/password.
      */
     public function hasCredentials(int $userId): bool
     {
         $settings = CourierSetting::where('user_id', $userId)->first();
-        return $settings
-            && $settings->pathao_client_id
-            && $settings->pathao_client_secret
-            && $settings->pathao_username
-            && $settings->pathao_password;
+        if (! $settings || ! $settings->pathao_client_id || ! $settings->pathao_client_secret) {
+            return false;
+        }
+
+        if ($settings->pathao_access_token && $settings->pathao_token_expires_at
+            && Carbon::parse($settings->pathao_token_expires_at)->gt(now()->addMinutes(5))) {
+            return true;
+        }
+
+        if ($settings->pathao_refresh_token) {
+            return true;
+        }
+
+        return (bool) ($settings->pathao_username && $settings->pathao_password);
     }
 }

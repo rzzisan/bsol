@@ -40,6 +40,14 @@ const t = {
     testingPathao: "চেক হচ্ছে...",
     testPathaoSuccess: "Pathao কানেকশন সফল।",
     testPathaoError: "Pathao কানেকশন ব্যর্থ।",
+    testRedx: "RedX টেস্ট",
+    testingRedx: "চেক হচ্ছে...",
+    testRedxSuccess: "RedX কানেকশন সফল।",
+    testRedxError: "RedX কানেকশন ব্যর্থ।",
+    testCarrybee: "CarryBee টেস্ট",
+    testingCarrybee: "চেক হচ্ছে...",
+    testCarrybeeSuccess: "CarryBee কানেকশন সফল।",
+    testCarrybeeError: "CarryBee কানেকশন ব্যর্থ।",
     createStoreTitle: "Pathao Store তৈরি করুন",
     createStoreBtn: "Store তৈরি করুন",
     creatingStore: "তৈরি হচ্ছে...",
@@ -144,6 +152,14 @@ const t = {
     testingPathao: "Testing...",
     testPathaoSuccess: "Pathao connection successful.",
     testPathaoError: "Pathao connection failed.",
+    testRedx: "Test RedX",
+    testingRedx: "Testing...",
+    testRedxSuccess: "RedX connection successful.",
+    testRedxError: "RedX connection failed.",
+    testCarrybee: "Test CarryBee",
+    testingCarrybee: "Testing...",
+    testCarrybeeSuccess: "CarryBee connection successful.",
+    testCarrybeeError: "CarryBee connection failed.",
     createStoreTitle: "Create Pathao Store",
     createStoreBtn: "Create Store",
     creatingStore: "Creating...",
@@ -295,6 +311,8 @@ export default function CourierSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testingPathao, setTestingPathao] = useState(false);
+  const [testingRedx, setTestingRedx] = useState(false);
+  const [testingCarrybee, setTestingCarrybee] = useState(false);
   const [message, setMessage] = useState<{ type: "success"|"error"; text: string } | null>(null);
   const [stores, setStores] = useState<PathaoStore[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
@@ -564,6 +582,44 @@ export default function CourierSettingsPage() {
       }
     } finally {
       setTestingPathao(false);
+    }
+  };
+
+  const handleTestRedx = async () => {
+    setTestingRedx(true); setMessage(null);
+    try {
+      const res = await fetch(`${API}/courier/settings/test-redx`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        const storeInfo = d.data?.pickup_store_count !== undefined ? ` (${d.data.pickup_store_count} pickup store(s) found)` : "";
+        setMessage({ type: "success", text: txt.testRedxSuccess + storeInfo });
+      } else {
+        setMessage({ type: "error", text: d.message ?? txt.testRedxError });
+      }
+    } finally {
+      setTestingRedx(false);
+    }
+  };
+
+  const handleTestCarrybee = async () => {
+    setTestingCarrybee(true); setMessage(null);
+    try {
+      const res = await fetch(`${API}/courier/settings/test-carrybee`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        const storeInfo = d.data?.store_count !== undefined ? ` (${d.data.store_count} store(s) found)` : "";
+        setMessage({ type: "success", text: txt.testCarrybeeSuccess + storeInfo });
+      } else {
+        setMessage({ type: "error", text: d.message ?? txt.testCarrybeeError });
+      }
+    } finally {
+      setTestingCarrybee(false);
     }
   };
 
@@ -1272,6 +1328,18 @@ export default function CourierSettingsPage() {
               <button onClick={() => void handleTestPathao()} disabled={testingPathao}
                 className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm hover:bg-[var(--surface-soft)] disabled:opacity-60">
                 {testingPathao ? txt.testingPathao : txt.testPathao}
+              </button>
+            )}
+            {activeTab === "redx" && (
+              <button onClick={() => void handleTestRedx()} disabled={testingRedx}
+                className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm hover:bg-[var(--surface-soft)] disabled:opacity-60">
+                {testingRedx ? txt.testingRedx : txt.testRedx}
+              </button>
+            )}
+            {activeTab === "carrybee" && (
+              <button onClick={() => void handleTestCarrybee()} disabled={testingCarrybee}
+                className="rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm hover:bg-[var(--surface-soft)] disabled:opacity-60">
+                {testingCarrybee ? txt.testingCarrybee : txt.testCarrybee}
               </button>
             )}
           </div>

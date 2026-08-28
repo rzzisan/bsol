@@ -676,6 +676,8 @@ Route::middleware('active_subscription')->group(function () {
             Route::put('/settings', [CourierController::class, 'saveSettings']);
             Route::post('/settings/test', [CourierController::class, 'testConnection']);
             Route::post('/settings/test-pathao', [CourierController::class, 'testPathaoConnection']);
+            Route::post('/settings/test-redx', [CourierController::class, 'testRedxConnection']);
+            Route::post('/settings/test-carrybee', [CourierController::class, 'testCarrybeeConnection']);
             Route::post('/settings/test-steadfast-fraud-check', [CourierController::class, 'testSteadfastFraudCheck']);
         });
 

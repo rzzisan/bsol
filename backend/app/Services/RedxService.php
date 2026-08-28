@@ -2,11 +2,19 @@
 
 namespace App\Services;
 
+use App\Services\Courier\Concerns\CourierHttpRetry;
 use App\Models\CourierSetting;
 use Illuminate\Support\Facades\Http;
 
+// pre_launch_polish_context.md §গ — retry/backoff applied only to read-only
+// lookups (areas/pickup-stores/charge-calc/track/info), never to
+// createParcel/createPickupStore/updateParcel: those aren't idempotent, and
+// retrying a request whose response was merely lost to a network blip risks
+// double-booking a real parcel.
 class RedxService
 {
+    use CourierHttpRetry;
+
     private function baseUrl(string $environment): string
     {
         return $environment === 'sandbox'
@@ -63,7 +71,7 @@ class RedxService
                 'district_name' => $districtName,
             ]);
 
-            $response = $this->client($creds['token'])->get($creds['base_url'] . '/areas', $query);
+            $response = $this->client($creds['token'])->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . '/areas', $query);
             $body = $response->json();
 
             if ($response->successful()) {
@@ -112,7 +120,7 @@ class RedxService
         }
 
         try {
-            $response = $this->client($creds['token'])->get($creds['base_url'] . '/pickup/stores');
+            $response = $this->client($creds['token'])->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . '/pickup/stores');
             $body = $response->json();
 
             if ($response->successful()) {
@@ -135,7 +143,7 @@ class RedxService
         }
 
         try {
-            $response = $this->client($creds['token'])->get($creds['base_url'] . '/charge/charge_calculator', [
+            $response = $this->client($creds['token'])->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . '/charge/charge_calculator', [
                 'delivery_area_id' => $deliveryAreaId,
                 'pickup_area_id' => $pickupAreaId,
                 'cash_collection_amount' => $codAmount,
@@ -189,7 +197,7 @@ class RedxService
         }
 
         try {
-            $response = $this->client($creds['token'])->get($creds['base_url'] . '/parcel/track/' . urlencode($trackingId));
+            $response = $this->client($creds['token'])->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . '/parcel/track/' . urlencode($trackingId));
             $body = $response->json();
 
             if ($response->successful()) {
@@ -210,7 +218,7 @@ class RedxService
         }
 
         try {
-            $response = $this->client($creds['token'])->get($creds['base_url'] . '/parcel/info/' . urlencode($trackingId));
+            $response = $this->client($creds['token'])->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get($creds['base_url'] . '/parcel/info/' . urlencode($trackingId));
             $body = $response->json();
 
             if ($response->successful()) {

@@ -129,12 +129,21 @@ class CarrybeeBookingApiTest extends TestCase
         });
     }
 
-    public function test_booking_fails_without_delivery_city_or_zone(): void
+    /**
+     * pre_launch_polish_context.md §গ — city/zone missing from the request
+     * no longer fails immediately; CarrybeeCourierProvider::book() now
+     * tries to auto-resolve them from the order's own address first (the
+     * bulk-booking path has no per-order search UI to have supplied them).
+     * Still fails cleanly, just after making that one attempt.
+     */
+    public function test_booking_fails_when_city_or_zone_cannot_be_auto_resolved_from_the_address(): void
     {
         $user = $this->configuredUser();
         $order = $this->makeOrder($user);
 
-        Http::fake();
+        Http::fake([
+            'sandbox.carrybee.com/api/v2/area-suggestion*' => Http::response(['error' => true, 'message' => 'No match found.']),
+        ]);
 
         $response = $this->postJson("/api/courier/book/{$order->id}", [
             'courier' => 'carrybee',
@@ -142,7 +151,57 @@ class CarrybeeBookingApiTest extends TestCase
         ], $this->authHeaders($user));
 
         $response->assertStatus(422);
-        Http::assertNothingSent();
+        Http::assertSentCount(1); // the auto-resolve attempt, nothing further
+    }
+
+    public function test_booking_auto_resolves_city_and_zone_from_the_address_when_not_supplied(): void
+    {
+        $user = $this->configuredUser();
+        $order = $this->makeOrder($user); // "House 1, Road 2, Mirpur"
+
+        Http::fake([
+            'sandbox.carrybee.com/api/v2/area-suggestion*' => Http::response([
+                'error' => false,
+                'data' => ['items' => [['city_id' => 3, 'zone_id' => 7, 'area_id' => 42, 'area_name' => 'Mirpur']]],
+            ]),
+            'sandbox.carrybee.com/api/v2/orders' => Http::response([
+                'error' => false, 'message' => 'Order created successfully',
+                'data' => ['order' => ['consignment_id' => 'CB999', 'delivery_fee' => '60']],
+            ], 201),
+        ]);
+
+        $response = $this->postJson("/api/courier/book/{$order->id}", [
+            'courier' => 'carrybee',
+            'cod_amount' => 1500,
+        ], $this->authHeaders($user));
+
+        $response->assertOk()->assertJsonPath('consignment_id', 'CB999');
+
+        Http::assertSent(fn ($request) => str_ends_with((string) $request->url(), '/api/v2/orders')
+            && $request['city_id'] === 3 && $request['zone_id'] === 7 && $request['area_id'] === 42);
+    }
+
+    public function test_explicitly_supplied_city_and_zone_skip_the_auto_resolve_lookup(): void
+    {
+        $user = $this->configuredUser();
+        $order = $this->makeOrder($user);
+
+        Http::fake([
+            'sandbox.carrybee.com/api/v2/orders' => Http::response([
+                'error' => false, 'message' => 'Order created successfully',
+                'data' => ['order' => ['consignment_id' => 'CB1', 'delivery_fee' => '60']],
+            ], 201),
+        ]);
+
+        $response = $this->postJson("/api/courier/book/{$order->id}", [
+            'courier' => 'carrybee',
+            'cod_amount' => 1500,
+            'delivery_city_id' => 1,
+            'delivery_zone_id' => 1,
+        ], $this->authHeaders($user));
+
+        $response->assertOk();
+        Http::assertSentCount(1); // straight to /orders, no area-suggestion lookup
     }
 
     public function test_track_order_updates_courier_status_from_order_details(): void

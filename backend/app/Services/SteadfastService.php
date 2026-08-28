@@ -2,11 +2,20 @@
 
 namespace App\Services;
 
+use App\Services\Courier\Concerns\CourierHttpRetry;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
+// pre_launch_polish_context.md §গ — retry/backoff applied only to
+// read-only lookups (status/balance/fraud-check/return-requests/payments/
+// police-stations), never to create_order/create_order-bulk/
+// create_return_request: those aren't idempotent, and retrying a request
+// whose response was merely lost to a network blip risks double-booking a
+// real parcel.
 class SteadfastService
 {
+    use CourierHttpRetry;
+
     private const BASE = 'https://portal.packzy.com/api/v1';
 
     private function client(string $apiKey, string $secretKey)
@@ -95,28 +104,28 @@ class SteadfastService
 
     public function getStatus(string $apiKey, string $secretKey, string $consignmentId): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/status_by_cid/' . urlencode($consignmentId));
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/status_by_cid/' . urlencode($consignmentId));
 
         return $this->jsonResponse($response);
     }
 
     public function getStatusByInvoice(string $apiKey, string $secretKey, string $invoice): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/status_by_invoice/' . urlencode($invoice));
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/status_by_invoice/' . urlencode($invoice));
 
         return $this->jsonResponse($response);
     }
 
     public function getStatusByTrackingCode(string $apiKey, string $secretKey, string $trackingCode): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/status_by_trackingcode/' . urlencode($trackingCode));
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/status_by_trackingcode/' . urlencode($trackingCode));
 
         return $this->jsonResponse($response);
     }
 
     public function getBalance(string $apiKey, string $secretKey): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/get_balance');
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/get_balance');
 
         return $this->jsonResponse($response, []);
     }
@@ -126,7 +135,7 @@ class SteadfastService
      */
     public function fraudCheck(string $apiKey, string $secretKey, string $phone): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/fraud_check/' . urlencode($this->formatPhone($phone)));
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/fraud_check/' . urlencode($this->formatPhone($phone)));
 
         return $this->jsonResponse($response, []);
     }
@@ -152,35 +161,35 @@ class SteadfastService
 
     public function getReturnRequest(string $apiKey, string $secretKey, int|string $id): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/get_return_request/' . urlencode((string) $id));
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/get_return_request/' . urlencode((string) $id));
 
         return $this->jsonResponse($response);
     }
 
     public function getReturnRequests(string $apiKey, string $secretKey): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/get_return_requests');
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/get_return_requests');
 
         return $this->jsonResponse($response, []);
     }
 
     public function getPayments(string $apiKey, string $secretKey): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/payments');
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/payments');
 
         return $this->jsonResponse($response, []);
     }
 
     public function getPayment(string $apiKey, string $secretKey, int|string $paymentId): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/payments/' . urlencode((string) $paymentId));
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/payments/' . urlencode((string) $paymentId));
 
         return $this->jsonResponse($response, []);
     }
 
     public function getPoliceStations(string $apiKey, string $secretKey): array
     {
-        $response = $this->client($apiKey, $secretKey)->get(self::BASE . '/police_stations');
+        $response = $this->client($apiKey, $secretKey)->retry(2, 300, $this->retryOnConnectionFailureOnly(), throw: false)->get(self::BASE . '/police_stations');
 
         return $this->jsonResponse($response, []);
     }

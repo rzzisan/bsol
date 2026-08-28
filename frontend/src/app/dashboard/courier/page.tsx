@@ -199,7 +199,7 @@ type BookForm = {
 };
 
 type BulkForm = {
-  courier: "pathao" | "steadfast" | "redx";
+  courier: "pathao" | "steadfast" | "carrybee" | "paperfly";
   store_id: string;
   delivery_type: "48" | "12";
   item_type: "1" | "2";
@@ -500,6 +500,11 @@ export default function BookParcelPage() {
           delivery_type: Number(bulkForm.delivery_type),
           item_type: Number(bulkForm.item_type),
           item_weight: Number(bulkForm.item_weight),
+          // CarryBee reads its own weight field (parcel_weight_kg, same as
+          // RedX) rather than Pathao's item_weight — send both from the one
+          // "item weight" input so the value carries over regardless of
+          // which courier is picked.
+          parcel_weight_kg: Number(bulkForm.item_weight) || undefined,
           item_description: bulkForm.item_description || undefined,
           note: bulkForm.note || undefined,
         }),
@@ -1032,6 +1037,8 @@ export default function BookParcelPage() {
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
                   <option value="pathao">{txt.pathao}</option>
                   <option value="steadfast">{txt.steadfast}</option>
+                  <option value="carrybee">{txt.carrybee}</option>
+                  <option value="paperfly">{txt.paperfly}</option>
                 </select>
               </label>
 
