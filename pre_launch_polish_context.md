@@ -202,11 +202,12 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ঢ. Digital Product System
+## ঢ. Digital Product System — ✅ সম্পন্ন (2026-08-28)
 
 **সোর্স:** `digital_product_context.md`
 
-- ☐ Phase 1 লাইভ — কোনো Phase 2 প্ল্যান আছে কিনা (bulk product upload, license-key delivery ইত্যাদি) `digital_product_context.md` খুলে verify করা, এই polish pass-এ শুধু existing flow-এর real-user QA যথেষ্ট
+- ✅ **Phase 2 প্ল্যান verify করা হয়েছে — কিছুই pending নেই।** `digital_product_context.md §৮` non-goals হিসেবে license-key/DRM/mixed-cart/recurring/affiliate/S3-migration স্পষ্টভাবে Phase 1-এর বাইরে রাখা, কোনো Phase 2 রোডম্যাপ ডকুমেন্ট আলাদাভাবে বানানো হয়নি (ইচ্ছাকৃত)
+- ✅ **(2026-08-28) একটা real, currently-live gap পাওয়া গেছে ও ফিক্স করা হয়েছে — শুধু "QA যথেষ্ট" না।** `digital_product_context.md §১৫`-এ আগে থেকেই flag করা ছিল: `digital_download_otp`/`digital_product_delivered` use-case-এর জন্য production-এ কোনো admin `NotificationUseCaseBinding`-ই ছিল না — verify করে কনফার্ম হয়েছে **এখনো তাই ছিল** (০টা বাইন্ডিং)। ফলে OTP গেট চালু (ডিফল্ট) রেখে কোনো সেলার ডিজিটাল প্রোডাক্ট বিক্রি করলে কাস্টমার "Could not send the code" এরর পেত (একমাত্র বিদ্যমান ডিজিটাল প্রোডাক্টের সেলার নিজেই এটা হিট করে OTP বন্ধ করে workaround করেছিলেন)। এটা কোনো per-seller বিজনেস সিদ্ধান্ত না — ডিজাইন অনুযায়ীই platform-wide, যেকোনো admin-এর একবার সেটআপ যথেষ্ট (`DigitalDeliveryService::platformAdmin()`)। ৪টা নতুন NotificationTemplate (SMS+Email × ২টা use-case, বিদ্যমান কার্যকর gateway/email-config রিইউজ করে) + ২টা বাইন্ডিং production-এ তৈরি, Admin API দিয়ে লাইভ verify। কোনো কোড পরিবর্তন লাগেনি (পুরো ফিচারই আগে থেকে সঠিকভাবে বিল্ড করা ছিল, শুধু operational setup ধাপ বাকি ছিল)
 
 ---
 

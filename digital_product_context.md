@@ -221,7 +221,7 @@ Phase 1-এ যা থাকবে: expiring signed link + download-count cap + 
 
 **যাচাই:** ২টা নতুন টেস্ট, `DigitalProductTest.php` এখন ২১টা সব pass। ফুল স্যুট ৪৪৫ passed। Production migrate সফল, deploy সফল।
 
-**এখনো বাকি (admin-side, কোডের বাইরে):** যেসব সেলার OTP গেট **চালু রাখতে চান**, তাদের জন্য SMS/email আসলে পাঠাতে হলে admin-কে `/admin/settings/notification-templates` + `/admin/settings/notification-use-cases`-এ গিয়ে `digital_download_otp`/`digital_product_delivered`-এর জন্য টেমপ্লেট+বাইন্ডিং সেট করতে হবে — এটা এখনো করা হয়নি production-এ।
+**✅ সম্পন্ন (2026-08-28, pre_launch_polish_context.md §ঢ):** `digital_download_otp`/`digital_product_delivered` দুটোরই SMS+Email টেমপ্লেট (id ৯-১২, বিদ্যমান কার্যকর gateway_id=1/email_configuration_id=4 রিইউজ করে) + `NotificationUseCaseBinding` production-এ তৈরি করা হয়েছে, `/admin/notification-use-case-bindings` API দিয়ে verify করা হয়েছে। এখন থেকে OTP গেট চালু রাখা যেকোনো সেলারের ডাউনলোড ফ্লো কাজ করবে — আর কোনো admin-side setup বাকি নেই। কোনো কোড পরিবর্তন লাগেনি, শুধু ডেটা (এই পুরো Phase 1 ফিচারের জন্য এটাই ছিল একমাত্র অসম্পূর্ণ operational ধাপ)।
 - `components/thank-you-view.tsx` — `order.digital_deliveries` থাকলে "ডাউনলোড লিংক" কার্ড দেখায় (প্রতিটা `/d/{token}`-এ লিংক করা)।
 - **নতুন `app/d/[token]/page.tsx`** — পাবলিক ডাউনলোড পেজ (client-side): status লোড → OTP লাগলে "কোড পাঠান" → কোড ভেরিফাই → ডাউনলোড বাটন (`GET /api/public/digital-deliveries/{token}/download`, ব্রাউজার সরাসরি ফাইল নামায়)। external_url ডেলিভারিতে সরাসরি ডাউনলোড বাটন (OTP ছাড়াই)।
 - `app/admin/settings/digital-products/page.tsx` (নতুন, `product-media` সেটিংস পেজের হুবহু ক্লোন) + `lib/admin-menu.ts`-এ নতুন `digitalProductSettings` মেনু এন্ট্রি।
