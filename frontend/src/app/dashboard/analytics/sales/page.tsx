@@ -180,6 +180,17 @@ export default function Page() {
   const money = (n: number) => `৳${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
   const maxTrendOrders = Math.max(1, ...(sales?.trend.map((r) => r.orders) ?? [1]));
 
+  // A fixed 28px-min bar (the old behaviour) works for a week's worth of
+  // bars, but at the month/30-day range's ~30 bars it forced horizontal
+  // scrolling on a typical phone screen just to see the whole trend shape —
+  // the one thing a trend chart is for. Past ~14 points, shrink the floor
+  // so the full range fits in view, and thin out the date labels (every
+  // bar's label at that density is illegible clutter anyway, not lost
+  // information). pre_launch_polish_context.md §ঝ.
+  const trendPointCount = sales?.trend.length ?? 0;
+  const trendBarMinWidth = trendPointCount > 14 ? 10 : 28;
+  const trendLabelStride = trendPointCount > 20 ? 5 : trendPointCount > 14 ? 3 : 1;
+
   return (
     <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       activeKey="sales-report"
@@ -269,15 +280,22 @@ export default function Page() {
           <p className="py-6 text-center text-sm text-[var(--muted)]">{t.empty}</p>
         ) : (
           <div className="flex h-40 gap-1 overflow-x-auto pb-1">
-            {sales.trend.map((row) => (
-              <div key={row.date} className="flex min-w-[28px] flex-1 flex-col items-center" title={`${row.date}: ${row.orders}`}>
+            {sales.trend.map((row, idx) => (
+              <div
+                key={row.date}
+                className="flex flex-1 flex-col items-center"
+                style={{ minWidth: `${trendBarMinWidth}px` }}
+                title={`${row.date}: ${row.orders}`}
+              >
                 <div className="flex w-full flex-1 items-end">
                   <div
                     className="w-full rounded-t bg-[var(--accent)]"
                     style={{ height: `${Math.max(4, (row.orders / maxTrendOrders) * 100)}%` }}
                   />
                 </div>
-                <span className="mt-1 text-[10px] text-[var(--muted)]">{row.date.slice(5)}</span>
+                <span className="mt-1 h-3 text-[10px] text-[var(--muted)]">
+                  {idx % trendLabelStride === 0 ? row.date.slice(5) : ""}
+                </span>
               </div>
             ))}
           </div>

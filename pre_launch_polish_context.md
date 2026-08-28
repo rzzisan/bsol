@@ -153,14 +153,14 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ঝ. Analytics (seller-facing)
+## ঝ. Analytics (seller-facing) — ✅ সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.7, feature_roadmap P5
 
-- ☐ **Ads ROI tracker এখনো placeholder** (ইচ্ছাকৃত, UTM/ad-spend/Facebook data source prerequisite) — P5 প্রায়োরিটি, Facebook App Review কনফার্ম হওয়ার পর এটা শুরু করার প্রথম candidate
+- ✅ **স্টেল/অপরিবর্তিত প্রমাণিত:** Ads ROI tracker এখনো honest placeholder (`ModulePlaceholder` কম্পোনেন্ট, ইচ্ছাকৃত) — ঠিক আগের মতোই, P5-এ যথাযথভাবে scoped, এই পাসে কোনো পরিবর্তন লাগেনি
 
 **UI/UX অডিট:**
-- ☐ Sales/Customer/Courier analytics পেজ — CSS bar-chart trend বড় dataset-এ (৩+ মাস ডেটা) readability
+- ✅ **(2026-08-28) Sales/Customer/Courier chart readability যাচাই করা হয়েছে।** আসল স্কোপ ধরা পড়েছে যাচাইয়ে: Courier analytics পেজে আদৌ কোনো chart নেই (শুধু টেবিল/কার্ড); Customer (Intelligence) পেজের chart জেলা-ভিত্তিক horizontal bar (bounded ক্যাটাগরি সংখ্যা, তারিখ-রেঞ্জ বাড়লে সমস্যা হয় না); **শুধু Sales Report পেজের daily trend chart** আসল ঝুঁকিতে ছিল। এছাড়া "৩+ মাস" আসলে UI দিয়ে reachable-ই না (প্রিসেট maximum "এই মাস"/৩০ দিন) — কিন্তু সেই আসল ৩০-দিন কেসেই মোবাইলে পুরো ট্রেন্ড দেখতে horizontal scroll লাগত (৩০টা বার × ২৮px min-width ≈ ৯৬০px, বেশিরভাগ ফোন স্ক্রিনের চেয়ে চওড়া)। ফিক্স: ১৪+ পয়েন্টে bar min-width কমিয়ে (২৮px → ১০px) আর প্রতিটা বারের label না দেখিয়ে sparse (প্রতি ৩য়/৫ম বারে) দেখানো — পুরো ট্রেন্ডের shape এখন প্রায় পুরোটাই এক নজরে দেখা যায়, কম স্ক্রল লাগে, আর ঘন লেবেলের ভিড়ও কমেছে
 
 ---
 
