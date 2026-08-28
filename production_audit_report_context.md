@@ -66,7 +66,7 @@ BSOL একটা টয়/MVP প্রজেক্ট না — এটা ge
 | 5 | Ads ROI tracker সম্পূর্ণ করা | UTM/ad-spend ডেটা সোর্স যোগ করে placeholder সরানো | `SAAS_MODULE_CONTEXT.md §15.7/§16.1` |
 | 6 | Marketing broadcast (SMS+Email) | retention/upsell, customer segment ইতিমধ্যে আছে | `feature_roadmap_context.md` #৭ |
 | 7 | WhatsApp ও Auto-top-up resume | external ব্লকার সরলেই — কোড-সম্পূর্ণ | `whatsapp_context.md`, `auto_top_up_context.md` |
-| 8 | 2FA + admin audit trail | নিরাপত্তা hardening, স্কেলের আগে | 🟡 শুরু হয়েছে (২০২৬-০৮-২৮) — `security_hardening_context.md` |
+| 8 | 2FA + admin audit trail | নিরাপত্তা hardening, স্কেলের আগে | ✅ সম্পন্ন (২০২৬-০৮-২৮) — `security_hardening_context.md` |
 
 ---
 

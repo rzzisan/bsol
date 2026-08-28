@@ -209,6 +209,15 @@ const content = {
       authSectionTitle: "শুরু করুন",
       authSectionSubtitle: "লগইন করুন অথবা নতুন অ্যাকাউন্ট তৈরি করুন — সম্পূর্ণ ফ্রি।",
       forgotPassword: "পাসওয়ার্ড ভুলে গেছেন?",
+      twoFaTitle: "দুই-ধাপ ভেরিফিকেশন",
+      twoFaSubtitle: "আপনার অথেন্টিকেটর অ্যাপ থেকে ৬-সংখ্যার কোডটি লিখুন।",
+      twoFaCodeLabel: "৬-সংখ্যার কোড",
+      twoFaRecoveryLabel: "রিকভারি কোড",
+      twoFaUseRecovery: "কোড এক্সেস নেই? রিকভারি কোড ব্যবহার করুন",
+      twoFaUseCode: "অথেন্টিকেটর কোড ব্যবহার করুন",
+      twoFaSubmit: "যাচাই করুন",
+      twoFaVerifying: "যাচাই হচ্ছে...",
+      twoFaBack: "ফিরে যান",
     },
   },
   en: {
@@ -321,6 +330,15 @@ const content = {
       authSectionTitle: "Get started",
       authSectionSubtitle: "Login to your account or create a new one — completely free.",
       forgotPassword: "Forgot password?",
+      twoFaTitle: "Two-factor verification",
+      twoFaSubtitle: "Enter the 6-digit code from your authenticator app.",
+      twoFaCodeLabel: "6-digit code",
+      twoFaRecoveryLabel: "Recovery code",
+      twoFaUseRecovery: "Lost access to your code? Use a recovery code",
+      twoFaUseCode: "Use authenticator code instead",
+      twoFaSubmit: "Verify",
+      twoFaVerifying: "Verifying...",
+      twoFaBack: "Back",
     },
   },
 };
@@ -563,6 +581,13 @@ function AuthSection({
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
+  // Admin two-factor login challenge (security_hardening_context.md §2) —
+  // set once login() responds with requires_2fa instead of a token.
+  const [twoFaChallengeToken, setTwoFaChallengeToken] = useState<string | null>(null);
+  const [twoFaCode, setTwoFaCode] = useState("");
+  const [twoFaUseRecovery, setTwoFaUseRecovery] = useState(false);
+  const [twoFaVerifying, setTwoFaVerifying] = useState(false);
+
   const [regName, setRegName] = useState("");
   const [regMobile, setRegMobile] = useState("");
   const [regEmail, setRegEmail] = useState("");
@@ -617,6 +642,10 @@ function AuthSection({
         // single-use handoff code in this URL. The destination origin mints
         // its own token (custom_domain_context.md §6).
         window.location.href = data.redirect_to;
+      } else if (data?.requires_2fa) {
+        // Admin with 2FA enabled — no token yet, hold onto the challenge
+        // token and show the code-entry step instead (§2 below).
+        setTwoFaChallengeToken(data.challenge_token);
       } else {
         persistAuth(data.token, data);
         setLoginEmail("");
@@ -626,6 +655,41 @@ function AuthSection({
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleTwoFactorVerify(e: React.FormEvent) {
+    e.preventDefault();
+    clearErrors();
+    if (!twoFaChallengeToken) return;
+    setTwoFaVerifying(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/2fa/challenge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          challenge_token: twoFaChallengeToken,
+          ...(twoFaUseRecovery ? { recovery_code: twoFaCode } : { code: twoFaCode }),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data?.error_code === "challenge_expired" || data?.error_code === "challenge_locked" || data?.error_code === "challenge_invalid") {
+          setTwoFaChallengeToken(null);
+          setTwoFaCode("");
+        }
+        setError(data?.message ?? "Verification failed.");
+      } else {
+        persistAuth(data.token, data);
+        setTwoFaChallengeToken(null);
+        setTwoFaCode("");
+        setLoginEmail("");
+        setLoginPassword("");
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setTwoFaVerifying(false);
     }
   }
 
@@ -771,7 +835,7 @@ function AuthSection({
         </div>
       )}
 
-      {tab === "login" && (
+      {tab === "login" && !twoFaChallengeToken && (
         <form onSubmit={handleLogin} className="flex flex-col gap-4" noValidate>
           <FormInput
             id="login_email"
@@ -804,6 +868,57 @@ function AuthSection({
             <a href={`/forgot-password?lang=${locale}`} className="text-sm text-[var(--accent)] hover:underline">
               {t.forgotPassword}
             </a>
+          </div>
+        </form>
+      )}
+
+      {tab === "login" && twoFaChallengeToken && (
+        <form onSubmit={handleTwoFactorVerify} className="flex flex-col gap-4" noValidate>
+          <div>
+            <h3 className="text-base font-semibold text-[var(--foreground)]">{t.twoFaTitle}</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">{t.twoFaSubtitle}</p>
+          </div>
+          <FormInput
+            id="two_fa_code"
+            label={twoFaUseRecovery ? t.twoFaRecoveryLabel : t.twoFaCodeLabel}
+            type="text"
+            placeholder={twoFaUseRecovery ? "XXXX-XXXX" : "000000"}
+            value={twoFaCode}
+            onChange={setTwoFaCode}
+            required
+            autoComplete="one-time-code"
+          />
+          <button
+            type="submit"
+            disabled={twoFaVerifying || !twoFaCode}
+            className="w-full rounded-xl bg-[var(--accent)] py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {twoFaVerifying ? t.twoFaVerifying : t.twoFaSubmit}
+          </button>
+          <div className="flex items-center justify-between text-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setTwoFaChallengeToken(null);
+                setTwoFaCode("");
+                setTwoFaUseRecovery(false);
+                clearErrors();
+              }}
+              className="text-[var(--muted)] hover:underline"
+            >
+              {t.twoFaBack}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTwoFaUseRecovery((prev) => !prev);
+                setTwoFaCode("");
+                clearErrors();
+              }}
+              className="text-[var(--accent)] hover:underline"
+            >
+              {twoFaUseRecovery ? t.twoFaUseCode : t.twoFaUseRecovery}
+            </button>
           </div>
         </form>
       )}

@@ -18,7 +18,10 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'mobile', 'mobile_verified_at', 'email', 'email_verified_at', 'password', 'role', 'user_status', 'subscription_package_id', 'sms_gateway_id', 'subscription_status', 'subscription_started_at', 'subscription_ends_at', 'owner_id', 'staff_status', 'must_change_password', 'signup_utm_source', 'signup_utm_medium', 'signup_utm_campaign', 'signup_utm_content', 'signup_utm_term', 'signup_fbp', 'signup_fbc', 'signup_landing_path'])]
-#[Hidden(['password', 'remember_token'])]
+// two_factor_* deliberately absent from Fillable — only ever set by
+// TwoFactorController/TotpService, never client-writable
+// (security_hardening_context.md).
+#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -43,7 +46,19 @@ class User extends Authenticatable
             'storefront_addon_until'  => 'datetime',
             'deleted_at'              => 'datetime',
             'must_change_password'    => 'boolean',
+            'two_factor_secret'          => 'encrypted',
+            'two_factor_recovery_codes'  => 'encrypted:array',
+            'two_factor_confirmed_at'    => 'datetime',
         ];
+    }
+
+    /**
+     * Whether two-factor is actually active (not just mid-setup with an
+     * unconfirmed secret sitting on the row).
+     */
+    public function hasTwoFactorEnabled(): bool
+    {
+        return $this->two_factor_secret !== null && $this->two_factor_confirmed_at !== null;
     }
 
     public function subscriptionPackage()

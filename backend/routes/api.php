@@ -73,6 +73,8 @@ use App\Http\Controllers\Api\Admin\LandingTemplateController as AdminLandingTemp
 use App\Http\Controllers\Api\Admin\LandingPageAdminController;
 use App\Http\Controllers\Api\Admin\CourierCacheController;
 use App\Http\Controllers\Api\Admin\AdminTrackingController;
+use App\Http\Controllers\Api\Admin\TwoFactorController;
+use App\Http\Controllers\Api\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\PublicMarketingPixelController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\PublicMarketingTrackController;
@@ -110,6 +112,14 @@ Route::get('/health', function () {
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// Second half of the 2FA login flow (security_hardening_context.md §2).
+// Public because the caller has no token yet — login() withheld it and
+// handed back a challenge_token instead. Throttled + a per-challenge
+// 5-attempt cap (TwoFactorChallengeService) together bound how many guesses
+// a 6-digit code can be brute-forced with.
+Route::post('/2fa/challenge', [AuthController::class, 'verifyTwoFactorChallenge'])
+    ->middleware('throttle:10,1');
 
 // Second half of the per-seller subdomain login handoff
 // (custom_domain_context.md §6). Public because the caller has no token yet;
@@ -843,6 +853,15 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/addon-purchases', [AdminAddonPurchaseController::class, 'index']);
         Route::post('/addon-purchases/{addonPurchase}/approve', [AdminAddonPurchaseController::class, 'approve']);
         Route::post('/addon-purchases/{addonPurchase}/reject', [AdminAddonPurchaseController::class, 'reject']);
+
+        // Admin two-factor auth (security_hardening_context.md §2) + audit
+        // trail (§3) — read-only listing, shared across all admins.
+        Route::get('/2fa/status', [TwoFactorController::class, 'status']);
+        Route::post('/2fa/setup', [TwoFactorController::class, 'setup']);
+        Route::post('/2fa/enable', [TwoFactorController::class, 'enable']);
+        Route::post('/2fa/disable', [TwoFactorController::class, 'disable']);
+        Route::post('/2fa/recovery-codes/regenerate', [TwoFactorController::class, 'regenerateRecoveryCodes']);
+        Route::get('/audit-logs', [AdminAuditLogController::class, 'index']);
 
         Route::get('/registration-defaults', [AdminController::class, 'getRegistrationDefaults']);
         Route::put('/registration-defaults', [AdminController::class, 'updateRegistrationDefaults']);

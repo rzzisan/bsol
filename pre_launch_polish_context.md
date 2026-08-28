@@ -121,7 +121,7 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 - ☐ `OrderController::destroy` soft-delete করে কিন্তু accounting entry cleanup করে না — orphaned ledger row থেকে যায়
 - ☐ Expired subscription-এ seller নিজের delivered COD order status update করতে পারে না → real delivered cash accounting-এ কখনো confirm হয় না যতক্ষণ renew না করে — **product decision দরকার** (এই behavior রাখা হবে নাকি delivered-confirm exempt করা হবে expired subscription-এও)
 - ☐ কোনো default subscription package সেট না থাকলে নতুন user permanently unmetered/free থেকে যায় — admin panel-এ warning/guard যোগ করা
-- ☐ **P2 (payment gateway sandbox verify, এখনো Not started):** Nagad Merchant ও EPS-এর verify endpoint response shape real sandbox দিয়ে verify করা — financial-critical, soft-launch batch-এর আগে করা উচিত (`online_payment_context.md`, `production_audit_report_context.md §৭`)
+- 🟡 **P2 (payment gateway sandbox verify) — EPS ✅ সম্পন্ন (২০২৬-০৮-১৯), Nagad Merchant ⬜ এখনো বাকি (external — real merchant sandbox account দরকার):** ২০২৬-০৮-২৮-এ ধরা পড়েছে `feature_roadmap_context.md`/`production_audit_report_context.md §৭` দুটোতেই এই আইটেম ভুলভাবে "Not started" দেখাচ্ছিল যদিও EPS আসলে অনেক আগেই live sandbox test + bug fix হয়ে গেছে — এখন sync হয়েছে। Nagad-এর `verifyPayment()`-এ success-path logging হার্ডেনিং যোগ হয়েছে (real test-এর বিকল্প না) — বিস্তারিত `online_payment_context.md §৯.১, §১১`, `security_hardening_context.md`
 
 **UI/UX অডিট:**
 - ☐ Subscription/billing পেজ — প্যাকেজ ফিচার-লিস্ট (recent `max_staff`/`features` wiring commit-এর পর) UI-তে সঠিকভাবে reflect করছে কিনা end-to-end verify
@@ -134,8 +134,9 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 **সোর্স:** §15.9, §17.6, §17.8 item 7, recent commits (dashboard homepage, package form)
 
 - ☐ এখনো কোনো super-admin tier নেই (last-admin lockout guard আছে, কিন্তু granular admin-role নেই) — স্কেল বাড়লে দরকার হবে
-- ☐ 2FA + admin audit trail (P8, feature_roadmap) — এখনো Not started, security hardening pass-এ প্রথম candidate
+- ✅ **(2026-08-28) 2FA + admin audit trail সম্পন্ন ও লাইভ** — বিস্তারিত `security_hardening_context.md`। Admin-only TOTP 2FA (নিজে-implement, RFC 6238 test vector দিয়ে verify) + recovery codes + login-challenge flow + ৮টা sensitive admin action-এ audit log। `/admin/settings/security` + `/admin/audit-logs` পেজ, ২৮টা নতুন টেস্ট (সব pass, ০ regression)
 - ☐ Recent commit `56acf11`/`62bb4b2` (dashboard homepage real data + package `max_staff`/`features` form) — নতুন করে যোগ হওয়া অংশ ফ্রেশ eye দিয়ে একবার browser-এ ক্লিক-থ্রু verify করা (real data edge case: শূন্য সেলার, শূন্য প্যাকেজ ইত্যাদি)
+- ☐ **নতুন (2026-08-28 আবিষ্কৃত) — backend test suite-এ ৮০টা pre-existing ব্যর্থতা, sqlite-vs-postgres dialect mismatch** — `phpunit.xml` টেস্ট SQLite in-memory-তে চালায়, কিন্তু ক্রমবর্ধমান Postgres-specific raw SQL (`to_char()`, `now()`, `ON CONFLICT`) ব্যবহার হচ্ছে যেটা SQLite সাপোর্ট করে না — আসল লজিক বাগ না, কিন্তু test suite-এর signal-to-noise কমিয়ে দিচ্ছে (নতুন real regression এই ৮০-এর ভেতরে চাপা পড়ে যেতে পারে)। Fix করতে হয় test suite real Postgres-এ চালাতে হবে, নাহলে raw SQL গুলো DB-agnostic করে লিখতে হবে — বড় আলাদা সিদ্ধান্ত, এই ব্যাচের স্কোপে করা হয়নি
 
 **UI/UX অডিট:**
 - ☐ Admin sidebar/menu — নতুন যোগ হওয়া মডিউলগুলো (addon-packages, marketing-events, tracking, support) মেনু-হায়ারার্কি/active-state consistency (`CONTEXT.md` §22 checklist দিয়ে re-verify)
@@ -206,8 +207,8 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 **সোর্স:** §17.8, `production_audit_report_context.md §৩`, `domain_security_audit.md`
 
-- ☐ **2FA + admin audit trail** — এখনো Not started (P8), soft-launch scale বাড়ার আগে করা উচিত
-- ☐ Payment gateway sandbox verify (Nagad/EPS) — উপরে §ছ-তেও আছে, financial risk হওয়ায় এখানেও ক্রস-লিস্টেড
+- ✅ **(2026-08-28) 2FA + admin audit trail সম্পন্ন** — বিস্তারিত §জ ও `security_hardening_context.md`
+- 🟡 **(2026-08-28) Payment gateway sandbox verify — EPS ✅ সম্পন্ন (২০২৬-০৮-১৯-এই ছিল, ডকুমেন্টেশন stale ছিল, এখন sync হয়েছে), Nagad Merchant এখনো ⬜** — real Nagad merchant sandbox account/credential external dependency, verify()-এ success-path logging hardening যোগ হয়েছে কিন্তু আসল field-shape এখনো unconfirmed — বিস্তারিত §ছ ও `online_payment_context.md §৯.১, §১১`
 - ☐ প্রতিটা নতুন module merge/deploy-এর আগে `CONTEXT.md` §25 (`adminScopeUserIds()`)-এর checklist অনুযায়ী shared-vs-per-user scoping re-verify — বিশেষ করে recent addon-packages/marketing-events মডিউলগুলোতে এটা প্রয়োগ হয়েছে কিনা একবার audit করা
 
 ---

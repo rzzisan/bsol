@@ -39,6 +39,8 @@ const ADMIN_MENU_TEXT: Record<Locale, Record<string, string>> = {
     support: "সাপোর্ট",
     tracking: "ট্র্যাকিং ব্যবহার",
     marketingEvents: "মার্কেটিং ইভেন্ট",
+    security: "নিরাপত্তা (2FA)",
+    auditLogs: "অডিট লগ",
   },
   en: {
     dashboard: "Dashboard",
@@ -70,6 +72,8 @@ const ADMIN_MENU_TEXT: Record<Locale, Record<string, string>> = {
     support: "Support",
     tracking: "Tracking Usage",
     marketingEvents: "Marketing Events",
+    security: "Security (2FA)",
+    auditLogs: "Audit Log",
   },
 };
 
@@ -86,6 +90,7 @@ export function buildAdminMenu(locale: Locale): ShellMenuItem[] {
     { key: "settings-notification-templates", label: l.notificationTemplates, href: "/admin/settings/notification-templates" },
     { key: "settings-notification-use-cases", label: l.notificationUseCases, href: "/admin/settings/notification-use-cases" },
     { key: "settings-notification-logs", label: l.notificationLogs, href: "/admin/settings/notification-logs" },
+    { key: "settings-security", label: l.security, href: "/admin/settings/security" },
   ];
 
   return [
@@ -126,6 +131,7 @@ export function buildAdminMenu(locale: Locale): ShellMenuItem[] {
     { key: "tracking", label: l.tracking, icon: "🎯", href: "/admin/tracking" },
     { key: "marketing-events", label: l.marketingEvents, icon: "📣", href: "/admin/marketing-events" },
     { key: "support", label: l.support, icon: "💬", href: "/admin/support" },
+    { key: "audit-logs", label: l.auditLogs, icon: "📜", href: "/admin/audit-logs" },
     { key: "reports", label: l.reports, icon: "📊" },
     { key: "settings", label: l.settings, icon: "⚙️", children: settingsChildren },
   ];

@@ -7,6 +7,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Models\ShopProfile;
 use App\Models\User;
+use App\Services\Security\AdminAuditLogger;
+use App\Services\Security\RecoveryCodeService;
+use App\Services\Security\TotpService;
+use App\Services\Security\TwoFactorChallengeService;
 use App\Services\SubdomainHandoffService;
 use App\Support\FrontendUrl;
 use Illuminate\Support\Facades\Hash;
@@ -15,7 +19,10 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly SubdomainHandoffService $handoff) {}
+    public function __construct(
+        private readonly SubdomainHandoffService $handoff,
+        private readonly TwoFactorChallengeService $twoFactorChallenge,
+    ) {}
 
     public function register(Request $request): JsonResponse
     {
@@ -74,12 +81,129 @@ class AuthController extends Controller
             ]);
         }
 
+        // Two-factor gate — admin-only for now (security_hardening_context.md
+        // §2). Deliberately checked here, after the subdomain-handoff branch
+        // above: an admin never has a shop subdomain to hand off to
+        // (SubdomainHandoffService::redirectHostFor), so this is always the
+        // real "about to mint a token" point for them.
+        if ($user->hasTwoFactorEnabled()) {
+            $challengeToken = $this->twoFactorChallenge->issue($user, $request->ip());
+
+            return response()->json([
+                'requires_2fa' => true,
+                'challenge_token' => $challengeToken,
+                'message' => 'Enter your two-factor authentication code to continue.',
+            ]);
+        }
+
         $token = $user->createToken('frontend')->plainTextToken;
+
+        if ($user->isAdmin()) {
+            AdminAuditLogger::log('admin.login', 'User', $user->id, actingAdminId: $user->id);
+        }
 
         return response()->json([
             'message' => 'Login successful.',
             'token' => $token,
             'user' => $user,
+            ...$this->staffAuthContext($user),
+        ]);
+    }
+
+    /**
+     * Second half of the 2FA login flow: exchange a challenge token + TOTP
+     * (or recovery) code for the real Sanctum token that login() withheld.
+     * Public by necessity, same reasoning as exchangeHandoff() below — the
+     * caller has no bearer token yet.
+     */
+    public function verifyTwoFactorChallenge(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'challenge_token' => ['required', 'string', 'max:128'],
+            'code' => ['nullable', 'string', 'max:20'],
+            'recovery_code' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        if (empty($data['code']) && empty($data['recovery_code'])) {
+            throw ValidationException::withMessages([
+                'code' => ['Enter your authenticator code or a recovery code.'],
+            ]);
+        }
+
+        $payload = $this->twoFactorChallenge->peek($data['challenge_token']);
+
+        if ($payload === null) {
+            return response()->json([
+                'message' => 'This login attempt has expired. Please log in again.',
+                'error_code' => 'challenge_expired',
+            ], 422);
+        }
+
+        $user = User::find($payload['user_id']);
+
+        if (! $user || ! $user->hasTwoFactorEnabled()) {
+            $this->twoFactorChallenge->invalidate($data['challenge_token']);
+
+            return response()->json([
+                'message' => 'This login attempt is no longer valid. Please log in again.',
+                'error_code' => 'challenge_invalid',
+            ], 422);
+        }
+
+        $valid = false;
+        $usedRecoveryCode = false;
+
+        if (! empty($data['code'])) {
+            $valid = TotpService::verify($user->two_factor_secret, $data['code']);
+        }
+
+        if (! $valid && ! empty($data['recovery_code'])) {
+            $remaining = RecoveryCodeService::consume(
+                $user->two_factor_recovery_codes ?? [],
+                $data['recovery_code'],
+            );
+
+            if ($remaining !== null) {
+                $valid = true;
+                $usedRecoveryCode = true;
+                $user->two_factor_recovery_codes = $remaining;
+                $user->save();
+            }
+        }
+
+        if (! $valid) {
+            $remainingAttempts = $this->twoFactorChallenge->recordFailedAttempt($data['challenge_token']);
+
+            if ($remainingAttempts <= 0) {
+                return response()->json([
+                    'message' => 'Too many incorrect attempts. Please log in again.',
+                    'error_code' => 'challenge_locked',
+                ], 422);
+            }
+
+            return response()->json([
+                'message' => 'Incorrect code.',
+                'error_code' => 'invalid_code',
+                'remaining_attempts' => $remainingAttempts,
+            ], 422);
+        }
+
+        $this->twoFactorChallenge->redeem($data['challenge_token']);
+
+        $token = $user->createToken('frontend')->plainTextToken;
+
+        AdminAuditLogger::log(
+            $usedRecoveryCode ? 'admin.login_via_recovery_code' : 'admin.login_via_2fa',
+            'User',
+            $user->id,
+            actingAdminId: $user->id,
+        );
+
+        return response()->json([
+            'message' => 'Login successful.',
+            'token' => $token,
+            'user' => $user,
+            'used_recovery_code' => $usedRecoveryCode,
             ...$this->staffAuthContext($user),
         ]);
     }

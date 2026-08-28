@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AddonPurchase;
 use App\Services\AddonApplyService;
+use App\Services\Security\AdminAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -57,6 +58,11 @@ class AdminAddonPurchaseController extends Controller
 
         $this->addonApplyService->apply($addonPurchase);
 
+        AdminAuditLogger::log('addon_purchase.approve', 'AddonPurchase', $addonPurchase->id, [
+            'user_id' => $addonPurchase->user_id,
+            'amount' => $addonPurchase->amount,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Purchase approved and applied.',
@@ -82,6 +88,11 @@ class AdminAddonPurchaseController extends Controller
             'admin_note' => $validated['admin_note'] ?? null,
             'reviewed_by' => auth()->id(),
             'reviewed_at' => now(),
+        ]);
+
+        AdminAuditLogger::log('addon_purchase.reject', 'AddonPurchase', $addonPurchase->id, [
+            'user_id' => $addonPurchase->user_id,
+            'admin_note' => $validated['admin_note'] ?? null,
         ]);
 
         return response()->json([

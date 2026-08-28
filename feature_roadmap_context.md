@@ -8,6 +8,8 @@ Master context: `CONTEXT.md` (server/ops), `SAAS_MODULE_CONTEXT.md` (§15 ground
 
 > **🚨 এই তালিকা থেকে যেকোনো নতুন আইটেমে কাজ শুরু করার আগে বাধ্যতামূলক:** CONTEXT.md §৩১ এবং `staff_team_role_context.md` পড়ো এবং সেই ফিচারটা Staff/Team role-aware ভাবে ডিজাইন/implement করো — নতুন কোনো resource তৈরি করলে সেটা Pattern A (team-shared, `whereIn(shopUserIds())`) না Pattern B (owner-only, `shopOwnerId()`) সেই সিদ্ধান্ত প্রথমেই নিতে হবে, প্রয়োজনে নতুন `StaffPermission::MODULE_KEYS` entry ও route middleware যোগ করতে হবে। এটা এখন optional না, প্রতিটা নতুন module-এর জন্য mandatory চেকলিস্ট।
 
+Last updated: 2026-08-28 (২) — **P8 (2FA + admin audit trail) ✅ সম্পন্ন ও লাইভ** — admin-only TOTP 2FA + recovery codes + login-challenge flow, প্লাস ৮টা sensitive admin action-এ audit log। বিস্তারিত `security_hardening_context.md`। এই session-এ পরের priority আপাতত open নেই (P2 partial/external-blocked, P3-P7 আগেই সম্পন্ন/paused) — user নতুন item বেছে নেবে। Older entries kept as-is:
+
 Last updated: 2026-08-28 — **P2 status সংশোধন**: EPS আসলে ইতিমধ্যে ✅ real sandbox-এ live verify হয়ে গেছে (২০২৬-০৮-১৯-এই, `online_payment_context.md §৯.১`-এ documented ছিল কিন্তু এই ফাইলের P2 row-এ কখনো reflect হয়নি) — শুধু Nagad Merchant এখনো genuinely unconfirmed, `NagadMerchantGatewayClient::verifyPayment()`-এ success-path logging যোগ হয়েছে (hardening, বাস্তব sandbox test-এর বিকল্প না)। পরবর্তী: ২FA + admin audit trail (P8) শুরু। Older entries kept as-is:
 
 Last updated: 2026-08-23 (৫) — **SaaS বিলিং ধাপ ৫ (ল্যান্ডিং পেজ লিমিট) ✅ সম্পন্ন ও লাইভ, স্কোপ সরলীকৃত** — user-এর নির্দেশে addon বাদ, শুধু প্যাকেজ-ভিত্তিক ফ্ল্যাট মোট-সংখ্যা লিমিট। বিস্তারিত `subscription_billing_context.md §১২`। পরবর্তী: Tracking boost addon (শেষ ধাপ)। Older entries kept as-is:
@@ -75,7 +77,7 @@ Last updated: 2026-08-10 — প্রাথমিক তালিকা তৈ�
 | **P5** | Ads ROI ট্র্যাকার সম্পূর্ণ করা | ⬜ Not started (এখনো placeholder) — audit-প্রায়োরিটি #৫, UTM/ad-spend ডেটা সোর্স দরকার | `SAAS_MODULE_CONTEXT.md §15.7/§16.1`, `production_audit_report_context.md §৭` |
 | **P6** | Marketing broadcast (SMS+Email) | ⬜ Not started — audit-প্রায়োরিটি #৬, উপরে #৭-এও আছে | — |
 | **P7** | WhatsApp + Auto-top-up resume | ⏸️ পজড, external ব্লকার সরলে resume | `whatsapp_context.md`, `auto_top_up_context.md` |
-| **P8** | 2FA + Admin audit trail (security hardening) | ⬜ Not started — audit-প্রায়োরিটি #৮ | `production_audit_report_context.md §৭` |
+| **P8** | 2FA + Admin audit trail (security hardening) | ✅ সম্পন্ন ও লাইভ (২০২৬-০৮-২৮) — admin-only TOTP 2FA (RFC 6238, নিজে implement করা, official test vector দিয়ে verify) + recovery codes + login challenge flow, প্লাস ৮টা high-value admin action-এ audit log (user/package CRUD, subscription/addon payment approve-reject, 2FA changes, admin login) | `security_hardening_context.md` |
 | — | PWA | ⬜ Not started | (§16.9) |
 | — | Facebook App Review সম্পূর্ণ করা (external) | ⬜ Not started | `facebook_integration_context.md` §3 |
 | — | WooCommerce Connector real staging QA (external, ব্যবহারকারীর নিজের সাইটে) | ⬜ Not started | `wordpress_connect_context.md` |

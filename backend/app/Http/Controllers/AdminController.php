@@ -10,6 +10,7 @@ use App\Models\SubscriptionPackage;
 use App\Models\SmsGateway;
 use App\Models\SubscriptionPayment;
 use App\Models\User;
+use App\Services\Security\AdminAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -163,6 +164,10 @@ class AdminController extends Controller
             $validated['email_verified_at'] = null;
         }
 
+        // Audit trail cares about which fields changed and their before/after
+        // values, never the plaintext password itself.
+        $changedFields = array_diff(array_keys($validated), ['password']);
+
         $user->update($validated);
 
         if ($emailChanged) {
@@ -171,6 +176,11 @@ class AdminController extends Controller
                 ->whereIn('email', array_values(array_unique([$originalEmail, $user->email])))
                 ->delete();
         }
+
+        AdminAuditLogger::log('user.update', 'User', $user->id, [
+            'changed_fields' => array_values($changedFields),
+            'password_changed' => array_key_exists('password', $validated),
+        ]);
 
         return response()->json([
             'message' => 'User updated successfully.',
@@ -185,6 +195,11 @@ class AdminController extends Controller
                 'message' => 'Cannot delete the last remaining admin.',
             ], 422);
         }
+
+        AdminAuditLogger::log('user.delete', 'User', $user->id, [
+            'email' => $user->email,
+            'role' => $user->role,
+        ]);
 
         $user->delete();
 
@@ -235,6 +250,8 @@ class AdminController extends Controller
 
         $package = SubscriptionPackage::create($validated);
 
+        AdminAuditLogger::log('package.create', 'SubscriptionPackage', $package->id, ['name' => $package->name]);
+
         return response()->json([
             'message' => 'Package created successfully.',
             'package' => $package,
@@ -261,6 +278,10 @@ class AdminController extends Controller
 
         $package->update($validated);
 
+        AdminAuditLogger::log('package.update', 'SubscriptionPackage', $package->id, [
+            'changed_fields' => array_values(array_keys($validated)),
+        ]);
+
         return response()->json([
             'message' => 'Package updated successfully.',
             'package' => $package,
@@ -274,6 +295,8 @@ class AdminController extends Controller
         if ($regSetting->default_subscription_package_id === $package->id) {
             $regSetting->update(['default_subscription_package_id' => null]);
         }
+
+        AdminAuditLogger::log('package.delete', 'SubscriptionPackage', $package->id, ['name' => $package->name]);
 
         $package->delete();
 

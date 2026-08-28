@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PlatformBillingSetting;
 use App\Models\SubscriptionPayment;
+use App\Services\Security\AdminAuditLogger;
 use App\Services\SubscriptionActivationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,6 +95,12 @@ class AdminSubscriptionController extends Controller
 
         $this->activationService->activate($payment);
 
+        AdminAuditLogger::log('subscription_payment.approve', 'SubscriptionPayment', $payment->id, [
+            'user_id' => $payment->user_id,
+            'amount' => $payment->amount,
+            'trx_id' => $payment->trx_id,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Payment approved and subscription activated.',
@@ -119,6 +126,12 @@ class AdminSubscriptionController extends Controller
             'admin_note' => $validated['admin_note'] ?? null,
             'reviewed_by' => auth()->id(),
             'reviewed_at' => now(),
+        ]);
+
+        AdminAuditLogger::log('subscription_payment.reject', 'SubscriptionPayment', $payment->id, [
+            'user_id' => $payment->user_id,
+            'amount' => $payment->amount,
+            'admin_note' => $validated['admin_note'] ?? null,
         ]);
 
         return response()->json([
