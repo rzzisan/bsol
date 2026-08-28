@@ -74,6 +74,7 @@ const labels = {
     enabledHint: "বন্ধ থাকলে সেলাররা শুধু অ্যাডমিনের উত্তরের অপেক্ষায় থাকবে, AI কিছু পাঠাবে না।",
     activeProvider: "সক্রিয় প্রোভাইডার",
     model: "মডেল (উপরের সাজেশন দেখে বসাও)",
+    modelMustMatchProvider: "⚠️ মডেল অবশ্যই নির্বাচিত প্রোভাইডারের হতে হবে, নাহলে AI ব্যর্থ হবে",
     effort: "Effort (গুণমান বনাম খরচ)",
     maxPerDay: "প্রতিদিন সর্বোচ্চ AI রিপ্লাই (ফাঁকা রাখলে সীমাহীন)",
     todayCount: "আজ পাঠানো হয়েছে",
@@ -107,6 +108,7 @@ const labels = {
     enabledHint: "When off, sellers just wait for an admin reply — the AI sends nothing.",
     activeProvider: "Active provider",
     model: "Model (see suggestion above)",
+    modelMustMatchProvider: "⚠️ The model must belong to the selected provider, or the AI will fail",
     effort: "Effort (quality vs. cost)",
     maxPerDay: "Max AI replies per day (leave blank for unlimited)",
     todayCount: "Sent today",
@@ -205,6 +207,22 @@ export default function AiSupportSettingsPage() {
   const menus = useMemo(() => buildAdminMenu(locale), [t]);
 
   const update = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm((p) => ({ ...p, [k]: v }));
+
+  const allSuggestedModels = useMemo(() => PROVIDERS.map((p) => PROVIDER_META[p].suggestedModel), []);
+
+  // Switching provider without updating the model field silently breaks the
+  // agent (e.g. picking Groq while the model still reads "gemini-2.5-flash"
+  // — a real production incident this guards against). Only auto-fill when
+  // the current value still looks like an untouched suggestion, never
+  // overwrite a deliberately customized model name.
+  const handleProviderChange = (nextProvider: Provider) => {
+    setForm((prev) => {
+      const looksUntouched = prev.model.trim() === "" || allSuggestedModels.includes(prev.model.trim());
+      const suggestion = providers[nextProvider]?.default_model || PROVIDER_META[nextProvider].suggestedModel;
+
+      return { ...prev, provider: nextProvider, model: looksUntouched ? suggestion : prev.model };
+    });
+  };
 
   const submit = async () => {
     if (!token) return;
@@ -381,7 +399,7 @@ export default function AiSupportSettingsPage() {
               <span className="mb-1 block text-xs text-[var(--muted)]">{t.activeProvider}</span>
               <select
                 value={form.provider}
-                onChange={(e) => update("provider", e.target.value as Provider)}
+                onChange={(e) => handleProviderChange(e.target.value as Provider)}
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
               >
                 {PROVIDERS.map((p) => (
@@ -399,6 +417,9 @@ export default function AiSupportSettingsPage() {
                 onChange={(e) => update("model", e.target.value)}
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
               />
+              <span className="mt-1 block text-[11px] text-[var(--muted)]">
+                {t.modelMustMatchProvider} — {PROVIDER_META[form.provider].label}: {PROVIDER_META[form.provider].suggestedModel}
+              </span>
             </label>
             <label>
               <span className="mb-1 block text-xs text-[var(--muted)]">{t.effort}</span>

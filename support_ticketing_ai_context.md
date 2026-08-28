@@ -50,6 +50,12 @@
 
 ⚠️ **queue worker (`hybrid-queue-worker.service`) একটা long-running প্রসেস — কোড ডিপ্লয় করলেই এটা নতুন কোড pickup করে না, ম্যানুয়ালি `sudo systemctl restart hybrid-queue-worker.service` চালাতে হয়।**
 
+### provider/model mismatch — আরেকটা লাইভ ইনসিডেন্ট (2026-08-28)
+
+Admin "Active Provider" dropdown থেকে Anthropic থেকে Groq-এ সুইচ করেছিল কিন্তু Model ফিল্ড আগের `gemini-2.5-flash`-ই থেকে গিয়েছিল — Groq সেই মডেল চেনে না বলে `404 model_not_found`, safety net ঠিকই fallback পাঠিয়েছে কিন্তু root cause ছিল ভুল কনফিগারেশন, কোনো কোড বাগ না। ফিক্স:
+- `/admin/settings/ai-support`-এ provider dropdown বদলালে, model ফিল্ড যদি এখনো কোনো provider-এর "unedited suggestion"-এর মতো দেখায় (খালি বা কোনো provider-এর suggested model-এর সাথে হুবহু মেলে), তাহলে স্বয়ংক্রিয়ভাবে নতুন provider-এর suggested model বসিয়ে দেয় — deliberately customized model name কখনো overwrite করে না।
+- Model ফিল্ডের নিচে এখন সবসময় সতর্কবার্তা + নির্বাচিত provider-এর জন্য সাজেস্টেড মডেল দেখায়।
+
 ### প্রি-রিকুইজিট বদলে গেছে
 
 আগে `backend/.env`-এ `ANTHROPIC_API_KEY` বসাতে হতো — এখন সেটা আর ব্যবহৃত হয় না। এখন **সরাসরি `/admin/settings/ai-support` পেজ থেকে** যেকোনো প্রোভাইডারের key পেস্ট করে "Save this provider" চাপলেই key `ai_provider_credentials` টেবিলে এনক্রিপ্টেড অবস্থায় জমা হয়ে যায় — কোনো `.env`/ডিপ্লয় লাগে না।
