@@ -211,11 +211,12 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ণ. Onboarding + Bulk Import
+## ণ. Onboarding + Bulk Import — 🟡 কোড-লেভেলে সম্পন্ন, বাকিটা external
 
 **সোর্স:** `onboarding_checklist_context.md`, feature_roadmap P1/P3
 
-- ☐ Onboarding checklist + demo-seed — নতুন real সেলার সাইনআপ করলে churn-drop verify করার জন্য প্রথম soft-launch cohort থেকে feedback নেওয়া
+- ✅ **(2026-08-28) `onboarding_checklist_context.md`-এর নিজস্ব honest self-flag ("frontend visual rendering আলাদাভাবে browser-verify করা হয়নি") কোড-লেভেলে রিভিউ করা হয়েছে — কোনো সমস্যা পাওয়া যায়নি।** `getting-started-checklist.tsx` (progress bar/step-card/demo-toggle লজিক) আর products পেজের DEMO badge — দুটোই established design token (`--accent`/`--surface-soft`/`--border`/`--muted`) সঠিকভাবে ব্যবহার করে, edge case (allDone, empty steps, staff-hide) ঠিকভাবে হ্যান্ডলড
+- ☐ **বাকি: প্রথম soft-launch cohort থেকে real feedback** — এটা genuinely external/business-side (আসল সেলার সাইনআপ + churn-drop পর্যবেক্ষণ দরকার), কোড থেকে আগানো সম্ভব না — feature নিজেই ইতিমধ্যে ভালোভাবে বিল্ড+টেস্ট+লাইভ-verify করা (৮/৮ টেস্ট, disposable প্রোডাকশন অ্যাকাউন্ট দিয়ে end-to-end curl verify)
 
 ---
 
