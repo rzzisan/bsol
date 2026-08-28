@@ -950,6 +950,7 @@ Route::middleware(['staff_permission:orders', 'active_subscription:allow_deliver
         Route::put('/settings/platform-branding', [PlatformSettingsController::class, 'update']);
         Route::get('/settings/facebook', [PlatformFacebookSettingsController::class, 'show']);
         Route::put('/settings/facebook', [PlatformFacebookSettingsController::class, 'update']);
+        Route::put('/settings/facebook/app-review-status', [PlatformFacebookSettingsController::class, 'updateAppReviewStatus']);
         Route::get('/marketing-events', [PlatformMarketingEventController::class, 'index']);
         Route::get('/marketing-events/channels', [PlatformMarketingEventController::class, 'channels']);
 

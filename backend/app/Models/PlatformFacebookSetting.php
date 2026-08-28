@@ -16,6 +16,7 @@ class PlatformFacebookSetting extends Model
     protected $fillable = [
         'app_id', 'login_config_id', 'app_secret', 'webhook_verify_token',
         'marketing_pixel_id', 'marketing_capi_access_token', 'marketing_test_event_code',
+        'app_review_approved',
     ];
 
     protected $hidden = [
@@ -28,6 +29,7 @@ class PlatformFacebookSetting extends Model
             'app_secret' => 'encrypted',
             'webhook_verify_token' => 'encrypted',
             'marketing_capi_access_token' => 'encrypted',
+            'app_review_approved' => 'boolean',
         ];
     }
 
@@ -47,6 +49,7 @@ class PlatformFacebookSetting extends Model
             'marketing_pixel_id' => $this->marketing_pixel_id,
             'marketing_capi_access_token_set' => filled($this->marketing_capi_access_token),
             'marketing_test_event_code' => $this->marketing_test_event_code,
+            'app_review_approved' => (bool) $this->app_review_approved,
         ];
     }
 

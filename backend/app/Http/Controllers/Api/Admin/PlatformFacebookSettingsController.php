@@ -57,4 +57,24 @@ class PlatformFacebookSettingsController extends Controller
 
         return response()->json(['success' => true, 'data' => $setting->fresh()->masked()]);
     }
+
+    /**
+     * Toggling App Review status is deliberately its own endpoint, not a
+     * field on the main credentials form — that form's blank-means-
+     * unchanged handling above only applies to secrets; a plain boolean
+     * folded into the same submit would get silently reset to false by
+     * any save that didn't happen to carry it. See
+     * pre_launch_polish_context.md §ঞ / facebook_integration_context.md §10.
+     */
+    public function updateAppReviewStatus(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'app_review_approved' => ['required', 'boolean'],
+        ]);
+
+        $setting = PlatformFacebookSetting::getSetting();
+        $setting->update(['app_review_approved' => $data['app_review_approved']]);
+
+        return response()->json(['success' => true, 'data' => $setting->fresh()->masked()]);
+    }
 }

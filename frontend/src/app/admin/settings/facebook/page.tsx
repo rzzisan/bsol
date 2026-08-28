@@ -24,6 +24,7 @@ type Settings = {
   marketing_pixel_id: string;
   marketing_capi_access_token_set: boolean;
   marketing_test_event_code: string;
+  app_review_approved: boolean;
 };
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -46,6 +47,13 @@ const labels = {
     setPlaceholder: "সেট করা আছে — বদলাতে নতুন মান লিখুন",
     notSetPlaceholder: "সেট করা নেই",
     webhookUrlLabel: "Webhook Callback URL (Meta App-এ এটা বসান)",
+    appReviewTitle: "App Review স্ট্যাটাস",
+    appReviewSubtitle: "এই টগল সেলার-ফেসিং Connect পেজে \"এখনো অনুমোদনের অপেক্ষায়\" নোটিস দেখাবে কিনা ঠিক করে — Facebook-এর নিজের App Review অবস্থা ট্র্যাক করে না, শুধু admin নিজে জানান কবে পুরোপুরি লাইভ (pages_manage_metadata/engagement/messaging approved)।",
+    appReviewApproved: "✓ পুরোপুরি approved — নোটিস লুকানো আছে",
+    appReviewPending: "⚠ এখনো পার্শিয়াল/pending — সেলারদের নোটিস দেখানো হচ্ছে",
+    appReviewMarkApproved: "Approved হিসেবে মার্ক করুন",
+    appReviewMarkPending: "Pending-এ ফিরিয়ে নিন",
+    toggling: "আপডেট হচ্ছে...",
     marketingTitle: "মার্কেটিং পিক্সেল",
     marketingSubtitle: "এই SaaS নিজেই বিক্রির জন্য ফেসবুক বিজ্ঞাপন চালানোর ট্র্যাকিং — সেলারদের স্টোরফ্রন্ট পিক্সেল থেকে আলাদা। CompleteRegistration (সাইনআপ) ও Subscribe (পেইড কনভার্সন) ইভেন্ট এখান থেকে পাঠানো হয়।",
     marketingPixelId: "Pixel ID",
@@ -103,6 +111,13 @@ const labels = {
     setPlaceholder: "Currently set — type a new value to change",
     notSetPlaceholder: "Not set",
     webhookUrlLabel: "Webhook Callback URL (put this in the Meta App)",
+    appReviewTitle: "App Review Status",
+    appReviewSubtitle: "This toggle controls whether the seller-facing Connect page shows an \"awaiting approval\" notice — it doesn't track Facebook's actual App Review status itself, it's just an admin flag for when the app is genuinely fully live (pages_manage_metadata/engagement/messaging approved).",
+    appReviewApproved: "✓ Fully approved — notice is hidden",
+    appReviewPending: "⚠ Still partial/pending — sellers are seeing the notice",
+    appReviewMarkApproved: "Mark as approved",
+    appReviewMarkPending: "Revert to pending",
+    toggling: "Updating...",
     marketingTitle: "Marketing Pixel",
     marketingSubtitle: "Ad-tracking for selling this SaaS itself — separate from any seller's storefront pixel. CompleteRegistration (signup) and Subscribe (paid conversion) events are sent from here.",
     marketingPixelId: "Pixel ID",
@@ -160,6 +175,7 @@ export default function AdminFacebookSettingsPage() {
   const [marketingTestEventCode, setMarketingTestEventCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [togglingReview, setTogglingReview] = useState(false);
 
   const t = useMemo(() => labels[locale], [locale]);
 
@@ -249,6 +265,28 @@ export default function AdminFacebookSettingsPage() {
     }
   };
 
+  const toggleAppReviewApproved = async () => {
+    if (!token || !current) return;
+    setTogglingReview(true);
+    setMessage("");
+    try {
+      const res = await fetch(`${API}/admin/settings/facebook/app-review-status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ app_review_approved: !current.app_review_approved }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data?.message ?? "Update failed");
+        return;
+      }
+      setCurrent(data.data);
+      setMessage(t.updated);
+    } finally {
+      setTogglingReview(false);
+    }
+  };
+
   if (state !== "ready") {
     return (
       <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-8">
@@ -287,6 +325,30 @@ export default function AdminFacebookSettingsPage() {
             <p className="mb-1 text-xs text-[var(--muted)]">{t.webhookUrlLabel}</p>
             <code className="break-all text-sm text-[var(--foreground)]">{webhookUrl}</code>
           </div>
+
+          {current && (
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
+              <p className="text-sm font-semibold">{t.appReviewTitle}</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t.appReviewSubtitle}</p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <span
+                  className={`text-sm font-medium ${
+                    current.app_review_approved ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                  }`}
+                >
+                  {current.app_review_approved ? t.appReviewApproved : t.appReviewPending}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void toggleAppReviewApproved()}
+                  disabled={togglingReview}
+                  className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold hover:bg-[var(--surface-soft)] disabled:opacity-60"
+                >
+                  {togglingReview ? t.toggling : current.app_review_approved ? t.appReviewMarkPending : t.appReviewMarkApproved}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <label>

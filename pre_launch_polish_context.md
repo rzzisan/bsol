@@ -164,12 +164,13 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ঞ. Facebook/Meta Lead Capture
+## ঞ. Facebook/Meta Lead Capture — 🟡 আংশিক সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.11, `facebook_integration_context.md`
 
-- ☐ **App Review ফলাফল কনফার্ম করা** — ২০২৬-০৮-০৭ সাবমিট হয়েছিল, ~২০ দিনের timeline পার হয়ে গেছে (আজ ২০২৬-০৮-২৭) — এটা প্রথমে চেক করা উচিত, ফলাফল না জানা থাকলে non-admin seller-দের Messenger lead-capture broken অবস্থায় থাকতে পারে
-- ☐ App Review approve হলে non-admin seller flow end-to-end আরেকবার verify
+- ✅ **(2026-08-28) App Review ফলাফল কনফার্ম করা হয়েছে।** `facebook_integration_context.md §১০`-এ ইতিমধ্যেই ছিল: ২০২৬-০৮-২০-এ decision এসেছে — **partial** (৫/৮ permission approved: `pages_read_user_content`/`pages_show_list`/`business_management`/`pages_read_engagement`/`public_profile`; ৩টা rejected শুধু screencast-জনিত কারণে, ফিচারের কোড/ফাংশনালিটিতে কোনো সমস্যা না: `pages_manage_metadata`/`pages_manage_engagement`/`pages_messaging`)। User-কে সরাসরি জিজ্ঞেস করে কনফার্ম করা হয়েছে (২০২৬-০৮-২৮): **এখনো রি-রেকর্ড+রিসাবমিট করা হয়নি** (স্ক্রিন রেকর্ডিং সেলফ-সার্ভিস কাজ, ইউজারকেই করতে হবে — এই সেশন থেকে সম্ভব না)। যেহেতু rejected ৩টা permission-ই লিড-ক্যাপচারের আসল কোর (webhook subscribe + reply), Meta-র Development Mode-এ non-admin/tester সেলার এখনো ফিচারটা ব্যবহারই করতে পারবে না
+- ✅ **(2026-08-28) নতুন — সেলার-ফেসিং "pending approval" নোটিস যোগ করা হয়েছে (আগে ছিল না)।** সমস্যা ছিল: `/dashboard/settings/facebook` পেজে কোনো ইঙ্গিতই ছিল না যে ফিচারটা এখনো সবার জন্য কাজ করবে না — একজন সাধারণ সেলার Connect ক্লিক করলে শুধু Facebook-এর নিজস্ব cryptic error দেখত, কোনো ব্যাখ্যা ছাড়া। ফিক্স: নতুন `PlatformFacebookSetting.app_review_approved` boolean (migration + admin-only টগল `/admin/settings/facebook`-এ, ডেডিকেটেড এন্ডপয়েন্ট — মূল ক্রেডেনশিয়াল ফর্মের সাথে entangled না, যাতে অন্য সেভ ভুলে করে রিসেট করে না দেয়)। ডিফল্ট `false` — সেলার পেজে amber নোটিস দেখায় ("এই মুহূর্তে Connect করলে Facebook-এর error দেখাতে পারে, আপনার সমস্যা না")। Admin resubmission approve হওয়ার খবর পেলেই এক ক্লিকে টগল করে দেবে — কোনো redeploy লাগবে না। ৬টা নতুন টেস্ট
+- ☐ **App Review (রিসাবমিশনের পরে) approve হলে non-admin seller flow end-to-end verify** — এখনো ব্লকড, উপরের কারণে
 
 ---
 

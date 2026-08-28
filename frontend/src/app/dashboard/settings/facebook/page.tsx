@@ -11,6 +11,7 @@ const t = {
   bn: {
     pageTitle: "ফেসবুক পেজ",
     intro: "আপনার Facebook Page কানেক্ট করলে পেজের কমেন্ট এবং ইনবক্স মেসেজ থেকে অটোমেটিক লিড ক্যাপচার হবে — Leads ইনবক্সে দেখা যাবে।",
+    reviewPendingNotice: "এই ফিচারটি এখনো Facebook-এর অনুমোদনের অপেক্ষায় আছে। এই মুহূর্তে Connect করার চেষ্টা করলে Facebook-এর পক্ষ থেকে একটি ত্রুটি দেখাতে পারে — এটি আপনার সমস্যা নয়। সম্পূর্ণ চালু হলে এখানেই জানানো হবে।",
     loading: "লোড হচ্ছে...",
     connected: "কানেক্টেড",
     notConnected: "কানেক্টেড নয়",
@@ -36,6 +37,7 @@ const t = {
   en: {
     pageTitle: "Facebook Page",
     intro: "Connecting your Facebook Page auto-captures leads from Page comments and inbox messages — view them in the Leads inbox.",
+    reviewPendingNotice: "This feature is still awaiting Facebook's approval. Trying to Connect right now may show an error from Facebook itself — that isn't something wrong on your end. This notice will disappear once it's fully live.",
     loading: "Loading...",
     connected: "Connected",
     notConnected: "Not connected",
@@ -70,6 +72,7 @@ type Connection = {
 
 type Status = {
   connected: boolean;
+  app_review_approved: boolean;
   data: Connection[];
 };
 
@@ -235,6 +238,12 @@ function FacebookSettingsPage() {
     <UserShell locale={locale} onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")} activeKey="facebook-connect" defaultExpandedKey="settings" pageTitle={{ bn: tr.pageTitle, en: tr.pageTitle }}>
       <div className="mx-auto max-w-2xl space-y-4">
         <p className="text-sm text-[var(--muted)]">{tr.intro}</p>
+
+        {status && !status.app_review_approved && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+            {tr.reviewPendingNotice}
+          </div>
+        )}
 
         {message && (
           <div

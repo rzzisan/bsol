@@ -36,6 +36,14 @@ class FacebookConnectController extends Controller
         return response()->json([
             'success' => true,
             'connected' => $connections->isNotEmpty(),
+            // Meta App Review is still partial (facebook_integration_context.md
+            // §10) — pages_manage_metadata/engagement/messaging (what lead
+            // capture actually needs) are pending resubmission, so Meta's
+            // Development Mode means only the app's own admin/developer/
+            // tester Facebook users can actually complete Connect right
+            // now. Lets the frontend show an honest notice instead of the
+            // seller hitting an unexplained Facebook-side rejection.
+            'app_review_approved' => (bool) PlatformFacebookSetting::getSetting()->app_review_approved,
             'data' => $connections->map(fn ($c) => [
                 'id' => $c->id,
                 'page_name' => $c->page_name,
