@@ -77,16 +77,18 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ঘ. Landing Page / Checkout / Abandoned Checkout
+## ঘ. Landing Page / Checkout / Abandoned Checkout — ✅ সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.4, §17.4, `landing_page_context.md`
 
-- ☐ `LandingPageAnalyticsController::linkVisitToOrder` — `order_id` caller-এর নিজের order-এ scoped না (শুধু global exists চেক) — analytics data pollution সম্ভব (low impact কিন্তু ফিক্স সহজ)
+- ✅ **স্টেল প্রমাণিত (কোনো কোড পরিবর্তন লাগেনি):** `LandingPageAnalyticsController::linkVisitToOrder`-এর `order_id`/`visit_id` স্কোপিং সমস্যা — চেক করে দেখা গেছে আগেই ফিক্সড (কমিট `36fab21`, এই পোলিশ পাস শুরুর আগেই)। `Rule::exists(...)->where('user_id', ...)` এবং `->where('landing_page_id', ...)` দিয়ে ঠিকভাবে scoped। যেহেতু কোনো টেস্ট ছিল না, নতুন `LandingPageAnalyticsLinkVisitTest.php` (৪টা টেস্ট) দিয়ে lock-in করা হয়েছে
 
 **UI/UX অডিট:**
-- ☐ Landing page builder editor — element library-তে নতুন যোগ হওয়া সব element bn/en + dark/light-এ preview মেলে কিনা
-- ☐ Public checkout ফর্ম (mobile network slow-connection-এ) loading/error state polish
-- ☐ Abandoned checkout dashboard পেজ — resume-link flow real ডেটা দিয়ে আরেকবার end-to-end click-through করা
+- ✅ **Landing page builder editor — element library bn/en + dark/light যাচাই।** `BLOCK_LABELS` (১২টা block type) সব bn/en-এ সম্পূর্ণ, `block-fields.tsx`/builder-এ কোনো hardcoded light-only color পাওয়া যায়নি (সব `var(--...)` টোকেন ব্যবহার করে) — কোনো ফিক্স লাগেনি
+- ✅ **(2026-08-28) Public checkout ফর্ম — slow-connection error handling ফিক্স + বড় bn/en gap আবিষ্কার+ফিক্স।** `public-landing-page-view.tsx`-এ দুটো সমস্যা পাওয়া গেছে:
+  1. Network failure (fetch নিজেই fail করলে, slow/dropped mobile connection-এ)-এ raw browser error text (যেমন "Failed to fetch") সরাসরি কাস্টমারকে দেখানো হতো, bn/en কোনোটাতেই translated ছিল না — এখন `err instanceof TypeError` চেক করে আলাদা, translated network-error message দেখায়
+  2. পুরো Payment Method + Order Summary সেকশন (COD/wallet/gateway পেমেন্ট অপশন, "Original Price"/"Product Discount"/"Shipping"/"TOTAL", privacy notice, "Place Order" বাটন) **সম্পূর্ণ hardcoded ইংরেজি ছিল** — pageLanguage বাংলা হলেও কখনো বাংলায় দেখাত না (পেমেন্ট-গেটওয়ে ফিচার যোগের সময় বাকি পেজের i18n discipline অনুসরণ করা হয়নি)। এখন ১৪টা নতুন bn/en key দিয়ে পুরো সেকশন localized
+- ✅ **(2026-08-28) Abandoned checkout resume-link flow — কোড-লেভেল ট্রেস করে verify করা হয়েছে।** `AbandonedCheckoutService::resume()` সঠিকভাবে `landing_page_id`-তে scoped (cross-seller resume সম্ভব না), dashboard-এর কপি-লিংক ফ্লো সেলারের নিজস্ব subdomain (`public_url`) থেকে link বানায় সঠিক null-check সহ, failed resume silently graceful fallback করে। **লাইভ প্রোডাকশন ডেটায় সরাসরি ব্রাউজার click-through করা হয়নি** — real customer PII/DB row তৈরি/পরিবর্তনের ঝুঁকি এড়াতে ইচ্ছাকৃতভাবে বাদ দেওয়া হয়েছে; কোড-লেভেল যাচাই যথেষ্ট নির্ভরযোগ্য মনে হয়েছে (existing `test_a_converted_row_is_not_resurrected_by_a_stale_capture`-সহ প্রাসঙ্গিক টেস্ট আগে থেকেই আছে)
 
 ---
 

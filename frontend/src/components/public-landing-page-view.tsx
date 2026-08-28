@@ -309,6 +309,7 @@ const PUBLIC_UI_TEXT = {
     selectOption: "নির্বাচন করুন",
     previewNotice: "এটি একটি প্রিভিউ — অর্ডার সাবমিট হয়নি। আসল অর্ডারে কাস্টমার Thank You পেজে যাবে।",
     orderSubmitFailed: "অর্ডার সাবমিট করা যায়নি।",
+    orderSubmitNetworkError: "ইন্টারনেট সংযোগে সমস্যা হচ্ছে। আপনার নেটওয়ার্ক চেক করে আবার চেষ্টা করুন — আপনার তথ্য নিরাপদ আছে, অর্ডার এখনো সাবমিট হয়নি।",
     orderSuccess: (orderNumber: string) => `অর্ডার সফল হয়েছে। অর্ডার নম্বর: ${orderNumber}`,
     defaultCtaText: "অর্ডার করতে চাই",
     defaultProductsTitle: "আপনার পছন্দ মতো প্রোডাক্ট সিলেক্ট করুন",
@@ -322,6 +323,20 @@ const PUBLIC_UI_TEXT = {
     selectProductToOrder: "অর্ডারের জন্য product select করুন",
     deliveryContact: "ডেলিভারি ও যোগাযোগ",
     contactLabel: "যোগাযোগ",
+    noImage: "ছবি নেই",
+    selectedProduct: "নির্বাচিত প্রোডাক্ট",
+    originalPrice: "মূল দাম",
+    productDiscount: "প্রোডাক্ট ডিসকাউন্ট",
+    shippingLabel: "শিপিং",
+    totalLabel: "সর্বমোট",
+    paymentMethodTitle: "পেমেন্ট মেথড",
+    codLabel: "ক্যাশ অন ডেলিভারি",
+    codDescription: "ডেলিভারির সময় নগদে পেমেন্ট করুন।",
+    payWithWallet: (provider: string) => `${provider} দিয়ে পে করুন`,
+    walletInstructions: (number: string) => `অর্ডার করার পর ${number} নম্বরে টাকা পাঠান, তারপর Transaction ID সাবমিট করুন।`,
+    gatewayDescription: "নিরাপদে অনলাইনে পে করুন — পেমেন্ট সম্পন্ন করতে আপনাকে রিডাইরেক্ট করা হবে।",
+    privacyNotice: "আপনার ব্যক্তিগত তথ্য অর্ডার প্রসেস করতে, এই ওয়েবসাইটে আপনার অভিজ্ঞতা উন্নত করতে, এবং আমাদের প্রাইভেসি পলিসিতে বর্ণিত অন্যান্য উদ্দেশ্যে ব্যবহৃত হবে।",
+    placeOrder: (amount: string) => `অর্ডার করুন ${amount}`,
   },
   en: {
     whyChoose: "Why choose this page?",
@@ -329,6 +344,7 @@ const PUBLIC_UI_TEXT = {
     selectOption: "Select an option",
     previewNotice: "This is a preview — no order was submitted. On the live page, customers land on the Thank You page.",
     orderSubmitFailed: "Order could not be submitted.",
+    orderSubmitNetworkError: "There's a problem with your internet connection. Please check your network and try again — your details are safe, the order hasn't been submitted yet.",
     orderSuccess: (orderNumber: string) => `Order placed successfully. Order number: ${orderNumber}`,
     defaultCtaText: "I want to order",
     defaultProductsTitle: "Select your preferred products",
@@ -342,6 +358,20 @@ const PUBLIC_UI_TEXT = {
     selectProductToOrder: "Select a product to order",
     deliveryContact: "Delivery & Contact",
     contactLabel: "Contact",
+    noImage: "No image",
+    selectedProduct: "Selected product",
+    originalPrice: "Original Price",
+    productDiscount: "Product Discount",
+    shippingLabel: "Shipping",
+    totalLabel: "TOTAL",
+    paymentMethodTitle: "Payment Method",
+    codLabel: "Cash on delivery",
+    codDescription: "Pay with cash upon delivery.",
+    payWithWallet: (provider: string) => `Pay with ${provider}`,
+    walletInstructions: (number: string) => `Send money to ${number} after placing the order, then submit the Transaction ID.`,
+    gatewayDescription: "Pay securely online — you'll be redirected to complete payment.",
+    privacyNotice: "Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our privacy policy.",
+    placeOrder: (amount: string) => `Place Order ${amount}`,
   },
 } as const;
 
@@ -1251,7 +1281,15 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       setCheckout((prev) => Object.fromEntries(Object.entries(prev).map(([productId, item]) => [productId, { ...item, quantity: 1 }])));
       document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : t.orderSubmitFailed);
+      // fetch() itself (no response at all — offline, DNS failure, dropped
+      // mid-request on a slow mobile connection) always rejects with a
+      // TypeError; our own `throw new Error(message)` above for a real
+      // (non-ok) response is a plain Error. Without this distinction a
+      // flaky connection surfaced the raw browser string ("Failed to
+      // fetch") to the customer, in English regardless of page language.
+      // pre_launch_polish_context.md §ঘ.
+      const isNetworkFailure = err instanceof TypeError;
+      setSubmitError(isNetworkFailure ? t.orderSubmitNetworkError : err instanceof Error ? err.message : t.orderSubmitFailed);
     } finally {
       setSubmitting(false);
     }
@@ -1666,11 +1704,11 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-slate-100 object-cover" />
                           ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">No image</div>
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">{t.noImage}</div>
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-semibold text-slate-900">{item.title_override || product.name}</div>
-                            <div className="mt-1 text-xs text-slate-500">{item.subtitle || activeVariant?.sku || product.sku || "Selected product"}</div>
+                            <div className="mt-1 text-xs text-slate-500">{item.subtitle || activeVariant?.sku || product.sku || t.selectedProduct}</div>
                             <div className="mt-3 inline-flex items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                               <button type="button" onClick={() => patchCheckout(item.product_id, { quantity: Math.max(1, quantity - 1) })} className="px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">−</button>
                               <div className="min-w-10 border-x border-slate-200 px-3 py-2 text-center text-sm font-semibold text-slate-900">{quantity}</div>
@@ -1685,24 +1723,24 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                 </div>
 
                 <div className="mt-6 space-y-3 border-t border-dashed border-slate-200 pt-4 text-sm text-slate-600">
-                  <div className="flex justify-between"><span>Original Price</span><strong>{money(originalSubtotal)}</strong></div>
-                  <div className="flex justify-between"><span>Product Discount</span><strong className="text-rose-500">-{money(discountTotal)}</strong></div>
+                  <div className="flex justify-between"><span>{t.originalPrice}</span><strong>{money(originalSubtotal)}</strong></div>
+                  <div className="flex justify-between"><span>{t.productDiscount}</span><strong className="text-rose-500">-{money(discountTotal)}</strong></div>
                   {!isDigitalCart ? (
-                    <div className="flex justify-between"><span>Shipping</span><strong>{money(effectiveShippingCharge)}</strong></div>
+                    <div className="flex justify-between"><span>{t.shippingLabel}</span><strong>{money(effectiveShippingCharge)}</strong></div>
                   ) : null}
-                  <div className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-semibold">TOTAL</span><strong style={{ color: theme.primary }}>{money(total)}</strong></div>
+                  <div className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-semibold">{t.totalLabel}</span><strong style={{ color: theme.primary }}>{money(total)}</strong></div>
                 </div>
               </div>
 
               <div className="lp-card rounded-3xl p-6 sm:p-8">
-                <h3 className="text-lg font-bold" style={{ color: theme.primary }}>Payment Method</h3>
+                <h3 className="text-lg font-bold" style={{ color: theme.primary }}>{t.paymentMethodTitle}</h3>
                 <div className="mt-4 space-y-3">
                   {codEnabled && !isDigitalCart && (
                     <label className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${paymentMethod === "cod" ? "border-orange-300 bg-orange-50" : "border-slate-200 bg-white"}`}>
                       <input type="radio" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mt-1" />
                       <div>
-                        <div className="text-sm font-semibold text-slate-900">Cash on delivery</div>
-                        <div className="mt-1 text-xs text-slate-500">Pay with cash upon delivery.</div>
+                        <div className="text-sm font-semibold text-slate-900">{t.codLabel}</div>
+                        <div className="mt-1 text-xs text-slate-500">{t.codDescription}</div>
                       </div>
                     </label>
                   )}
@@ -1732,9 +1770,9 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                           className="mt-1"
                         />
                         <div>
-                          <div className="text-sm font-semibold text-slate-900">Pay with {providerName}</div>
+                          <div className="text-sm font-semibold text-slate-900">{t.payWithWallet(providerName)}</div>
                           <div className="mt-1 text-xs text-slate-500">
-                            Send money to {ch.number} after placing the order, then submit the Transaction ID.
+                            {t.walletInstructions(ch.number)}
                           </div>
                         </div>
                       </label>
@@ -1754,17 +1792,17 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                         />
                         <div>
                           <div className="text-sm font-semibold text-slate-900">{GATEWAY_PROVIDER_LABELS[ch.provider] ?? ch.provider}</div>
-                          <div className="mt-1 text-xs text-slate-500">Pay securely online — you&apos;ll be redirected to complete payment.</div>
+                          <div className="mt-1 text-xs text-slate-500">{t.gatewayDescription}</div>
                         </div>
                       </label>
                     );
                   })}
                 </div>
 
-                <p className="mt-4 text-xs leading-6 text-slate-500">Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our privacy policy.</p>
+                <p className="mt-4 text-xs leading-6 text-slate-500">{t.privacyNotice}</p>
 
                 <button type="submit" disabled={submitting || selectedProducts.length === 0} className="mt-6 inline-flex w-full items-center justify-center rounded-2xl px-6 py-3.5 text-base font-semibold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
-                  {submitting ? t.sendingOrder : selectedProducts.length === 0 ? t.selectProductToOrder : `Place Order ${money(total)}`}
+                  {submitting ? t.sendingOrder : selectedProducts.length === 0 ? t.selectProductToOrder : t.placeOrder(money(total))}
                 </button>
               </div>
             </div>
