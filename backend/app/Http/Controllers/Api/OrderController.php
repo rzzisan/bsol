@@ -15,6 +15,7 @@ use App\Services\AccountingService;
 use App\Services\OrderInvoicePdfService;
 use App\Services\OrderStatusService;
 use App\Support\PhoneIntelCache;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -179,6 +180,36 @@ class OrderController extends Controller
 
     public function store(StoreOrderRequest $request): JsonResponse
     {
+        // Order::generateOrderNumber() reads the last order_number with no
+        // lock — two concurrent creates for the same shop can compute the
+        // same next sequence, and the second one's insert then hits
+        // orders_user_id_order_number_unique instead of the "One or more
+        // selected products/variants..." style friendly error (pre_launch_
+        // polish_context.md §ক). Retrying re-runs generateOrderNumber()
+        // against the now-committed first insert, so the second attempt
+        // naturally gets the next real number — same "catch the unique
+        // violation and retry" convention as AccountingService::
+        // upsertTransaction() and SmsAutomationService (§17.9 #5).
+        $maxAttempts = 3;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                return $this->storeOrder($request);
+            } catch (UniqueConstraintViolationException $e) {
+                $isOrderNumberRace = str_contains($e->getMessage(), 'orders_user_id_order_number_unique');
+
+                if (! $isOrderNumberRace || $attempt === $maxAttempts) {
+                    throw $e;
+                }
+            }
+        }
+
+        // Unreachable — the loop above always either returns or throws.
+        throw new \RuntimeException('Failed to create order after retrying order number generation.');
+    }
+
+    private function storeOrder(StoreOrderRequest $request): JsonResponse
+    {
         $data = $request->validated();
         // Order.user_id is deliberately always the shop OWNER id (like
         // Customer.user_id, staff_team_role_context.md §3.3) — not the acting
@@ -253,9 +284,18 @@ class OrderController extends Controller
                 ->unique()
                 ->values();
 
+            // Scoped through the parent product's user_id — omitting
+            // product_id on an item (variant-only) used to skip the
+            // product_id==variant.product_id cross-check below entirely,
+            // so an item naming only product_variant_id could pull in
+            // another shop's variant (pricing/stock/SKU) with no ownership
+            // check at all (pre_launch_polish_context.md §ক). This query
+            // itself is now the ownership boundary regardless of what the
+            // item includes.
             $variantsById = ProductVariant::query()
                 ->whereIn('id', $variantIds)
                 ->whereNull('deleted_at')
+                ->whereHas('product', fn ($q) => $q->whereIn('user_id', $shopUserIds))
                 ->get(['id', 'product_id', 'sku', 'regular_price', 'discount', 'discount_type', 'selling_price', 'stock_qty', 'is_active'])
                 ->keyBy('id');
 

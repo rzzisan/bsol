@@ -293,8 +293,12 @@ class ProductVariantController extends Controller
             $slugParts = collect($combo)->map(fn ($v) => Str::upper(Str::slug($v->value, '-')))->implode('-');
             $sku = $prefix . '-' . $slugParts;
 
-            // Skip if SKU already exists globally (including soft-deleted rows)
-            if (ProductVariant::withTrashed()->where('sku', $sku)->exists()) {
+            // Skip if this seller already has that SKU (including soft-deleted
+            // rows) — scoped per-shop, not global (pre_launch_polish_context.md
+            // §ক): SKUs are seller-chosen and only need to be unique within
+            // one shop, same as the DB-level product_variants_user_id_sku_unique
+            // partial index below.
+            if (ProductVariant::withTrashed()->where('user_id', $product->user_id)->where('sku', $sku)->exists()) {
                 $skipped++;
                 continue;
             }
@@ -304,6 +308,7 @@ class ProductVariantController extends Controller
 
                 $variant = ProductVariant::create([
                     'product_id'    => $product->id,
+                    'user_id'       => $product->user_id,
                     'sku'           => $sku,
                     'regular_price' => $data['default_price'],
                     'discount'      => $data['default_discount'] ?? 0,
@@ -429,7 +434,13 @@ class ProductVariantController extends Controller
         // where $ignoreId filled the slot the string assumed was always
         // present. Rule::unique() avoids the fragile positional string
         // entirely, matching the pattern already used in ProductController.
-        $skuRule = Rule::unique('product_variants', 'sku')->whereNull('deleted_at');
+        // Scoped to this seller's own variants (pre_launch_polish_context.md
+        // §ক) — matches the DB-level product_variants_user_id_sku_unique
+        // partial index; global uniqueness let one seller's SKU block every
+        // other seller from ever using the same string.
+        $skuRule = Rule::unique('product_variants', 'sku')
+            ->where('user_id', $product->user_id)
+            ->whereNull('deleted_at');
         if ($ignoreId) {
             $skuRule = $skuRule->ignore($ignoreId);
         }
@@ -467,6 +478,7 @@ class ProductVariantController extends Controller
 
         $variant = ProductVariant::create([
             'product_id'         => $product->id,
+            'user_id'            => $product->user_id,
             'sku'                => $data['sku'],
             'source'             => $data['source'] ?? null,
             'source_ref'         => $data['source_ref'] ?? null,

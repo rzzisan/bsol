@@ -152,24 +152,44 @@ class ConnectProductSyncTest extends TestCase
         $this->assertDatabaseHas('product_variants', ['sku' => 'TSHIRT-VAR-M', 'stock_qty' => 1]);
     }
 
-    public function test_variant_sku_collision_is_skipped_with_a_warning_not_a_failure(): void
+    public function test_a_variant_sku_shared_with_a_different_sellers_wc_site_syncs_fine(): void
     {
-        // product_variants.sku is unique across the whole install — two
-        // different sellers' WooCommerce sites can legitimately generate
-        // the same variant SKU.
+        // product_variants.sku uniqueness is scoped per shop now
+        // (pre_launch_polish_context.md §ক) — two different sellers'
+        // WooCommerce sites legitimately generating the same variant SKU is
+        // no longer a collision at all, so both should sync clean with no
+        // warning (this used to be skipped-with-a-warning when the
+        // constraint was global).
         [, $keyA] = $this->connectedMerchant();
         $this->postJson('/api/connect/v1/products/sync', $this->variablePayload('wc-p-seller-a'), $this->connectHeaders($keyA))->assertOk();
 
         [, $keyB] = $this->connectedMerchant();
-        $collidingPayload = $this->variablePayload('wc-p-seller-b');
-        // variant[0] deliberately left colliding with seller A's "TSHIRT-VAR-M";
-        // variant[1] renamed so only one of the two actually conflicts.
-        $collidingPayload['variants'][1]['sku'] = 'TSHIRT-VAR-XL-UNIQUE';
-
-        $response = $this->postJson('/api/connect/v1/products/sync', $collidingPayload, $this->connectHeaders($keyB));
+        $response = $this->postJson('/api/connect/v1/products/sync', $this->variablePayload('wc-p-seller-b'), $this->connectHeaders($keyB));
 
         $response->assertOk()
-            ->assertJsonPath('data.variants_synced', 1) // only the second (non-colliding) variant went through
+            ->assertJsonPath('data.variants_synced', 2)
+            ->assertJsonCount(0, 'data.warnings');
+    }
+
+    public function test_a_variant_sku_collision_within_the_same_sellers_own_products_is_still_skipped_with_a_warning(): void
+    {
+        [$user, $rawKey] = $this->connectedMerchant();
+        $headers = $this->connectHeaders($rawKey);
+
+        $this->postJson('/api/connect/v1/products/sync', $this->variablePayload('wc-p-1'), $headers)->assertOk();
+
+        // A second, different product from the same seller reusing one of
+        // the same variant SKUs — this is a real same-shop collision and
+        // should still be skipped with a warning, not create a duplicate.
+        // Product-level sku changed too so only the variant collides.
+        $secondPayload = $this->variablePayload('wc-p-2');
+        $secondPayload['sku'] = 'TSHIRT-VAR-2';
+        $secondPayload['variants'][1]['sku'] = 'TSHIRT-VAR-XL-UNIQUE';
+
+        $response = $this->postJson('/api/connect/v1/products/sync', $secondPayload, $headers);
+
+        $response->assertOk()
+            ->assertJsonPath('data.variants_synced', 1)
             ->assertJsonCount(1, 'data.warnings');
     }
 

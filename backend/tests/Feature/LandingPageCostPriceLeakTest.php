@@ -57,7 +57,7 @@ class LandingPageCostPriceLeakTest extends TestCase
         ]);
 
         $variant = ProductVariant::create([
-            'product_id' => $product->id, 'sku' => 'TS-M-' . uniqid(),
+            'product_id' => $product->id, 'user_id' => $owner->id, 'sku' => 'TS-M-' . uniqid(),
             'regular_price' => 500, 'discount' => 0, 'discount_type' => 'amount',
             'cost_price' => 199.99, 'stock_qty' => 5, 'low_stock_threshold' => 2,
             'is_active' => true,

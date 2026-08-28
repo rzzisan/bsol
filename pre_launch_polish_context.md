@@ -21,24 +21,26 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ক. Core Commerce (Order / Product / Customer)
+## ক. Core Commerce (Order / Product / Customer) — ✅ backend আইটেম সম্পন্ন (2026-08-28)
 
 **সোর্স:** `SAAS_MODULE_CONTEXT.md` §15.1, §17.1
 
 **Feature bug (backend):**
-- ☐ `OrderController::store()` — শুধু `product_variant_id` পাঠালে (কোনো `product_id` ছাড়া) ownership check bypass সম্ভব, অন্য seller-এর variant নিজের অর্ডারে যোগ করা যায় তাত্ত্বিকভাবে
-- ☐ Stock check `store()`-এ creation-time validate হয় কিন্তু decrement হয় status-transition-এ (TOCTOU) — দুটো concurrent order একই limited stock pass করতে পারে
-- ☐ `Order::generateOrderNumber()` lock ছাড়া `orderByDesc('id')` — রেসে raw `QueryException` (500) সম্ভব, data করাপ্ট হয় না কিন্তু user raw error পায় (২০২৬-০৮-২২-এ ধরা পড়া cross-shop collision বাগের মতোই ক্লাস, ওইটা ফিক্স হয়েছে কিন্তু এই lock-less pattern নিজেই এখনো আছে)
+- ✅ **`OrderController::store()` variant ownership bypass ফিক্স** — variant lookup query এখন `whereHas('product', fn($q) => $q->whereIn('user_id', $shopUserIds))` দিয়ে scoped, `product_id` পাঠানো হোক বা না হোক। ৪টা টেস্ট (`OrderStoreVariantScopingTest`)
+- ✅ **Stock check TOCTOU — verify করা হয়েছে, ইতিমধ্যেই নিরাপদ, ফিক্স লাগেনি।** Creation-time check শুধু advisory/UX; আসল authoritative guard `OrderStatusService::transition()`-এ atomic `WHERE stock_qty >= quantity` (§17.9 fix #8, এখনো আছে) — দুটো concurrent order create পাস করলেও পরে confirm করার সময় দ্বিতীয়টা atomically reject হয়, oversell সম্ভব না
+- ✅ **`Order::generateOrderNumber()` race ফিক্স** — `OrderController::store()`-এ retry wrapper, `UniqueConstraintViolationException` (শুধু `orders_user_id_order_number_unique`) ধরে ৩ বার পর্যন্ত পুনরায় নম্বর জেনারেট করে। ৩টা টেস্ট (`OrderNumberRaceRetryTest`)
 
 **Hardening/cleanup:**
-- ☐ Product SKU uniqueness এখনো global (per-user না) — এক seller-এর SKU অন্য seller-কে block করতে পারে
-- ☐ `Customer::orders()` relation define করা কিন্তু ব্যবহার হয় না (dead code, `show()` manually query করে) — cleanup
-- ☐ `CustomerController::syncAll()` পুরো seller-এর সব order মেমোরিতে লোড করে, কোনো chunking নেই — বড় seller-এ memory/perf ঝুঁকি
+- ✅ **Product variant SKU uniqueness এখন per-shop scoped** — migration `2026_08_28_110000_scope_product_variant_sku_unique_per_shop`: নতুন denormalized `product_variants.user_id` কলাম (products থেকে backfilled) + partial unique index (soft-delete-aware, users.email-এর ২০২৬-০৮-১৫ ফিক্সের মতোই pattern)। `ProductVariantController`-এর ২টা create-site + validation rule + bulk-generate-এর collision-check সব আপডেট। ৪টা টেস্ট + `ConnectProductSyncTest`-এর পুরনো test আপডেট (cross-seller SKU sync এখন সফল হয়, আগে warning দিত)
+- ✅ **`Customer::orders()` dead-code cleanup** — `CustomerController::show()` এখন সেই relation ব্যবহার করে duplicate query লেখার বদলে। ৩টা টেস্ট (`CustomerShowOrdersTest`, staff cross-visibility-সহ)
+- ✅ **`CustomerController::syncAll()` chunking ফিক্স** — পুরো shop-এর order মেমোরিতে লোড করার বদলে `chunk(500)` + শুধু দরকারি কলাম select + ছোট phone-set দিয়ে dedupe। ২টা টেস্ট (৫০১-রো chunk-boundary টেস্টসহ)
 
-**UI/UX অডিট (এখনো করা হয়নি):**
-- ☐ Order list/detail, Product list/detail, Customer list/detail — bn/en টেক্সট length change-এ layout না ভাঙে তা mobile+tablet-এ verify করা
-- ☐ Variant picker/table UI large variant-count-এ (২০+ combination) usability check
-- ☐ Order status badge/color consistency অন্য মডিউলের (courier, subscription) status badge-এর সাথে মেলে কিনা
+**সব ১৬+টা নতুন টেস্ট + পুরো backend suite (৬৩৮ টেস্ট) আগে-পরে diff করে ০ regression — একটা genuine self-regression ধরা পড়েছিল মাঝপথে (SKU migration-এর NOT NULL constraint ৩টা পুরনো টেস্ট ফিক্সচার ভেঙেছিল + ConnectProductSyncTest-এর একটা test পুরনো global-uniqueness আচরণ assert করছিল) — সবগুলো ধরে ফিক্স করা হয়েছে, চূড়ান্ত রান-এ বেসলাইনের ৮০টা ছাড়া ০ ব্যর্থতা।**
+
+**UI/UX অডিট:**
+- ✅ Order status badge/color consistency — থ-সেকশনে ইতিমধ্যে cross-check করা হয়েছে (দেখো §থ ব্যাচ ৩), মূলত consistent পাওয়া গেছে
+- ☐ Order list/detail, Product list/detail, Customer list/detail — bn/en টেক্সট length change-এ layout না ভাঙে তা mobile+tablet-এ verify করা (real browser লাগবে, এখনো করা হয়নি)
+- ☐ Variant picker/table UI large variant-count-এ (২০+ combination) usability check (real browser লাগবে, এখনো করা হয়নি)
 
 ---
 

@@ -162,8 +162,11 @@ class CustomerController extends Controller
     {
         $customer = Customer::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
 
-        $orders = Order::whereIn('user_id', auth()->user()->shopUserIds())
-            ->where('customer_phone', $customer->phone)
+        // Customer::orders() already encodes this exact same shop-scoped,
+        // phone-matched query (staff_team_role_context.md §3.3) — this used
+        // to duplicate it by hand instead of using the relation
+        // (pre_launch_polish_context.md §ক dead-code note).
+        $orders = $customer->orders()
             ->with('items:id,order_id,product_name,quantity,unit_price,total')
             ->orderByDesc('created_at')
             ->take(50)
@@ -220,17 +223,36 @@ class CustomerController extends Controller
     {
         $shopUserIds = auth()->user()->shopUserIds();
 
-        // Latest order per distinct phone — used to seed name/address
-        $orders = Order::whereIn('user_id', $shopUserIds)
-            ->orderByDesc('id')
-            ->get()
-            ->unique('customer_phone');
-
+        // Previously loaded every order for the shop into memory at once
+        // (Order::whereIn(...)->get()) just to dedupe by phone in PHP — a
+        // seller with tens of thousands of orders could OOM/time out on
+        // this (pre_launch_polish_context.md §ক). Chunks through instead,
+        // selecting only the columns syncFromOrder() actually reads, and
+        // tracks seen phones in a small array (not full Order objects) to
+        // skip older duplicates once the latest order for that phone has
+        // already been processed — syncFromOrder()'s own total_orders/
+        // total_spent/last_order_at are always recomputed fresh from the DB
+        // regardless of which specific order triggers it, so only the
+        // once-per-new-customer name/address seed actually depends on
+        // "latest first" here.
+        $seenPhones = [];
         $count = 0;
-        foreach ($orders as $order) {
-            Customer::syncFromOrder($order);
-            $count++;
-        }
+
+        Order::whereIn('user_id', $shopUserIds)
+            ->select(['id', 'user_id', 'customer_phone', 'customer_name', 'customer_address',
+                'customer_district', 'customer_thana', 'customer_area',
+                'pathao_city_id', 'pathao_zone_id', 'pathao_area_id'])
+            ->orderByDesc('id')
+            ->chunk(500, function ($orders) use (&$seenPhones, &$count) {
+                foreach ($orders as $order) {
+                    if (isset($seenPhones[$order->customer_phone])) {
+                        continue;
+                    }
+                    $seenPhones[$order->customer_phone] = true;
+                    Customer::syncFromOrder($order);
+                    $count++;
+                }
+            });
 
         return response()->json(['success' => true, 'message' => "$count customers synced."]);
     }

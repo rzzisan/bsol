@@ -122,6 +122,7 @@ class WooCommerceStockPushTest extends TestCase
         $product = $this->wcProduct($user, ['has_variants' => true, 'stock' => 0]);
         $variant = ProductVariant::create([
             'product_id' => $product->id,
+            'user_id' => $user->id,
             'sku' => 'TSHIRT-001-M',
             'source' => 'woocommerce',
             'source_ref' => 'wc-v-1',
