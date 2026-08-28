@@ -41,6 +41,7 @@ const ADMIN_MENU_TEXT: Record<Locale, Record<string, string>> = {
     marketingEvents: "মার্কেটিং ইভেন্ট",
     security: "নিরাপত্তা (2FA)",
     auditLogs: "অডিট লগ",
+    globalBlacklist: "গ্লোবাল ব্লকলিস্ট",
   },
   en: {
     dashboard: "Dashboard",
@@ -74,6 +75,7 @@ const ADMIN_MENU_TEXT: Record<Locale, Record<string, string>> = {
     marketingEvents: "Marketing Events",
     security: "Security (2FA)",
     auditLogs: "Audit Log",
+    globalBlacklist: "Global Blacklist",
   },
 };
 
@@ -132,6 +134,7 @@ export function buildAdminMenu(locale: Locale): ShellMenuItem[] {
     { key: "marketing-events", label: l.marketingEvents, icon: "📣", href: "/admin/marketing-events" },
     { key: "support", label: l.support, icon: "💬", href: "/admin/support" },
     { key: "audit-logs", label: l.auditLogs, icon: "📜", href: "/admin/audit-logs" },
+    { key: "global-blacklist", label: l.globalBlacklist, icon: "🚫", href: "/admin/global-blacklist" },
     { key: "reports", label: l.reports, icon: "📊" },
     { key: "settings", label: l.settings, icon: "⚙️", children: settingsChildren },
   ];

@@ -44,16 +44,16 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## খ. Fraud & Risk
+## খ. Fraud & Risk — ✅ সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.2, §17.2
 
-- ☐ Global blacklist propagation (+40 score) — যেকোনো এক seller ব্লকলিস্ট করলেই সব seller-এর জন্য "medium risk" হয়ে যায়, কোনো validation/audit trail ছাড়া — abuse-able, দরকার হলে audit log বা dispute-flow যোগ করা বিবেচনা করা
-- ☐ Paperfly fraud-check heuristic parsing (`str_contains` on status string) — fragile, verify/harden করা
-- ☐ `/fraud/courier-check` রুটে কোনো per-user throttle নেই
+- ✅ **Global blacklist propagation hardening।** পুরোপুরি বন্ধ করা হয়নি (dispute-flow বানানো হয়নি — কোনো customer-facing পোর্টালই নেই এই প্ল্যাটফর্মে, তাই বড় স্কোপ), কিন্তু ২টা কাজের জিনিস যোগ হয়েছে: (১) `/fraud/blacklist` POST route-এ `throttle:20,1` — একটা একাউন্ট থেকে মুহূর্তে অনেক ফোন blacklist করে shared signal mass-poison করা এখন কঠিন, (২) নতুন **admin-facing platform-wide blacklist oversight view** (`GET /api/admin/global-blacklist`, `/admin/global-blacklist` পেজ) — কে কোন ফোন কেন ব্লক করেছে + কতজন ভিন্ন seller একই ফোন ব্লক করেছে (corroboration signal, একজনের অভিযোগ vs একাধিক sellerর) admin এখন এক পেজে দেখে investigate করতে পারবে। ৫টা টেস্ট (`FraudHardeningTest`)
+- ✅ **Paperfly fraud-check heuristic — যাচাই করা হয়েছে, ইতিমধ্যেই ফিক্সড, স্টেল ছিল এই আইটেম।** `PaperflyFraudCheckService` (২০২৬-০৮-০৫-এর নিজস্ব কমেন্ট অনুযায়ী reverse-engineered rewrite) এখন structured JSON field পড়ে (`total`/`delivered`/`returned`/`partial`/`smart_check.delivery_rate`), কোনো `str_contains` string-heuristic নেই। বাকি ৪টা courier fraud-check service (Steadfast/Pathao/RedX/Carrybee)-ও চেক করা হয়েছে, সবগুলো clean HTTP status code/JSON ব্যবহার করে
+- ✅ **`/fraud/courier-check` route-এ `throttle:30,1` যোগ করা হয়েছে** — আগে unthrottled ছিল, real external courier API call ট্রিগার করতে পারত cache-miss হলে
 
 **UI/UX:**
-- ☐ Fraud-check ও blacklist পেজ — risk-level রং/ব্যাজ consistency অন্য মডিউলের সাথে মেলে কিনা
+- ✅ **Risk-level রং/ব্যাজ consistency যাচাই করা হয়েছে — consistent পাওয়া গেছে।** Fraud-check, `customers/risky`, ও `orders` লিস্ট — তিনটাই low→emerald, medium→yellow, high→red একই semantic pattern মেনে চলে (opacity সামান্য ভিন্ন `/10` vs `/15`, চোখে পড়ে না, ফিক্স করার মতো real issue না)
 
 ---
 

@@ -75,6 +75,7 @@ use App\Http\Controllers\Api\Admin\CourierCacheController;
 use App\Http\Controllers\Api\Admin\AdminTrackingController;
 use App\Http\Controllers\Api\Admin\TwoFactorController;
 use App\Http\Controllers\Api\Admin\AdminAuditLogController;
+use App\Http\Controllers\Api\Admin\GlobalBlacklistController;
 use App\Http\Controllers\Api\PublicMarketingPixelController;
 use App\Http\Controllers\Api\PublicPlatformSettingsController;
 use App\Http\Controllers\Api\PublicMarketingTrackController;
@@ -813,9 +814,18 @@ Route::middleware('active_subscription')->group(function () {
         Route::post('/check-phone', [FraudController::class, 'checkPhone']);
         Route::post('/bulk-check', [FraudController::class, 'bulkCheck']);
         Route::get('/blacklist', [FraudController::class, 'blacklist']);
-        Route::post('/blacklist', [FraudController::class, 'addBlacklist']);
+        // Throttled — a blacklist add feeds the +40 shared-signal score every
+        // OTHER seller sees for that phone (pre_launch_polish_context.md §খ),
+        // so unlimited adds from one account could mass-poison the shared
+        // signal in a burst.
+        Route::post('/blacklist', [FraudController::class, 'addBlacklist'])->middleware('throttle:20,1');
         Route::delete('/blacklist/{id}', [FraudController::class, 'removeBlacklist']);
-        Route::get('/courier-check', [CourierFraudCheckController::class, 'check']);
+        // Previously unthrottled (pre_launch_polish_context.md §খ) — unlike
+        // /fraud/check-phone above, which relies on the same underlying
+        // cache/DB reads but had no explicit route-level limit either;
+        // courier-check specifically can trigger real external courier API
+        // calls on a cache miss.
+        Route::get('/courier-check', [CourierFraudCheckController::class, 'check'])->middleware('throttle:30,1');
     });
 }); // end active_subscription group
 
@@ -873,6 +883,8 @@ Route::middleware(['staff_permission:orders', 'active_subscription:allow_deliver
         Route::post('/2fa/disable', [TwoFactorController::class, 'disable']);
         Route::post('/2fa/recovery-codes/regenerate', [TwoFactorController::class, 'regenerateRecoveryCodes']);
         Route::get('/audit-logs', [AdminAuditLogController::class, 'index']);
+        // Platform-wide blacklist oversight (pre_launch_polish_context.md §খ).
+        Route::get('/global-blacklist', [GlobalBlacklistController::class, 'index']);
 
         Route::get('/registration-defaults', [AdminController::class, 'getRegistrationDefaults']);
         Route::put('/registration-defaults', [AdminController::class, 'updateRegistrationDefaults']);
