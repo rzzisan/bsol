@@ -474,7 +474,24 @@ export default function UserShell({
     typeof window === "undefined" ? null : localStorage.getItem("impersonating_name"),
   );
 
-  function exitImpersonation() {
+  async function exitImpersonation() {
+    // Revoke the impersonation token server-side first (domain_security_
+    // audit.md §L-2) — it stays live for the rest of its 60-minute TTL
+    // otherwise, even though this tab is about to switch back to the
+    // admin's own token. Best-effort: a failed request here must never
+    // block getting the admin back to their own session.
+    const impersonationToken = getStoredToken();
+    if (impersonationToken) {
+      try {
+        await fetch("/api/impersonate/end", {
+          method: "POST",
+          headers: { Accept: "application/json", Authorization: `Bearer ${impersonationToken}` },
+        });
+      } catch {
+        // ignore
+      }
+    }
+
     const adminToken = localStorage.getItem("admin_token_backup");
     localStorage.removeItem("impersonating_name");
     localStorage.removeItem("admin_token_backup");
@@ -764,7 +781,7 @@ export default function UserShell({
           </span>
           <button
             type="button"
-            onClick={exitImpersonation}
+            onClick={() => void exitImpersonation()}
             className="rounded-lg bg-amber-950 px-3 py-1 text-xs font-semibold text-amber-50 hover:opacity-90"
           >
             {locale === "bn" ? "অ্যাডমিনে ফিরুন" : "Back to admin"}

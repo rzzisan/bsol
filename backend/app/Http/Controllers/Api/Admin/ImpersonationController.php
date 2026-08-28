@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Security\AdminAuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -60,6 +61,10 @@ class ImpersonationController extends Controller
             'ip' => $request->ip(),
         ]);
 
+        AdminAuditLogger::log('impersonation_started', 'User', $target->id, [
+            'target_email' => $target->email,
+        ], actingAdminId: $admin->id);
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -72,5 +77,37 @@ class ImpersonationController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * "Return" from impersonation — revokes the impersonation token
+     * server-side instead of leaving it valid for the rest of its 60-minute
+     * TTL after the admin's own tab has already discarded it client-side
+     * (domain_security_audit.md §L-2). Reachable outside the is_admin group
+     * because by the time this runs, the acting identity IS the impersonated
+     * seller — that's what the token actually grants.
+     *
+     * Deliberately a no-op (still 200, still "success") on a plain seller's
+     * own token: nothing to revoke, and there's no reason to let this
+     * endpoint's existence signal to a normal request whether it was an
+     * impersonation session or not.
+     */
+    public function end(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $token = $user?->currentAccessToken();
+        $name = (string) ($token->name ?? '');
+
+        if ($token && str_starts_with($name, 'impersonation:admin-')) {
+            $adminId = (int) substr($name, strlen('impersonation:admin-'));
+
+            AdminAuditLogger::log('impersonation_ended', 'User', $user->id, [
+                'target_email' => $user->email,
+            ], actingAdminId: $adminId);
+
+            $token->delete();
+        }
+
+        return response()->json(['success' => true]);
     }
 }

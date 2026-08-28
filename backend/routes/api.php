@@ -363,6 +363,12 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
     Route::put('/me', [AuthController::class, 'updateProfile']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    // "Return" from admin impersonation — reachable here (not under
+    // is_admin) because by the time this fires, the acting identity IS the
+    // impersonated seller (domain_security_audit.md §L-2). Revokes the
+    // impersonation token server-side instead of leaving it valid for the
+    // rest of its 60-minute TTL after the admin's tab thinks it's "returned".
+    Route::post('/impersonate/end', [ImpersonationController::class, 'end']);
 
     // Phase 1 core module — staff/team sub-account role, staff_team_role_context.md §4
     Route::middleware('staff_permission:sms')->group(function () {

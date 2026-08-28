@@ -183,11 +183,14 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ঠ. Custom Domain / Subdomain
+## ঠ. Custom Domain / Subdomain — 🟡 মূল আইটেম সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.13, `custom_domain_context.md`, `domain_security_audit.md`
 
-- ☐ সেলারের নিজস্ব কাস্টম ডোমেইন (T8b) — এখনো শুরু হয়নি, DNS CNAME verification + nginx/certbot automation লাগবে (বড় ops স্কোপ, প্রথম batch-এর জন্য must-have না)
+- ☐ সেলারের নিজস্ব কাস্টম ডোমেইন (T8b) — এখনো শুরু হয়নি, DNS CNAME verification + nginx/certbot automation লাগবে (বড় ops স্কোপ, প্রথম batch-এর জন্য must-have না) — অপরিবর্তিত
+- ✅ **(2026-08-28) `domain_security_audit.md`-এর L-2 রিকমেন্ডেশন বাস্তবায়ন — impersonation token server-side revoke + audit log।** "ফিরে যান" ক্লিকে আগে শুধু client-side localStorage clear হতো, impersonation token (৬০ মিনিট TTL) সার্ভারে valid-ই থেকে যেত। এখন নতুন `POST /impersonate/end` (is_admin গ্রুপের বাইরে — কারণ ততক্ষণে acting identity সেলার নিজেই) token revoke করে + `AdminAuditLogger`-এ log করে (real admin id-তে attribute করে, impersonated সেলারের id-তে না)। **আবিষ্কার**: impersonation `start()`-ও কখনো audit log-এ ছিল না যদিও এটাই সবচেয়ে বেশি account-takeover blast radius-এর অ্যাকশন — এখন দুটোই (`impersonation_started`/`impersonation_ended`) লগড। ৬টা নতুন টেস্ট (`ImpersonationTest.php`, আগে এই ফিচারের কোনো টেস্টই ছিল না)
+- ✅ **(2026-08-28) L-4 রিকমেন্ডেশন — phishing-adjacent subdomain label reserve করা হয়েছে।** যাচাই করে দেখা গেছে `login`/`account`/`security`/`sso`/`auth` ইত্যাদি আগে থেকেই reserved ছিল — audit-এর সাজেস্ট করা ৪টার মধ্যে ৩টা আগে থেকেই ছিল, শুধু ৭টা genuinely missing phishing-lure label (`secure`, `verify`, `signin`, `confirm`, `password`, `unlock`, `otp`) নতুন যোগ করা হয়েছে — কোনো কোড পরিবর্তন লাগেনি, বিদ্যমান admin reserved-subdomains মেকানিজম দিয়েই (ঠিক যেমন audit নিজেই বলেছিল "এখন UI থেকেই সম্ভব")
+- ✅ **(2026-08-28) I-2 রিকমেন্ডেশন — CORS `*` থেকে সংকুচিত করা হয়েছে।** নতুন `config/cors.php`: `allowed_origins_patterns` এখন শুধু `https://{platform-apex}` বা `https://{label}.{platform-apex}` মেলে (lookalike ডোমেইন যেমন `zyrotechbd.com.evil.com` মেলে না, regex-এ verify করা হয়েছে)। **সৎ মূল্যায়ন** (audit নিজেও যা বলেছে): Bearer token localStorage-এ (origin-scoped, অন্য সাইট পড়তে পারে না) আর `supports_credentials` আগে থেকেই false, তাই এটা token-leak ফিক্স না — defense-in-depth শুধু। ৬টা নতুন টেস্ট (`CorsPolicyTest.php`)। L-1/L-3 (handoff-কোড URL-এ যাওয়া, impersonation token-এর পূর্ণ ক্ষমতা) — audit নিজেই "গ্রহণযোগ্য" মার্ক করেছে, কোনো পরিবর্তন লাগেনি
 
 ---
 
