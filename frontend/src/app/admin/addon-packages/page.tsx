@@ -278,24 +278,24 @@ export default function AdminAddonPackagesPage() {
           <h2 className="text-base font-semibold text-[var(--foreground)]">{locale === "bn" ? "প্যাকেজ তালিকা" : "Package list"}</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-[var(--surface-soft)]">
+          <table className="min-w-full border-collapse text-sm">
+            <thead className="bg-[var(--accent)] text-white">
               <tr>
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-right">Orders</th>
-                <th className="px-3 py-2 text-right">Days</th>
-                <th className="px-3 py-2 text-right">Price</th>
-                <th className="px-3 py-2 text-center">Action</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">Name</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">Orders</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">Days</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">Price</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-center font-semibold">Action</th>
               </tr>
             </thead>
             <tbody>
               {packages.map((p) => (
-                <tr key={p.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-2">{p.name} <span className="text-xs text-[var(--muted)]">({p.type})</span></td>
-                  <td className="px-3 py-2 text-right">{p.quantity ?? "—"}</td>
-                  <td className="px-3 py-2 text-right">{p.duration_days ?? "—"}</td>
-                  <td className="px-3 py-2 text-right">৳{p.price}</td>
-                  <td className="px-3 py-2 text-center">
+                <tr key={p.id}>
+                  <td className="border border-[var(--border)] px-3 py-2">{p.name} <span className="text-xs text-[var(--muted)]">({p.type})</span></td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-right">{p.quantity ?? "—"}</td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-right">{p.duration_days ?? "—"}</td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-right">৳{p.price}</td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-center">
                     <button
                       onClick={() => void deletePackage(p.id)}
                       className="rounded px-2 py-1 text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100"
@@ -307,7 +307,7 @@ export default function AdminAddonPackagesPage() {
               ))}
               {packages.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={5} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {locale === "bn" ? "কোনো প্যাকেজ নেই।" : "No packages yet."}
                   </td>
                 </tr>
@@ -324,24 +324,24 @@ export default function AdminAddonPackagesPage() {
           </h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-[var(--surface-soft)]">
+          <table className="min-w-full border-collapse text-sm">
+            <thead className="bg-[var(--accent)] text-white">
               <tr>
-                <th className="px-3 py-2 text-left">Seller</th>
-                <th className="px-3 py-2 text-left">Package</th>
-                <th className="px-3 py-2 text-left">TrxID</th>
-                <th className="px-3 py-2 text-right">Amount</th>
-                <th className="px-3 py-2 text-center">Action</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">Seller</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">Package</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">TrxID</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-right font-semibold">Amount</th>
+                <th className="border border-[var(--border)] px-3 py-2 text-center font-semibold">Action</th>
               </tr>
             </thead>
             <tbody>
               {purchases.map((p) => (
-                <tr key={p.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-2">{p.user?.name ?? "—"}</td>
-                  <td className="px-3 py-2">{p.addon_package?.name ?? "—"}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{p.trx_id}</td>
-                  <td className="px-3 py-2 text-right">৳{p.amount}</td>
-                  <td className="px-3 py-2 text-center">
+                <tr key={p.id}>
+                  <td className="border border-[var(--border)] px-3 py-2">{p.user?.name ?? "—"}</td>
+                  <td className="border border-[var(--border)] px-3 py-2">{p.addon_package?.name ?? "—"}</td>
+                  <td className="border border-[var(--border)] px-3 py-2 font-mono text-xs">{p.trx_id}</td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-right">৳{p.amount}</td>
+                  <td className="border border-[var(--border)] px-3 py-2 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={() => void approvePurchase(p.id)}
@@ -361,7 +361,7 @@ export default function AdminAddonPackagesPage() {
               ))}
               {purchases.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-[var(--muted)]">
+                  <td colSpan={5} className="border border-[var(--border)] px-4 py-6 text-center text-[var(--muted)]">
                     {locale === "bn" ? "কোনো পেন্ডিং অনুরোধ নেই।" : "No pending requests."}
                   </td>
                 </tr>

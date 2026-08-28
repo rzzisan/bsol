@@ -139,17 +139,17 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## জ. Admin Panel
+## জ. Admin Panel — 🟡 মূল আইটেম সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.9, §17.6, §17.8 item 7, recent commits (dashboard homepage, package form)
 
-- ☐ এখনো কোনো super-admin tier নেই (last-admin lockout guard আছে, কিন্তু granular admin-role নেই) — স্কেল বাড়লে দরকার হবে
+- ☐ এখনো কোনো super-admin tier নেই (last-admin lockout guard আছে, কিন্তু granular admin-role নেই) — স্কেল বাড়লে দরকার হবে (বর্তমানে মাত্র ১ জন admin — এখনই দরকার নেই, বড় আলাদা ফিচার হিসেবে থাকল)
 - ✅ **(2026-08-28) 2FA + admin audit trail সম্পন্ন ও লাইভ** — বিস্তারিত `security_hardening_context.md`। Admin-only TOTP 2FA (নিজে-implement, RFC 6238 test vector দিয়ে verify) + recovery codes + login-challenge flow + ৮টা sensitive admin action-এ audit log। `/admin/settings/security` + `/admin/audit-logs` পেজ, ২৮টা নতুন টেস্ট (সব pass, ০ regression)
-- ☐ Recent commit `56acf11`/`62bb4b2` (dashboard homepage real data + package `max_staff`/`features` form) — নতুন করে যোগ হওয়া অংশ ফ্রেশ eye দিয়ে একবার browser-এ ক্লিক-থ্রু verify করা (real data edge case: শূন্য সেলার, শূন্য প্যাকেজ ইত্যাদি)
-- ☐ **নতুন (2026-08-28 আবিষ্কৃত) — backend test suite-এ ৮০টা pre-existing ব্যর্থতা, sqlite-vs-postgres dialect mismatch** — `phpunit.xml` টেস্ট SQLite in-memory-তে চালায়, কিন্তু ক্রমবর্ধমান Postgres-specific raw SQL (`to_char()`, `now()`, `ON CONFLICT`) ব্যবহার হচ্ছে যেটা SQLite সাপোর্ট করে না — আসল লজিক বাগ না, কিন্তু test suite-এর signal-to-noise কমিয়ে দিচ্ছে (নতুন real regression এই ৮০-এর ভেতরে চাপা পড়ে যেতে পারে)। Fix করতে হয় test suite real Postgres-এ চালাতে হবে, নাহলে raw SQL গুলো DB-agnostic করে লিখতে হবে — বড় আলাদা সিদ্ধান্ত, এই ব্যাচের স্কোপে করা হয়নি
+- ✅ **(2026-08-28) Dashboard homepage + package form edge case verify — লাইভ প্রোডাকশন ডেটা দিয়ে করা হয়েছে (real admin token দিয়ে সরাসরি API hit)।** `/admin/summary`-তে real ডেটায় mixed zero/non-zero values (০ inactive sellers, ৩টা প্যাকেজ ০ সেলার নিয়ে) সঠিকভাবে রিটার্ন হয়েছে; `/admin/packages`-এ `max_staff: null` কেস ঠিকভাবে হ্যান্ডলড (ফ্রন্টএন্ড `?? t.unlimited` ফলব্যাক)। কোড-লেভেলে zero-array/division-by-zero কেস (`Math.max(1, ...)` ফলব্যাক, বার-চার্ট) সব জায়গায় আগে থেকেই সঠিক — কোনো বাগ পাওয়া যায়নি
+- ☐ backend test suite-এ ৮০টা pre-existing sqlite-vs-postgres ব্যর্থতা — অপরিবর্তিত, বড় আলাদা সিদ্ধান্ত হিসেবে এখনো এই ব্যাচের স্কোপে নেই (আগের নোট অনুযায়ী)
 
 **UI/UX অডিট:**
-- ☐ Admin sidebar/menu — নতুন যোগ হওয়া মডিউলগুলো (addon-packages, marketing-events, tracking, support) মেনু-হায়ারার্কি/active-state consistency (`CONTEXT.md` §22 checklist দিয়ে re-verify)
+- ✅ **(2026-08-28) Admin sidebar/menu re-verify — সব ঠিক পাওয়া গেছে (`activeKey`, `buildAdminMenu(locale)`, `CatvShell` সবগুলো নতুন পেজেই consistent)।** কিন্তু এই যাচাইয়ের সময় **table header consistency-তে real drift পাওয়া গেছে ও ফিক্স করা হয়েছে** (`CONTEXT.md §22` মেনে): `addon-packages` (দুটো টেবিল) আর `billing` পেজের হেডার আগে plain/muted স্টাইলে ছিল, বাকি ৪টা পেজ (packages/tracking/audit-logs/global-blacklist) আগে থেকেই `bg-[var(--accent)] text-white` canonical স্টাইলে — এখন সবগুলো একই। সাথে body row-ও fully-bordered grid স্টাইলে normalize করা হয়েছে (আগে শুধু `border-t` row-divider ছিল)। `courier-cache`-এর per-courier ব্র্যান্ড-কালার হেডার (Pathao লাল/Steadfast টিল ইত্যাদি) আর `marketing-events`/অন্যান্য analytics-সামারি টেবিলের হালকা muted-header স্টাইল — দুটোই যাচাই করে **ইচ্ছাকৃত, established secondary pattern** প্রমাণিত (একাধিক পেজে reused), ফিক্স করা হয়নি
 
 ---
 
