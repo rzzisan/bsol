@@ -399,30 +399,54 @@ genuine merge for whatever this doesn't already cover.
    syncs fine with `fbp`/`fbc` simply absent — this must never block order
    creation.
 
-## Online payment gateways (1.19.0, block-checkout fix in 1.19.2)
+## Online payment gateways (1.19.0 → 1.19.6)
 
 Every channel enabled on the connected BSOL account should appear as a
 WooCommerce payment method automatically — nothing to configure on the
-WordPress side beyond connecting.
+WordPress side beyond connecting. 1.19.0 shipped the feature; 1.19.1
+through 1.19.6 were all real bugs found only by testing on an actual live
+seller site (this dev environment has no WordPress install to have caught
+any of them first — see §6/§7 of `wordpress_connect_context.md`). The
+steps below fold every one of those rounds back in, so a fresh QA pass
+doesn't have to rediscover them.
 
-0. Test on **both** checkout types if the store uses (or might switch to)
-   either: WooCommerce → Settings → Advanced → Checkout page tells you
-   which — a page using the `[woocommerce_checkout]` shortcode is
-   "classic"; one built with the Checkout block (edit the page, look for
-   a "Checkout" block in the block editor) is "block-based". 1.19.0's
-   registration only covered classic; 1.19.2 added block support
-   separately (`Bsol_Gateway_Blocks_Support` + `bsol-gateway-blocks.js`) —
-   confirm payment methods actually appear on whichever type(s) this
-   store's real checkout page uses.
+0. **Fastest first check**: BSOL Connect → Settings → **Payment Gateways**
+   panel (added 1.19.3). It calls BSOL directly (bypassing the 15-minute
+   cache), lists exactly which channels this site currently sees, detects
+   and displays whether this site's checkout is **classic**
+   (`[woocommerce_checkout]` shortcode) or **block-based** (WooCommerce
+   8.3+ default) — 1.19.0's registration only covered classic, 1.19.2
+   added block support (`Bsol_Gateway_Blocks_Support` +
+   `bsol-gateway-blocks.js`) — and has a **Refresh now** button that
+   clears both the payment-channel cache and the update-notice cache in
+   one click, no transient/DB access needed. Confirm this panel shows
+   `Bsol_Payment_Gateway: yes`-equivalent (channels listed, not an error)
+   before going any further — 1.19.1/1.19.4 were both cases where the
+   whole module silently failed to load (see the context doc for why:
+   a `WC_Payment_Gateway`-extending class file required too early, then
+   a `woocommerce_loaded` hook registered too late — both are now fixed,
+   but this panel is the fast way to notice if it ever regresses instead
+   of a multi-round guess-and-check).
 1. On BSOL dashboard → Settings → Online Payment Channels, enable at
    least one wallet_manual channel (e.g. bKash personal, with a receiving
    number) and one gateway_auto channel (e.g. SSLCommerz sandbox).
-2. On WooCommerce → Settings → Payments, confirm both show up as
-   "BSOL: {Provider}" (may take up to 15 minutes — the channel list is
-   cached in a transient; deleting the `bsol_payment_channels` transient
-   forces an immediate refresh). Confirm each one's own settings screen
-   shows the "Credentials are managed in your BSOL dashboard" notice and
-   has no credential fields of its own.
+2. On WooCommerce → Settings → Payments, confirm both show up (may take
+   up to 15 minutes — the channel list is cached in a transient; use the
+   Refresh now button from step 0, or delete the `bsol_payment_channels`
+   transient, to force it immediately). Confirm each one's own settings
+   screen shows the "Credentials are managed in your BSOL dashboard"
+   notice and has no credential fields of its own.
+   - **Known quirk, not a bug (1.19.5)**: a gateway's title shows with a
+     "BSOL: " prefix once its settings page has ever been opened+saved in
+     wp-admin (even without editing anything), and without the prefix if
+     it never has — same code, different history per gateway. Don't
+     report this as inconsistent; it's already understood (see the
+     context doc if the exact mechanism matters).
+   - **Cash on Delivery showing no title text is not this plugin's bug**
+     — that's WooCommerce's own native `cod` gateway, whose `title`
+     option happens to be saved blank on some stores; this plugin never
+     touches it. Fix on that store: WooCommerce → Settings → Payments →
+     Cash on delivery → set a Title → Save.
 3. **Wallet flow**: place an order choosing the bKash-personal method.
    Confirm the order goes to "On hold" and the order-received page shows
    a "Send X to this bKash number" card with sender-number/TrxID fields.
@@ -442,4 +466,15 @@ WordPress side beyond connecting.
    stays unpaid.
 6. Disable a channel in BSOL dashboard — confirm it disappears from
    WooCommerce → Settings → Payments within 15 minutes (or immediately
-   after deleting the `bsol_payment_channels` transient).
+   after using Refresh now / deleting the `bsol_payment_channels`
+   transient).
+7. **Gateway shortcut form (1.19.6)**: on the same BSOL Connect → Settings
+   → Payment Gateways panel, use the one-page table (Enabled checkbox +
+   Title field per channel) instead of WooCommerce's per-gateway settings
+   screens. Confirm a change here takes effect immediately (no 15-minute
+   cache — this writes straight to `woocommerce_bsol_{provider}_settings`,
+   the same option WooCommerce's own settings screen would). Confirm
+   submitting a blank Title falls back to the plain provider label rather
+   than saving empty (this was the exact Cash-on-Delivery-blank-title
+   complaint from step 2, so the shortcut form deliberately guards
+   against reproducing it).

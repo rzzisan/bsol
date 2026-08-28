@@ -174,11 +174,12 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ট. WordPress/WooCommerce Connector
+## ট. WordPress/WooCommerce Connector — 🟡 আংশিক সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.12, `wordpress_connect_context.md`
 
-- ☐ **Real WooCommerce staging সাইটে end-to-end QA এখনো হয়নি** — এই dev environment-এ কোনো WordPress ইনস্টল নেই, ব্যবহারকারীকে নিজে `SETUP.md` চেকলিস্ট ধরে করতে হবে; soft-launch cohort-এর কোনো সেলারের real WooCommerce সাইট থাকলে এটাই প্রথম real QA হবে
+- ✅ **(2026-08-28) `SETUP.md` accuracy fix — সত্যিকারের গ্যাপ পাওয়া গেছে।** যাচাই করে দেখা গেছে প্লাগইনের আসল ভার্সন v1.19.6, কিন্তু `SETUP.md`-এর payment-gateway QA চেকলিস্ট শুধু v1.19.0/v1.19.2 পর্যন্ত কভার করত — v1.19.1 থেকে v1.19.6-এর ৫ রাউন্ড real live-test ফিক্স (module load-order bug, block-checkout registration, status panel, "BSOL: " prefix quirk, COD blank-title non-bug, shortcut form) কখনো checklist-এ ফিরে আসেনি (changelog.md-এ ঠিকই ছিল)। এখন সব যোগ হয়েছে, যাতে ব্যবহারকারীর real WooCommerce QA পাস already-known/fixed জিনিস আবার নতুন বাগ হিসেবে আবিষ্কার না করে
+- ☐ **Real WooCommerce staging সাইটে end-to-end QA এখনো বাকি** — এই dev environment-এ কোনো WordPress ইনস্টল নেই, ব্যবহারকারীকে নিজে (এখন-আপডেটেড) `SETUP.md` চেকলিস্ট ধরে করতে হবে; soft-launch cohort-এর কোনো সেলারের real WooCommerce সাইট থাকলে এটাই প্রথম real QA হবে
 
 ---
 
