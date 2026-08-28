@@ -53,7 +53,7 @@ export default function ReviewsPanel({
     <div>
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">
-          <Stars value={average} /> {average.toFixed(1)}/5 — {count} reviews
+          <Stars value={average} /> {average.toFixed(1)}/5 — {count}টি রিভিউ
         </p>
         {!showForm && !submitted ? (
           <button onClick={() => setShowForm(true)} className="text-xs font-semibold text-slate-600 hover:underline">

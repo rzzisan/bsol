@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/storefront/product-card";
 import { fetchCategories, fetchProductsServer } from "@/lib/storefront-client";
+import { paginationRange } from "@/lib/pagination-range";
 import StorefrontPageTracking from "@/components/storefront/page-tracking";
 
 type RouteProps = {
@@ -78,16 +79,24 @@ export default async function CategoryRoute({ params, searchParams }: RouteProps
       )}
 
       {result?.meta && result.meta.last_page > 1 ? (
-        <div className="mt-6 flex justify-center gap-2 text-sm">
-          {Array.from({ length: result.meta.last_page }, (_, i) => i + 1).map((n) => (
-            <Link
-              key={n}
-              href={`/category/${slug}?page=${n}${sort ? `&sort=${sort}` : ""}`}
-              className={`rounded-lg px-3 py-1.5 ${n === result.meta.current_page ? "bg-slate-900 text-white" : "border border-slate-200"}`}
-            >
-              {n}
-            </Link>
-          ))}
+        <div className="mt-6 flex justify-center overflow-x-auto">
+          <div className="flex flex-nowrap gap-2 text-sm">
+            {paginationRange(result.meta.current_page, result.meta.last_page).map((n, i) =>
+              n === "…" ? (
+                <span key={`ellipsis-${i}`} className="px-2 py-1.5 text-slate-400">
+                  …
+                </span>
+              ) : (
+                <Link
+                  key={n}
+                  href={`/category/${slug}?page=${n}${sort ? `&sort=${sort}` : ""}`}
+                  className={`shrink-0 rounded-lg px-3 py-1.5 ${n === result.meta.current_page ? "bg-slate-900 text-white" : "border border-slate-200"}`}
+                >
+                  {n}
+                </Link>
+              )
+            )}
+          </div>
         </div>
       ) : null}
     </div>

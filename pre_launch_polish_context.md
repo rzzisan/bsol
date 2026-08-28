@@ -92,16 +92,19 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ঙ. Seller Storefront (ফুল ইকমার্স শপ)
+## ঙ. Seller Storefront (ফুল ইকমার্স শপ) — 🟡 মূল আইটেম সম্পন্ন (2026-08-28)
 
 **সোর্স:** `seller_storefront_context.md` §২৪-২৫, feature_roadmap আইটেম #৯
 
-- ☐ Follow-up আইটেম (২০২৬-০৮-২২-এ নোট করা, এখনো unconfirmed status): ন্যাভ বার কালার কাস্টমাইজেশন, ব্যানার প্রোডাক্ট-লিংক পিকার, ফিচারড ক্যাটাগরি থাম্বনেইল — `seller_storefront_context.md` খুলে বর্তমান status verify করো, এখনো বাকি থাকলে এখানেই সেরা জায়গা এটা শেষ করার
+- ✅ **স্টেল প্রমাণিত (2026-08-28 যাচাই, কোনো কোড পরিবর্তন লাগেনি)** — `seller_storefront_context.md §২৫` নিজেই ইতিমধ্যে "✅ লাইভ" মার্ক করা (২০২৬-০৮-২২), migration+টেস্ট+লাইভ ব্রাউজার ভেরিফাই (zareen.zyrotechbd.com) সহ। এই পোলিশ ডকের "unconfirmed status" নোটটাই স্টেল ছিল। কোড-লেভেলে re-confirm করা হয়েছে: `StorefrontSettingController`-এ `nav_bg_color`/`nav_text_color` ভ্যালিডেশন এখনো আছে
 
 **UI/UX অডিট:**
-- ☐ Standard ও CareSolution — দুটো থিমেই মোবাইল bottom-nav/drawer, cart badge, checkout flow ফ্রেশ চোখে verify (নতুন সেলার হিসেবে) করা
-- ☐ Homepage banner/featured-category/product-card — বড় ক্যাটালগ (১০০+ product) দিয়ে load-time/pagination UX চেক
-- ☐ Review/rating UI — spam/empty-state handling
+- ✅ **(2026-08-28) বড় ক্যাটালগ pagination — ২টা real bug পাওয়া গেছে ও ফিক্স করা হয়েছে:**
+  1. **`/search` পেজ (main "browse all products" এন্ট্রি পয়েন্ট)-এ pagination UI-ই ছিল না** — `fetchProductsClient()`-কে কখনো `page` param পাঠানো হতো না, তাই ২০টার বেশি (default per_page) প্রোডাক্ট থাকা যেকোনো শপে কাস্টমার প্রথম পেজের পরের প্রোডাক্ট **কখনোই দেখতে পেত না** — শুধু cosmetic না, real সাইট-ব্রাউজ ক্যাপাবিলিটি বন্ধ ছিল। এখন page state + windowed pagination control যোগ হয়েছে
+  2. **`/category/{slug}` পেজে প্রতিটা পেজ নম্বর আলাদা লিংক হিসেবে রেন্ডার হতো, কোনো windowing/ellipsis ছাড়া** — ১০০+ প্রোডাক্ট স্কেলে last_page বড় হলে (৫০+) এক সারিতে ৫০টা বাটন, কোনো wrap/scroll হ্যান্ডলিং ছাড়া, মোবাইলে overflow হতো। নতুন শেয়ার্ড `paginationRange()` হেল্পার (first/last/current±1 + "…") দুটো পেজেই ব্যবহার করে ফিক্স, সাথে `overflow-x-auto` defensive
+  - হোমপেজ (banner/featured-category/product grid)-এর কোয়েরি নিজেই ক্যাপড (featured ≤১২, per-category ≤১০) — ক্যাটালগ সাইজ নির্বিশেষে লোড-টাইম স্থির, ফিক্স লাগেনি
+- ✅ **Review/rating UI — spam/empty-state ইতিমধ্যে ঠিকভাবে হ্যান্ডলড, verify করা হয়েছে।** `is_approved` default false (মডারেশন গেট, ordering কোনো প্রি-রিকোয়ারমেন্ট ছাড়াই ওপেন সাবমিশন হওয়া সত্ত্বেও spam সরাসরি পাবলিক হয় না) + `throttle:10,1` রেট-লিমিট + client-এ submit-button disabled during submit + empty-state ("এখনো কোনো রিভিউ নেই।") — সব আগে থেকেই সঠিক। একটা ছোট bn/en অসঙ্গতি পাওয়া গেছে (`{count} reviews` — বাকি পুরো প্যানেল বাংলা-only অথচ এই একটা শব্দ ইংরেজি ছিল) — ফিক্স করা হয়েছে
+- ☐ **Standard ও CareSolution মোবাইল bottom-nav/drawer/checkout flow** — কোড-লেভেলে cart badge (`useCart()` context + localStorage, রিঅ্যাক্টিভ) এবং floating-cart-button রিভিউ করে কোনো স্ট্রাকচারাল সমস্যা পাওয়া যায়নি, কিন্তু **আসল ব্রাউজারে ফ্রেশ-চোখে click-through করা হয়নি** — ফ্রন্টএন্ডে কোনো টেস্ট ইনফ্রা নেই এই প্রজেক্টে, আর লাইভ প্রোডাকশন সেলার সেশনে টেস্ট ডেটা দিয়ে interact করাটা ইচ্ছাকৃতভাবে এড়ানো হয়েছে (real customer-facing state touch করার ঝুঁকি)। ভবিষ্যতে সত্যিকারের ব্রাউজার-QA পাস দরকার হলে এখানেই বাকি
 
 ---
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import ProductCard from "@/components/storefront/product-card";
 import StorefrontPageTracking from "@/components/storefront/page-tracking";
+import { paginationRange } from "@/lib/pagination-range";
 import {
   fetchCategoriesClient,
   fetchProductsClient,
@@ -19,10 +20,11 @@ import {
  * public checkout flow (see src/app/terms/page.tsx, .../orders/create/page.tsx).
  */
 export default function SearchRoute() {
-  const [params, setParams] = useState<{ q: string; category: string; sort: string }>({
+  const [params, setParams] = useState<{ q: string; category: string; sort: string; page: number }>({
     q: "",
     category: "",
     sort: "newest",
+    page: 1,
   });
   const [input, setInput] = useState("");
   const [categories, setCategories] = useState<CategorySummary[]>([]);
@@ -31,7 +33,12 @@ export default function SearchRoute() {
 
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
-    const initial = { q: sp.get("q") ?? "", category: sp.get("category") ?? "", sort: sp.get("sort") ?? "newest" };
+    const initial = {
+      q: sp.get("q") ?? "",
+      category: sp.get("category") ?? "",
+      sort: sp.get("sort") ?? "newest",
+      page: Number(sp.get("page")) || 1,
+    };
     setParams(initial);
     setInput(initial.q);
     fetchCategoriesClient().then((data) => setCategories(data ?? []));
@@ -39,19 +46,36 @@ export default function SearchRoute() {
 
   useEffect(() => {
     setLoading(true);
-    fetchProductsClient({ q: params.q || undefined, category: params.category || undefined, sort: params.sort })
+    fetchProductsClient({ q: params.q || undefined, category: params.category || undefined, sort: params.sort, page: params.page })
       .then(setResult)
       .finally(() => setLoading(false));
+    // Every filter/sort/page change starts back at the top of the results.
+    window.scrollTo(0, 0);
   }, [params]);
 
-  function updateParams(next: Partial<typeof params>) {
-    const merged = { ...params, ...next };
+  // Filter/sort changes reset to page 1 (a fresh result set); goToPage()
+  // below is the only caller that moves through an existing result set.
+  function updateParams(next: Partial<Omit<typeof params, "page">>) {
+    const merged = { ...params, ...next, page: 1 };
     setParams(merged);
 
     const sp = new URLSearchParams();
     if (merged.q) sp.set("q", merged.q);
     if (merged.category) sp.set("category", merged.category);
     if (merged.sort && merged.sort !== "newest") sp.set("sort", merged.sort);
+
+    window.history.pushState({}, "", `/search${sp.toString() ? `?${sp}` : ""}`);
+  }
+
+  function goToPage(page: number) {
+    const merged = { ...params, page };
+    setParams(merged);
+
+    const sp = new URLSearchParams();
+    if (merged.q) sp.set("q", merged.q);
+    if (merged.category) sp.set("category", merged.category);
+    if (merged.sort && merged.sort !== "newest") sp.set("sort", merged.sort);
+    if (merged.page > 1) sp.set("page", String(merged.page));
 
     window.history.pushState({}, "", `/search${sp.toString() ? `?${sp}` : ""}`);
   }
@@ -114,6 +138,29 @@ export default function SearchRoute() {
       ) : (
         <p className="text-sm text-slate-500">কোনো প্রোডাক্ট পাওয়া যায়নি।</p>
       )}
+
+      {!loading && result?.meta && result.meta.last_page > 1 ? (
+        <div className="mt-6 flex justify-center overflow-x-auto">
+          <div className="flex flex-nowrap gap-2 text-sm">
+            {paginationRange(result.meta.current_page, result.meta.last_page).map((n, i) =>
+              n === "…" ? (
+                <span key={`ellipsis-${i}`} className="px-2 py-1.5 text-slate-400">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => goToPage(n)}
+                  className={`shrink-0 rounded-lg px-3 py-1.5 ${n === result.meta.current_page ? "bg-slate-900 text-white" : "border border-slate-200"}`}
+                >
+                  {n}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
