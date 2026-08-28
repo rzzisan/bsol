@@ -194,11 +194,11 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ড. Tracking Platform (Pixel + CAPI)
+## ড. Tracking Platform (Pixel + CAPI) — ✅ সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.14, `tracking_capi_context.md`
 
-- ☐ প্রোডাকশনে প্রতিটি প্যাকেজে `max_tracking_events_per_day = NULL` (unlimited) — soft-launch-এর আগে বাস্তব লিমিট Admin → Packages-এ বসানো উচিত (silent event loss এড়াতে, ইচ্ছাকৃত সেফ ডিফল্ট কিন্তু ভুলে থেকে গেলে cost/abuse risk)
+- ✅ **(2026-08-28) `max_tracking_events_per_day` limit সব প্যাকেজে সেট করা হয়েছে — checklist-এর claim যাচাই করে partially স্টেল পাওয়া গেছে।** আসলে সব প্যাকেজ NULL ছিল না — default প্যাকেজ "Free Trial" (নতুন সেলার যেটাতে ল্যান্ড করে) আগে থেকেই 5000/day, "Business" 15000/day সেট ছিল। বাকি ৩টা ("Trial", "Starter", "Growth") এখনো NULL ছিল, বর্তমানে ০ জন সেলার থাকায় (তাই আজই কোনো impact ছিল না)। User-কে জিজ্ঞেস করে (প্রস্তাবিত ভ্যালু approved): **Trial=5000** (Free Trial-এর মতো, legacy/basic tier), **Starter=7500**, **Growth=30000** (Business-এর ডাবল, যেহেতু Growth-ই সবচেয়ে বড় প্যাকেজ)। সব প্যাকেজেই এখন real limit — কোনো প্যাকেজ আর unlimited/NULL না। কোনো কোড পরিবর্তন লাগেনি (existing `TrackingQuotaService::limitFor()` + admin Packages ফর্ম দিয়েই enforced/editable), শুধু ডেটা ফিক্স, Admin API দিয়ে সরাসরি লাইভ verify করা হয়েছে
 
 ---
 
