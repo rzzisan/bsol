@@ -244,6 +244,8 @@ export default function BookParcelPage() {
   const [storesFetched, setStoresFetched] = useState(false);
   const [priceResult, setPriceResult] = useState<{ fee: number; final: number } | null>(null);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
+  const [redxChargeResult, setRedxChargeResult] = useState<{ deliveryCharge: number; codCharge: number } | null>(null);
+  const [calculatingRedxCharge, setCalculatingRedxCharge] = useState(false);
 
   const [redxStores, setRedxStores] = useState<RedxStore[]>([]);
   const [loadingRedxStores, setLoadingRedxStores] = useState(false);
@@ -442,6 +444,7 @@ export default function BookParcelPage() {
     });
     setBookResult(null);
     setPriceResult(null);
+    setRedxChargeResult(null);
     setRedxAreaSearch("");
     setRedxAreaResults([]);
     setCarrybeeZones([]);
@@ -552,6 +555,32 @@ export default function BookParcelPage() {
       }
     } finally {
       setCalculatingPrice(false);
+    }
+  };
+
+  const calculateRedxCharge = async () => {
+    if (!modal || !form.store_id || !form.redx_delivery_area_id) return;
+    const pickupStore = redxStores.find(s => String(s.id) === form.store_id);
+    if (!pickupStore) return;
+    setCalculatingRedxCharge(true);
+    setRedxChargeResult(null);
+    try {
+      const res = await fetch(`${API}/courier/redx/charge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          delivery_area_id: Number(form.redx_delivery_area_id),
+          pickup_area_id: pickupStore.area_id,
+          cod_amount: Number(form.cod_amount) || 0,
+          weight_kg: Number(form.item_weight) || 0.5,
+        }),
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setRedxChargeResult({ deliveryCharge: d.data.deliveryCharge, codCharge: d.data.codCharge });
+      }
+    } finally {
+      setCalculatingRedxCharge(false);
     }
   };
 
@@ -724,6 +753,7 @@ export default function BookParcelPage() {
                     const courier = e.target.value as BookForm["courier"];
                     setForm(f => ({ ...f, courier }));
                     setPriceResult(null);
+                    setRedxChargeResult(null);
                     if (courier === "pathao") void fetchPathaoStores();
                     if (courier === "redx") void fetchRedxStores();
                     if (courier === "carrybee") { void fetchCarrybeeStores(); void fetchCarrybeeCities(); }
@@ -877,6 +907,20 @@ export default function BookParcelPage() {
                         className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
                     </label>
                   </div>
+
+                  {form.store_id && form.redx_delivery_area_id && (
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={() => void calculateRedxCharge()} disabled={calculatingRedxCharge}
+                        className="rounded-xl border border-[var(--accent)] px-3 py-1.5 text-xs text-[var(--accent)] hover:bg-[var(--accent)]/10 disabled:opacity-60">
+                        {calculatingRedxCharge ? txt.calculating : txt.calcPrice}
+                      </button>
+                      {redxChargeResult && (
+                        <span className="text-sm font-semibold text-emerald-400">
+                          {txt.deliveryFee}: ৳{redxChargeResult.deliveryCharge + redxChargeResult.codCharge}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 

@@ -179,4 +179,52 @@ class RedxBookingApiTest extends TestCase
         $response->assertOk();
         $this->assertSame('pickup-pending', $order->fresh()->courier_status);
     }
+
+    /**
+     * pre_launch_polish_context.md §গ — this endpoint existed but was never
+     * called from the frontend (Pathao had an inline delivery-fee preview
+     * in the booking modal, RedX didn't). Now wired up the same way.
+     */
+    public function test_charge_calculator_proxies_the_official_api(): void
+    {
+        $user = $this->configuredUser();
+
+        Http::fake([
+            'sandbox.redx.com.bd/v1.0.0-beta/charge/charge_calculator*' => Http::response([
+                'deliveryCharge' => 60, 'codCharge' => 15,
+            ]),
+        ]);
+
+        $response = $this->postJson('/api/courier/redx/charge', [
+            'delivery_area_id' => 10,
+            'pickup_area_id' => 1,
+            'cod_amount' => 1500,
+            'weight_kg' => 0.5,
+        ], $this->authHeaders($user));
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.deliveryCharge', 60)
+            ->assertJsonPath('data.codCharge', 15);
+
+        Http::assertSent(fn ($request) => str_contains((string) $request->url(), 'delivery_area_id=10')
+            && str_contains((string) $request->url(), 'pickup_area_id=1')
+            && str_contains((string) $request->url(), 'cash_collection_amount=1500')
+            // weight_kg (0.5) is converted to grams (500) before hitting RedX.
+            && str_contains((string) $request->url(), 'weight=500'));
+    }
+
+    public function test_charge_calculator_fails_cleanly_without_redx_credentials(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->postJson('/api/courier/redx/charge', [
+            'delivery_area_id' => 10,
+            'pickup_area_id' => 1,
+            'cod_amount' => 1500,
+            'weight_kg' => 0.5,
+        ], $this->authHeaders($user));
+
+        $response->assertStatus(422)->assertJsonPath('success', false);
+    }
 }
