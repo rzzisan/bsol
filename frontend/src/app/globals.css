@@ -451,6 +451,12 @@ a {
 
 .catv-content {
   padding: 1rem;
+  /* The floating Support widget (support-chat-widget.tsx) is fixed at
+     bottom-4/right-4 (bottom-6/right-6 from sm:) — a ~56px pill button
+     plus that offset. Without extra clearance here, any page whose last
+     element lands near the viewport's bottom-right (e.g. a table's
+     pagination row) gets visually covered by it. */
+  padding-bottom: 6rem;
 }
 
 .catv-modal-overlay {
