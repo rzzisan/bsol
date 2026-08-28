@@ -268,6 +268,19 @@ class NagadMerchantGatewayClient implements PaymentGatewayClient
             Log::warning('Nagad verifyPayment did not validate', [
                 'tran_id' => $merchantTranId, 'response' => $data,
             ]);
+        } else {
+            // Log the raw shape on the success path too, once — this field
+            // set is still unconfirmed against a real Nagad response (see
+            // class docblock / online_payment_context.md §11). EPS had the
+            // exact same "shape assumed, not confirmed" gap and it turned
+            // out our guessed field names were wrong even though the
+            // provider's own page said success — the failure-path log
+            // wouldn't have caught that class of bug, only this one would.
+            // Keep this log until a real sandbox transaction confirms the
+            // shape, then it can be removed.
+            Log::info('Nagad verifyPayment validated — confirm this matches real Nagad response shape', [
+                'tran_id' => $merchantTranId, 'response' => $data,
+            ]);
         }
 
         return [

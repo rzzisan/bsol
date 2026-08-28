@@ -60,13 +60,13 @@ BSOL একটা টয়/MVP প্রজেক্ট না — এটা ge
 | Priority | ফিচার | কেন | ট্র্যাকিং |
 |---|---|---|---|
 | 1 | Onboarding wizard + demo-seed data | churn কমানো, নতুন সেলার activation | ✅ **সম্পন্ন (২০২৬-০৮-২২)** — বিস্তারিত `onboarding_checklist_context.md`, `feature_roadmap_context.md` |
-| 2 | Payment gateway sandbox verification (Nagad, EPS) | financial risk বন্ধ করা soft-launch-এর আগে | `online_payment_context.md` |
+| 2 | Payment gateway sandbox verification (Nagad, EPS) | financial risk বন্ধ করা soft-launch-এর আগে | 🟡 **EPS ✅ সম্পন্ন (২০২৬-০৮-১৯, real sandbox test + bug fix)** — এই row-এ আগে ভুলভাবে reflect হয়নি; **Nagad Merchant এখনো ⬜** (external: real merchant sandbox account দরকার) — `online_payment_context.md §৯.১, §১১` |
 | 3 | Bulk/CSV order import | migrating সেলারদের ঘর্ষণ কমায় | `feature_roadmap_context.md` #বিদ্যমান আইটেম |
 | 4 | Referral/affiliate program (সেলার→সেলার) | সস্তা, বিশ্বাসযোগ্য CAC চ্যানেল | `feature_roadmap_context.md` #বিদ্যমান আইটেম |
 | 5 | Ads ROI tracker সম্পূর্ণ করা | UTM/ad-spend ডেটা সোর্স যোগ করে placeholder সরানো | `SAAS_MODULE_CONTEXT.md §15.7/§16.1` |
 | 6 | Marketing broadcast (SMS+Email) | retention/upsell, customer segment ইতিমধ্যে আছে | `feature_roadmap_context.md` #৭ |
 | 7 | WhatsApp ও Auto-top-up resume | external ব্লকার সরলেই — কোড-সম্পূর্ণ | `whatsapp_context.md`, `auto_top_up_context.md` |
-| 8 | 2FA + admin audit trail | নিরাপত্তা hardening, স্কেলের আগে | নতুন `security_hardening_context.md` (তৈরি হলে) |
+| 8 | 2FA + admin audit trail | নিরাপত্তা hardening, স্কেলের আগে | 🟡 শুরু হয়েছে (২০২৬-০৮-২৮) — `security_hardening_context.md` |
 
 ---
 
