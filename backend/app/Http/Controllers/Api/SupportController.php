@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateAiSupportReplyJob;
 use App\Models\SupportConversation;
 use App\Models\SupportMessage;
 use Illuminate\Http\JsonResponse;
@@ -76,6 +77,13 @@ class SupportController extends Controller
             'last_message_sender_type' => 'user',
             'admin_unread_count' => $conversation->admin_unread_count + 1,
         ]);
+
+        // Instant AI first-response — support_ticketing_ai_context.md. Skipped
+        // once a human admin has ever replied here (human_handled), and the
+        // service itself no-ops when the AI agent is disabled/capped.
+        if (! $conversation->human_handled) {
+            GenerateAiSupportReplyJob::dispatch('conversation', $conversation->id);
+        }
 
         return response()->json(['success' => true, 'data' => $message]);
     }

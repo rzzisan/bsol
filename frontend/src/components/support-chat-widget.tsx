@@ -9,8 +9,8 @@ const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\
 interface SupportMessage {
   id: number;
   conversation_id: number;
-  sender_type: "user" | "admin";
-  sender_id: number;
+  sender_type: "user" | "admin" | "ai";
+  sender_id: number | null;
   message: string;
   is_read: boolean;
   created_at: string;
@@ -175,7 +175,7 @@ export default function SupportChatWidget() {
           setMessages((prev) => [...prev, ...incoming]);
           lastIdRef.current = incoming[incoming.length - 1].id;
           scrollToBottom();
-          if (incoming.some((m) => m.sender_type === "admin")) void markRead();
+          if (incoming.some((m) => m.sender_type === "admin" || m.sender_type === "ai")) void markRead();
         }
       } catch {
         // silent
@@ -294,9 +294,16 @@ export default function SupportChatWidget() {
                   className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
                     m.sender_type === "user"
                       ? "bg-[var(--accent)] text-white"
-                      : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
+                      : m.sender_type === "ai"
+                        ? "border border-violet-300/60 bg-violet-50 text-[var(--foreground)] dark:border-violet-700/50 dark:bg-violet-950/30"
+                        : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
                   }`}
                 >
+                  {m.sender_type === "ai" && (
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-violet-500">
+                      {locale === "bn" ? "AI এজেন্ট" : "AI Agent"}
+                    </p>
+                  )}
                   <p className="whitespace-pre-wrap break-words">{m.message}</p>
                   <p
                     className={`mt-1 text-right text-[10px] ${

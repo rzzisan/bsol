@@ -11,7 +11,7 @@ class SupportConversation extends Model
     protected $fillable = [
         'user_id', 'status', 'last_message_at', 'last_message_preview',
         'last_message_sender_type', 'user_unread_count', 'admin_unread_count',
-        'closed_by', 'closed_at',
+        'human_handled', 'closed_by', 'closed_at',
     ];
 
     protected function casts(): array
@@ -19,6 +19,7 @@ class SupportConversation extends Model
         return [
             'last_message_at' => 'datetime',
             'closed_at' => 'datetime',
+            'human_handled' => 'boolean',
         ];
     }
 

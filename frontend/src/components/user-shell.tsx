@@ -274,6 +274,12 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number, whatsappU
       badge: whatsappUnread,
     },
     {
+      key: "my-tickets",
+      label: (t as any).myTickets ?? "আমার টিকেট",
+      icon: "🎫",
+      href: "/dashboard/tickets",
+    },
+    {
       key: "courier",
       label: t.courier,
       icon: "🚚",

@@ -37,11 +37,13 @@ const ADMIN_MENU_TEXT: Record<Locale, Record<string, string>> = {
     facebookSettings: "ফেসবুক অ্যাপ",
     courierCache: "কুরিয়ার ক্যাশ",
     support: "সাপোর্ট",
+    tickets: "টিকেট",
     tracking: "ট্র্যাকিং ব্যবহার",
     marketingEvents: "মার্কেটিং ইভেন্ট",
     security: "নিরাপত্তা (2FA)",
     auditLogs: "অডিট লগ",
     globalBlacklist: "গ্লোবাল ব্লকলিস্ট",
+    aiSupportSettings: "AI সাপোর্ট এজেন্ট",
   },
   en: {
     dashboard: "Dashboard",
@@ -71,11 +73,13 @@ const ADMIN_MENU_TEXT: Record<Locale, Record<string, string>> = {
     facebookSettings: "Facebook App",
     courierCache: "Courier Cache",
     support: "Support",
+    tickets: "Tickets",
     tracking: "Tracking Usage",
     marketingEvents: "Marketing Events",
     security: "Security (2FA)",
     auditLogs: "Audit Log",
     globalBlacklist: "Global Blacklist",
+    aiSupportSettings: "AI Support Agent",
   },
 };
 
@@ -93,6 +97,7 @@ export function buildAdminMenu(locale: Locale): ShellMenuItem[] {
     { key: "settings-notification-use-cases", label: l.notificationUseCases, href: "/admin/settings/notification-use-cases" },
     { key: "settings-notification-logs", label: l.notificationLogs, href: "/admin/settings/notification-logs" },
     { key: "settings-security", label: l.security, href: "/admin/settings/security" },
+    { key: "settings-ai-support", label: l.aiSupportSettings, href: "/admin/settings/ai-support" },
   ];
 
   return [
@@ -133,6 +138,7 @@ export function buildAdminMenu(locale: Locale): ShellMenuItem[] {
     { key: "tracking", label: l.tracking, icon: "🎯", href: "/admin/tracking" },
     { key: "marketing-events", label: l.marketingEvents, icon: "📣", href: "/admin/marketing-events" },
     { key: "support", label: l.support, icon: "💬", href: "/admin/support" },
+    { key: "tickets", label: l.tickets, icon: "🎫", href: "/admin/tickets" },
     { key: "audit-logs", label: l.auditLogs, icon: "📜", href: "/admin/audit-logs" },
     { key: "global-blacklist", label: l.globalBlacklist, icon: "🚫", href: "/admin/global-blacklist" },
     { key: "reports", label: l.reports, icon: "📊" },

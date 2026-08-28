@@ -90,6 +90,9 @@ class AdminSupportController extends Controller
             'last_message_sender_type' => 'admin',
             'user_unread_count' => $conversation->user_unread_count + 1,
             'admin_unread_count' => 0,
+            // A human has now taken over this thread — the AI stops
+            // auto-replying here (support_ticketing_ai_context.md).
+            'human_handled' => true,
         ]);
 
         return response()->json(['success' => true, 'data' => $message]);

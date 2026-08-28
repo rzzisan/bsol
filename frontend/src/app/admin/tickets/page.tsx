@@ -17,28 +17,40 @@ import {
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
 
-interface ConversationUser {
+type Status = "open" | "pending" | "resolved" | "closed";
+type Priority = "low" | "medium" | "high" | "urgent";
+type Category = "billing" | "order" | "product" | "technical" | "account" | "other";
+
+interface TicketUser {
   id: number;
   name: string;
   email: string;
   mobile: string | null;
 }
 
-interface Conversation {
+interface Ticket {
   id: number;
-  user_id: number;
-  status: "open" | "closed";
+  ticket_number: string;
+  subject: string;
+  category: Category;
+  priority: Priority;
+  status: Status;
+  assigned_admin_id: number | null;
+  assigned_admin: { id: number; name: string } | null;
+  ai_handled: boolean;
+  escalated: boolean;
+  escalation_reason: string | null;
   last_message_at: string | null;
   last_message_preview: string | null;
   last_message_sender_type: "user" | "admin" | "ai" | null;
   user_unread_count: number;
   admin_unread_count: number;
-  user: ConversationUser;
+  user: TicketUser;
 }
 
-interface SupportMessage {
+interface TicketMessage {
   id: number;
-  conversation_id: number;
+  ticket_id: number;
   sender_type: "user" | "admin" | "ai";
   sender_id: number | null;
   message: string;
@@ -46,94 +58,69 @@ interface SupportMessage {
   created_at: string;
 }
 
-type StatusFilter = "all" | "open" | "closed";
+type StatusFilter = "all" | Status;
+
+const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
+const STATUSES: Status[] = ["open", "pending", "resolved", "closed"];
 
 const text = {
   bn: {
-    title: "সাপোর্ট ইনবক্স",
-    subtitle: "সব সেলারের সাপোর্ট চ্যাট — যেকোনো অ্যাডমিন যেকোনো কথোপকথন দেখতে ও রিপ্লাই দিতে পারবেন।",
+    title: "সাপোর্ট টিকেট",
+    subtitle: "সব সেলারের টিকেট — যেকোনো অ্যাডমিন দেখতে ও রিপ্লাই দিতে পারবেন।",
     loginRequired: "এই পেজ দেখতে হলে অ্যাডমিন হিসেবে লগইন করুন।",
     accessDenied: "শুধুমাত্র অ্যাডমিন এই পেজ দেখতে পারবেন।",
     goHome: "হোমে যান",
-    menuDashboard: "ড্যাশবোর্ড",
-    menuCustomers: "গ্রাহক",
-    menuActive: "অ্যাকটিভ গ্রাহক",
-    menuPending: "পেন্ডিং গ্রাহক",
-    menuSms: "এসএমএস",
-    menuSmsGateway: "এসএমএস গেটওয়ে",
-    menuSmsSend: "এসএমএস সেন্ড",
-    menuSmsHistory: "এসএমএস হিস্টোরি",
-    menuSmsCredit: "এসএমএস ক্রেডিট",
-    menuPackages: "প্যাকেজ",
-    menuBilling: "বিলিং",
-    menuReports: "রিপোর্ট",
-    menuSettings: "সেটিংস",
-    menuEmailSettings: "ইমেইল সেটিংস",
-    menuLandingPages: "ল্যান্ডিং পেজ",
-    menuLandingTemplates: "ল্যান্ডিং টেমপ্লেট",
-    menuCourierCache: "কুরিয়ার ক্যাশ",
-    menuSupport: "সাপোর্ট",
     languageLabel: "ভাষা",
     themeLabel: "থিম",
-    searchPlaceholder: "নাম, ইমেইল বা মোবাইল দিয়ে খুঁজুন",
+    searchPlaceholder: "টিকেট নম্বর, বিষয় বা সেলার খুঁজুন",
     statusAll: "সব",
-    statusOpen: "চলমান",
-    statusClosed: "বন্ধ",
-    noConversations: "কোনো কথোপকথন পাওয়া যায়নি।",
-    selectConversation: "একটি কথোপকথন সিলেক্ট করুন",
-    close: "বন্ধ করুন",
-    reopen: "আবার খুলুন",
+    status: { open: "খোলা", pending: "অপেক্ষমাণ", resolved: "সমাধান হয়েছে", closed: "বন্ধ" } as Record<Status, string>,
+    priority: { low: "নিম্ন", medium: "মাঝারি", high: "উচ্চ", urgent: "জরুরি" } as Record<Priority, string>,
+    category: { billing: "বিলিং", order: "অর্ডার", product: "প্রোডাক্ট", technical: "টেকনিক্যাল", account: "অ্যাকাউন্ট", other: "অন্যান্য" } as Record<Category, string>,
+    escalatedOnly: "শুধু Escalated",
+    noTickets: "কোনো টিকেট পাওয়া যায়নি।",
+    selectTicket: "একটি টিকেট সিলেক্ট করুন",
+    takeOver: "নিজে দায়িত্ব নিন",
+    takenOverBy: "দায়িত্বে",
+    aiHandling: "AI পরিচালনা করছে",
+    escalatedBadge: "🚩 Escalated",
     placeholder: "রিপ্লাই লিখুন…",
     send: "পাঠান",
     empty: "এখনও কোনো মেসেজ নেই।",
     loadOlder: "আগের মেসেজ",
     loading: "লোড হচ্ছে…",
-    backToList: "তালিকায় ফিরুন",
     noMobile: "মোবাইল নেই",
     sendError: "মেসেজ পাঠানো যায়নি।",
+    aiAgent: "AI এজেন্ট",
   },
   en: {
-    title: "Support Inbox",
-    subtitle: "All sellers' support chats — any admin can view and reply to any conversation.",
+    title: "Support Tickets",
+    subtitle: "All sellers' tickets — any admin can view and reply.",
     loginRequired: "Please login as admin to access this page.",
     accessDenied: "Only admin users can view this page.",
     goHome: "Go Home",
-    menuDashboard: "Dashboard",
-    menuCustomers: "Customers",
-    menuActive: "Active Customers",
-    menuPending: "Pending Customers",
-    menuSms: "SMS",
-    menuSmsGateway: "SMS Gateway",
-    menuSmsSend: "Send SMS",
-    menuSmsHistory: "SMS History",
-    menuSmsCredit: "SMS Credit",
-    menuPackages: "Packages",
-    menuBilling: "Billing",
-    menuReports: "Reports",
-    menuSettings: "Settings",
-    menuEmailSettings: "Email Settings",
-    menuLandingPages: "Landing Pages",
-    menuLandingTemplates: "Landing Templates",
-    menuCourierCache: "Courier Cache",
-    menuSupport: "Support",
     languageLabel: "Language",
     themeLabel: "Theme",
-    searchPlaceholder: "Search by name, email or mobile",
+    searchPlaceholder: "Search ticket #, subject or seller",
     statusAll: "All",
-    statusOpen: "Open",
-    statusClosed: "Closed",
-    noConversations: "No conversations found.",
-    selectConversation: "Select a conversation",
-    close: "Close",
-    reopen: "Reopen",
+    status: { open: "Open", pending: "Pending", resolved: "Resolved", closed: "Closed" } as Record<Status, string>,
+    priority: { low: "Low", medium: "Medium", high: "High", urgent: "Urgent" } as Record<Priority, string>,
+    category: { billing: "Billing", order: "Order", product: "Product", technical: "Technical", account: "Account", other: "Other" } as Record<Category, string>,
+    escalatedOnly: "Escalated only",
+    noTickets: "No tickets found.",
+    selectTicket: "Select a ticket",
+    takeOver: "Take over",
+    takenOverBy: "Assigned to",
+    aiHandling: "AI is handling this",
+    escalatedBadge: "🚩 Escalated",
     placeholder: "Type a reply…",
     send: "Send",
     empty: "No messages yet.",
     loadOlder: "Load older",
     loading: "Loading…",
-    backToList: "Back to list",
     noMobile: "No mobile",
     sendError: "Couldn't send the message.",
+    aiAgent: "AI Agent",
   },
 };
 
@@ -151,18 +138,32 @@ function formatTime(iso: string | null, locale: Locale) {
   }
 }
 
-export default function AdminSupportPage() {
+function priorityColor(p: Priority) {
+  switch (p) {
+    case "urgent":
+      return "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300";
+    case "high":
+      return "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300";
+    case "medium":
+      return "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
+    default:
+      return "bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300";
+  }
+}
+
+export default function AdminTicketsPage() {
   const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [escalatedOnly, setEscalatedOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const [messages, setMessages] = useState<SupportMessage[]>([]);
+  const [messages, setMessages] = useState<TicketMessage[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [draft, setDraft] = useState("");
@@ -171,8 +172,6 @@ export default function AdminSupportPage() {
 
   const listRef = useRef<HTMLDivElement>(null);
   const lastIdRef = useRef(0);
-  const selectedIdRef = useRef<number | null>(null);
-  selectedIdRef.current = selectedId;
 
   useEffect(() => {
     setLocale(getStoredLocale());
@@ -204,44 +203,38 @@ export default function AdminSupportPage() {
   }, []);
 
   const t = useMemo(() => text[locale], [locale]);
-
-  const menu = useMemo(
-    () =>
-      buildAdminMenu(locale),
-    [t],
-  );
+  const menu = useMemo(() => buildAdminMenu(locale), [t]);
 
   const authHeaders = useCallback((): Record<string, string> => {
     const token = getStoredToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   }, []);
 
-  const loadConversations = useCallback(async () => {
+  const loadTickets = useCallback(async () => {
     setLoadingList(true);
     try {
       const params = new URLSearchParams({ per_page: "50" });
       if (statusFilter !== "all") params.set("status", statusFilter);
+      if (escalatedOnly) params.set("escalated_only", "1");
       if (search.trim()) params.set("q", search.trim());
 
-      const res = await fetch(`${API_BASE_URL}/admin/support/conversations?${params.toString()}`, {
-        headers: authHeaders(),
-      });
+      const res = await fetch(`${API_BASE_URL}/admin/tickets?${params.toString()}`, { headers: authHeaders() });
       if (!res.ok) return;
       const data = await res.json();
-      setConversations(data.data ?? []);
+      setTickets(data.data ?? []);
     } catch {
       // silent
     } finally {
       setLoadingList(false);
     }
-  }, [statusFilter, search, authHeaders]);
+  }, [statusFilter, escalatedOnly, search, authHeaders]);
 
   useEffect(() => {
     if (state !== "ready") return;
-    void loadConversations();
-    const interval = setInterval(loadConversations, 15000);
+    void loadTickets();
+    const interval = setInterval(loadTickets, 15000);
     return () => clearInterval(interval);
-  }, [state, loadConversations]);
+  }, [state, loadTickets]);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -250,15 +243,10 @@ export default function AdminSupportPage() {
   }, []);
 
   const markRead = useCallback(
-    async (conversationId: number) => {
+    async (ticketId: number) => {
       try {
-        await fetch(`${API_BASE_URL}/admin/support/conversations/${conversationId}/read`, {
-          method: "POST",
-          headers: authHeaders(),
-        });
-        setConversations((prev) =>
-          prev.map((c) => (c.id === conversationId ? { ...c, admin_unread_count: 0 } : c)),
-        );
+        await fetch(`${API_BASE_URL}/admin/tickets/${ticketId}/read`, { method: "POST", headers: authHeaders() });
+        setTickets((prev) => prev.map((tk) => (tk.id === ticketId ? { ...tk, admin_unread_count: 0 } : tk)));
       } catch {
         // silent
       }
@@ -267,14 +255,12 @@ export default function AdminSupportPage() {
   );
 
   const loadMessages = useCallback(
-    async (conversationId: number) => {
+    async (ticketId: number) => {
       try {
-        const res = await fetch(`${API_BASE_URL}/admin/support/conversations/${conversationId}/messages`, {
-          headers: authHeaders(),
-        });
+        const res = await fetch(`${API_BASE_URL}/admin/tickets/${ticketId}/messages`, { headers: authHeaders() });
         if (!res.ok) return;
         const data = await res.json();
-        const list: SupportMessage[] = data.data ?? [];
+        const list: TicketMessage[] = data.data ?? [];
         setMessages(list);
         setHasMore(Boolean(data.has_more));
         if (list.length) lastIdRef.current = list[list.length - 1].id;
@@ -295,19 +281,18 @@ export default function AdminSupportPage() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(
-          `${API_BASE_URL}/admin/support/conversations/${selectedId}/messages?after_id=${lastIdRef.current}`,
-          { headers: authHeaders() },
-        );
+        const res = await fetch(`${API_BASE_URL}/admin/tickets/${selectedId}/messages?after_id=${lastIdRef.current}`, {
+          headers: authHeaders(),
+        });
         if (!res.ok) return;
         const data = await res.json();
-        const incoming: SupportMessage[] = data.data ?? [];
+        const incoming: TicketMessage[] = data.data ?? [];
         if (incoming.length) {
           setMessages((prev) => [...prev, ...incoming]);
           lastIdRef.current = incoming[incoming.length - 1].id;
           scrollToBottom();
           if (incoming.some((m) => m.sender_type === "user")) void markRead(selectedId);
-          void loadConversations();
+          void loadTickets();
         }
       } catch {
         // silent
@@ -322,13 +307,12 @@ export default function AdminSupportPage() {
     if (!selectedId || !messages.length || loadingOlder) return;
     setLoadingOlder(true);
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/admin/support/conversations/${selectedId}/messages?before_id=${messages[0].id}`,
-        { headers: authHeaders() },
-      );
+      const res = await fetch(`${API_BASE_URL}/admin/tickets/${selectedId}/messages?before_id=${messages[0].id}`, {
+        headers: authHeaders(),
+      });
       if (!res.ok) return;
       const data = await res.json();
-      const older: SupportMessage[] = data.data ?? [];
+      const older: TicketMessage[] = data.data ?? [];
       setMessages((prev) => [...older, ...prev]);
       setHasMore(Boolean(data.has_more));
     } finally {
@@ -342,7 +326,7 @@ export default function AdminSupportPage() {
     setSending(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/support/conversations/${selectedId}/messages`, {
+      const res = await fetch(`${API_BASE_URL}/admin/tickets/${selectedId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ message: value }),
@@ -352,32 +336,45 @@ export default function AdminSupportPage() {
         return;
       }
       const data = await res.json();
-      const created: SupportMessage = data.data;
+      const created: TicketMessage = data.data;
       setMessages((prev) => [...prev, created]);
       lastIdRef.current = created.id;
       setDraft("");
       scrollToBottom();
-      void loadConversations();
+      void loadTickets();
     } catch {
       setError(t.sendError);
     } finally {
       setSending(false);
     }
-  }, [draft, selectedId, sending, authHeaders, scrollToBottom, loadConversations, t.sendError]);
+  }, [draft, selectedId, sending, authHeaders, scrollToBottom, loadTickets, t.sendError]);
 
-  const toggleStatus = useCallback(
-    async (conversation: Conversation) => {
-      const nextStatus = conversation.status === "open" ? "closed" : "open";
+  const takeOver = useCallback(
+    async (ticket: Ticket) => {
       try {
-        const res = await fetch(`${API_BASE_URL}/admin/support/conversations/${conversation.id}/status`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({ status: nextStatus }),
+        const res = await fetch(`${API_BASE_URL}/admin/tickets/${ticket.id}/take-over`, {
+          method: "POST",
+          headers: authHeaders(),
         });
         if (!res.ok) return;
-        setConversations((prev) =>
-          prev.map((c) => (c.id === conversation.id ? { ...c, status: nextStatus } : c)),
-        );
+        void loadTickets();
+      } catch {
+        // silent
+      }
+    },
+    [authHeaders, loadTickets],
+  );
+
+  const updateStatus = useCallback(
+    async (ticket: Ticket, status: Status) => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/tickets/${ticket.id}/status`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ status }),
+        });
+        if (!res.ok) return;
+        setTickets((prev) => prev.map((tk) => (tk.id === ticket.id ? { ...tk, status } : tk)));
       } catch {
         // silent
       }
@@ -385,7 +382,24 @@ export default function AdminSupportPage() {
     [authHeaders],
   );
 
-  const selected = conversations.find((c) => c.id === selectedId) ?? null;
+  const updatePriority = useCallback(
+    async (ticket: Ticket, priority: Priority) => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/tickets/${ticket.id}/priority`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ priority }),
+        });
+        if (!res.ok) return;
+        setTickets((prev) => prev.map((tk) => (tk.id === ticket.id ? { ...tk, priority } : tk)));
+      } catch {
+        // silent
+      }
+    },
+    [authHeaders],
+  );
+
+  const selected = tickets.find((tk) => tk.id === selectedId) ?? null;
 
   if (state !== "ready") {
     return (
@@ -412,15 +426,13 @@ export default function AdminSupportPage() {
       localeLabel={t.languageLabel}
       themeLabel={t.themeLabel}
       sidebarTitle="Admin Panel"
-      userName={t.menuSupport}
-      userMeta={t.title}
       menu={menu}
-      activeKey="support"
+      activeKey="tickets"
       onToggleLocale={() => setLocale(locale === "bn" ? "en" : "bn")}
       onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
     >
-      <div className="grid h-[calc(100vh-11rem)] min-h-[28rem] grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
-        {/* Conversation list */}
+      <div className="grid h-[calc(100vh-11rem)] min-h-[28rem] grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr]">
+        {/* Ticket list */}
         <section
           className={`flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] ${
             selectedId ? "hidden lg:flex" : "flex"
@@ -433,101 +445,144 @@ export default function AdminSupportPage() {
               placeholder={t.searchPlaceholder}
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             />
-            <div className="flex gap-1">
-              {(["all", "open", "closed"] as StatusFilter[]).map((f) => (
+            <div className="flex flex-wrap gap-1">
+              {(["all", ...STATUSES] as StatusFilter[]).map((f) => (
                 <button
                   key={f}
                   type="button"
                   onClick={() => setStatusFilter(f)}
-                  className={`flex-1 rounded-lg px-2 py-1 text-xs font-semibold ${
-                    statusFilter === f
-                      ? "bg-[var(--accent)] text-white"
-                      : "border border-[var(--border)] text-[var(--muted)]"
+                  className={`rounded-lg px-2 py-1 text-xs font-semibold ${
+                    statusFilter === f ? "bg-[var(--accent)] text-white" : "border border-[var(--border)] text-[var(--muted)]"
                   }`}
                 >
-                  {f === "all" ? t.statusAll : f === "open" ? t.statusOpen : t.statusClosed}
+                  {f === "all" ? t.statusAll : t.status[f]}
                 </button>
               ))}
             </div>
+            <label className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
+              <input type="checkbox" checked={escalatedOnly} onChange={(e) => setEscalatedOnly(e.target.checked)} />
+              {t.escalatedOnly}
+            </label>
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {loadingList && conversations.length === 0 && (
-              <p className="p-4 text-center text-xs text-[var(--muted)]">{t.loading}</p>
-            )}
-            {!loadingList && conversations.length === 0 && (
-              <p className="p-4 text-center text-xs text-[var(--muted)]">{t.noConversations}</p>
-            )}
-            {conversations.map((c) => (
+            {loadingList && tickets.length === 0 && <p className="p-4 text-center text-xs text-[var(--muted)]">{t.loading}</p>}
+            {!loadingList && tickets.length === 0 && <p className="p-4 text-center text-xs text-[var(--muted)]">{t.noTickets}</p>}
+            {tickets.map((tk) => (
               <button
-                key={c.id}
+                key={tk.id}
                 type="button"
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => setSelectedId(tk.id)}
                 className={`flex w-full flex-col gap-0.5 border-b border-[var(--border)] px-3 py-2.5 text-left transition hover:bg-[var(--surface-soft)] ${
-                  selectedId === c.id ? "bg-[var(--surface-soft)]" : ""
+                  selectedId === tk.id ? "bg-[var(--surface-soft)]" : ""
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-[var(--foreground)]">
-                    {c.user?.name ?? `#${c.user_id}`}
-                  </span>
-                  {c.admin_unread_count > 0 && (
+                  <span className="truncate text-xs font-mono text-[var(--muted)]">{tk.ticket_number}</span>
+                  {tk.admin_unread_count > 0 && (
                     <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                      {c.admin_unread_count > 9 ? "9+" : c.admin_unread_count}
+                      {tk.admin_unread_count > 9 ? "9+" : tk.admin_unread_count}
                     </span>
                   )}
                 </div>
-                <span className="truncate text-xs text-[var(--muted)]">
-                  {c.last_message_sender_type === "admin" ? "↩ " : c.last_message_sender_type === "ai" ? "🤖 " : ""}
-                  {c.last_message_preview ?? "—"}
-                </span>
-                <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
-                  <span>{formatTime(c.last_message_at, locale)}</span>
-                  <span className={c.status === "open" ? "text-emerald-500" : ""}>
-                    {c.status === "open" ? t.statusOpen : t.statusClosed}
+                <span className="truncate text-sm font-semibold text-[var(--foreground)]">{tk.subject}</span>
+                <span className="truncate text-xs text-[var(--muted)]">{tk.user?.name ?? `#${tk.user.id}`}</span>
+                <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${priorityColor(tk.priority)}`}>
+                    {t.priority[tk.priority]}
                   </span>
+                  <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">
+                    {t.category[tk.category]}
+                  </span>
+                  <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">
+                    {t.status[tk.status]}
+                  </span>
+                  {tk.escalated && <span className="text-[10px]">{t.escalatedBadge}</span>}
                 </div>
               </button>
             ))}
           </div>
         </section>
 
-        {/* Chat panel */}
+        {/* Thread panel */}
         <section
           className={`flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] ${
             selectedId ? "flex" : "hidden lg:flex"
           }`}
         >
           {!selected ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-[var(--muted)]">
-              {t.selectConversation}
-            </div>
+            <div className="flex flex-1 items-center justify-center text-sm text-[var(--muted)]">{t.selectTicket}</div>
           ) : (
             <>
-              <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(null)}
-                    className="rounded-full p-1 text-[var(--muted)] hover:bg-[var(--border)] hover:text-[var(--foreground)] lg:hidden"
-                    aria-label="back"
-                  >
-                    ←
-                  </button>
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--foreground)]">{selected.user?.name}</p>
-                    <p className="text-xs text-[var(--muted)]">
-                      {selected.user?.email} · {selected.user?.mobile ?? t.noMobile}
-                    </p>
+              <div className="flex flex-col gap-2 border-b border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(null)}
+                      className="rounded-full p-1 text-[var(--muted)] hover:bg-[var(--border)] hover:text-[var(--foreground)] lg:hidden"
+                      aria-label="back"
+                    >
+                      ←
+                    </button>
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--foreground)]">
+                        {selected.ticket_number} · {selected.subject}
+                      </p>
+                      <p className="text-xs text-[var(--muted)]">
+                        {selected.user?.name} · {selected.user?.email} · {selected.user?.mobile ?? t.noMobile}
+                      </p>
+                    </div>
                   </div>
+                  {selected.assigned_admin_id === null ? (
+                    <button
+                      type="button"
+                      onClick={() => void takeOver(selected)}
+                      className="shrink-0 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--border)]"
+                    >
+                      {t.takeOver}
+                    </button>
+                  ) : (
+                    <span className="shrink-0 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--muted)]">
+                      {t.takenOverBy}: {selected.assigned_admin?.name ?? "—"}
+                    </span>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void toggleStatus(selected)}
-                  className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--border)]"
-                >
-                  {selected.status === "open" ? t.close : t.reopen}
-                </button>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {selected.ai_handled && !selected.assigned_admin_id && (
+                    <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                      🤖 {t.aiHandling}
+                    </span>
+                  )}
+                  {selected.escalated && (
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                      {t.escalatedBadge}
+                      {selected.escalation_reason ? `: ${selected.escalation_reason}` : ""}
+                    </span>
+                  )}
+                  <select
+                    value={selected.status}
+                    onChange={(e) => void updateStatus(selected, e.target.value as Status)}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs"
+                  >
+                    {STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {t.status[s]}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={selected.priority}
+                    onChange={(e) => void updatePriority(selected, e.target.value as Priority)}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs"
+                  >
+                    {PRIORITIES.map((p) => (
+                      <option key={p} value={p}>
+                        {t.priority[p]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div ref={listRef} className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
@@ -543,9 +598,7 @@ export default function AdminSupportPage() {
                     </button>
                   </div>
                 )}
-                {messages.length === 0 && (
-                  <p className="mt-6 text-center text-xs text-[var(--muted)]">{t.empty}</p>
-                )}
+                {messages.length === 0 && <p className="mt-6 text-center text-xs text-[var(--muted)]">{t.empty}</p>}
                 {messages.map((m) => (
                   <div key={m.id} className={`flex ${m.sender_type === "admin" ? "justify-end" : "justify-start"}`}>
                     <div
@@ -558,9 +611,7 @@ export default function AdminSupportPage() {
                       }`}
                     >
                       {m.sender_type === "ai" && (
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-violet-500">
-                          {locale === "bn" ? "AI এজেন্ট" : "AI Agent"}
-                        </p>
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-violet-500">{t.aiAgent}</p>
                       )}
                       <p className="whitespace-pre-wrap break-words">{m.message}</p>
                       <p

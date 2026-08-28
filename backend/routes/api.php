@@ -57,12 +57,15 @@ use App\Http\Controllers\Api\LandingTemplateController;
 use App\Http\Controllers\Api\SmsAutomationController;
 use App\Http\Controllers\Api\StaffController;
 use App\Http\Controllers\Api\SupportController;
+use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\TrackingDestinationController;
 use App\Http\Controllers\Api\TrackingEventController;
 use App\Http\Controllers\Api\TrackingUsageController;
 use App\Http\Controllers\Api\CollectionHistoryController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\AdminSupportController;
+use App\Http\Controllers\Api\Admin\AdminSupportTicketController;
+use App\Http\Controllers\Api\Admin\PlatformAiSupportSettingController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
 use App\Http\Controllers\Api\Admin\ImpersonationController;
 use App\Http\Controllers\Api\Admin\PlatformFacebookSettingsController;
@@ -459,6 +462,19 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::post('/messages', [SupportController::class, 'send']);
         Route::post('/read', [SupportController::class, 'markRead']);
         Route::get('/unread-count', [SupportController::class, 'unreadCount']);
+    });
+
+    // ── Support ticketing (alongside live chat, not replacing it) —
+    // support_ticketing_ai_context.md. Same expired-subscription exemption as
+    // the chat group above.
+    Route::prefix('tickets')->group(function () {
+        Route::get('/', [SupportTicketController::class, 'index']);
+        Route::post('/', [SupportTicketController::class, 'store']);
+        Route::get('/unread-count', [SupportTicketController::class, 'unreadCount']);
+        Route::get('/{ticket}', [SupportTicketController::class, 'show']);
+        Route::get('/{ticket}/messages', [SupportTicketController::class, 'messages']);
+        Route::post('/{ticket}/messages', [SupportTicketController::class, 'send']);
+        Route::post('/{ticket}/read', [SupportTicketController::class, 'markRead']);
     });
 
 Route::middleware('active_subscription')->group(function () {
@@ -1001,6 +1017,21 @@ Route::middleware(['staff_permission:orders', 'active_subscription:allow_deliver
             Route::put('/conversations/{conversation}/status', [AdminSupportController::class, 'updateStatus']);
             Route::get('/unread-count', [AdminSupportController::class, 'unreadCount']);
         });
+
+        // Support ticketing (admin inbox) + AI agent kill switch/settings —
+        // support_ticketing_ai_context.md.
+        Route::prefix('tickets')->group(function () {
+            Route::get('/', [AdminSupportTicketController::class, 'index']);
+            Route::get('/unread-count', [AdminSupportTicketController::class, 'unreadCount']);
+            Route::get('/{ticket}/messages', [AdminSupportTicketController::class, 'messages']);
+            Route::post('/{ticket}/messages', [AdminSupportTicketController::class, 'send']);
+            Route::post('/{ticket}/take-over', [AdminSupportTicketController::class, 'takeOver']);
+            Route::post('/{ticket}/read', [AdminSupportTicketController::class, 'markRead']);
+            Route::put('/{ticket}/status', [AdminSupportTicketController::class, 'updateStatus']);
+            Route::put('/{ticket}/priority', [AdminSupportTicketController::class, 'updatePriority']);
+        });
+        Route::get('/settings/ai-support', [PlatformAiSupportSettingController::class, 'show']);
+        Route::put('/settings/ai-support', [PlatformAiSupportSettingController::class, 'update']);
 
     });
 });
