@@ -2,6 +2,7 @@
 
 namespace App\Services\Support;
 
+use App\Models\AiKnowledgeBaseArticle;
 use App\Models\Order;
 use App\Models\PlatformAiSupportSetting;
 use App\Models\SubscriptionPayment;
@@ -151,19 +152,24 @@ class AiSupportAgentService
                 $this->toolDefinitions(),
                 $this->toolDispatcher($user, $onEscalate),
             );
-
-            if ($finalText !== null) {
-                $onReply($finalText);
-                $settings->recordReply();
-            }
         } catch (\Throwable $e) {
             Log::error('ai_support.generate_failed', ['provider' => $settings->provider, 'user_id' => $user->id, 'error' => $e->getMessage()]);
-
-            // Never leave the seller with silence on an API failure — post a
-            // graceful placeholder and force a human to pick it up.
-            $onReply('দুঃখিত, এই মুহূর্তে স্বয়ংক্রিয় উত্তর দেওয়া সম্ভব হচ্ছে না। আমাদের টিমের একজন সদস্য শীঘ্রই আপনার সাথে যোগাযোগ করবেন। | Sorry, an automated reply isn\'t possible right now — a team member will get back to you shortly.');
-            $onEscalate('AI reply failed: '.$e->getMessage(), 'medium');
+            $finalText = null;
         }
+
+        if ($finalText !== null) {
+            $onReply($finalText);
+            $settings->recordReply();
+
+            return;
+        }
+
+        // A provider adapter can also return null without throwing (a logged
+        // HTTP error, or the model producing no final text at all) — never
+        // let that read as silence to the seller. Always land on a reply.
+        Log::warning('ai_support.no_reply_produced', ['provider' => $settings->provider, 'user_id' => $user->id]);
+        $onReply('দুঃখিত, এই মুহূর্তে স্বয়ংক্রিয় উত্তর দেওয়া সম্ভব হচ্ছে না। আমাদের টিমের একজন সদস্য শীঘ্রই আপনার সাথে যোগাযোগ করবেন। | Sorry, an automated reply isn\'t possible right now — a team member will get back to you shortly.');
+        $onEscalate('AI produced no reply (provider error or empty response)', 'medium');
     }
 
     /** Provider-agnostic tool definitions — every adapter translates these into its own wire format. */
@@ -186,6 +192,17 @@ class AiSupportAgentService
                 'name' => 'get_recent_payments',
                 'description' => "The seller's own 10 most recent subscription payments (amount, status, method, admin note if rejected). No input needed.",
                 'inputSchema' => $emptySchema,
+            ],
+            [
+                'name' => 'search_platform_help',
+                'description' => "Search this SaaS platform's own how-to knowledge base — use this for 'how do I use module X' / 'how do I buy Y' questions (orders, products, courier, SMS, WhatsApp, Facebook, landing pages, analytics, accounting, subscription/billing, store settings, support) BEFORE deciding to escalate. Not for account-specific data — use the other tools for that.",
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'query' => ['type' => 'string', 'description' => "The seller's question, in their own words"],
+                    ],
+                    'required' => ['query'],
+                ],
             ],
             [
                 'name' => 'escalate_to_admin',
@@ -218,6 +235,7 @@ class AiSupportAgentService
                     Order::where('user_id', $user->id)->latest()->limit(10)
                         ->get(['order_number', 'status', 'payment_status', 'courier_status', 'total', 'created_at'])
                 ),
+                'search_platform_help' => $this->searchKnowledgeBase((string) ($input['query'] ?? '')),
                 'get_recent_payments' => json_encode(
                     SubscriptionPayment::where('user_id', $user->id)->latest()->limit(10)
                         ->get(['amount', 'status', 'payment_method', 'trx_id', 'admin_note', 'created_at'])
@@ -240,6 +258,52 @@ class AiSupportAgentService
         };
     }
 
+    /**
+     * Plain keyword scoring over the active knowledge base — title matches
+     * weighted higher than body matches. Deliberately not Postgres full-text
+     * search: its default text-search configs don't stem Bengali, so a
+     * substring/word-overlap score is more predictable for bn/en mixed
+     * queries than tsvector would be here.
+     */
+    private function searchKnowledgeBase(string $query): string
+    {
+        $query = trim($query);
+        if ($query === '') {
+            return json_encode(['error' => 'empty query']);
+        }
+
+        $words = array_filter(preg_split('/\s+/u', $query) ?: [], fn (string $w) => mb_strlen($w) >= 2);
+
+        $matches = AiKnowledgeBaseArticle::where('is_active', true)->get()
+            ->map(function (AiKnowledgeBaseArticle $article) use ($words) {
+                $titleLower = mb_strtolower($article->title);
+                $bodyLower = mb_strtolower($article->title.' '.$article->content);
+                $score = 0;
+                foreach ($words as $word) {
+                    $wordLower = mb_strtolower($word);
+                    if (str_contains($titleLower, $wordLower)) {
+                        $score += 2;
+                    } elseif (str_contains($bodyLower, $wordLower)) {
+                        $score += 1;
+                    }
+                }
+
+                return ['article' => $article, 'score' => $score];
+            })
+            ->filter(fn (array $row) => $row['score'] > 0)
+            ->sortByDesc('score')
+            ->take(3);
+
+        if ($matches->isEmpty()) {
+            return json_encode(['result' => 'No matching help article found in the knowledge base.']);
+        }
+
+        return json_encode($matches->map(fn (array $row) => [
+            'title' => $row['article']->title,
+            'content' => $row['article']->content,
+        ])->values());
+    }
+
     private function maskTrx(?string $trx): ?string
     {
         if ($trx === null || $trx === '') {
@@ -255,11 +319,11 @@ class AiSupportAgentService
 আপনি BSOL AI সাপোর্ট এজেন্ট — একটি বাংলাদেশি ই-কমার্স SaaS প্ল্যাটফর্মের সেলারদের সহায়তাকারী।
 
 নিয়ম:
-- শুধুমাত্র এই প্ল্যাটফর্মের সাবস্ক্রিপশন, বিলিং, অর্ডার ও অ্যাকাউন্ট সংক্রান্ত প্রশ্নে সাহায্য করুন।
-- সেলারের নিজের অ্যাকাউন্ট ডেটা দেখার জন্য আপনাকে টুল দেওয়া হয়েছে — অনুমান না করে সবসময় টুল থেকে প্রকৃত তথ্য যাচাই করে উত্তর দিন।
+- এই প্ল্যাটফর্মের যেকোনো মডিউল কিভাবে ব্যবহার করতে হয় (অর্ডার, প্রোডাক্ট, কুরিয়ার, SMS, WhatsApp, Facebook, ল্যান্ডিং পেজ, অ্যানালিটিক্স, অ্যাকাউন্টিং, সাবস্ক্রিপশন/বিলিং, স্টোর সেটিংস, সাপোর্ট) — এই ধরনের "কিভাবে করব" প্রশ্নে সাহায্য করার আগে অবশ্যই search_platform_help টুল দিয়ে খুঁজে দেখুন। সরাসরি escalate করার আগে এটা try করা বাধ্যতামূলক।
+- সেলারের নিজের অ্যাকাউন্ট-নির্দিষ্ট প্রশ্নে (সাবস্ক্রিপশন স্ট্যাটাস, নিজের অর্ডার, নিজের পেমেন্ট) get_subscription_status/get_recent_orders/get_recent_payments টুল ব্যবহার করুন — অনুমান না করে সবসময় টুল থেকে প্রকৃত তথ্য যাচাই করে উত্তর দিন।
 - সেলার যে ভাষায় প্রশ্ন করেছেন (বাংলা/ইংরেজি) সেই ভাষাতেই উত্তর দিন।
 - আপনি কখনও কোনো write action সম্পাদন করতে পারবেন না — রিফান্ড, সাবস্ক্রিপশন বাতিল/পরিবর্তন, বা অন্য কোনো অ্যাকাউন্ট পরিবর্তন। এমন অনুরোধ পেলে escalate_to_admin কল করুন এবং সেলারকে সংক্ষেপে জানান যে একজন টিম সদস্য শীঘ্রই যোগাযোগ করবেন।
-- আপনি নিশ্চিত না হলে বা প্রশ্নটি স্পর্শকাতর/জটিল মনে হলে অনুমান করে ভুল তথ্য না দিয়ে escalate_to_admin কল করুন।
+- search_platform_help-এ কিছু না পেলে এবং নিজের জ্ঞান দিয়েও নিশ্চিতভাবে উত্তর দিতে না পারলে — অনুমান করে ভুল তথ্য না দিয়ে escalate_to_admin কল করুন।
 - উত্তর সংক্ষিপ্ত ও সরাসরি রাখুন।
 PROMPT;
 

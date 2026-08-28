@@ -34,6 +34,22 @@
   - `AiProviderClientFactory::make($settings)` — active provider-এর credential row খুঁজে সঠিক adapter বানায়; key না থাকলে `null` রিটার্ন করে (`AiSupportAgentService` এটাকে ঠিক "disabled"-এর মতোই ট্রিট করে — চুপচাপ কিছু পাঠায় না, মানুষের জন্য অপেক্ষা করে)।
 - `AiSupportAgentService`-এর tool গুলো এখন provider-নিরপেক্ষ plain array + একটা dispatcher closure — orchestration লজিক (guard, escalation, reply persist) অপরিবর্তিত।
 
+### প্ল্যাটফর্ম how-to নলেজ বেস (added 2026-08-29)
+
+লাইভ টেস্টে ধরা পড়েছিল: AI শুধু account-specific ডেটা (সাবস্ক্রিপশন/অর্ডার/পেমেন্ট) দেখতে পারত, কিন্তু "SMS ক্রেডিট কিভাবে কিনব" জাতীয় সাধারণ "কিভাবে করব" প্রশ্নে কোনো tool না থাকায় সরাসরি escalate করে দিচ্ছিল — যদিও এগুলো platform-এর সাধারণ ব্যবহারবিধি, escalation-যোগ্য না।
+
+- **`ai_knowledge_base_articles`**: slug/title/content/is_active/sort_order — অ্যাডমিন-এডিটেবল (`/admin/settings/ai-knowledge-base`)। মাইগ্রেশনেই সিলার-সাইড পুরো মেনু কভার করে ১৩টা আর্টিকেল সিড করা হয়েছে (অর্ডার, প্রোডাক্ট, গ্রাহক, কুরিয়ার, SMS, WhatsApp, Facebook, ল্যান্ডিং পেজ, অ্যানালিটিক্স, অ্যাকাউন্টিং, সাবস্ক্রিপশন/বিলিং, স্টোর সেটিংস+স্টাফ, সাপোর্ট) — `frontend/src/components/user-shell.tsx`-এর আসল seller menu অনুযায়ী লেখা, অনুমান করে না।
+- নতুন টুল **`search_platform_help(query)`** — সাধারণ কীওয়ার্ড স্কোরিং (title match ×2, body match ×1), Postgres FTS ব্যবহার করা হয়নি কারণ ডিফল্ট text-search config বাংলা stem করে না, প্লেইন substring matching বাংলা/ইংরেজি মিশ্র প্রশ্নে বেশি predictable। সেরা ৩টা ফলাফল দেয়।
+- System prompt-এ এখন স্পষ্ট নির্দেশ: "কিভাবে করব" টাইপ প্রশ্নে escalate করার **আগে** `search_platform_help` try করা বাধ্যতামূলক — শুধু account-নির্দিষ্ট প্রশ্নেই অন্য টুলগুলো ব্যবহার হবে।
+
+### AI silently কোনো উত্তর না দেওয়ার বাগ (found + fixed 2026-08-28)
+
+লাইভ টেস্টে দুইটা bug ধরা পড়েছিল একসাথে:
+1. **Gemini-স্পেসিফিক**: no-argument tool call (`get_subscription_status` ইত্যাদি) echo করার সময় PHP-এর `{}` → `[]` রূপান্তরের কারণে ২য় tool-call থেকে Gemini `400 Invalid JSON: Proto field is not repeating` error দিচ্ছিল। `GeminiProviderClient`-এ echo করা `functionCall.args` empty হলে `stdClass`-এ cast করে ফিক্স করা হয়েছে।
+2. **সব provider-এ প্রযোজ্য, বেশি গুরুত্বপূর্ণ**: কোনো provider adapter exception না ছুঁড়ে চুপচাপ `null` রিটার্ন করলে (যেমন উপরের মতো একটা logged HTTP error-এর পর) `AiSupportAgentService`-এ কিছুই হতো না — না fallback message, না escalation। এখন **provider থেকে যেকোনো কারণে ফাইনাল টেক্সট না এলে** (exception বা silent null, দুটোই) সবসময় fallback message + escalation হয় — সেলার আর নিরুত্তর অবস্থায় থাকবে না।
+
+⚠️ **queue worker (`hybrid-queue-worker.service`) একটা long-running প্রসেস — কোড ডিপ্লয় করলেই এটা নতুন কোড pickup করে না, ম্যানুয়ালি `sudo systemctl restart hybrid-queue-worker.service` চালাতে হয়।**
+
 ### প্রি-রিকুইজিট বদলে গেছে
 
 আগে `backend/.env`-এ `ANTHROPIC_API_KEY` বসাতে হতো — এখন সেটা আর ব্যবহৃত হয় না। এখন **সরাসরি `/admin/settings/ai-support` পেজ থেকে** যেকোনো প্রোভাইডারের key পেস্ট করে "Save this provider" চাপলেই key `ai_provider_credentials` টেবিলে এনক্রিপ্টেড অবস্থায় জমা হয়ে যায় — কোনো `.env`/ডিপ্লয় লাগে না।

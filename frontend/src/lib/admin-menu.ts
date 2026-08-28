@@ -44,6 +44,7 @@ const ADMIN_MENU_TEXT: Record<Locale, Record<string, string>> = {
     auditLogs: "অডিট লগ",
     globalBlacklist: "গ্লোবাল ব্লকলিস্ট",
     aiSupportSettings: "AI সাপোর্ট এজেন্ট",
+    aiKnowledgeBase: "AI নলেজ বেস",
   },
   en: {
     dashboard: "Dashboard",
@@ -80,6 +81,7 @@ const ADMIN_MENU_TEXT: Record<Locale, Record<string, string>> = {
     auditLogs: "Audit Log",
     globalBlacklist: "Global Blacklist",
     aiSupportSettings: "AI Support Agent",
+    aiKnowledgeBase: "AI Knowledge Base",
   },
 };
 
@@ -98,6 +100,7 @@ export function buildAdminMenu(locale: Locale): ShellMenuItem[] {
     { key: "settings-notification-logs", label: l.notificationLogs, href: "/admin/settings/notification-logs" },
     { key: "settings-security", label: l.security, href: "/admin/settings/security" },
     { key: "settings-ai-support", label: l.aiSupportSettings, href: "/admin/settings/ai-support" },
+    { key: "settings-ai-knowledge-base", label: l.aiKnowledgeBase, href: "/admin/settings/ai-knowledge-base" },
   ];
 
   return [

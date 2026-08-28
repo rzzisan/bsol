@@ -64,7 +64,18 @@ class GeminiProviderClient implements AiProviderClient
                     return trim($text) !== '' ? trim($text) : null;
                 }
 
-                $contents[] = ['role' => 'model', 'parts' => $parts];
+                // Echo the model's turn back verbatim — except a no-arg tool call's
+                // `args: {}` decodes via ->json() into a PHP `[]`, and re-encoding
+                // that emits a JSON *array* instead of an object; Gemini then
+                // rejects the next request with "Proto field is not repeating,
+                // cannot start list." Force it back to an object.
+                $contents[] = ['role' => 'model', 'parts' => array_map(function ($part) {
+                    if (isset($part['functionCall']['args']) && is_array($part['functionCall']['args']) && empty($part['functionCall']['args'])) {
+                        $part['functionCall']['args'] = new \stdClass;
+                    }
+
+                    return $part;
+                }, $parts)];
 
                 $responseParts = [];
                 foreach ($functionCalls as $part) {

@@ -4,11 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\AiProviderCredential;
 use App\Models\PlatformAiSupportSetting;
+use App\Models\SupportTicket;
 use App\Models\User;
+use App\Services\Support\AiProviders\AiProviderClient;
 use App\Services\Support\AiProviders\AiProviderClientFactory;
 use App\Services\Support\AiProviders\AnthropicProviderClient;
 use App\Services\Support\AiProviders\GeminiProviderClient;
 use App\Services\Support\AiProviders\OpenAiCompatibleProviderClient;
+use App\Services\Support\AiSupportAgentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -102,5 +105,36 @@ class AiProviderCredentialTest extends TestCase
 
         $settings->update(['provider' => 'groq']);
         $this->assertInstanceOf(OpenAiCompatibleProviderClient::class, $factory->make($settings));
+    }
+
+    // -- Safety net: a provider that returns null without throwing must never
+    // read as silence to the seller (this is exactly what happened live —
+    // GeminiProviderClient logged an HTTP error and returned null, and the
+    // orchestrator did nothing at all with it). ---------------------------
+
+    public function test_a_provider_returning_null_still_gets_a_fallback_reply_and_escalation(): void
+    {
+        PlatformAiSupportSetting::current()->update(['is_enabled' => true, 'provider' => 'anthropic']);
+        AiProviderCredential::create(['provider' => 'anthropic', 'api_key' => 'k']);
+
+        $silentProvider = new class implements AiProviderClient
+        {
+            public function respond(string $systemPrompt, array $history, array $tools, \Closure $executeTool): ?string
+            {
+                return null; // simulates a logged HTTP failure or an empty model response
+            }
+        };
+        $this->mock(AiProviderClientFactory::class, function ($mock) use ($silentProvider) {
+            $mock->shouldReceive('make')->andReturn($silentProvider);
+        });
+
+        $seller = User::factory()->create(['role' => 'user']);
+        $ticket = SupportTicket::create(['ticket_number' => 'TKT-000010', 'user_id' => $seller->id, 'subject' => 'x', 'category' => 'other']);
+
+        app(AiSupportAgentService::class)->respondToTicket($ticket);
+
+        $ticket->refresh();
+        $this->assertSame(1, $ticket->messages()->where('sender_type', 'ai')->count());
+        $this->assertTrue($ticket->escalated);
     }
 }

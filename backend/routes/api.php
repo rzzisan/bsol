@@ -65,6 +65,7 @@ use App\Http\Controllers\Api\CollectionHistoryController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\AdminSupportController;
 use App\Http\Controllers\Api\Admin\AdminSupportTicketController;
+use App\Http\Controllers\Api\Admin\AiKnowledgeBaseArticleController;
 use App\Http\Controllers\Api\Admin\AiProviderCredentialController;
 use App\Http\Controllers\Api\Admin\PlatformAiSupportSettingController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
@@ -1035,6 +1036,12 @@ Route::middleware(['staff_permission:orders', 'active_subscription:allow_deliver
         Route::put('/settings/ai-support', [PlatformAiSupportSettingController::class, 'update']);
         Route::get('/ai-providers', [AiProviderCredentialController::class, 'index']);
         Route::put('/ai-providers/{provider}', [AiProviderCredentialController::class, 'update']);
+        Route::prefix('ai-knowledge-base')->group(function () {
+            Route::get('/', [AiKnowledgeBaseArticleController::class, 'index']);
+            Route::post('/', [AiKnowledgeBaseArticleController::class, 'store']);
+            Route::put('/{article}', [AiKnowledgeBaseArticleController::class, 'update']);
+            Route::delete('/{article}', [AiKnowledgeBaseArticleController::class, 'destroy']);
+        });
 
     });
 });
