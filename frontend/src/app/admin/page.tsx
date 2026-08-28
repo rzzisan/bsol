@@ -29,6 +29,8 @@ const text = {
     sidebarTitle: "অ্যাডমিন প্যানেল",
     welcome: "স্বাগতম",
     loading: "লোড হচ্ছে...",
+    noDefaultPackageWarning: "⚠️ কোনো ডিফল্ট রেজিস্ট্রেশন প্যাকেজ সেট নেই — নতুন সেলাররা কোনো লিমিট ছাড়াই রেজিস্টার করছে।",
+    noDefaultPackageFix: "প্যাকেজ পেজে গিয়ে ঠিক করুন",
     menu: {
       dashboard: "ড্যাশবোর্ড",
       customers: "গ্রাহক",
@@ -79,6 +81,8 @@ const text = {
     sidebarTitle: "Admin Panel",
     welcome: "Welcome",
     loading: "Loading...",
+    noDefaultPackageWarning: "⚠️ No default registration package is set — new sellers are registering with no limits at all.",
+    noDefaultPackageFix: "Fix it on the Packages page",
     menu: {
       dashboard: "Dashboard",
       customers: "Customers",
@@ -138,6 +142,7 @@ type Summary = {
   package_distribution: { name: string; sellers: number }[];
   monthly_registrations: { month: string; label: string; total: number }[];
   recent_users: { id: number; name: string; email: string; mobile: string | null; user_status: string; created_at: string }[];
+  config_warnings?: { no_default_package: boolean };
 };
 
 const STATUS_STYLE: Record<string, string> = {
@@ -269,6 +274,13 @@ export default function AdminDashboardPage() {
         </h2>
         <p className="mt-1 text-sm text-[var(--muted)]">{t.subtitle}</p>
       </section>
+
+      {summary?.config_warnings?.no_default_package && (
+        <section className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-600">
+          <span>{t.noDefaultPackageWarning}</span>
+          <a href="/admin/packages" className="font-semibold underline">{t.noDefaultPackageFix}</a>
+        </section>
+      )}
 
       {loadingSummary ? (
         <p className="mt-4 text-sm text-[var(--muted)]">{t.loading}</p>

@@ -509,6 +509,7 @@ class OrderController extends Controller
     {
         $order = Order::whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
         $phone = $order->customer_phone;
+        $this->accountingService->onOrderDeleted($order);
         $order->delete();
         PhoneIntelCache::bump($phone);
 

@@ -113,14 +113,14 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ছ. Accounting + Subscription/Billing
+## ছ. Accounting + Subscription/Billing — ✅ মূল আইটেম সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.6, §15.8, §17.6, §18, `subscription_billing_context.md`
 
-- ☐ Auto-ledger dedup `updateOrCreate` (select-then-write) — DB-তে কোনো unique constraint নেই, concurrent status change/retry হলে race সম্ভব; unique constraint যোগ করা বিবেচনা করা
-- ☐ `OrderController::destroy` soft-delete করে কিন্তু accounting entry cleanup করে না — orphaned ledger row থেকে যায়
-- ☐ Expired subscription-এ seller নিজের delivered COD order status update করতে পারে না → real delivered cash accounting-এ কখনো confirm হয় না যতক্ষণ renew না করে — **product decision দরকার** (এই behavior রাখা হবে নাকি delivered-confirm exempt করা হবে expired subscription-এও)
-- ☐ কোনো default subscription package সেট না থাকলে নতুন user permanently unmetered/free থেকে যায় — admin panel-এ warning/guard যোগ করা
+- ✅ **(2026-08-28) Auto-ledger dedup race ফিক্স** — `transactions_dedup_unique` DB constraint যোগ + `AccountingService::upsertTransaction()` (race হলে update-এ fallback করে, throw করে না)। বিস্তারিত `security_hardening_context.md §৬.১`, ৬টা টেস্ট
+- ✅ **(2026-08-28) `OrderController::destroy` orphaned ledger row ফিক্স** — নতুন `AccountingService::onOrderDeleted()`, income entry cleanup করে (expense রেখে দেয়, cancelled/returned-এর মতোই)। `security_hardening_context.md §৬.২`
+- ✅ **(2026-08-28) Expired subscription COD confirm — product decision নেওয়া হয়েছে (exempt করা হয়েছে)।** user-কে জিজ্ঞেস করা হয়েছিল, সরাসরি উত্তর না পাওয়ায় recommended অপশনে এগোনো হয়েছে: delivered/returned/cancelled status transition এখন subscription hard-paywall থেকে exempt, বাকি সব order action ব্লকড থাকে। `EnsureActiveSubscription:allow_delivery_confirmation` মোড। **ভুল মনে হলে সহজে reversible** — বিস্তারিত ও revert-নির্দেশনা `security_hardening_context.md §৬.৩`, ৬টা টেস্ট
+- ✅ **(2026-08-28) No-default-package footgun ফিক্স** — admin dashboard homepage-এ + package পেজে ⚠️ warning banner (`config_warnings.no_default_package`), লাইভ ডেটায় verify করা হয়েছে (এখন actually false — প্যাকেজ সেট করা আছে)
 - 🟡 **P2 (payment gateway sandbox verify) — EPS ✅ সম্পন্ন (২০২৬-০৮-১৯), Nagad Merchant ⬜ এখনো বাকি (external — real merchant sandbox account দরকার):** ২০২৬-০৮-২৮-এ ধরা পড়েছে `feature_roadmap_context.md`/`production_audit_report_context.md §৭` দুটোতেই এই আইটেম ভুলভাবে "Not started" দেখাচ্ছিল যদিও EPS আসলে অনেক আগেই live sandbox test + bug fix হয়ে গেছে — এখন sync হয়েছে। Nagad-এর `verifyPayment()`-এ success-path logging হার্ডেনিং যোগ হয়েছে (real test-এর বিকল্প না) — বিস্তারিত `online_payment_context.md §৯.১, §১১`, `security_hardening_context.md`
 
 **UI/UX অডিট:**
@@ -203,13 +203,13 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## ত. Cross-cutting Security Hardening
+## ত. Cross-cutting Security Hardening — ✅ সম্পন্ন (2026-08-28)
 
 **সোর্স:** §17.8, `production_audit_report_context.md §৩`, `domain_security_audit.md`
 
 - ✅ **(2026-08-28) 2FA + admin audit trail সম্পন্ন** — বিস্তারিত §জ ও `security_hardening_context.md`
 - 🟡 **(2026-08-28) Payment gateway sandbox verify — EPS ✅ সম্পন্ন (২০২৬-০৮-১৯-এই ছিল, ডকুমেন্টেশন stale ছিল, এখন sync হয়েছে), Nagad Merchant এখনো ⬜** — real Nagad merchant sandbox account/credential external dependency, verify()-এ success-path logging hardening যোগ হয়েছে কিন্তু আসল field-shape এখনো unconfirmed — বিস্তারিত §ছ ও `online_payment_context.md §৯.১, §১১`
-- ☐ প্রতিটা নতুন module merge/deploy-এর আগে `CONTEXT.md` §25 (`adminScopeUserIds()`)-এর checklist অনুযায়ী shared-vs-per-user scoping re-verify — বিশেষ করে recent addon-packages/marketing-events মডিউলগুলোতে এটা প্রয়োগ হয়েছে কিনা একবার audit করা
+- ✅ **(2026-08-28) addon-packages/marketing-events-এ adminScopeUserIds() re-verify সম্পন্ন — কোনো বাগ পাওয়া যায়নি।** `AddonPackage`-এ `user_id` কলামই নেই (platform-wide catalog, scoping প্রযোজ্য না); `PlatformMarketingEventController` কোথাও `auth()->id()` দিয়ে filter করে না (সব admin একই dataset দেখে, সঠিক); `AdminAddonPurchaseController::index()`-ও unscoped, ঠিক আছে। বিস্তারিত `security_hardening_context.md §৭`
 
 ---
 

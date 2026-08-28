@@ -34,6 +34,7 @@ class AdminApiTest extends TestCase
                 'package_distribution',
                 'monthly_registrations',
                 'recent_users',
+                'config_warnings' => ['no_default_package'],
             ])
             ->assertJsonPath('totals.sellers', 3)
             ->assertJsonPath('totals.active_sellers', 2)

@@ -83,6 +83,14 @@ class AdminController extends Controller
                 ->map(fn (SubscriptionPackage $p) => ['name' => $p->name, 'sellers' => $p->users_count]),
             'monthly_registrations' => $monthlySeries,
             'recent_users' => (clone $sellers)->latest()->take(5)->get(['id', 'name', 'email', 'mobile', 'user_status', 'created_at']),
+            // Surfaced here (not just on the registration-defaults form
+            // itself) because a config footgun is exactly the kind of thing
+            // an admin won't think to go looking for — pre_launch_polish
+            // §ছ: with no default package, every new seller registers
+            // permanently unmetered, no quota ever applies.
+            'config_warnings' => [
+                'no_default_package' => RegistrationSetting::getSetting()->default_subscription_package_id === null,
+            ],
         ]);
     }
 

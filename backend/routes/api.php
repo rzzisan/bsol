@@ -546,11 +546,9 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/orders/stats', [OrderController::class, 'stats']);
         Route::get('/orders/create-bootstrap', [OrderController::class, 'createBootstrap']);
         Route::get('/orders/create/bootstrap', [OrderController::class, 'createBootstrap']);
-        Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
         Route::get('/orders/bulk-import/template', [OrderBulkImportController::class, 'template']);
         Route::post('/orders/bulk-import/preview', [OrderBulkImportController::class, 'preview']);
         Route::post('/orders/bulk-import/commit', [OrderBulkImportController::class, 'commit']);
-        Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
         Route::get('/orders/{order}/invoice', [OrderController::class, 'invoicePdf']);
         Route::get('/orders/{order}/payments', [OrderPaymentController::class, 'index']);
         Route::post('/orders/{order}/payments', [OrderPaymentController::class, 'store']);
@@ -820,6 +818,19 @@ Route::middleware('active_subscription')->group(function () {
         Route::get('/courier-check', [CourierFraudCheckController::class, 'check']);
     });
 }); // end active_subscription group
+
+// Order status transitions to delivered/returned/cancelled are exempt from
+// the subscription hard-paywall (pre_launch_polish_context.md §ছ,
+// security_hardening_context.md) — the courier has already collected real
+// cash (or returned the parcel) regardless of subscription state; blocking
+// the confirmation doesn't drive renewal, it just leaves the seller's own
+// accounting permanently wrong even after they do renew. Everything else
+// order-related (create/edit/pending→confirmed/etc.) still requires an
+// active subscription. See EnsureActiveSubscription::isAccountingConfirmingStatusChange().
+Route::middleware(['staff_permission:orders', 'active_subscription:allow_delivery_confirmation'])->group(function () {
+    Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus']);
+    Route::post('/orders/bulk-status', [OrderController::class, 'bulkStatus']);
+});
 
     Route::middleware('is_admin')->prefix('admin')->group(function () {
         Route::get('/summary', [AdminController::class, 'dashboardSummary']);

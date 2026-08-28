@@ -113,6 +113,8 @@ const text = {
     defaultsTitle: "ডিফল্ট রেজিস্ট্রেশন সেটিংস",
     defaultsDescription:
       "নতুন ইউজার রেজিস্ট্রেশন সম্পন্ন হলে কোন Status এবং Package পাবে তা নির্ধারণ করুন।",
+    noDefaultPackageWarning:
+      "⚠️ এখন কোনো ডিফল্ট প্যাকেজ সেট নেই — নতুন প্রতিটা সেলার কোনো subscription package ছাড়াই রেজিস্টার করবে এবং অর্ডার/ল্যান্ডিং পেজ ইত্যাদির কোনো লিমিট প্রযোজ্য হবে না (permanently unmetered)। এটা যদি ইচ্ছাকৃত সিদ্ধান্ত না হয়, নিচে একটা প্যাকেজ বেছে নিন।",
     listTitle: "প্যাকেজ তালিকা",
     loading: "লোড হচ্ছে...",
     empty: "এখনও কোনো প্যাকেজ নেই।",
@@ -228,6 +230,8 @@ const text = {
     defaultsTitle: "Default Registration Settings",
     defaultsDescription:
       "Choose which status and package newly registered users should receive right after registration.",
+    noDefaultPackageWarning:
+      "⚠️ No default package is set — every new seller registers with no subscription package at all, so no order/landing-page/etc. limit ever applies to them (permanently unmetered). If that isn't intentional, choose a package below.",
     listTitle: "Package List",
     loading: "Loading...",
     empty: "No packages found yet.",
@@ -333,6 +337,7 @@ export default function AdminPackagesPage() {
   const [packages, setPackages] = useState<SubscriptionPackage[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [defaults, setDefaults] = useState<RegistrationDefaults>(EMPTY_DEFAULTS);
+  const [defaultsLoaded, setDefaultsLoaded] = useState(false);
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [form, setForm] = useState<PackageForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -432,6 +437,7 @@ export default function AdminPackagesPage() {
           default_subscription_package_id:
             data.defaults.default_subscription_package_id,
         });
+        setDefaultsLoaded(true);
       }
     } catch {
       setMessage({ type: "err", text: t.defaultsFailed });
@@ -806,6 +812,12 @@ export default function AdminPackagesPage() {
       <section className="catv-panel mb-5 p-4 sm:p-5">
         <h2 className="text-base font-semibold text-[var(--foreground)]">{t.defaultsTitle}</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">{t.defaultsDescription}</p>
+
+        {defaultsLoaded && !defaults.default_subscription_package_id && (
+          <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-600">
+            {t.noDefaultPackageWarning}
+          </div>
+        )}
 
         <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={handleSaveDefaults}>
           <div>

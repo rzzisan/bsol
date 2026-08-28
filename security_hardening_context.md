@@ -1,5 +1,7 @@
 # Security Hardening — Admin 2FA + Audit Trail
 
+Last updated: 2026-08-28 (২) — **§৬-৭ নতুন যোগ হলো: ছ-এর বাকি accounting hardening আইটেমগুলো + adminScopeUserIds() re-verify সম্পন্ন।** নিচে দেখো। Older entries kept as-is:
+
 Last updated: 2026-08-28 — **§1-৩ সব ✅ সম্পন্ন ও লাইভ (Phase 1 MVP scope)।** `production_audit_report_context.md §৭` আইটেম ৮, `feature_roadmap_context.md` P8।
 
 ---
@@ -94,13 +96,38 @@ POST /api/admin/2fa/recovery-codes/regenerate    (is_admin)
 
 ---
 
-## ৪. এই ব্যাচে পাওয়া, কিন্তু আলাদা একটা জিনিস — Test infra gap (fix করা হয়নি, শুধু নথিভুক্ত)
+## ৫. এই ব্যাচে পাওয়া, কিন্তু আলাদা একটা জিনিস — Test infra gap (fix করা হয়নি, শুধু নথিভুক্ত)
 
 পুরো backend test suite (`php artisan test`) চালিয়ে confirm করা হয়েছে আমার নতুন কোড কোনো regression আনেনি (আগে ও পরে দুটোতেই ঠিক ৮০টা ব্যর্থতা, একই টেস্টগুলো)। কিন্তু এই ৮০টা ব্যর্থতা নিজেই একটা real, বাড়তে-থাকা সমস্যা — `phpunit.xml` টেস্ট চালায় SQLite in-memory-তে (`DB_CONNECTION=sqlite`), কিন্তু কোডবেসে ক্রমবর্ধমানভাবে Postgres-specific raw SQL ব্যবহার হচ্ছে (`to_char()`, `now()`, `ON CONFLICT` upsert) — এগুলো SQLite সাপোর্ট করে না, তাই সেই টেস্টগুলো সবসময় fail করে, আসল লজিক বাগ না। এটা `pre_launch_polish_context.md`-এ নতুন আইটেম হিসেবে যোগ করা হয়েছে (এই ফাইলের স্কোপ না, বড় আলাদা সিদ্ধান্ত লাগবে — টেস্ট suite real Postgres-এ চালানো, নাকি raw SQL গুলো DB-agnostic করে লেখা)।
 
 ---
 
-## ৫. পরবর্তী ধাপ (এই ব্যাচে করা হয়নি)
+## ৬. Accounting hardening (ছ-এর বাকি ৩ আইটেম, ২০২৬-০৮-২৮)
+
+### ৬.১ Auto-ledger dedup race — ফিক্স
+
+`AccountingService`-এর ৩টা `Transaction::updateOrCreate()` কল (onOrderCreated/onOrderDelivered/onCourierChargeUpdated) একই ৫-কলাম key (`user_id, reference_type, reference_id, type, category`) ব্যবহার করত কিন্তু DB-তে কোনো unique constraint ছিল না — concurrent status change/retry রেসে duplicate row হতে পারত। migration `2026_08_28_100000_add_unique_index_to_transactions_dedup_key` — নতুন `transactions_dedup_unique` (Postgres NULL-distinct সেমান্টিক্সে manual transaction-গুলো অপ্রভাবিত থাকে)। নতুন `AccountingService::upsertTransaction()` wrapper — race হলে `UniqueConstraintViolationException` catch করে update-এ fallback করে (SmsAutomationService-এর claim-then-update কনভেনশন, §17.9 #5)। মাইগ্রেশনের আগে production-এ duplicate-check করা হয়েছে (০ পাওয়া গেছে)।
+
+### ৬.২ `OrderController::destroy` — orphaned ledger row ফিক্স
+
+নতুন `AccountingService::onOrderDeleted()` — order delete হওয়ার সময় income transaction (order_cod) মুছে দেয়, কিন্তু courier_charge expense রেখে দেয় (`onOrderCancelledOrReturned()`-এর ঠিক একই, আগে-থেকে-established ডিজাইন — real খরচ, order মুছে গেলেও মুছে যাওয়া উচিত না)। `OrderController::destroy()`-এ wire করা হয়েছে।
+
+### ৬.৩ Expired subscription-এ COD delivered confirm — product decision নেওয়া হয়েছে (exempt করা)
+
+User-কে জিজ্ঞেস করা হয়েছিল (AskUserQuestion), সরাসরি উত্তর আসেনি বলে recommended অপশনে এগোনো হয়েছে: **order status-কে delivered/returned/cancelled-এ বদলানো এখন subscription hard-paywall থেকে exempt**, বাকি সব order action (create/edit/pending→confirmed ইত্যাদি) আগের মতোই ব্লকড থাকে। `EnsureActiveSubscription` middleware নতুন optional `$mode` parameter নেয় (`active_subscription:allow_delivery_confirmation`) — শুধু `PUT /orders/{order}/status` ও `POST /orders/bulk-status` রুট দুটো এই মোড ব্যবহার করে (রাউট ফাইলে `active_subscription` গ্রুপ থেকে বের করে আলাদা গ্রুপে সরানো হয়েছে)। যুক্তি: courier ইতিমধ্যে টাকা কালেক্ট করেছে বা পার্সেল ফেরত দিয়েছে subscription অবস্থা যাই হোক না কেন — confirm ব্লক করলে renewal বাড়ে না, শুধু সেলারের হিসাব ভুল থেকে যায় (এমনকি renew করার পরেও)।
+
+**যদি এই সিদ্ধান্ত ভুল মনে হয়** — `routes/api.php`-এ নতুন গ্রুপ (কমেন্ট "Order status transitions to delivered/returned/cancelled are exempt...") খুঁজে সরিয়ে দাও, আর `EnsureActiveSubscription::isAccountingConfirmingStatusChange()` ব্যবহার বন্ধ করলেই আগের behavior-এ ফিরে যাবে।
+
+Test: `tests/Feature/OrderStatusSubscriptionGateTest.php` (৬টা — delivered/returned/cancelled exempt, confirmed/create এখনো ব্লকড, bulk-status একইভাবে, active subscription অপ্রভাবিত)।
+
+## ৭. adminScopeUserIds() re-verify — addon-packages, marketing-events (ছ + ত)
+
+দুটোই যাচাই করা হয়েছে, কোনো বাগ পাওয়া যায়নি:
+- **`AdminAddonPackageController`** — `AddonPackage` মডেলে কোনো `user_id` কলামই নেই (SubscriptionPackage-এর মতোই platform-wide catalog, admin-shared config — CONTEXT.md §25-এর "System configuration" bucket)। Scoping প্রযোজ্যই না।
+- **`Api\Admin\PlatformMarketingEventController`** — `platform_marketing_events.user_id` আছে কিন্তু সেটা BSOL-এর নিজের acquisition-funnel analytics-এর জন্য FK reference (কোন সেলার কোন চ্যানেল থেকে এসেছে), সেলার-owned resource না। কন্ট্রোলার কোথাও `auth()->id()`-দিয়ে query filter করে না — সব admin একই পুরো dataset দেখে, যা সঠিক (shared admin resource)।
+- **`AdminAddonPurchaseController::index()`** — বাড়তি check করা হয়েছে, কোনো user-scoping filter নেই, সব সেলারের purchase request সব admin দেখে (AdminSubscriptionController::listPayments-এর প্যাটার্ন মেনে)।
+
+## ৮. পরবর্তী ধাপ (এই ব্যাচে করা হয়নি)
 
 - Seller/staff account পর্যন্ত 2FA প্রসারিত করা (এখন admin-only)
 - QR কোড রেন্ডারিং (এখন শুধু ম্যানুয়াল সিক্রেট এন্ট্রি)

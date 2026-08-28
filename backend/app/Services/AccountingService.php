@@ -5,9 +5,29 @@ namespace App\Services;
 use App\Models\Order;
 use App\Models\OrderPayment;
 use App\Models\Transaction;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 class AccountingService
 {
+    /**
+     * updateOrCreate() itself isn't atomic (find-then-write) — a concurrent
+     * call with the same key (e.g. a status-change retry racing the courier
+     * status-sync scheduler, courier_status_sync_context.md) could both find
+     * nothing and both try to create, so the second write now hits
+     * transactions_dedup_unique instead of silently duplicating the ledger
+     * row. When that happens the row already exists with the first writer's
+     * values — apply this call's $values to it instead (matches
+     * SmsAutomationService's claim-then-update convention, §17.9 #5).
+     */
+    private function upsertTransaction(array $key, array $values): void
+    {
+        try {
+            Transaction::updateOrCreate($key, $values);
+        } catch (UniqueConstraintViolationException) {
+            Transaction::where($key)->update($values);
+        }
+    }
+
     /**
      * "Whatever's due on the invoice at the moment it's handed to the
      * courier is the COD amount" (courier_status_sync_context.md §4.1) — an
@@ -30,7 +50,7 @@ class AccountingService
             return;
         }
 
-        Transaction::updateOrCreate(
+        $this->upsertTransaction(
             [
                 'user_id' => $order->user_id,
                 'reference_type' => 'order',
@@ -55,7 +75,7 @@ class AccountingService
             return;
         }
 
-        Transaction::updateOrCreate(
+        $this->upsertTransaction(
             [
                 'user_id' => $order->user_id,
                 'reference_type' => 'order',
@@ -125,6 +145,26 @@ class AccountingService
         if ($order->payment_method === 'cod' && $order->payment_status === 'paid') {
             $order->update(['payment_status' => 'due']);
         }
+    }
+
+    /**
+     * OrderController::destroy() previously left the order's income
+     * transaction behind after deleting the order itself — an orphaned
+     * ledger row a seller's accounting report would keep counting even
+     * though the order it belonged to no longer exists anywhere in their
+     * UI (pre_launch_polish_context.md §ছ). Mirrors
+     * onOrderCancelledOrReturned()'s existing, already-shipped design
+     * exactly: the income entry goes, the courier_charge expense (a real
+     * cost already incurred, if a booking happened) stays — deleting the
+     * order record shouldn't erase money that was actually spent.
+     */
+    public function onOrderDeleted(Order $order): void
+    {
+        Transaction::where('user_id', $order->user_id)
+            ->where('reference_type', 'order')
+            ->where('reference_id', $order->id)
+            ->where('type', Transaction::TYPE_INCOME)
+            ->delete();
     }
 
     /**
@@ -214,7 +254,7 @@ class AccountingService
             return;
         }
 
-        Transaction::updateOrCreate(
+        $this->upsertTransaction(
             [
                 'user_id' => $order->user_id,
                 'reference_type' => 'order',
