@@ -108,18 +108,18 @@ Last updated: 2026-08-27 — নতুন ফাইল তৈরি। উদ্
 
 ---
 
-## চ. Communication (SMS / Email / WhatsApp / Notification)
+## চ. Communication (SMS / Email / WhatsApp / Notification) — 🟡 মূল আইটেম সম্পন্ন (2026-08-28)
 
 **সোর্স:** §15.5, §17.5, `whatsapp_context.md`, `zyro_sms.md`
 
-- ☐ শুধু `khudebarta` provider বাস্তবে supported — schema provider-agnostic কিন্তু বাস্তবে single-provider; multi-provider দরকার হলে scope করা, নাহলে UI-তে honest রাখা
-- ☐ SMS automation UI-তে `payment_due`/`failed_delivery_retry` trigger-type সিলেক্ট করা যায় কিন্তু কোনো কোড path কখনো fire করে না — dead UI option, হয় implement করো নাহলে dropdown থেকে সরাও
-- ☐ Delayed SMS-এ orphaned "queued" log row থেকে যাওয়ার সম্ভাবনা এখনো আছে (queue worker চালু আছে ২০২৬-০৮-০৮ থেকে, কিন্তু edge-case retry-exhaustion-এ log স্টেট আটকে যাচ্ছে কিনা periodically চেক করা)
-- ☐ WhatsApp (§পজড, external blocker) — Meta Business verification সেলার নিজে করেছে কিনা periodically ping করা, ব্লকার সরলে সাথে সাথে resume করার জন্য
-- ☐ Marketing broadcast (SMS+Email, segment-targeted) — এখনো শুরু হয়নি (feature_roadmap #৭/P6), Customer Intelligence-এর existing segment-tagging reuse করে নতুন `SmsBroadcastController` — নতুন ফিচার হিসেবে যোগ করার সময় এখানেই স্লট করা যাবে
+- ✅ **স্টেল প্রমাণিত (কোনো কোড পরিবর্তন লাগেনি):** শুধু `khudebarta` provider সাপোর্টেড — ইতিমধ্যেই প্রতিটা লেয়ারে honest: `GatewayProvider` TS টাইপ + dropdown-এ শুধু Khudebarta option, ব্যাকএন্ডের create/update দুটোতেই `Rule::in(['khudebarta'])` ভ্যালিডেশন। Schema-র string কলামটা শুধু ভবিষ্যতের জন্য flexible রাখা, এখন কোনো bypass path নেই
+- ✅ **(2026-08-28) `payment_due`/`failed_delivery_retry` dead trigger অপশন সরানো হয়েছে** — `SmsAutomationRule::TRIGGER_EVENTS`, ফ্রন্টএন্ড dropdown, উভয় জায়গা থেকে। কোনো কোড পাথ কখনো এই দুটো fire করত না (verify: প্রোডাকশনে ০টা rule এগুলো ব্যবহার করছিল)। WhatsApp-এর সমতুল্য `WhatsappAutomationRule::TRIGGER_EVENTS` (পরে বানানো ফিচার) আগে থেকেই এই দুটো বাদ দিয়ে বানানো ছিল — সেই প্যাটার্নের সাথে align করা হলো
+- ✅ **(2026-08-28) Delayed SMS orphaned "queued" row — verify করা হয়েছে, ইতিমধ্যে ফিক্সড।** `SendAutomationSmsJob::failed()` হুক (কমিট `e0f7ea6`, এই পোলিশ সেশনের আগেই) retry-exhaustion-এ 'queued' রো-কে 'failed'-এ ফাইনালাইজ করে। লাইভ প্রোডাকশন ডেটা যাচাই: **০টা stuck queued row** (কোনো বয়সেই), queue worker (`hybrid-queue-worker.service`) healthy/running। পুরো ফিচারের জন্য কোনো টেস্ট ছিল না — নতুন `SmsAutomationTest.php` (৯টা) দিয়ে lock-in করা হয়েছে, orphan-guard regression টেস্টসহ
+- ☐ **WhatsApp (§পজড, external blocker) — অপরিবর্তিত।** Meta Business Verification প্রতি সেলারকে নিজে করতে হয়, এই dev environment থেকে automate/query করার কোনো উপায় নেই (Meta Graph API-র নিজস্ব Business Verification status endpoint আলাদা, বানানো হয়নি — এখন কোনো সেলার WhatsApp connect করেনি বলে এটার জন্য কোনো ROI নেই এই মুহূর্তে)। Manual periodic check হিসেবেই থেকে যাচ্ছে
+- ☐ **Marketing broadcast — অপরিবর্তিত, এখনো শুরু হয়নি।** feature_roadmap #৭/P6-এ যথাযথভাবে scoped আছে, এই পোলিশ পাসের স্কোপ না (নতুন ফিচার, পলিশ না)
 
 **UI/UX অডিট:**
-- ☐ SMS/Email template editor — variable placeholder ({customer_name} ইত্যাদি) preview WYSIWYG কিনা
+- ✅ **(2026-08-28) SMS template editor-এ WYSIWYG preview যোগ করা হয়েছে** — যাচাই করে দেখা গেছে placeholder chip ক্লিক করলে শুধু literal `{customer_name}` টেক্সট বসত, কোনো rendered preview ছিল না (Admin-এর নিজস্ব Notification Template editor-এ আগে থেকেই preview আছে, কিন্তু seller-facing SMS automation-এ ছিল না)। এখন `SmsAutomationService::renderTemplate()`-এর ঠিক same substitution map ব্যবহার করে ক্লায়েন্ট-সাইড sample-data preview প্যানেল (নতুন backend এন্ডপয়েন্ট লাগেনি, static sample value যথেষ্ট)
 
 ---
 

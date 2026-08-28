@@ -4,13 +4,14 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import UserShell from "@/components/user-shell";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
 
+// 'payment_due'/'failed_delivery_retry' used to be offered here but no
+// backend trigger source ever fires them (dead options) — removed to
+// match SmsAutomationRule::TRIGGER_EVENTS. See pre_launch_polish_context.md §চ.
 type TriggerEvent =
   | "order_confirmed"
   | "order_shipped"
   | "order_delivered"
-  | "order_cancelled"
-  | "payment_due"
-  | "failed_delivery_retry";
+  | "order_cancelled";
 
 interface SmsAutomationRule {
   id: number;
@@ -34,6 +35,28 @@ const TEMPLATE_PLACEHOLDERS = [
   "{delivery_date}",
 ];
 
+// Mirrors SmsAutomationService::renderTemplate()'s substitution map exactly
+// (backend/app/Services/SmsAutomationService.php) — sample values only, so
+// the seller can see what an actual message looks like before saving, not
+// just the raw {placeholder} syntax. pre_launch_polish_context.md §চ.
+const PLACEHOLDER_SAMPLE_VALUES: Record<string, string> = {
+  "{customer_name}": "Karim Uddin",
+  "{order_number}": "ORD-1024",
+  "{total}": "1250.00",
+  "{courier}": "Pathao",
+  "{tracking_id}": "PTO123456789",
+  "{shop_name}": "Your Shop",
+  "{delivery_date}": new Date().toISOString().slice(0, 10),
+};
+
+function renderTemplatePreview(template: string): string {
+  let rendered = template;
+  for (const [placeholder, sample] of Object.entries(PLACEHOLDER_SAMPLE_VALUES)) {
+    rendered = rendered.split(placeholder).join(sample);
+  }
+  return rendered.trim();
+}
+
 const text = {
   bn: {
     pageTitle: "SMS অটোমেশন",
@@ -48,6 +71,8 @@ const text = {
       active: "Active",
       placeholders: "Placeholders",
       placeholderHint: "Placeholder-এ ক্লিক করলে Message Template-এ যোগ হবে",
+      previewLabel: "প্রিভিউ (নমুনা ডেটা দিয়ে)",
+      previewEmpty: "টেমপ্লেট লিখুন — নমুনা ডেটা দিয়ে প্রিভিউ এখানে দেখাবে।",
     },
     actions: {
       create: "Rule তৈরি করুন",
@@ -68,8 +93,6 @@ const text = {
       order_shipped: "Order Shipped",
       order_delivered: "Order Delivered",
       order_cancelled: "Order Cancelled",
-      payment_due: "Payment Due",
-      failed_delivery_retry: "Failed Delivery Retry",
     },
   },
   en: {
@@ -85,6 +108,8 @@ const text = {
       active: "Active",
       placeholders: "Placeholders",
       placeholderHint: "Click a placeholder to insert into Message Template",
+      previewLabel: "Preview (with sample data)",
+      previewEmpty: "Start typing the template — a preview with sample data will show here.",
     },
     actions: {
       create: "Create Rule",
@@ -105,8 +130,6 @@ const text = {
       order_shipped: "Order Shipped",
       order_delivered: "Order Delivered",
       order_cancelled: "Order Cancelled",
-      payment_due: "Payment Due",
-      failed_delivery_retry: "Failed Delivery Retry",
     },
   },
 };
@@ -136,8 +159,6 @@ export default function Page() {
     "order_shipped",
     "order_delivered",
     "order_cancelled",
-    "payment_due",
-    "failed_delivery_retry",
   ];
 
   const resetForm = () => {
@@ -370,6 +391,12 @@ export default function Page() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="mt-2 rounded-lg border border-[var(--border)] bg-[var(--background)] p-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">{t.fields.previewLabel}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--foreground)]">
+                {form.template_text.trim() ? renderTemplatePreview(form.template_text) : t.fields.previewEmpty}
+              </p>
             </div>
           </div>
 

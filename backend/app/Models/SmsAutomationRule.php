@@ -11,13 +11,19 @@ class SmsAutomationRule extends Model
 {
     use HasFactory;
 
+    // 'payment_due' and 'failed_delivery_retry' used to be offered here but
+    // handleOrderStatusChanged()/statusToTriggerEvent() (the only thing that
+    // ever fires a rule) has no code path that produces either — a
+    // due-date concept and a courier-retry signal that don't exist yet.
+    // Dropped rather than implemented (0 rows used either in production —
+    // pre_launch_polish_context.md §চ); WhatsappAutomationRule::
+    // TRIGGER_EVENTS, the newer sibling feature, was already built without
+    // them.
     public const TRIGGER_EVENTS = [
         'order_confirmed',
         'order_shipped',
         'order_delivered',
         'order_cancelled',
-        'payment_due',
-        'failed_delivery_retry',
     ];
 
     protected $fillable = [
