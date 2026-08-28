@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PlatformAiSupportSetting extends Model
 {
     protected $fillable = [
-        'is_enabled', 'model', 'effort', 'max_ai_replies_per_day',
+        'is_enabled', 'provider', 'model', 'effort', 'max_ai_replies_per_day',
         'daily_reply_count', 'daily_reply_count_reset_at', 'system_prompt_extra', 'updated_by',
     ];
 

@@ -2,8 +2,6 @@
 
 namespace App\Services\Support;
 
-use Anthropic\Client as AnthropicClient;
-use Anthropic\Lib\Tools\BetaRunnableTool;
 use App\Models\Order;
 use App\Models\PlatformAiSupportSetting;
 use App\Models\SubscriptionPayment;
@@ -12,12 +10,16 @@ use App\Models\SupportMessage;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
 use App\Models\User;
+use App\Services\Support\AiProviders\AiProviderClientFactory;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
  * Instant first-response AI agent for both support surfaces (live chat +
- * tickets) — support_ticketing_ai_context.md.
+ * tickets) — support_ticketing_ai_context.md. Which LLM actually answers is
+ * pluggable (Anthropic/Gemini/Groq/OpenAI/OpenRouter, chosen in
+ * platform_ai_support_settings.provider) — this class stays the orchestrator
+ * (guards, tool logic, reply/escalation persistence) regardless of provider.
  *
  * Security: every read tool below captures the thread's own $user from PHP
  * scope. None of them accept a user/account id as a model-supplied argument,
@@ -27,11 +29,7 @@ use Illuminate\Support\Str;
  */
 class AiSupportAgentService
 {
-    private const MAX_TOOL_ITERATIONS = 6;
-
-    private const MAX_REPLY_TOKENS = 2000;
-
-    public function __construct(private readonly AnthropicClient $client) {}
+    public function __construct(private readonly AiProviderClientFactory $providerFactory) {}
 
     public function respondToTicket(SupportTicket $ticket): void
     {
@@ -138,35 +136,28 @@ class AiSupportAgentService
             return;
         }
 
+        $provider = $this->providerFactory->make($settings);
+
+        if ($provider === null) {
+            Log::info('ai_support.no_provider_key', ['provider' => $settings->provider, 'user_id' => $user->id]);
+
+            return; // selected provider has no API key saved yet — wait for a human, same as disabled.
+        }
+
         try {
-            $runner = $this->client->beta->messages->toolRunner(
-                maxTokens: self::MAX_REPLY_TOKENS,
-                messages: $history,
-                model: $settings->model,
-                tools: $this->buildTools($user, $onEscalate),
-                maxIterations: self::MAX_TOOL_ITERATIONS,
-                extraParams: [
-                    'system' => $this->systemPrompt($settings),
-                    'thinking' => ['type' => 'adaptive'],
-                    'outputConfig' => ['effort' => $settings->effort],
-                ],
+            $finalText = $provider->respond(
+                $this->systemPrompt($settings),
+                $history,
+                $this->toolDefinitions(),
+                $this->toolDispatcher($user, $onEscalate),
             );
 
-            $finalText = null;
-            foreach ($runner as $message) {
-                foreach ($message->content as $block) {
-                    if ($block->type === 'text' && trim($block->text) !== '') {
-                        $finalText = $block->text;
-                    }
-                }
-            }
-
             if ($finalText !== null) {
-                $onReply(trim($finalText));
+                $onReply($finalText);
                 $settings->recordReply();
             }
         } catch (\Throwable $e) {
-            Log::error('ai_support.generate_failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            Log::error('ai_support.generate_failed', ['provider' => $settings->provider, 'user_id' => $user->id, 'error' => $e->getMessage()]);
 
             // Never leave the seller with silence on an API failure — post a
             // graceful placeholder and force a human to pick it up.
@@ -175,44 +166,59 @@ class AiSupportAgentService
         }
     }
 
-    /** @return list<BetaRunnableTool> */
-    private function buildTools(User $user, \Closure $onEscalate): array
+    /** Provider-agnostic tool definitions — every adapter translates these into its own wire format. */
+    private function toolDefinitions(): array
     {
         $emptySchema = ['type' => 'object', 'properties' => new \stdClass, 'required' => []];
 
         return [
-            new BetaRunnableTool(
-                definition: [
-                    'name' => 'get_subscription_status',
-                    'description' => "The seller's own current subscription package, status, and renewal date. No input needed.",
-                    'inputSchema' => $emptySchema,
+            [
+                'name' => 'get_subscription_status',
+                'description' => "The seller's own current subscription package, status, and renewal date. No input needed.",
+                'inputSchema' => $emptySchema,
+            ],
+            [
+                'name' => 'get_recent_orders',
+                'description' => "The seller's own 10 most recent store orders (status, payment status, courier status, total). No input needed.",
+                'inputSchema' => $emptySchema,
+            ],
+            [
+                'name' => 'get_recent_payments',
+                'description' => "The seller's own 10 most recent subscription payments (amount, status, method, admin note if rejected). No input needed.",
+                'inputSchema' => $emptySchema,
+            ],
+            [
+                'name' => 'escalate_to_admin',
+                'description' => 'Flag this conversation for a human admin instead of answering yourself. Use for refunds, account/financial actions, or anything you are not confident about.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'reason' => ['type' => 'string', 'description' => 'Why a human needs to take this'],
+                        'suggested_priority' => ['type' => 'string', 'enum' => SupportTicket::PRIORITIES],
+                    ],
+                    'required' => ['reason'],
                 ],
-                run: fn () => json_encode([
+            ],
+        ];
+    }
+
+    /** One dispatcher every provider adapter calls the same way: fn(name, input): string. */
+    private function toolDispatcher(User $user, \Closure $onEscalate): \Closure
+    {
+        return function (string $name, array $input) use ($user, $onEscalate): string {
+            return match ($name) {
+                'get_subscription_status' => json_encode([
                     'package' => $user->subscriptionPackage?->name,
                     'status' => $user->subscription_status,
                     'started_at' => optional($user->subscription_started_at)->toDateString(),
                     'ends_at' => optional($user->subscription_ends_at)->toDateString(),
                     'is_expired' => $user->isSubscriptionExpired(),
                 ]),
-            ),
-            new BetaRunnableTool(
-                definition: [
-                    'name' => 'get_recent_orders',
-                    'description' => "The seller's own 10 most recent store orders (status, payment status, courier status, total). No input needed.",
-                    'inputSchema' => $emptySchema,
-                ],
-                run: fn () => json_encode(
+                'get_recent_orders' => json_encode(
                     Order::where('user_id', $user->id)->latest()->limit(10)
                         ->get(['order_number', 'status', 'payment_status', 'courier_status', 'total', 'created_at'])
                 ),
-            ),
-            new BetaRunnableTool(
-                definition: [
-                    'name' => 'get_recent_payments',
-                    'description' => "The seller's own 10 most recent subscription payments (amount, status, method, admin note if rejected). No input needed.",
-                    'inputSchema' => $emptySchema,
-                ],
-                run: fn () => json_encode(
+                'get_recent_payments' => json_encode(
                     SubscriptionPayment::where('user_id', $user->id)->latest()->limit(10)
                         ->get(['amount', 'status', 'payment_method', 'trx_id', 'admin_note', 'created_at'])
                         ->map(fn (SubscriptionPayment $p) => [
@@ -224,27 +230,14 @@ class AiSupportAgentService
                             'created_at' => $p->created_at,
                         ])
                 ),
-            ),
-            new BetaRunnableTool(
-                definition: [
-                    'name' => 'escalate_to_admin',
-                    'description' => 'Flag this conversation for a human admin instead of answering yourself. Use for refunds, account/financial actions, or anything you are not confident about.',
-                    'inputSchema' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'reason' => ['type' => 'string', 'description' => 'Why a human needs to take this'],
-                            'suggested_priority' => ['type' => 'string', 'enum' => SupportTicket::PRIORITIES],
-                        ],
-                        'required' => ['reason'],
-                    ],
-                ],
-                run: function (array $input) use ($onEscalate) {
+                'escalate_to_admin' => (function () use ($input, $onEscalate) {
                     $onEscalate((string) ($input['reason'] ?? 'unspecified'), (string) ($input['suggested_priority'] ?? 'medium'));
 
                     return 'Escalated to a human admin. You may still send the seller a brief acknowledgement.';
-                },
-            ),
-        ];
+                })(),
+                default => json_encode(['error' => "unknown tool: {$name}"]),
+            };
+        };
     }
 
     private function maskTrx(?string $trx): ?string

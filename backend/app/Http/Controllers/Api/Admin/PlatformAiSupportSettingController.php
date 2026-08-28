@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiProviderCredential;
 use App\Models\PlatformAiSupportSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class PlatformAiSupportSettingController extends Controller
     {
         $data = $request->validate([
             'is_enabled' => ['required', 'boolean'],
+            'provider' => ['required', 'in:'.implode(',', AiProviderCredential::PROVIDERS)],
             'model' => ['required', 'string', 'max:100'],
             'effort' => ['required', 'in:low,medium,high,xhigh,max'],
             'max_ai_replies_per_day' => ['nullable', 'integer', 'min:1'],

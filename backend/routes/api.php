@@ -65,6 +65,7 @@ use App\Http\Controllers\Api\CollectionHistoryController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\Admin\AdminSupportController;
 use App\Http\Controllers\Api\Admin\AdminSupportTicketController;
+use App\Http\Controllers\Api\Admin\AiProviderCredentialController;
 use App\Http\Controllers\Api\Admin\PlatformAiSupportSettingController;
 use App\Http\Controllers\Api\Admin\ProductMediaSettingsController;
 use App\Http\Controllers\Api\Admin\ImpersonationController;
@@ -1032,6 +1033,8 @@ Route::middleware(['staff_permission:orders', 'active_subscription:allow_deliver
         });
         Route::get('/settings/ai-support', [PlatformAiSupportSettingController::class, 'show']);
         Route::put('/settings/ai-support', [PlatformAiSupportSettingController::class, 'update']);
+        Route::get('/ai-providers', [AiProviderCredentialController::class, 'index']);
+        Route::put('/ai-providers/{provider}', [AiProviderCredentialController::class, 'update']);
 
     });
 });

@@ -21,7 +21,22 @@
 
 `escalate_to_admin` টুল — একমাত্র side-effect-ওয়ালা টুল: reason + suggested_priority নিয়ে ticket/conversation-এ escalation flag বসায় ও admin_unread_count বাড়ায়। System prompt-এ কড়াভাবে বলা আছে: AI কখনও write action (রিফান্ড, সাবস্ক্রিপশন বাতিল) নিজে করবে না, শুধু status জানাবে অথবা escalate করবে।
 
-Model: `claude-opus-5` (Anthropic PHP SDK-এর Tool Runner — `$client->beta->messages->toolRunner(...)`), `thinking: adaptive`, `effort` অ্যাডমিন-কনফিগারযোগ্য (ডিফল্ট medium)।
+### মাল্টি-প্রোভাইডার (added 2026-08-28)
+
+শুরুতে শুধু Anthropic হার্ডকোড করা ছিল। এখন super-admin ড্যাশবোর্ড থেকে **৫টা প্রোভাইডারের** key দেওয়া যায় — Anthropic, Google Gemini, Groq, OpenAI, OpenRouter (Gemini/Groq-এর ফ্রি টিয়ার আছে, খরচ ছাড়াই চালানো যায়) — এবং যেকোনো একটাকে "active" হিসেবে বেছে নেওয়া যায়।
+
+- **`ai_provider_credentials`**: এক প্রোভাইডারে এক row — `provider` (unique), `api_key` (`encrypted` cast), `default_model` (সাজেশন মাত্র, admin বদলাতে পারে)।
+- **`platform_ai_support_settings.provider`**: কোন প্রোভাইডার এখন active, `model` কলামে সেই প্রোভাইডারের জন্য নির্বাচিত মডেলের নাম।
+- **`app/Services/Support/AiProviders/`** — provider-agnostic contract (`AiProviderClient` interface: `respond(systemPrompt, history, tools, executeTool): ?string`)। তিনটা adapter, পাঁচটা না, কারণ OpenAI/Groq/OpenRouter একই chat-completions + tool-calling wire format ব্যবহার করে:
+  - `AnthropicProviderClient` — Anthropic PHP SDK Tool Runner (আগের মতোই, শুধু interface-এর পেছনে সরানো হয়েছে)।
+  - `OpenAiCompatibleProviderClient(baseUrl, apiKey, model)` — raw HTTP (`Http::` facade, এই কোডবেসের বাকি ৩rd-party ক্লায়েন্টদের মতোই কনভেনশন) `POST {baseUrl}/chat/completions`। OpenAI/Groq/OpenRouter তিনটাই এটা ব্যবহার করে, শুধু base URL আলাদা।
+  - `GeminiProviderClient(apiKey, model)` — Gemini-এর নিজস্ব wire format (`user`/`model` role, `functionCall`/`functionResponse` parts) — সম্পূর্ণ আলাদা adapter।
+  - `AiProviderClientFactory::make($settings)` — active provider-এর credential row খুঁজে সঠিক adapter বানায়; key না থাকলে `null` রিটার্ন করে (`AiSupportAgentService` এটাকে ঠিক "disabled"-এর মতোই ট্রিট করে — চুপচাপ কিছু পাঠায় না, মানুষের জন্য অপেক্ষা করে)।
+- `AiSupportAgentService`-এর tool গুলো এখন provider-নিরপেক্ষ plain array + একটা dispatcher closure — orchestration লজিক (guard, escalation, reply persist) অপরিবর্তিত।
+
+### প্রি-রিকুইজিট বদলে গেছে
+
+আগে `backend/.env`-এ `ANTHROPIC_API_KEY` বসাতে হতো — এখন সেটা আর ব্যবহৃত হয় না। এখন **সরাসরি `/admin/settings/ai-support` পেজ থেকে** যেকোনো প্রোভাইডারের key পেস্ট করে "Save this provider" চাপলেই key `ai_provider_credentials` টেবিলে এনক্রিপ্টেড অবস্থায় জমা হয়ে যায় — কোনো `.env`/ডিপ্লয় লাগে না।
 
 ## ট্রিগার ফ্লো
 
@@ -36,24 +51,26 @@ Admin কোনো টিকিটে রিপ্লাই দিলে (বা
 - সেলার: `GET/POST /api/tickets`, `GET /api/tickets/{id}`, `GET/POST /api/tickets/{id}/messages`, `POST /api/tickets/{id}/read`, `GET /api/tickets/unread-count`
 - অ্যাডমিন: `GET /api/admin/tickets`, `GET/POST /api/admin/tickets/{id}/messages`, `POST /api/admin/tickets/{id}/take-over`, `POST /api/admin/tickets/{id}/read`, `PUT /api/admin/tickets/{id}/status`, `PUT /api/admin/tickets/{id}/priority`, `GET /api/admin/tickets/unread-count`
 - AI সেটিংস: `GET/PUT /api/admin/settings/ai-support`
+- AI প্রোভাইডার key: `GET /api/admin/ai-providers` (key কখনও পুরোটা রিটার্ন করে না, শুধু `has_key`/masked preview), `PUT /api/admin/ai-providers/{provider}`
 
 ## Frontend
 
 - `/admin/tickets` — অ্যাডমিন ইনবক্স (list+thread, filters, take-over, AI ব্যাজ) — `admin/support/page.tsx`-এর একই skeleton।
 - `/dashboard/tickets` — সেলার-সাইড টিকেট লিস্ট + নতুন টিকেট ফর্ম + থ্রেড ভিউ। `user-shell.tsx` মেনুতে "আমার টিকেট" এন্ট্রি।
-- `/admin/settings/ai-support` — kill switch + model/effort/daily cap/extra prompt ফর্ম, বাকি settings পেজগুলোর মতোই।
+- `/admin/settings/ai-support` — উপরে ৫টা provider credential card (key/default model/free-tier badge, নিজস্ব Save বাটন), নিচে active provider select + kill switch + model/effort/daily cap/extra prompt ফর্ম।
 - লাইভ চ্যাট widget + admin support page দুটোতেই `sender_type === 'ai'` মেসেজ আলাদা (বেগুনি) bubble + badge দিয়ে দেখানো হয়।
 
 ## প্রি-রিকুইজিট (ম্যানুয়াল)
 
-`backend/.env`-এ `ANTHROPIC_API_KEY` সেট করতে হবে (console.anthropic.com থেকে) — না থাকলেও কিছু ভাঙবে না, কারণ `platform_ai_support_settings.is_enabled` ডিফল্ট **false**। Key বসিয়ে `/admin/settings/ai-support`-এ গিয়ে চালু করলেই AI কাজ শুরু করবে।
+কোনো `.env` এন্ট্রি লাগে না — `/admin/settings/ai-support`-এ গিয়ে অন্তত একটা প্রোভাইডারের key সেভ করে, সেটাকে active provider হিসেবে বেছে নিয়ে, kill switch চালু করলেই AI কাজ শুরু করবে। key ছাড়া চালু করলেও কিছু ভাঙবে না — `AiProviderClientFactory::make()` `null` রিটার্ন করে, service সেটাকে disabled-এর মতোই ট্রিট করে।
 
 ## সীমাবদ্ধতা (এই রাউন্ডে ইচ্ছাকৃতভাবে বাদ)
 
 - Category তালিকা fixed enum, admin-editable না।
 - সময়ভিত্তিক SLA/auto-escalation নেই — শুধু AI-confidence-based escalation।
 - কোনো knowledge-base/document-RAG নেই — AI-এর জ্ঞান system prompt + সেলারের নিজের tool-fetched ডেটা পর্যন্তই সীমাবদ্ধ।
+- Ollama/self-hosted মডেল সাপোর্ট নেই এই রাউন্ডে (ইচ্ছাকৃতভাবে বাদ, দরকার হলে পরে `AiProviderClient`-এর আরেকটা adapter হিসেবে যোগ করা সহজ)।
 
 ## টেস্ট
 
-`backend/tests/Feature/SupportTicketingTest.php` (১২টা টেস্ট) — ticket lifecycle/authorization, AI-dispatch guard (assigned/human_handled/disabled/daily-cap — কোনোটাই আসল Anthropic API touch করে না), daily-cap reset লজিক। পুরো স্যুট isolated Postgres schema-তে verified: ৬৯৭ passed, ৩টা pre-existing baseline failure (AuthApiTest, CourierFraudCheckApiTest, ProductMediaApiTest) অপরিবর্তিত।
+`backend/tests/Feature/SupportTicketingTest.php` (১২টা) — ticket lifecycle/authorization, AI-dispatch guard, daily-cap reset। `backend/tests/Feature/AiProviderCredentialTest.php` (৬টা) — key কখনও echo হয় না, key-omit করে শুধু model আপডেট করা যায়, factory সঠিক adapter বেছে নেয়/no-key-এ null দেয়। কোনোটাই আসল provider API টাচ করে না। পুরো স্যুট isolated Postgres schema-তে verified: ৭০৩ passed, ৩টা pre-existing baseline failure (AuthApiTest, CourierFraudCheckApiTest, ProductMediaApiTest) অপরিবর্তিত।

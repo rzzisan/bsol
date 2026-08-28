@@ -40,13 +40,6 @@ return [
         'ipstack_key' => env('IPSTACK_API_KEY'),
     ],
 
-    // AiSupportAgentService (support_ticketing_ai_context.md) — server-side
-    // only, never exposed to the frontend. Gated separately by
-    // platform_ai_support_settings.is_enabled (the admin kill switch).
-    'anthropic' => [
-        'api_key' => env('ANTHROPIC_API_KEY'),
-    ],
-
     // Meta for Developers App — see SAAS_MODULE_CONTEXT.md §16.3 for setup
     // steps (create app, add "Facebook Login for Business" + "Webhooks"
     // products, subscribe page fields feed+messages, App Review for
