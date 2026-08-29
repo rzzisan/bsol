@@ -92,7 +92,15 @@ Backend: `SupportMessage`/`SupportTicketMessage`-এর `sender()` relation আ�
 - **History trim** — আগে পুরো thread (unbounded) প্রতি রিকোয়েস্টে পাঠানো হতো, এখন সর্বশেষ ১২টা মেসেজ পাঠানো হয় (`AiSupportAgentService::MAX_HISTORY_MESSAGES`) — লম্বা টিকিটে TPM চাপ কমাতে।
 - **`groq/compound`/`compound-mini` মডেল ব্যবহার করা যাবে না** — যদিও TPM অনেক বেশি (70K বনাম gpt-oss-এর 8K), এই মডেলগুলো custom tool-calling সাপোর্ট করে না ("agentic compound" সিস্টেম, নিজস্ব built-in টুল চালায়) — লাইভ টেস্টে `400 tool calling is not supported with this model` কনফার্ম করা হয়েছে।
 
-🔴 **জরুরি ডেটা সমস্যা পাওয়া গেছে (এখনো ফিক্স করা হয়নি, admin-কে জানানো হয়েছে):** লাইভ টেস্টে টুলটা রিয়েল ডেটা টেনে "Business" প্যাকেজকে **৳15/মাসে unlimited অর্ডার** হিসেবে সুপারিশ করেছে — অথচ "Growth" প্যাকেজ ৳1999/মাসে মাত্র 500 অর্ডার লিমিট। এটা স্পষ্টতই ভাঙা/leftover টেস্ট ডেটা (`subscription_packages` টেবিলে Business-এর `price`/`max_orders` ভুল বসানো আছে) — AI ঠিকই কাজ করছে, কিন্তু ভুল দামের ডেটা পড়ে সেলারকে ভুল/অবাস্তব অফার বলে দিচ্ছে। **`/admin/packages`-এ গিয়ে Business প্যাকেজের দাম/লিমিট ঠিক না করা পর্যন্ত এই টুল চালু রাখা ঝুঁকিপূর্ণ** — সেলারকে ভুল দাম বলে ফেললে সেটা নিয়ে দাবি উঠতে পারে।
+🟡 **আপডেট (2026-08-29, পরে):** admin `/admin/packages`-এ গিয়ে দাম/লিমিট ঠিক করে দিয়েছেন। পুনরায় লাইভ টেস্টে AI এখন সঠিকভাবে "কোনো প্যাকেজই দৈনিক ২৫০+ অর্ডার কভার করে না, কাস্টম প্ল্যান লাগবে" বলে escalate করছে — আর ভুলভাবে "unlimited" বলছে না। ছোট একটা numeric anomaly এখনও আছে (Business এখনও Growth-এর চেয়ে সস্তা অথচ বেশি অর্ডার-লিমিট দেয়) কিন্তু সেটা admin-এর ব্যবসায়িক সিদ্ধান্ত হতে পারে বলে touch করা হয়নি — শুধু জানিয়ে রাখা হয়েছে।
+
+## পেজ-ভিত্তিক "কীভাবে ব্যবহার করব?" বাটন (added 2026-08-29)
+
+প্রতিটা ড্যাশবোর্ড পেজে একটা floating "❓ কীভাবে ব্যবহার করব?" বাটন (bottom-left, Support বাটনের উল্টো কোণে যাতে ওভারল্যাপ না করে) — ক্লিক করলে সেই নির্দিষ্ট পেজের how-to কন্টেন্ট দেখায়। AI-এর জন্য বানানো knowledge base-ই পুনর্ব্যবহার করা হয়েছে — কোনো duplicate কন্টেন্ট লাগেনি।
+
+- **Backend**: নতুন read-only `GET /api/help/{slug}` (`HelpArticleController`) — শুধু active থাকলে `{title, content}` রিটার্ন করে, নাহলে 404। Seller-authenticated (auth:sanctum) কিন্তু admin-only না — existing `/admin/ai-knowledge-base` CRUD থেকে আলাদা এই lightweight lookup route।
+- **Frontend**: নতুন `frontend/src/components/page-help-button.tsx`, `UserShell`-এ globally মাউন্ট করা (SupportChatWidget-এর মতোই — প্রতিটা `/dashboard/*` পেজে automatic)। `usePathname()` দিয়ে বর্তমান route detect করে একটা longest-prefix-match টেবিল (`ROUTE_TO_SLUG`) দিয়ে সঠিক knowledge-base slug বের করে — যে পেজের জন্য কোনো slug ম্যাচ করে না (যেমন `/dashboard` overview) সেখানে বাটনই দেখায় না।
+- Admin `/admin/settings/ai-knowledge-base`-এ কোনো আর্টিকেল এডিট করলে সাথে সাথে এই বাটনেও এবং AI-এর `search_platform_help` টুলেও — দুই জায়গাতেই আপডেটেড কন্টেন্ট দেখা যাবে, একবারই মেইনটেইন করতে হয়।
 
 ### প্রি-রিকুইজিট বদলে গেছে
 

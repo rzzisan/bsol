@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\Connect\ConnectSmsController;
 use App\Http\Controllers\Api\Connect\ConnectTrackingController;
 use App\Http\Controllers\Api\CourierController;
 use App\Http\Controllers\Api\CourierFraudCheckController;
+use App\Http\Controllers\Api\HelpArticleController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DigitalDeliveryController;
 use App\Http\Controllers\Api\DigitalProductFileController;
@@ -478,6 +479,12 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::post('/{ticket}/messages', [SupportTicketController::class, 'send']);
         Route::post('/{ticket}/read', [SupportTicketController::class, 'markRead']);
     });
+
+    // Per-page "how do I use this?" help button — reads the same knowledge
+    // base the AI agent searches (support_ticketing_ai_context.md). Same
+    // expired-subscription exemption: a lapsed seller still needs to learn
+    // the product, e.g. to fix whatever is blocking renewal.
+    Route::get('/help/{slug}', [HelpArticleController::class, 'show']);
 
 Route::middleware('active_subscription')->group(function () {
     // ── Landing Page Builder + Analytics + Media Library + Abandoned Checkouts ──
