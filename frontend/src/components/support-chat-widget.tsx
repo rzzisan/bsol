@@ -288,22 +288,20 @@ export default function SupportChatWidget() {
               <p className="mt-6 text-center text-xs text-[var(--muted)]">{t.empty}</p>
             )}
 
+            {/* AI-authored replies are styled identically to admin replies here
+                on purpose — this is the seller-facing view, and the seller
+                should experience one consistent support team, not a visibly
+                separate "AI" sender (support_ticketing_ai_context.md). The
+                admin-facing views keep the distinct AI badge/color. */}
             {messages.map((m) => (
               <div key={m.id} className={`flex ${m.sender_type === "user" ? "justify-end" : "justify-start"}`}>
                 <div
                   className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
                     m.sender_type === "user"
                       ? "bg-[var(--accent)] text-white"
-                      : m.sender_type === "ai"
-                        ? "border border-violet-300/60 bg-violet-50 text-[var(--foreground)] dark:border-violet-700/50 dark:bg-violet-950/30"
-                        : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
+                      : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
                   }`}
                 >
-                  {m.sender_type === "ai" && (
-                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-violet-500">
-                      {locale === "bn" ? "AI এজেন্ট" : "AI Agent"}
-                    </p>
-                  )}
                   <p className="whitespace-pre-wrap break-words">{m.message}</p>
                   <p
                     className={`mt-1 text-right text-[10px] ${

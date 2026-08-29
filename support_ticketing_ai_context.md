@@ -63,7 +63,17 @@ Admin "Active Provider" dropdown থেকে Anthropic থেকে Groq-এ �
 - **Gemini**: মডেল নাম (`gemini-2.5-flash`) ঠিকই ছিল, `429` আসলে সত্যিকারের free-tier quota exhausted — কোনো কোড/কনফিগ সমস্যা না, নতুন key বা quota reset-এর অপেক্ষা করতে হবে।
 - **OpenRouter**: suggested `meta-llama/llama-3.3-70b-instruct:free` ও পরে টেস্ট করা `z-ai/glm-5.2:free` দুটোই তখন upstream rate-limited ছিল (OpenRouter free মডেলের capacity demand অনুযায়ী ওঠানামা করে) — `minimax/minimax-m3:free` দিয়ে সেই মুহূর্তে tool-calling টেস্ট পাস করেছে, এখন suggested default। এই volatility structural, কোনো নির্দিষ্ট মডেল নাম স্থায়ীভাবে নির্ভরযোগ্য না — সেটিংস পেজে এখন স্পষ্ট সতর্কবার্তা আছে।
 
-লাইভ `platform_ai_support_settings`/`ai_provider_credentials` রো সরাসরি আপডেট করে active provider **Groq + `openai/gpt-oss-120b`**-এ সেট করা হয়েছে (এই তিনটার মধ্যে সবচেয়ে স্থিতিশীল প্রমাণিত)।
+লাইভ `platform_ai_support_settings`/`ai_provider_credentials` রো সরাসরি আপডেট করে active provider **Groq + `openai/gpt-oss-120b`**-এ সেট করা হয়েছে (এই তিনটার মধ্যে সবচেয়ে স্থিতিশীল প্রমাণিত)। Groq-এর ফ্রি টিয়ার: ৩০ RPM, **১০০০ RPD**, ৮০০০ TPM, ২,০০,০০০ TPD (এই মডেলের জন্য, Groq-এর অফিসিয়াল ডকস + লাইভ header-এ ভেরিফাই করা)।
+
+### সেলার-facing persona — মানুষের মতো, "AI" শব্দ নেই (added 2026-08-29)
+
+ব্যবসায়িক সিদ্ধান্ত: সেলার যেন বুঝতে না পারে যে AI রিপ্লাই দিচ্ছে — একটা consistent human সাপোর্ট টিমের অভিজ্ঞতা দিতে হবে।
+
+- **System prompt** (`AiSupportAgentService::systemPrompt()`) থেকে "BSOL AI সাপোর্ট এজেন্ট" পরিচয় সরিয়ে "BSOL-এর সাপোর্ট টিমের একজন সদস্য" করা হয়েছে + স্পষ্ট নিয়ম: নিজেকে কখনও AI/বট/স্বয়ংক্রিয় বলে পরিচয় দেবে না, "আমাদের টিম/আমরা" হিসেবে কথা বলবে।
+- **Fallback message** (কোনো provider ব্যর্থ হলে) আগে ছিল "স্বয়ংক্রিয় উত্তর দেওয়া সম্ভব হচ্ছে না | Sorry, an automated reply..." (bilingual, pipe-separated — নিজেই একটা automation-tell ছিল)। এখন সেলারের শেষ মেসেজের ভাষা অনুযায়ী (Bengali Unicode range দিয়ে ডিটেক্ট করে) শুধু একটা ভাষায়, "অনুগ্রহ করে একটু অপেক্ষা করুন। শীঘ্রই আমাদের একজন সাপোর্ট এজেন্ট আপনার সাথে যোগাযোগ করবেন।" / "Please wait a moment — one of our support agents will get back to you shortly."
+- **Frontend**: seller-facing দুই জায়গা থেকেই (`support-chat-widget.tsx`, `dashboard/tickets/page.tsx`) "AI Agent" ব্যাজ + বেগুনি রঙ সরানো হয়েছে — AI-লিখিত মেসেজ এখন admin-লিখিত মেসেজের সাথে দৃশ্যত অভিন্ন। টিকেট লিস্টের প্রিভিউ থেকে 🤖 ইমোজিও সরানো হয়েছে। "নতুন টিকেট" ফর্মের hint টেক্সট থেকেও "AI" শব্দ সরানো হয়েছে।
+- **Admin-facing views অপরিবর্তিত** — `admin/support/page.tsx`, `admin/tickets/page.tsx`-এ AI ব্যাজ/রঙ/"AI is handling this" ইন্ডিকেটর ইচ্ছাকৃতভাবে রাখা হয়েছে, কারণ অ্যাডমিন টিমের নিজেদের জানা দরকার কোনটা AI লিখেছে (মান যাচাই, কখন hand-over নিতে হবে বোঝার জন্য)।
+- সরাসরি "তুমি কি AI/বট?" জিজ্ঞেস করলে মিথ্যা বলার কোনো নির্দিষ্ট নির্দেশ দেওয়া হয়নি — শুধু স্বতঃপ্রণোদিতভাবে (unprompted) কখনো "আমি একটা AI" বলবে না, এটুকুই নিশ্চিত করা হয়েছে।
 
 ### প্রি-রিকুইজিট বদলে গেছে
 

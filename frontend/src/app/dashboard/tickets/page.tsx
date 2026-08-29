@@ -55,8 +55,7 @@ const text = {
     loadOlder: "আগের মেসেজ",
     loading: "লোড হচ্ছে…",
     sendError: "মেসেজ পাঠানো যায়নি।",
-    aiAgent: "AI এজেন্ট",
-    aiHint: "সাধারণ প্রশ্নে সাথে সাথে AI উত্তর দেবে; জটিল কিছু হলে টিমের কাছে পাঠিয়ে দেওয়া হবে।",
+    aiHint: "সাধারণ প্রশ্নে দ্রুত উত্তর পাবেন — জটিল কিছু হলে আমাদের টিম নিজেই দেখবে।",
   },
   en: {
     pageTitle: "My Tickets",
@@ -78,8 +77,7 @@ const text = {
     loadOlder: "Load older",
     loading: "Loading…",
     sendError: "Couldn't send the message.",
-    aiAgent: "AI Agent",
-    aiHint: "Routine questions get an instant AI reply; anything complex is handed to our team.",
+    aiHint: "You'll get a quick reply for common questions — our team handles anything more involved.",
   },
 };
 
@@ -365,7 +363,7 @@ export default function MyTicketsPage() {
                 </div>
                 <span className="truncate text-sm font-semibold text-[var(--foreground)]">{tk.subject}</span>
                 <span className="truncate text-xs text-[var(--muted)]">
-                  {tk.last_message_sender_type === "ai" ? "🤖 " : tk.last_message_sender_type === "admin" ? "↩ " : ""}
+                  {tk.last_message_sender_type === "ai" || tk.last_message_sender_type === "admin" ? "↩ " : ""}
                   {tk.last_message_preview ?? "—"}
                 </span>
                 <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
@@ -421,20 +419,18 @@ export default function MyTicketsPage() {
                   </div>
                 )}
                 {messages.length === 0 && <p className="mt-6 text-center text-xs text-[var(--muted)]">{t.empty}</p>}
+                {/* AI-authored replies render identically to admin replies —
+                    seller-facing view, one consistent support team, no
+                    visible "AI" tell (support_ticketing_ai_context.md). */}
                 {messages.map((m) => (
                   <div key={m.id} className={`flex ${m.sender_type === "user" ? "justify-end" : "justify-start"}`}>
                     <div
                       className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
                         m.sender_type === "user"
                           ? "bg-[var(--accent)] text-white"
-                          : m.sender_type === "ai"
-                            ? "border border-violet-300/60 bg-violet-50 text-[var(--foreground)] dark:border-violet-700/50 dark:bg-violet-950/30"
-                            : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
+                          : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
                       }`}
                     >
-                      {m.sender_type === "ai" && (
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-violet-500">{t.aiAgent}</p>
-                      )}
                       <p className="whitespace-pre-wrap break-words">{m.message}</p>
                       <p
                         className={`mt-1 text-right text-[10px] ${

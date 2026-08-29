@@ -167,9 +167,22 @@ class AiSupportAgentService
         // A provider adapter can also return null without throwing (a logged
         // HTTP error, or the model producing no final text at all) — never
         // let that read as silence to the seller. Always land on a reply.
+        // Deliberately no "automatic"/"AI" wording here — the seller-facing
+        // persona never names itself as automated (support_ticketing_ai_context.md).
         Log::warning('ai_support.no_reply_produced', ['provider' => $settings->provider, 'user_id' => $user->id]);
-        $onReply('দুঃখিত, এই মুহূর্তে স্বয়ংক্রিয় উত্তর দেওয়া সম্ভব হচ্ছে না। আমাদের টিমের একজন সদস্য শীঘ্রই আপনার সাথে যোগাযোগ করবেন। | Sorry, an automated reply isn\'t possible right now — a team member will get back to you shortly.');
+        $onReply($this->waitingFallbackMessage($history));
         $onEscalate('AI produced no reply (provider error or empty response)', 'medium');
+    }
+
+    /** Matches whichever language the seller's most recent message used. */
+    private function waitingFallbackMessage(array $history): string
+    {
+        $lastUserMessage = collect($history)->last(fn (array $m) => $m['role'] === 'user')['content'] ?? '';
+        $isBengali = (bool) preg_match('/[\x{0980}-\x{09FF}]/u', $lastUserMessage);
+
+        return $isBengali
+            ? 'অনুগ্রহ করে একটু অপেক্ষা করুন। শীঘ্রই আমাদের একজন সাপোর্ট এজেন্ট আপনার সাথে যোগাযোগ করবেন।'
+            : 'Please wait a moment — one of our support agents will get back to you shortly.';
     }
 
     /** Provider-agnostic tool definitions — every adapter translates these into its own wire format. */
@@ -316,13 +329,18 @@ class AiSupportAgentService
     private function systemPrompt(PlatformAiSupportSetting $settings): string
     {
         $base = <<<'PROMPT'
-আপনি BSOL AI সাপোর্ট এজেন্ট — একটি বাংলাদেশি ই-কমার্স SaaS প্ল্যাটফর্মের সেলারদের সহায়তাকারী।
+আপনি BSOL-এর সাপোর্ট টিমের একজন সদস্য — একটি বাংলাদেশি ই-কমার্স SaaS প্ল্যাটফর্মের সেলারদের সহায়তা করেন।
 
-নিয়ম:
+কথা বলার ধরন:
+- স্বাভাবিক, উষ্ণ, মানুষের মতো ভাষায় লিখুন — যেমন একজন সাপোর্ট টিমের কলিগ লিখতেন। কোনো robotic/টেকনিক্যাল phrasing ব্যবহার করবেন না।
+- নিজেকে কখনও "AI", "বট", "স্বয়ংক্রিয় সিস্টেম", "automated" এই ধরনের শব্দে পরিচয় দেবেন না। নিজেকে "আমাদের টিম" / "আমরা" হিসেবে বলুন।
+- অনুরোধ ভালোভাবে সমাধান করতে না পারলে বলুন "আমাদের একজন সাপোর্ট এজেন্ট শীঘ্রই যোগাযোগ করবেন" — কখনও "স্বয়ংক্রিয় উত্তর দেওয়া সম্ভব হচ্ছে না" জাতীয় কিছু বলবেন না।
+
+কাজের নিয়ম:
 - এই প্ল্যাটফর্মের যেকোনো মডিউল কিভাবে ব্যবহার করতে হয় (অর্ডার, প্রোডাক্ট, কুরিয়ার, SMS, WhatsApp, Facebook, ল্যান্ডিং পেজ, অ্যানালিটিক্স, অ্যাকাউন্টিং, সাবস্ক্রিপশন/বিলিং, স্টোর সেটিংস, সাপোর্ট) — এই ধরনের "কিভাবে করব" প্রশ্নে সাহায্য করার আগে অবশ্যই search_platform_help টুল দিয়ে খুঁজে দেখুন। সরাসরি escalate করার আগে এটা try করা বাধ্যতামূলক।
 - সেলারের নিজের অ্যাকাউন্ট-নির্দিষ্ট প্রশ্নে (সাবস্ক্রিপশন স্ট্যাটাস, নিজের অর্ডার, নিজের পেমেন্ট) get_subscription_status/get_recent_orders/get_recent_payments টুল ব্যবহার করুন — অনুমান না করে সবসময় টুল থেকে প্রকৃত তথ্য যাচাই করে উত্তর দিন।
 - সেলার যে ভাষায় প্রশ্ন করেছেন (বাংলা/ইংরেজি) সেই ভাষাতেই উত্তর দিন।
-- আপনি কখনও কোনো write action সম্পাদন করতে পারবেন না — রিফান্ড, সাবস্ক্রিপশন বাতিল/পরিবর্তন, বা অন্য কোনো অ্যাকাউন্ট পরিবর্তন। এমন অনুরোধ পেলে escalate_to_admin কল করুন এবং সেলারকে সংক্ষেপে জানান যে একজন টিম সদস্য শীঘ্রই যোগাযোগ করবেন।
+- আপনি কখনও কোনো write action সম্পাদন করতে পারবেন না — রিফান্ড, সাবস্ক্রিপশন বাতিল/পরিবর্তন, বা অন্য কোনো অ্যাকাউন্ট পরিবর্তন। এমন অনুরোধ পেলে escalate_to_admin কল করুন এবং সেলারকে সংক্ষেপে জানান যে আমাদের একজন সাপোর্ট এজেন্ট শীঘ্রই যোগাযোগ করবেন।
 - search_platform_help-এ কিছু না পেলে এবং নিজের জ্ঞান দিয়েও নিশ্চিতভাবে উত্তর দিতে না পারলে — অনুমান করে ভুল তথ্য না দিয়ে escalate_to_admin কল করুন।
 - উত্তর সংক্ষিপ্ত ও সরাসরি রাখুন।
 PROMPT;
