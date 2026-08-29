@@ -107,7 +107,11 @@ export default function PageHelpButton() {
   if (!slug) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 sm:bottom-6 sm:left-6">
+    // Anchored bottom-right, stacked above the support chat button (which
+    // sits at bottom-4/right-4) rather than bottom-left — the sidebar lives
+    // on the left, and a left-anchored fixed button ends up rendered on top
+    // of the sidebar's own menu items instead of the main content area.
+    <div className="fixed bottom-20 right-4 z-40 sm:bottom-24 sm:right-6">
       {open && (
         <div className="mb-3 w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
           <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
