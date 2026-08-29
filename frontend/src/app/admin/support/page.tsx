@@ -478,7 +478,7 @@ export default function AdminSupportPage() {
                   )}
                 </div>
                 <span className="truncate text-xs text-[var(--muted)]">
-                  {c.last_message_sender_type === "admin" ? "↩ " : c.last_message_sender_type === "ai" ? "🤖 " : ""}
+                  {c.last_message_sender_type === "admin" || c.last_message_sender_type === "ai" ? "↩ " : ""}
                   {c.last_message_preview ?? "—"}
                 </span>
                 <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
@@ -552,16 +552,9 @@ export default function AdminSupportPage() {
                       className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
                         m.sender_type === "admin"
                           ? "bg-[var(--accent)] text-white"
-                          : m.sender_type === "ai"
-                            ? "border border-violet-300/60 bg-violet-50 text-[var(--foreground)] dark:border-violet-700/50 dark:bg-violet-950/30"
-                            : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
+                          : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
                       }`}
                     >
-                      {m.sender_type === "ai" && (
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-violet-500">
-                          {locale === "bn" ? "AI এজেন্ট" : "AI Agent"}
-                        </p>
-                      )}
                       <p className="whitespace-pre-wrap break-words">{m.message}</p>
                       <p
                         className={`mt-1 text-right text-[10px] ${

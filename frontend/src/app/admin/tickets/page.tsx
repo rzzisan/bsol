@@ -91,7 +91,6 @@ const text = {
     loading: "লোড হচ্ছে…",
     noMobile: "মোবাইল নেই",
     sendError: "মেসেজ পাঠানো যায়নি।",
-    aiAgent: "AI এজেন্ট",
   },
   en: {
     title: "Support Tickets",
@@ -120,7 +119,6 @@ const text = {
     loading: "Loading…",
     noMobile: "No mobile",
     sendError: "Couldn't send the message.",
-    aiAgent: "AI Agent",
   },
 };
 
@@ -605,14 +603,9 @@ export default function AdminTicketsPage() {
                       className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
                         m.sender_type === "admin"
                           ? "bg-[var(--accent)] text-white"
-                          : m.sender_type === "ai"
-                            ? "border border-violet-300/60 bg-violet-50 text-[var(--foreground)] dark:border-violet-700/50 dark:bg-violet-950/30"
-                            : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
+                          : "border border-[var(--border)] bg-[var(--surface-soft)] text-[var(--foreground)]"
                       }`}
                     >
-                      {m.sender_type === "ai" && (
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-violet-500">{t.aiAgent}</p>
-                      )}
                       <p className="whitespace-pre-wrap break-words">{m.message}</p>
                       <p
                         className={`mt-1 text-right text-[10px] ${
