@@ -75,6 +75,15 @@ Admin "Active Provider" dropdown থেকে Anthropic থেকে Groq-এ �
 - **Admin-facing views** — per-message "AI Agent"/"AI এজেন্ট" ব্যাজ + বেগুনি রঙ পরে `admin/support/page.tsx` ও `admin/tickets/page.tsx` থেকেও সরানো হয়েছে (2026-08-29 আপডেট) — এখন AI-লিখিত রিপ্লাই অ্যাডমিনের কাছেও সাধারণ admin-message-এর মতোই দেখায়। ticket-level অবস্থা-নির্দেশক ("🤖 AI is handling this", "🚩 Escalated") ইচ্ছাকৃতভাবে অপরিবর্তিত রাখা হয়েছে — এগুলো নির্দিষ্ট কোনো reply-র flag না, পুরো ticket-এর বর্তমান অবস্থা বোঝানোর জন্য, admin টিমের নিজেদের workflow-এর জন্য দরকারি।
 - সরাসরি "তুমি কি AI/বট?" জিজ্ঞেস করলে মিথ্যা বলার কোনো নির্দিষ্ট নির্দেশ দেওয়া হয়নি — শুধু স্বতঃপ্রণোদিতভাবে (unprompted) কখনো "আমি একটা AI" বলবে না, এটুকুই নিশ্চিত করা হয়েছে।
 
+### রিপ্লাইয়ের নিচে সাইনেচার — নাম, "AI" না (added 2026-08-29)
+
+প্রতিটা admin/AI রিপ্লাইয়ের নিচে এখন কে পাঠাল তার নাম দেখায় (সেলার-facing ও admin-facing দুই জায়গাতেই):
+- admin রিপ্লাই দিলে সেই admin-এর আসল নাম (যেমন "- Zisan")।
+- AI রিপ্লাই দিলে সবসময় **"- BSOL"** (কখনো "AI"/"AI Agent" না)।
+- সেলারের নিজের মেসেজে কোনো সাইনেচার নেই।
+
+Backend: `SupportMessage`/`SupportTicketMessage`-এর `sender()` relation আগে থেকেই ছিল, শুধু চারটা controller-এর (`SupportController`, `AdminSupportController`, `SupportTicketController`, `AdminSupportTicketController`) `messages()`/`send()` response-এ `->with('sender:id,name')` / `->load('sender:id,name')` যোগ করা হয়েছে — key ফাঁস হয় না, শুধু id+name। AI-লিখিত মেসেজে `sender_id` null-ই থাকে, ফ্রন্টএন্ড নিজেই `sender_type === 'ai'` দেখে "BSOL" বসায়।
+
 ### প্রি-রিকুইজিট বদলে গেছে
 
 আগে `backend/.env`-এ `ANTHROPIC_API_KEY` বসাতে হতো — এখন সেটা আর ব্যবহৃত হয় না। এখন **সরাসরি `/admin/settings/ai-support` পেজ থেকে** যেকোনো প্রোভাইডারের key পেস্ট করে "Save this provider" চাপলেই key `ai_provider_credentials` টেবিলে এনক্রিপ্টেড অবস্থায় জমা হয়ে যায় — কোনো `.env`/ডিপ্লয় লাগে না।

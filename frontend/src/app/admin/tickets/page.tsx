@@ -53,9 +53,18 @@ interface TicketMessage {
   ticket_id: number;
   sender_type: "user" | "admin" | "ai";
   sender_id: number | null;
+  sender: { id: number; name: string } | null;
   message: string;
   is_read: boolean;
   created_at: string;
+}
+
+// Signature line under a reply — the real team member's name, or "BSOL" for
+// an AI-authored reply (never reveals it was automated, even to admins).
+function signatureFor(m: TicketMessage): string | null {
+  if (m.sender_type === "user") return null;
+  if (m.sender_type === "admin") return m.sender?.name ?? "BSOL";
+  return "BSOL";
 }
 
 type StatusFilter = "all" | Status;
@@ -607,6 +616,7 @@ export default function AdminTicketsPage() {
                       }`}
                     >
                       <p className="whitespace-pre-wrap break-words">{m.message}</p>
+                      {signatureFor(m) && <p className="mt-1 text-xs font-medium text-[var(--muted)]">- {signatureFor(m)}</p>}
                       <p
                         className={`mt-1 text-right text-[10px] ${
                           m.sender_type === "admin" ? "text-white/70" : "text-[var(--muted)]"

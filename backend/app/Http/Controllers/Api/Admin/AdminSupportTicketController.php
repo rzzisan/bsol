@@ -55,7 +55,7 @@ class AdminSupportTicketController extends Controller
 
     public function messages(Request $request, SupportTicket $ticket): JsonResponse
     {
-        $query = SupportTicketMessage::where('ticket_id', $ticket->id);
+        $query = SupportTicketMessage::where('ticket_id', $ticket->id)->with('sender:id,name');
 
         if ($request->filled('after_id')) {
             $messages = $query->where('id', '>', (int) $request->after_id)->orderBy('id', 'asc')->limit(200)->get();
@@ -98,7 +98,7 @@ class AdminSupportTicketController extends Controller
             'ai_handled' => false,
         ]);
 
-        return response()->json(['success' => true, 'data' => $message]);
+        return response()->json(['success' => true, 'data' => $message->load('sender:id,name')]);
     }
 
     public function takeOver(SupportTicket $ticket): JsonResponse

@@ -86,7 +86,7 @@ class SupportTicketController extends Controller
     {
         $this->authorizeOwn($ticket);
 
-        $query = SupportTicketMessage::where('ticket_id', $ticket->id);
+        $query = SupportTicketMessage::where('ticket_id', $ticket->id)->with('sender:id,name');
 
         if ($request->filled('after_id')) {
             $messages = $query->where('id', '>', (int) $request->after_id)->orderBy('id', 'asc')->limit(200)->get();

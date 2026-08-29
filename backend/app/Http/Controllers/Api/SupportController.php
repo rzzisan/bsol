@@ -34,7 +34,7 @@ class SupportController extends Controller
     {
         $conversation = $this->conversationFor(auth()->id());
 
-        $query = SupportMessage::where('conversation_id', $conversation->id);
+        $query = SupportMessage::where('conversation_id', $conversation->id)->with('sender:id,name');
 
         if ($request->filled('after_id')) {
             $messages = $query->where('id', '>', (int) $request->after_id)

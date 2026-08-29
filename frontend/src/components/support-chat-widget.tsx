@@ -11,9 +11,18 @@ interface SupportMessage {
   conversation_id: number;
   sender_type: "user" | "admin" | "ai";
   sender_id: number | null;
+  sender: { id: number; name: string } | null;
   message: string;
   is_read: boolean;
   created_at: string;
+}
+
+// Signature line under a reply — the seller's own team member's real name,
+// or "BSOL" for an AI-authored reply (never reveals it was automated).
+function signatureFor(m: SupportMessage): string | null {
+  if (m.sender_type === "user") return null;
+  if (m.sender_type === "admin") return m.sender?.name ?? "BSOL";
+  return "BSOL";
 }
 
 const text = {
@@ -303,6 +312,7 @@ export default function SupportChatWidget() {
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">{m.message}</p>
+                  {signatureFor(m) && <p className="mt-1 text-xs font-medium text-[var(--muted)]">- {signatureFor(m)}</p>}
                   <p
                     className={`mt-1 text-right text-[10px] ${
                       m.sender_type === "user" ? "text-white/70" : "text-[var(--muted)]"

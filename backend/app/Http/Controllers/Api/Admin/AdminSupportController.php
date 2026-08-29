@@ -49,7 +49,7 @@ class AdminSupportController extends Controller
 
     public function messages(Request $request, SupportConversation $conversation): JsonResponse
     {
-        $query = SupportMessage::where('conversation_id', $conversation->id);
+        $query = SupportMessage::where('conversation_id', $conversation->id)->with('sender:id,name');
 
         if ($request->filled('after_id')) {
             $messages = $query->where('id', '>', (int) $request->after_id)
@@ -95,7 +95,7 @@ class AdminSupportController extends Controller
             'human_handled' => true,
         ]);
 
-        return response()->json(['success' => true, 'data' => $message]);
+        return response()->json(['success' => true, 'data' => $message->load('sender:id,name')]);
     }
 
     public function markRead(SupportConversation $conversation): JsonResponse
