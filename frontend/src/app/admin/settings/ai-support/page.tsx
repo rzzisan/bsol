@@ -42,9 +42,12 @@ const PROVIDERS: Provider[] = ["anthropic", "gemini", "groq", "openai", "openrou
 const PROVIDER_META: Record<Provider, { label: string; free: boolean; keyUrl: string; suggestedModel: string }> = {
   anthropic: { label: "Anthropic (Claude)", free: false, keyUrl: "console.anthropic.com", suggestedModel: "claude-opus-5" },
   gemini: { label: "Google Gemini", free: true, keyUrl: "ai.google.dev", suggestedModel: "gemini-2.5-flash" },
-  groq: { label: "Groq", free: true, keyUrl: "console.groq.com", suggestedModel: "llama-3.3-70b-versatile" },
+  groq: { label: "Groq", free: true, keyUrl: "console.groq.com", suggestedModel: "openai/gpt-oss-120b" },
   openai: { label: "OpenAI (GPT)", free: false, keyUrl: "platform.openai.com", suggestedModel: "gpt-4o-mini" },
-  openrouter: { label: "OpenRouter", free: false, keyUrl: "openrouter.ai", suggestedModel: "meta-llama/llama-3.3-70b-instruct:free" },
+  // OpenRouter's free (":free"-suffixed) models rotate/rate-limit dynamically
+  // by demand — this suggestion can go stale; verify at openrouter.ai/models
+  // if it starts failing with 404/429.
+  openrouter: { label: "OpenRouter", free: true, keyUrl: "openrouter.ai/models", suggestedModel: "minimax/minimax-m3:free" },
 };
 
 const labels = {
@@ -59,7 +62,7 @@ const labels = {
     updated: "সেটিংস আপডেট হয়েছে",
     goHome: "হোমে যান",
     providersTitle: "AI প্রোভাইডার ও API Key",
-    providersIntro: "যতগুলো প্রোভাইডারের key দিতে চাও দাও — নিচে থেকে যেকোনো একটাকে active হিসেবে বেছে নেওয়া যাবে। Gemini ও Groq-এর ফ্রি টিয়ার আছে, খরচ ছাড়াই AI চালানো যায়।",
+    providersIntro: "যতগুলো প্রোভাইডারের key দিতে চাও দাও — নিচে থেকে যেকোনো একটাকে active হিসেবে বেছে নেওয়া যাবে। Gemini, Groq ও OpenRouter-এর ফ্রি টিয়ার আছে। এর মধ্যে Groq সবচেয়ে স্থিতিশীল ফ্রি অপশন — Gemini-তে দ্রুত quota শেষ হতে পারে, আর OpenRouter-এর ফ্রি মডেল demand অনুযায়ী মাঝেমধ্যে সাময়িকভাবে rate-limit হয় (তখন AI নিরাপদে একজন অ্যাডমিনের কাছে পাঠিয়ে দেয়, silently আটকে থাকে না)।",
     free: "ফ্রি টিয়ার",
     apiKeyLabel: "API Key",
     apiKeyPlaceholderSaved: "সংরক্ষিত আছে — বদলাতে নতুন key লিখুন",
@@ -93,7 +96,7 @@ const labels = {
     updated: "Settings updated",
     goHome: "Go Home",
     providersTitle: "AI Providers & API Keys",
-    providersIntro: "Add keys for as many providers as you like — pick any one below as the active agent. Gemini and Groq have free tiers, so the feature can run at zero cost.",
+    providersIntro: "Add keys for as many providers as you like — pick any one below as the active agent. Gemini, Groq, and OpenRouter have free tiers. Groq is the most reliable free option — Gemini's free quota runs out quickly, and OpenRouter's free models get temporarily rate-limited by demand (the AI safely hands off to an admin when that happens, it never gets stuck silently).",
     free: "Free tier",
     apiKeyLabel: "API Key",
     apiKeyPlaceholderSaved: "Saved — type a new key to replace it",

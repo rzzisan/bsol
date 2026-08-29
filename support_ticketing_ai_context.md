@@ -56,6 +56,15 @@ Admin "Active Provider" dropdown থেকে Anthropic থেকে Groq-এ �
 - `/admin/settings/ai-support`-এ provider dropdown বদলালে, model ফিল্ড যদি এখনো কোনো provider-এর "unedited suggestion"-এর মতো দেখায় (খালি বা কোনো provider-এর suggested model-এর সাথে হুবহু মেলে), তাহলে স্বয়ংক্রিয়ভাবে নতুন provider-এর suggested model বসিয়ে দেয় — deliberately customized model name কখনো overwrite করে না।
 - Model ফিল্ডের নিচে এখন সবসময় সতর্কবার্তা + নির্বাচিত provider-এর জন্য সাজেস্টেড মডেল দেখায়।
 
+### সব ফ্রি প্রোভাইডার লাইভ-চেক করে ঠিক করা হয়েছে (2026-08-29)
+
+তিনটা saved key-ই (Groq, Gemini, OpenRouter) সরাসরি সেই প্রোভাইডারের live `/models` endpoint hit করে verify করা হয়েছে (guess করা হয়নি):
+- **Groq**: `llama-3.3-70b-versatile` আসলেই retire হয়ে গেছে (Groq-এর মডেল ক্যাটালগ পাল্টে গেছে)। Live model list চেক করে `openai/gpt-oss-120b` দিয়ে real tool-calling round-trip টেস্ট করে কাজ করা কনফার্ম করা হয়েছে — এখন এটাই suggested default।
+- **Gemini**: মডেল নাম (`gemini-2.5-flash`) ঠিকই ছিল, `429` আসলে সত্যিকারের free-tier quota exhausted — কোনো কোড/কনফিগ সমস্যা না, নতুন key বা quota reset-এর অপেক্ষা করতে হবে।
+- **OpenRouter**: suggested `meta-llama/llama-3.3-70b-instruct:free` ও পরে টেস্ট করা `z-ai/glm-5.2:free` দুটোই তখন upstream rate-limited ছিল (OpenRouter free মডেলের capacity demand অনুযায়ী ওঠানামা করে) — `minimax/minimax-m3:free` দিয়ে সেই মুহূর্তে tool-calling টেস্ট পাস করেছে, এখন suggested default। এই volatility structural, কোনো নির্দিষ্ট মডেল নাম স্থায়ীভাবে নির্ভরযোগ্য না — সেটিংস পেজে এখন স্পষ্ট সতর্কবার্তা আছে।
+
+লাইভ `platform_ai_support_settings`/`ai_provider_credentials` রো সরাসরি আপডেট করে active provider **Groq + `openai/gpt-oss-120b`**-এ সেট করা হয়েছে (এই তিনটার মধ্যে সবচেয়ে স্থিতিশীল প্রমাণিত)।
+
 ### প্রি-রিকুইজিট বদলে গেছে
 
 আগে `backend/.env`-এ `ANTHROPIC_API_KEY` বসাতে হতো — এখন সেটা আর ব্যবহৃত হয় না। এখন **সরাসরি `/admin/settings/ai-support` পেজ থেকে** যেকোনো প্রোভাইডারের key পেস্ট করে "Save this provider" চাপলেই key `ai_provider_credentials` টেবিলে এনক্রিপ্টেড অবস্থায় জমা হয়ে যায় — কোনো `.env`/ডিপ্লয় লাগে না।
