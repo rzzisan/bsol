@@ -5,6 +5,7 @@ namespace App\Services\Support;
 use App\Models\AiKnowledgeBaseArticle;
 use App\Models\Order;
 use App\Models\PlatformAiSupportSetting;
+use App\Models\SubscriptionPackage;
 use App\Models\SubscriptionPayment;
 use App\Models\SupportConversation;
 use App\Models\SupportMessage;
@@ -30,6 +31,12 @@ use Illuminate\Support\Str;
  */
 class AiSupportAgentService
 {
+    // Free-tier providers cap tokens-per-minute tightly (Groq's gpt-oss-120b
+    // is 8,000 TPM) — an unbounded full-thread history was blowing past that
+    // on longer tickets even before adding tool schemas. Only the most
+    // recent messages carry real conversational context anyway.
+    private const MAX_HISTORY_MESSAGES = 12;
+
     public function __construct(private readonly AiProviderClientFactory $providerFactory) {}
 
     public function respondToTicket(SupportTicket $ticket): void
@@ -40,7 +47,8 @@ class AiSupportAgentService
             return; // no owner, or a human already took over — AI stays out.
         }
 
-        $history = $ticket->messages()->orderBy('id')->get()
+        $history = $ticket->messages()->orderByDesc('id')->limit(self::MAX_HISTORY_MESSAGES)->get()
+            ->sortBy('id')->values()
             ->map(fn (SupportTicketMessage $m) => $this->toApiMessage($m->sender_type, $m->message))
             ->all();
 
@@ -81,7 +89,8 @@ class AiSupportAgentService
             return; // a human admin has already replied here — AI stays out.
         }
 
-        $history = $conversation->messages()->orderBy('id')->get()
+        $history = $conversation->messages()->orderByDesc('id')->limit(self::MAX_HISTORY_MESSAGES)->get()
+            ->sortBy('id')->values()
             ->map(fn (SupportMessage $m) => $this->toApiMessage($m->sender_type, $m->message))
             ->all();
 
@@ -207,6 +216,11 @@ class AiSupportAgentService
                 'inputSchema' => $emptySchema,
             ],
             [
+                'name' => 'get_available_packages',
+                'description' => 'All currently active subscription packages with price, billing period, order limit, and features — use this for "which package should I use" / "how much does it cost" / plan-comparison questions instead of guessing. No input needed.',
+                'inputSchema' => $emptySchema,
+            ],
+            [
                 'name' => 'search_platform_help',
                 'description' => "Search this SaaS platform's own how-to knowledge base — use this for 'how do I use module X' / 'how do I buy Y' questions (orders, products, courier, SMS, WhatsApp, Facebook, landing pages, analytics, accounting, subscription/billing, store settings, support) BEFORE deciding to escalate. Not for account-specific data — use the other tools for that.",
                 'inputSchema' => [
@@ -249,6 +263,17 @@ class AiSupportAgentService
                         ->get(['order_number', 'status', 'payment_status', 'courier_status', 'total', 'created_at'])
                 ),
                 'search_platform_help' => $this->searchKnowledgeBase((string) ($input['query'] ?? '')),
+                'get_available_packages' => json_encode(
+                    SubscriptionPackage::where('is_active', true)->orderBy('price')
+                        ->get(['name', 'price', 'duration_days', 'max_orders', 'features'])
+                        ->map(fn (SubscriptionPackage $p) => [
+                            'name' => $p->name,
+                            'price' => $p->price,
+                            'billing_period_days' => $p->duration_days,
+                            'max_orders_per_period' => $p->max_orders ?? 'unlimited',
+                            'features' => $p->features,
+                        ])
+                ),
                 'get_recent_payments' => json_encode(
                     SubscriptionPayment::where('user_id', $user->id)->latest()->limit(10)
                         ->get(['amount', 'status', 'payment_method', 'trx_id', 'admin_note', 'created_at'])
@@ -339,6 +364,7 @@ class AiSupportAgentService
 কাজের নিয়ম:
 - এই প্ল্যাটফর্মের যেকোনো মডিউল কিভাবে ব্যবহার করতে হয় (অর্ডার, প্রোডাক্ট, কুরিয়ার, SMS, WhatsApp, Facebook, ল্যান্ডিং পেজ, অ্যানালিটিক্স, অ্যাকাউন্টিং, সাবস্ক্রিপশন/বিলিং, স্টোর সেটিংস, সাপোর্ট) — এই ধরনের "কিভাবে করব" প্রশ্নে সাহায্য করার আগে অবশ্যই search_platform_help টুল দিয়ে খুঁজে দেখুন। সরাসরি escalate করার আগে এটা try করা বাধ্যতামূলক।
 - সেলারের নিজের অ্যাকাউন্ট-নির্দিষ্ট প্রশ্নে (সাবস্ক্রিপশন স্ট্যাটাস, নিজের অর্ডার, নিজের পেমেন্ট) get_subscription_status/get_recent_orders/get_recent_payments টুল ব্যবহার করুন — অনুমান না করে সবসময় টুল থেকে প্রকৃত তথ্য যাচাই করে উত্তর দিন।
+- "কোন প্যাকেজ নেব", "কত টাকা", "কত অর্ডার পর্যন্ত পারব" — এই ধরনের প্রশ্নে get_available_packages টুল কল করে আসল দাম/লিমিট দেখে সেলারের বলা চাহিদার (যেমন দৈনিক অর্ডার সংখ্যা) সাথে মিলিয়ে সুপারিশ করুন — কখনও দাম/লিমিট অনুমান করবেন না।
 - সেলার যে ভাষায় প্রশ্ন করেছেন (বাংলা/ইংরেজি) সেই ভাষাতেই উত্তর দিন।
 - আপনি কখনও কোনো write action সম্পাদন করতে পারবেন না — রিফান্ড, সাবস্ক্রিপশন বাতিল/পরিবর্তন, বা অন্য কোনো অ্যাকাউন্ট পরিবর্তন। এমন অনুরোধ পেলে escalate_to_admin কল করুন এবং সেলারকে সংক্ষেপে জানান যে আমাদের একজন সাপোর্ট এজেন্ট শীঘ্রই যোগাযোগ করবেন।
 - search_platform_help-এ কিছু না পেলে এবং নিজের জ্ঞান দিয়েও নিশ্চিতভাবে উত্তর দিতে না পারলে — অনুমান করে ভুল তথ্য না দিয়ে escalate_to_admin কল করুন।

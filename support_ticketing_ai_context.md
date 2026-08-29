@@ -84,6 +84,16 @@ Admin "Active Provider" dropdown থেকে Anthropic থেকে Groq-এ �
 
 Backend: `SupportMessage`/`SupportTicketMessage`-এর `sender()` relation আগে থেকেই ছিল, শুধু চারটা controller-এর (`SupportController`, `AdminSupportController`, `SupportTicketController`, `AdminSupportTicketController`) `messages()`/`send()` response-এ `->with('sender:id,name')` / `->load('sender:id,name')` যোগ করা হয়েছে — key ফাঁস হয় না, শুধু id+name। AI-লিখিত মেসেজে `sender_id` null-ই থাকে, ফ্রন্টএন্ড নিজেই `sender_type === 'ai'` দেখে "BSOL" বসায়।
 
+### প্যাকেজ প্রশ্নের জন্য নতুন টুল + TPM চাপ কমানো (added 2026-08-29)
+
+লাইভ টেস্টে "daily 250+ order-এর জন্য কোন প্যাকেজ নেব" প্রশ্নে AI escalate করে দিচ্ছিল — কারণ প্যাকেজ/দাম/লিমিট সংক্রান্ত কোনো টুল ছিল না। একই সময়ে Groq-এ TPM (8000, `openai/gpt-oss-120b`) rate-limit-এ ধরাও পড়ছিল বড় ticket thread-এ।
+
+- **নতুন টুল `get_available_packages`** — লাইভ `subscription_packages` টেবিল থেকে active প্যাকেজের নাম/দাম/duration/`max_orders` (null = unlimited, `OrderStatusService::consumeProcessingQuotaOrFail()`-এর কনভেনশন অনুযায়ী কনফার্ম করা)/features সরাসরি পড়ে — কোনো ডুপ্লিকেট/স্ট্যাটিক কন্টেন্ট মেইনটেইন করতে হয় না, প্যাকেজ পেজে (`/admin/packages`) দাম বদলালে এই টুলও সাথে সাথে আপডেটেড থাকবে।
+- **History trim** — আগে পুরো thread (unbounded) প্রতি রিকোয়েস্টে পাঠানো হতো, এখন সর্বশেষ ১২টা মেসেজ পাঠানো হয় (`AiSupportAgentService::MAX_HISTORY_MESSAGES`) — লম্বা টিকিটে TPM চাপ কমাতে।
+- **`groq/compound`/`compound-mini` মডেল ব্যবহার করা যাবে না** — যদিও TPM অনেক বেশি (70K বনাম gpt-oss-এর 8K), এই মডেলগুলো custom tool-calling সাপোর্ট করে না ("agentic compound" সিস্টেম, নিজস্ব built-in টুল চালায়) — লাইভ টেস্টে `400 tool calling is not supported with this model` কনফার্ম করা হয়েছে।
+
+🔴 **জরুরি ডেটা সমস্যা পাওয়া গেছে (এখনো ফিক্স করা হয়নি, admin-কে জানানো হয়েছে):** লাইভ টেস্টে টুলটা রিয়েল ডেটা টেনে "Business" প্যাকেজকে **৳15/মাসে unlimited অর্ডার** হিসেবে সুপারিশ করেছে — অথচ "Growth" প্যাকেজ ৳1999/মাসে মাত্র 500 অর্ডার লিমিট। এটা স্পষ্টতই ভাঙা/leftover টেস্ট ডেটা (`subscription_packages` টেবিলে Business-এর `price`/`max_orders` ভুল বসানো আছে) — AI ঠিকই কাজ করছে, কিন্তু ভুল দামের ডেটা পড়ে সেলারকে ভুল/অবাস্তব অফার বলে দিচ্ছে। **`/admin/packages`-এ গিয়ে Business প্যাকেজের দাম/লিমিট ঠিক না করা পর্যন্ত এই টুল চালু রাখা ঝুঁকিপূর্ণ** — সেলারকে ভুল দাম বলে ফেললে সেটা নিয়ে দাবি উঠতে পারে।
+
 ### প্রি-রিকুইজিট বদলে গেছে
 
 আগে `backend/.env`-এ `ANTHROPIC_API_KEY` বসাতে হতো — এখন সেটা আর ব্যবহৃত হয় না। এখন **সরাসরি `/admin/settings/ai-support` পেজ থেকে** যেকোনো প্রোভাইডারের key পেস্ট করে "Save this provider" চাপলেই key `ai_provider_credentials` টেবিলে এনক্রিপ্টেড অবস্থায় জমা হয়ে যায় — কোনো `.env`/ডিপ্লয় লাগে না।
