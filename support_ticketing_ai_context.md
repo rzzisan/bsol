@@ -102,6 +102,18 @@ Backend: `SupportMessage`/`SupportTicketMessage`-এর `sender()` relation আ�
 - **Frontend**: নতুন `frontend/src/components/page-help-button.tsx`, `UserShell`-এ globally মাউন্ট করা (SupportChatWidget-এর মতোই — প্রতিটা `/dashboard/*` পেজে automatic)। `usePathname()` দিয়ে বর্তমান route detect করে একটা longest-prefix-match টেবিল (`ROUTE_TO_SLUG`) দিয়ে সঠিক knowledge-base slug বের করে — যে পেজের জন্য কোনো slug ম্যাচ করে না (যেমন `/dashboard` overview) সেখানে বাটনই দেখায় না।
 - Admin `/admin/settings/ai-knowledge-base`-এ কোনো আর্টিকেল এডিট করলে সাথে সাথে এই বাটনেও এবং AI-এর `search_platform_help` টুলেও — দুই জায়গাতেই আপডেটেড কন্টেন্ট দেখা যাবে, একবারই মেইনটেইন করতে হয়।
 
+## ইনস্ট্যান্ট সমস্যা নির্ণয় (added 2026-08-29)
+
+আগে AI শুধু "কিভাবে করব" প্রশ্নে সাহায্য করতে পারত, কিন্তু "কেন X কাজ করছে না" প্রশ্নে concrete কোনো তথ্য ছাড়াই escalate করে দিত। এখন তিনটা নির্দিষ্ট সমস্যার জন্য নতুন `app/Services/Support/SupportDiagnosticsService.php` — প্রতিটা মেথড সেলারের নিজের একাউন্টের আসল state চেক করে শুধু raw fact রিটার্ন করে (কোনো verdict/prose না) — মডেল নিজেই ফ্যাক্ট দেখে বুঝিয়ে বলে, সমস্যা না থাকলে সেটাও স্পষ্ট করে বলার নির্দেশ system prompt-এ আছে।
+
+- **`diagnose_no_new_orders`** — storefront subdomain কনফিগার+active কিনা, storefront-এ visible active প্রোডাক্ট সংখ্যা, শেষ অর্ডার কতদিন আগে, গত ৭ দিনে abandoned checkout সংখ্যা (>0 মানে real traffic আসছে কিন্তু convert হচ্ছে না — zero-traffic থেকে আলাদা কারণ), সাবস্ক্রিপশন স্ট্যাটাস।
+- **`diagnose_sms_not_sending`** — platform-wide SMS গেটওয়ে active কিনা (এটা false হলে সেলার নিজে ঠিক করতে পারবে না, admin-level ইস্যু), সেলারের নিজের SMS ক্রেডিট ব্যালেন্স, সাম্প্রতিক ৫টা ব্যর্থ পাঠানোর আসল error_message।
+- **`diagnose_wordpress_not_connecting`** — সেলারের নিজের WooCommerce `PlatformApiKey` — key generate করা হয়েছে কিনা, status (pending = কখনো successfully connect হয়নি / connected / revoked), domain, শেষ কবে ব্যবহার হয়েছে।
+
+লাইভ টেস্টে verify করা হয়েছে ("amar sms pathano jacche na") — AI সঠিকভাবে গেটওয়ে/ক্রেডিট/সাম্প্রতিক-ব্যর্থতা চেক করে "system-side কোনো বাধা নেই" বলে সম্ভাব্য অন্য কারণ (ফোন নম্বর ফরম্যাট, নেটওয়ার্ক) সাজেস্ট করেছে — বানিয়ে কারণ বলেনি, চুপচাপ escalate-ও করেনি।
+
+টেস্টে একটা রিয়েল বাগ ধরা পড়েছিল (শিপ করার আগেই ফিক্স হয়েছে): Carbon-এর `diffInDays()` signed sign convention-এর কারণে `days_since_last_order`/`days_since_last_used` মাঝেমধ্যে negative আসছিল — `abs()` দিয়ে ফিক্স করা হয়েছে।
+
 ### প্রি-রিকুইজিট বদলে গেছে
 
 আগে `backend/.env`-এ `ANTHROPIC_API_KEY` বসাতে হতো — এখন সেটা আর ব্যবহৃত হয় না। এখন **সরাসরি `/admin/settings/ai-support` পেজ থেকে** যেকোনো প্রোভাইডারের key পেস্ট করে "Save this provider" চাপলেই key `ai_provider_credentials` টেবিলে এনক্রিপ্টেড অবস্থায় জমা হয়ে যায় — কোনো `.env`/ডিপ্লয় লাগে না।

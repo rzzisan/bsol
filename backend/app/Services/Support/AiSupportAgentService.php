@@ -37,7 +37,10 @@ class AiSupportAgentService
     // recent messages carry real conversational context anyway.
     private const MAX_HISTORY_MESSAGES = 12;
 
-    public function __construct(private readonly AiProviderClientFactory $providerFactory) {}
+    public function __construct(
+        private readonly AiProviderClientFactory $providerFactory,
+        private readonly SupportDiagnosticsService $diagnostics,
+    ) {}
 
     public function respondToTicket(SupportTicket $ticket): void
     {
@@ -221,6 +224,21 @@ class AiSupportAgentService
                 'inputSchema' => $emptySchema,
             ],
             [
+                'name' => 'diagnose_no_new_orders',
+                'description' => "Checks the seller's own account for concrete reasons new storefront orders might not be coming in — storefront/subdomain reachability, whether any products are actually visible for sale, days since the last order, and recent abandoned-checkout activity (signals real traffic vs. none at all). Use this instead of guessing when a seller reports 'no new orders' / 'orders not coming'. No input needed.",
+                'inputSchema' => $emptySchema,
+            ],
+            [
+                'name' => 'diagnose_sms_not_sending',
+                'description' => "Checks why SMS might not be sending — whether the platform's SMS gateway is active at all, the seller's own SMS credit balance, and their most recent failed sends with the actual error message. No input needed.",
+                'inputSchema' => $emptySchema,
+            ],
+            [
+                'name' => 'diagnose_wordpress_not_connecting',
+                'description' => "Checks the seller's own WordPress/WooCommerce plugin connection key — whether one was ever generated, its status (pending = never successfully connected, connected = has worked, revoked = needs a new key), the domain on file, and how long since it was last used. No input needed.",
+                'inputSchema' => $emptySchema,
+            ],
+            [
                 'name' => 'search_platform_help',
                 'description' => "Search this SaaS platform's own how-to knowledge base — use this for 'how do I use module X' / 'how do I buy Y' questions (orders, products, courier, SMS, WhatsApp, Facebook, landing pages, analytics, accounting, subscription/billing, store settings, support) BEFORE deciding to escalate. Not for account-specific data — use the other tools for that.",
                 'inputSchema' => [
@@ -262,6 +280,9 @@ class AiSupportAgentService
                     Order::where('user_id', $user->id)->latest()->limit(10)
                         ->get(['order_number', 'status', 'payment_status', 'courier_status', 'total', 'created_at'])
                 ),
+                'diagnose_no_new_orders' => json_encode($this->diagnostics->diagnoseNoNewOrders($user)),
+                'diagnose_sms_not_sending' => json_encode($this->diagnostics->diagnoseSmsNotSending($user)),
+                'diagnose_wordpress_not_connecting' => json_encode($this->diagnostics->diagnoseWordpressNotConnecting($user)),
                 'search_platform_help' => $this->searchKnowledgeBase((string) ($input['query'] ?? '')),
                 'get_available_packages' => json_encode(
                     SubscriptionPackage::where('is_active', true)->orderBy('price')
@@ -365,6 +386,7 @@ class AiSupportAgentService
 - এই প্ল্যাটফর্মের যেকোনো মডিউল কিভাবে ব্যবহার করতে হয় (অর্ডার, প্রোডাক্ট, কুরিয়ার, SMS, WhatsApp, Facebook, ল্যান্ডিং পেজ, অ্যানালিটিক্স, অ্যাকাউন্টিং, সাবস্ক্রিপশন/বিলিং, স্টোর সেটিংস, সাপোর্ট) — এই ধরনের "কিভাবে করব" প্রশ্নে সাহায্য করার আগে অবশ্যই search_platform_help টুল দিয়ে খুঁজে দেখুন। সরাসরি escalate করার আগে এটা try করা বাধ্যতামূলক।
 - সেলারের নিজের অ্যাকাউন্ট-নির্দিষ্ট প্রশ্নে (সাবস্ক্রিপশন স্ট্যাটাস, নিজের অর্ডার, নিজের পেমেন্ট) get_subscription_status/get_recent_orders/get_recent_payments টুল ব্যবহার করুন — অনুমান না করে সবসময় টুল থেকে প্রকৃত তথ্য যাচাই করে উত্তর দিন।
 - "কোন প্যাকেজ নেব", "কত টাকা", "কত অর্ডার পর্যন্ত পারব" — এই ধরনের প্রশ্নে get_available_packages টুল কল করে আসল দাম/লিমিট দেখে সেলারের বলা চাহিদার (যেমন দৈনিক অর্ডার সংখ্যা) সাথে মিলিয়ে সুপারিশ করুন — কখনও দাম/লিমিট অনুমান করবেন না।
+- "কেন নতুন অর্ডার আসছে না", "কেন SMS যাচ্ছে না", "কেন WordPress প্লাগইন কানেক্ট হচ্ছে না" — এই ধরনের সমস্যায় সংশ্লিষ্ট diagnose_* টুল (diagnose_no_new_orders / diagnose_sms_not_sending / diagnose_wordpress_not_connecting) কল করুন। টুল যা ফ্যাক্ট দেয় তার ভিত্তিতে সম্ভাব্য কারণ ও সমাধান বলুন। **টুল কোনো সমস্যা খুঁজে না পেলে সেটাও স্পষ্ট করে বলুন** (যেমন: "আমি চেক করেছি, স্টোরফ্রন্ট/প্রোডাক্ট/ক্রেডিট সব ঠিক আছে — সমস্যাটা সম্ভবত অন্য কারণে, একজন টিম সদস্য আরও গভীরে দেখবেন") — চুপচাপ escalate করবেন না বা বানিয়ে কারণ বলবেন না।
 - সেলার যে ভাষায় প্রশ্ন করেছেন (বাংলা/ইংরেজি) সেই ভাষাতেই উত্তর দিন।
 - আপনি কখনও কোনো write action সম্পাদন করতে পারবেন না — রিফান্ড, সাবস্ক্রিপশন বাতিল/পরিবর্তন, বা অন্য কোনো অ্যাকাউন্ট পরিবর্তন। এমন অনুরোধ পেলে escalate_to_admin কল করুন এবং সেলারকে সংক্ষেপে জানান যে আমাদের একজন সাপোর্ট এজেন্ট শীঘ্রই যোগাযোগ করবেন।
 - search_platform_help-এ কিছু না পেলে এবং নিজের জ্ঞান দিয়েও নিশ্চিতভাবে উত্তর দিতে না পারলে — অনুমান করে ভুল তথ্য না দিয়ে escalate_to_admin কল করুন।
