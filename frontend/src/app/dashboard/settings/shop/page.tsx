@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import UserShell from "@/components/user-shell";
-import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
+import { getStoredLocale, getStoredToken, sanitizeSubdomainInput, type Locale } from "@/lib/dashboard-client";
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -36,6 +36,7 @@ const t = {
     subdomainLabel: "সাবডোমেইন",
     subdomainPlaceholder: "যেমন: rahimfashion",
     checking: "যাচাই করা হচ্ছে...",
+    strippedHint: "শুধু ছোট হাতের অক্ষর, সংখ্যা ও হাইফেন রাখা হয়েছে — \".com\", স্পেস বা অন্য চিহ্ন প্রয়োজন নেই, তাই বাদ দেওয়া হয়েছে।",
     available: "এই ঠিকানাটি পাওয়া যাচ্ছে",
     claim: "ঠিকানা সেট করুন",
     claiming: "সেট হচ্ছে...",
@@ -85,6 +86,7 @@ const t = {
     subdomainLabel: "Subdomain",
     subdomainPlaceholder: "e.g. rahimfashion",
     checking: "Checking...",
+    strippedHint: "Only lowercase letters, numbers and hyphens are kept — \".com\", spaces and other characters aren't needed here, so they were dropped.",
     available: "This address is available",
     claim: "Set address",
     claiming: "Setting...",
@@ -144,6 +146,7 @@ function SubdomainPanel({
   );
   const [editing, setEditing] = useState(!current);
   const [input, setInput] = useState("");
+  const [strippedHint, setStrippedHint] = useState(false);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ success: boolean; text: string } | null>(null);
@@ -298,7 +301,12 @@ function SubdomainPanel({
             <div className="flex items-center gap-2">
               <input
                 value={input}
-                onChange={(e) => setInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const clean = sanitizeSubdomainInput(raw);
+                  setStrippedHint(raw.length > 0 && raw.toLowerCase() !== clean);
+                  setInput(clean);
+                }}
                 placeholder={txt.subdomainPlaceholder}
                 autoComplete="off"
                 spellCheck={false}
@@ -308,6 +316,7 @@ function SubdomainPanel({
             </div>
           </label>
 
+          {strippedHint && <p className="text-xs text-amber-500">{txt.strippedHint}</p>}
           {checking && <p className="text-xs text-[var(--muted)]">{txt.checking}</p>}
           {!checking && settled?.available && (
             <p className="text-xs text-emerald-400">{txt.available}</p>

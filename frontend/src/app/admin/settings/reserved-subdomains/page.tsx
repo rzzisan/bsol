@@ -9,6 +9,7 @@ import {
   getStoredToken,
   getStoredUser,
   normalizeRole,
+  sanitizeSubdomainInput,
   type AuthUser,
   type Locale,
   type ThemeMode,
@@ -217,7 +218,7 @@ export default function ReservedSubdomainsPage() {
             <div className="flex items-center gap-1">
               <input
                 value={newLabel}
-                onChange={(e) => setNewLabel(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                onChange={(e) => setNewLabel(sanitizeSubdomainInput(e.target.value))}
                 placeholder={txt.placeholder}
                 autoComplete="off"
                 className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"

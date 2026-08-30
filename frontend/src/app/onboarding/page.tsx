@@ -5,6 +5,7 @@ import {
   clearStoredAuth,
   getStoredLocale,
   getStoredToken,
+  sanitizeSubdomainInput,
   type Locale,
 } from "@/lib/dashboard-client";
 
@@ -35,6 +36,7 @@ const t = {
     address: "ঠিকানা (পিকআপ ঠিকানা)",
     addressPlaceholder: "দোকান/গুদামের সম্পূর্ণ ঠিকানা",
     next: "পরবর্তী ধাপ",
+    back: "পূর্ববর্তী ধাপ",
     saving: "সেভ হচ্ছে...",
     domainTitle: "আপনার শপের ঠিকানা",
     domainIntro: "এই ঠিকানাতেই আপনার ড্যাশবোর্ড ও ল্যান্ডিং পেজ চলবে। বিজ্ঞাপনের লিংকও এটাই হবে।",
@@ -53,6 +55,7 @@ const t = {
     reasonTooShort: "কমপক্ষে ৩ অক্ষর দিন।",
     reasonTooLong: "সর্বোচ্চ ৬৩ অক্ষর।",
     reasonInvalid: "শুধু ছোট হাতের অক্ষর, সংখ্যা ও মাঝখানে একক হাইফেন।",
+    strippedHint: "শুধু ছোট হাতের অক্ষর, সংখ্যা ও হাইফেন রাখা হয়েছে — \".com\", স্পেস বা অন্য চিহ্ন প্রয়োজন নেই, তাই বাদ দেওয়া হয়েছে।",
   },
   en: {
     title: "Shop setup",
@@ -67,6 +70,7 @@ const t = {
     address: "Address (pickup address)",
     addressPlaceholder: "Full address of your shop/warehouse",
     next: "Next step",
+    back: "Back",
     saving: "Saving...",
     domainTitle: "Your shop address",
     domainIntro: "Your dashboard and landing pages will live here. This is also what your ads will point at.",
@@ -85,6 +89,7 @@ const t = {
     reasonTooShort: "Use at least 3 characters.",
     reasonTooLong: "Use at most 63 characters.",
     reasonInvalid: "Lowercase letters, numbers and single hyphens only.",
+    strippedHint: "Only lowercase letters, numbers and hyphens are kept — \".com\", spaces and other characters aren't needed here, so they were dropped.",
   },
 };
 
@@ -101,6 +106,7 @@ export default function OnboardingPage() {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [label, setLabel] = useState("");
+  const [strippedHint, setStrippedHint] = useState(false);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -230,11 +236,18 @@ export default function OnboardingPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4 py-10 text-[var(--foreground)]">
       <div className="w-full max-w-lg">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between">
           <h1 className="text-lg font-bold">{txt.title}</h1>
           <span className="text-xs text-[var(--muted)]">
             {txt.step} {step} {txt.of} 2
           </span>
+        </div>
+
+        <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-soft)]">
+          <div
+            className="h-full rounded-full bg-[var(--accent)] transition-all"
+            style={{ width: step === 1 ? "50%" : "100%" }}
+          />
         </div>
 
         <div className="catv-panel p-5">
@@ -247,12 +260,12 @@ export default function OnboardingPage() {
 
               <div className="mt-4 grid gap-3">
                 <label>
-                  <span className="mb-1 block text-xs text-[var(--muted)]">{txt.shopName}</span>
+                  <span className="mb-1 block text-xs text-[var(--muted)]">{txt.shopName} <span className="text-red-400">*</span></span>
                   <input value={shopName} onChange={(e) => setShopName(e.target.value)} placeholder={txt.shopNamePlaceholder} className={input} />
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label>
-                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.phone}</span>
+                    <span className="mb-1 block text-xs text-[var(--muted)]">{txt.phone} <span className="text-red-400">*</span></span>
                     <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="numeric" className={input} />
                   </label>
                   <label>
@@ -261,7 +274,7 @@ export default function OnboardingPage() {
                   </label>
                 </div>
                 <label>
-                  <span className="mb-1 block text-xs text-[var(--muted)]">{txt.address}</span>
+                  <span className="mb-1 block text-xs text-[var(--muted)]">{txt.address} <span className="text-red-400">*</span></span>
                   <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={3} placeholder={txt.addressPlaceholder} className={input} />
                 </label>
               </div>
@@ -277,7 +290,12 @@ export default function OnboardingPage() {
                 <div className="flex items-center gap-2">
                   <input
                     value={label}
-                    onChange={(e) => setLabel(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const clean = sanitizeSubdomainInput(raw);
+                      setStrippedHint(raw.length > 0 && raw.toLowerCase() !== clean);
+                      setLabel(clean);
+                    }}
                     placeholder={txt.domainPlaceholder}
                     autoComplete="off"
                     spellCheck={false}
@@ -287,6 +305,7 @@ export default function OnboardingPage() {
                 </div>
               </label>
 
+              {strippedHint && <p className="mt-2 text-xs text-amber-500">{txt.strippedHint}</p>}
               {checking && <p className="mt-2 text-xs text-[var(--muted)]">{txt.checking}</p>}
               {!checking && settled?.available && <p className="mt-2 text-xs text-emerald-400">{txt.available}</p>}
               {!checking && settled && !settled.available && (
@@ -314,19 +333,29 @@ export default function OnboardingPage() {
                 type="button"
                 onClick={() => void saveProfile()}
                 disabled={busy || !profileValid}
-                className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[var(--border)] disabled:text-[var(--muted)]"
               >
                 {busy ? txt.saving : txt.next}
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => void finish()}
-                disabled={busy || checking || !settled?.available}
-                className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {busy ? txt.finishing : txt.finish}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  disabled={busy}
+                  className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--surface-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {txt.back}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void finish()}
+                  disabled={busy || checking || !settled?.available}
+                  className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[var(--border)] disabled:text-[var(--muted)]"
+                >
+                  {busy ? txt.finishing : txt.finish}
+                </button>
+              </div>
             )}
           </div>
         </div>

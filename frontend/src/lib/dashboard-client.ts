@@ -138,6 +138,24 @@ export function normalizeRole(user: AuthUser | null): "admin" | "user" | null {
 }
 
 /**
+ * Sanitizes a raw subdomain-label input as the seller types, mirroring
+ * SubdomainPolicy::normalize() on the backend exactly (strip a pasted
+ * protocol, keep only the first label of a pasted full host, then drop
+ * anything else invalid). Previously each of the 3 call sites did their
+ * own cruder `.replace(/[^a-z0-9-]/g, "")` with no protocol/dot handling,
+ * so pasting "MyShop.com" silently became "myshopcom" (dot just deleted,
+ * fusing the TLD into the label) instead of the backend's intended
+ * "myshop" — the user never saw any hint their input had been altered.
+ * See pre_launch_polish_context.md-adjacent onboarding-wizard review.
+ */
+export function sanitizeSubdomainInput(raw: string): string {
+  let value = raw.toLowerCase();
+  value = value.replace(/^https?:\/\//, "");
+  if (value.includes(".")) value = value.split(".")[0];
+  return value.replace(/[^a-z0-9-]/g, "");
+}
+
+/**
  * Fetches an authenticated PDF (or any file) via Bearer token and opens it
  * in a new tab. Plain <a href> can't carry the Authorization header, so the
  * file has to be fetched as a blob first — used for invoice PDFs
