@@ -125,7 +125,50 @@ class AiSupportAgentService
                 ]);
                 $conversation->update(['admin_unread_count' => $conversation->admin_unread_count + 1]);
             },
+            onOpenTicket: function (string $subject, string $category) use ($conversation, $user) {
+                return $this->openTicketFromConversation($conversation, $user, $subject, $category);
+            },
         );
+    }
+
+    /**
+     * Live-chat-only escalation path (support_ticketing_ai_context.md
+     * §"ask before opening a ticket"): copies the chat transcript into a new
+     * ticket so admin has full context, flags it escalated, and hands back
+     * the ticket number for the AI to tell the seller.
+     */
+    private function openTicketFromConversation(SupportConversation $conversation, User $user, string $subject, string $category): string
+    {
+        $ticket = SupportTicket::create([
+            'ticket_number' => 'PENDING',
+            'user_id' => $user->id,
+            'subject' => $subject !== '' ? $subject : 'Opened from live chat',
+            'category' => in_array($category, SupportTicket::CATEGORIES, true) ? $category : 'other',
+            'escalated' => true,
+            'escalation_reason' => 'Seller asked to open a ticket from live chat',
+        ]);
+        $ticket->update(['ticket_number' => 'TKT-'.str_pad((string) $ticket->id, 6, '0', STR_PAD_LEFT)]);
+
+        $lastMessage = null;
+        foreach ($conversation->messages()->orderBy('id')->get() as $m) {
+            $lastMessage = SupportTicketMessage::create([
+                'ticket_id' => $ticket->id,
+                'sender_type' => $m->sender_type,
+                'sender_id' => $m->sender_id,
+                'message' => $m->message,
+            ]);
+        }
+
+        $ticket->update([
+            'last_message_at' => $lastMessage?->created_at ?? now(),
+            'last_message_preview' => Str::limit($lastMessage?->message ?? $ticket->subject, 120),
+            'last_message_sender_type' => $lastMessage?->sender_type ?? 'user',
+            'admin_unread_count' => 1,
+        ]);
+
+        Log::info('ai_support.ticket_opened_from_chat', ['conversation_id' => $conversation->id, 'ticket_id' => $ticket->id]);
+
+        return $ticket->ticket_number;
     }
 
     private function toApiMessage(string $senderType, string $text): array
@@ -135,7 +178,7 @@ class AiSupportAgentService
         return ['role' => $senderType === 'user' ? 'user' : 'assistant', 'content' => $text];
     }
 
-    private function respond(User $user, array $history, \Closure $onReply, \Closure $onEscalate): void
+    private function respond(User $user, array $history, \Closure $onReply, \Closure $onEscalate, ?\Closure $onOpenTicket = null): void
     {
         $settings = PlatformAiSupportSetting::current();
 
@@ -159,10 +202,10 @@ class AiSupportAgentService
 
         try {
             $finalText = $provider->respond(
-                $this->systemPrompt($settings),
+                $this->systemPrompt($settings, isLiveChat: $onOpenTicket !== null),
                 $history,
-                $this->toolDefinitions(),
-                $this->toolDispatcher($user, $onEscalate),
+                $this->toolDefinitions(includeOpenTicket: $onOpenTicket !== null),
+                $this->toolDispatcher($user, $onEscalate, $onOpenTicket),
             );
         } catch (\Throwable $e) {
             Log::error('ai_support.generate_failed', ['provider' => $settings->provider, 'user_id' => $user->id, 'error' => $e->getMessage()]);
@@ -198,11 +241,11 @@ class AiSupportAgentService
     }
 
     /** Provider-agnostic tool definitions — every adapter translates these into its own wire format. */
-    private function toolDefinitions(): array
+    private function toolDefinitions(bool $includeOpenTicket): array
     {
         $emptySchema = ['type' => 'object', 'properties' => new \stdClass, 'required' => []];
 
-        return [
+        $tools = [
             [
                 'name' => 'get_subscription_status',
                 'description' => "The seller's own current subscription package, status, and renewal date. No input needed.",
@@ -262,12 +305,31 @@ class AiSupportAgentService
                 ],
             ],
         ];
+
+        if ($includeOpenTicket) {
+            // Live-chat only — see the system prompt rule this pairs with:
+            // ask the seller first, only call this after they say yes.
+            $tools[] = [
+                'name' => 'open_support_ticket',
+                'description' => "Opens a formal support ticket from this live chat conversation, copying the chat transcript into it so the admin team has full context. Only call this AFTER the seller has explicitly agreed (in their own words) that they want a ticket opened — never call it unprompted or on the first sign of trouble.",
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'subject' => ['type' => 'string', 'description' => "Short subject line summarizing the seller's problem"],
+                        'category' => ['type' => 'string', 'enum' => SupportTicket::CATEGORIES],
+                    ],
+                    'required' => ['subject', 'category'],
+                ],
+            ];
+        }
+
+        return $tools;
     }
 
     /** One dispatcher every provider adapter calls the same way: fn(name, input): string. */
-    private function toolDispatcher(User $user, \Closure $onEscalate): \Closure
+    private function toolDispatcher(User $user, \Closure $onEscalate, ?\Closure $onOpenTicket): \Closure
     {
-        return function (string $name, array $input) use ($user, $onEscalate): string {
+        return function (string $name, array $input) use ($user, $onEscalate, $onOpenTicket): string {
             return match ($name) {
                 'get_subscription_status' => json_encode([
                     'package' => $user->subscriptionPackage?->name,
@@ -311,6 +373,17 @@ class AiSupportAgentService
                     $onEscalate((string) ($input['reason'] ?? 'unspecified'), (string) ($input['suggested_priority'] ?? 'medium'));
 
                     return 'Escalated to a human admin. You may still send the seller a brief acknowledgement.';
+                })(),
+                'open_support_ticket' => (function () use ($input, $onOpenTicket) {
+                    if ($onOpenTicket === null) {
+                        return 'This tool is not available here.';
+                    }
+                    $ticketNumber = $onOpenTicket(
+                        (string) ($input['subject'] ?? 'Support request'),
+                        (string) ($input['category'] ?? 'other'),
+                    );
+
+                    return "Ticket {$ticketNumber} created and flagged for the admin team. Tell the seller their ticket number and that a team member will follow up there.";
                 })(),
                 default => json_encode(['error' => "unknown tool: {$name}"]),
             };
@@ -372,7 +445,7 @@ class AiSupportAgentService
         return strlen($trx) <= 4 ? $trx : str_repeat('*', strlen($trx) - 4).substr($trx, -4);
     }
 
-    private function systemPrompt(PlatformAiSupportSetting $settings): string
+    private function systemPrompt(PlatformAiSupportSetting $settings, bool $isLiveChat): string
     {
         $base = <<<'PROMPT'
 আপনি BSOL-এর সাপোর্ট টিমের একজন সদস্য — একটি বাংলাদেশি ই-কমার্স SaaS প্ল্যাটফর্মের সেলারদের সহায়তা করেন।
@@ -392,6 +465,16 @@ class AiSupportAgentService
 - search_platform_help-এ কিছু না পেলে এবং নিজের জ্ঞান দিয়েও নিশ্চিতভাবে উত্তর দিতে না পারলে — অনুমান করে ভুল তথ্য না দিয়ে escalate_to_admin কল করুন।
 - উত্তর সংক্ষিপ্ত ও সরাসরি রাখুন।
 PROMPT;
+
+        if ($isLiveChat) {
+            $base .= "\n\n".<<<'PROMPT'
+লাইভ চ্যাট-নির্দিষ্ট নিয়ম (টিকিটে প্রযোজ্য না):
+- যদি search_platform_help/diagnose_* সব চেষ্টা করেও প্রশ্নটার সমাধান দিতে না পারেন — সরাসরি escalate_to_admin কল করার বদলে সেলারকে জিজ্ঞেস করুন, যেমন: "এটার জন্য আমাদের টিম বিস্তারিত দেখলে ভালো হবে — আপনার জন্য কি একটা সাপোর্ট টিকেট খুলে দেব?"
+- সেলার সম্মতি জানালে (পরের মেসেজে "হ্যাঁ"/"ok"/অনুরূপ কিছু বললে) open_support_ticket টুল কল করুন, বিষয় ও ক্যাটাগরি নিজে থেকে ঠিক করে। টিকেট নম্বর পেলে সেলারকে জানিয়ে দিন যে আমাদের টিম ওখানেই follow up করবে।
+- সেলার না বললে বা অন্য কিছু জিজ্ঞেস করলে, টিকেট ছাড়াই যতটা সম্ভব সাহায্য করার চেষ্টা চালিয়ে যান।
+- রিফান্ড/অ্যাকাউন্ট পরিবর্তনের মতো স্পর্শকাতর/জরুরি বিষয়ে টিকিট জিজ্ঞেস করার দরকার নেই — আগের নিয়ম অনুযায়ী সরাসরি escalate_to_admin কল করুন।
+PROMPT;
+        }
 
         return $settings->system_prompt_extra
             ? $base."\n\n".$settings->system_prompt_extra
