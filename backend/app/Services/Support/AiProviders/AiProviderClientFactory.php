@@ -8,9 +8,11 @@ use App\Models\PlatformAiSupportSetting;
 
 /**
  * Resolves the currently-selected provider (platform_ai_support_settings.provider)
- * to its saved credential and builds the matching adapter. Returns null when
- * that provider has no key saved yet — AiSupportAgentService treats a null
- * client exactly like "disabled". support_ticketing_ai_context.md.
+ * to its saved credential(s) and builds the matching adapter. A provider can
+ * hold several keys — multiple candidates are wrapped in a
+ * RotatingProviderClient so a rate-limited key doesn't fail the whole reply.
+ * Returns null when that provider has no key saved yet — AiSupportAgentService
+ * treats a null client exactly like "disabled". support_ticketing_ai_context.md.
  */
 class AiProviderClientFactory
 {
@@ -22,12 +24,29 @@ class AiProviderClientFactory
 
     public function make(PlatformAiSupportSetting $settings): ?AiProviderClient
     {
-        $credential = AiProviderCredential::where('provider', $settings->provider)->first();
+        $credentials = AiProviderCredential::where('provider', $settings->provider)
+            ->whereNotNull('api_key')
+            ->orderBy('id')
+            ->get();
 
-        if ($credential === null || ! $credential->api_key) {
+        if ($credentials->isEmpty()) {
             return null;
         }
 
+        if ($credentials->count() === 1) {
+            return $this->buildAdapter($settings, $credentials->first());
+        }
+
+        return new RotatingProviderClient(
+            $credentials->map(fn (AiProviderCredential $credential) => [
+                'credential' => $credential,
+                'build' => fn () => $this->buildAdapter($settings, $credential),
+            ])->all(),
+        );
+    }
+
+    private function buildAdapter(PlatformAiSupportSetting $settings, AiProviderCredential $credential): AiProviderClient
+    {
         return match ($settings->provider) {
             'anthropic' => new AnthropicProviderClient(
                 new AnthropicClient(apiKey: $credential->api_key),
@@ -41,7 +60,7 @@ class AiProviderClientFactory
                 $credential->api_key,
                 $settings->model,
             ),
-            default => null,
+            default => throw new \InvalidArgumentException("Unknown AI provider: {$settings->provider}"),
         };
     }
 }

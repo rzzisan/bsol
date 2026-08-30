@@ -114,6 +114,19 @@ Backend: `SupportMessage`/`SupportTicketMessage`-এর `sender()` relation আ�
 
 টেস্টে একটা রিয়েল বাগ ধরা পড়েছিল (শিপ করার আগেই ফিক্স হয়েছে): Carbon-এর `diffInDays()` signed sign convention-এর কারণে `days_since_last_order`/`days_since_last_used` মাঝেমধ্যে negative আসছিল — `abs()` দিয়ে ফিক্স করা হয়েছে।
 
+## মাল্টি-key রোটেশন (added 2026-08-30)
+
+Groq-এর 8000 TPM লিমিট একটা busy টিকিট থ্রেডে সত্যিই আটকে দিয়েছিল (উপরের incident) — এখন প্রতিটা প্রোভাইডারে একাধিক key যোগ করা যায়, একটা rate-limit খেলে স্বয়ংক্রিয়ভাবে পরেরটাতে চলে যায়।
+
+- **`ai_provider_credentials`** এখন এক প্রোভাইডারে **এক row per key** (আগে ছিল এক row per provider — `unique(provider)` সরিয়ে `label` + `rate_limited_until` কলাম যোগ হয়েছে)।
+- নতুন **`AiProviderRateLimitedException`** — কোনো adapter নির্দিষ্ট key-এর কারণে ব্যর্থ হলে (429/401/403, Groq-এর 413 TPM-নির্দিষ্ট শেপ, Anthropic SDK-এর `RateLimitException`/`AuthenticationException`/`PermissionDeniedException`) এটা ছোঁড়ে — বাকি সব ব্যর্থতা (400 bad request, ভুল মডেল নাম, 5xx) আগের মতোই null/log — key বদলে সেগুলো ঠিক হবে না বলে rotate করা হয় না।
+- নতুন **`RotatingProviderClient`** — একই provider-এর একাধিক key-কে ঘুরিয়ে try করে, কোনো key cooldown-এ থাকলে (rate_limited_until ভবিষ্যতে) সেটা skip করে না ছুঁয়েই, ব্যর্থ হলে সেই key-কে ৩০-৬০ সেকেন্ড (বা প্রোভাইডারের নিজের Retry-After হিন্ট থাকলে সেটা) cooldown-এ পাঠিয়ে পরের key try করে।
+- `AiProviderClientFactory` এখন এক provider-এর সব key টেনে — একটা থাকলে সরাসরি adapter, একাধিক থাকলে `RotatingProviderClient`।
+- Admin UI (`/admin/settings/ai-support`) — প্রতিটা provider card এখন key-এর তালিকা দেখায় (label, masked preview, cooldown badge, প্রতিটার নিজস্ব model+delete), নিচে "+ নতুন Key যোগ করুন" ফর্ম।
+- Endpoints নতুন shape: `GET /admin/ai-providers` (list, প্রতি provider-এ keys array), `POST /admin/ai-providers/{provider}` (নতুন key যোগ), `PUT`/`DELETE /admin/ai-providers/keys/{id}` (id-নির্দিষ্ট)।
+
+লাইভ verify করা হয়েছে আসল Groq API-এর বিরুদ্ধে (guess না করে): ইচ্ছাকৃত একটা ভুল key + আসল key দিয়ে `RotatingProviderClient` বানিয়ে টেস্ট করা হয়েছে — ভুল key `401`-এ ব্যর্থ হয়ে সঠিকভাবে cooldown-এ গেছে, তারপর আসল key দিয়ে সফলভাবে রিপ্লাই এসেছে।
+
 ### প্রি-রিকুইজিট বদলে গেছে
 
 আগে `backend/.env`-এ `ANTHROPIC_API_KEY` বসাতে হতো — এখন সেটা আর ব্যবহৃত হয় না। এখন **সরাসরি `/admin/settings/ai-support` পেজ থেকে** যেকোনো প্রোভাইডারের key পেস্ট করে "Save this provider" চাপলেই key `ai_provider_credentials` টেবিলে এনক্রিপ্টেড অবস্থায় জমা হয়ে যায় — কোনো `.env`/ডিপ্লয় লাগে না।

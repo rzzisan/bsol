@@ -11,6 +11,7 @@ use App\Services\Support\AiProviders\AiProviderClientFactory;
 use App\Services\Support\AiProviders\AnthropicProviderClient;
 use App\Services\Support\AiProviders\GeminiProviderClient;
 use App\Services\Support\AiProviders\OpenAiCompatibleProviderClient;
+use App\Services\Support\AiProviders\RotatingProviderClient;
 use App\Services\Support\AiSupportAgentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -34,35 +35,61 @@ class AiProviderCredentialTest extends TestCase
 
         $providers = collect($response->json('data'))->keyBy('provider');
         $this->assertCount(5, $providers);
-        $this->assertTrue($providers['gemini']['has_key']);
-        $this->assertSame('••••1234', $providers['gemini']['masked_key']);
-        $this->assertFalse($providers['openai']['has_key']);
+        $geminiKeys = $providers['gemini']['keys'];
+        $this->assertCount(1, $geminiKeys);
+        $this->assertTrue($geminiKeys[0]['has_key']);
+        $this->assertSame('••••1234', $geminiKeys[0]['masked_key']);
+        $this->assertCount(0, $providers['openai']['keys']);
         $this->assertStringNotContainsString('super-secret-key', json_encode($response->json()));
     }
 
-    public function test_update_saves_a_new_key_and_omitting_it_keeps_the_existing_one(): void
+    public function test_store_adds_a_key_without_touching_others_on_the_same_provider(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
 
-        $this->putJson('/api/admin/ai-providers/groq', ['api_key' => 'groq-key-aaaa', 'default_model' => 'llama-3.3-70b-versatile'])
+        $this->postJson('/api/admin/ai-providers/groq', ['label' => 'Key 1', 'api_key' => 'groq-key-aaaa', 'default_model' => 'openai/gpt-oss-120b'])
             ->assertOk()
             ->assertJsonPath('data.has_key', true)
-            ->assertJsonPath('data.default_model', 'llama-3.3-70b-versatile');
+            ->assertJsonPath('data.default_model', 'openai/gpt-oss-120b');
 
-        // Updating just the model shouldn't wipe the previously saved key.
-        $this->putJson('/api/admin/ai-providers/groq', ['default_model' => 'llama-3.1-8b-instant'])
-            ->assertOk()
-            ->assertJsonPath('data.has_key', true)
-            ->assertJsonPath('data.default_model', 'llama-3.1-8b-instant');
+        $this->postJson('/api/admin/ai-providers/groq', ['label' => 'Key 2', 'api_key' => 'groq-key-bbbb'])
+            ->assertOk();
 
-        $this->assertSame('groq-key-aaaa', AiProviderCredential::where('provider', 'groq')->first()->api_key);
+        $this->assertCount(2, AiProviderCredential::where('provider', 'groq')->get());
+        $this->assertSame('groq-key-aaaa', AiProviderCredential::where('label', 'Key 1')->first()->api_key);
+        $this->assertSame('groq-key-bbbb', AiProviderCredential::where('label', 'Key 2')->first()->api_key);
     }
 
-    public function test_update_rejects_an_unknown_provider(): void
+    public function test_store_rejects_an_unknown_provider(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
 
-        $this->putJson('/api/admin/ai-providers/made-up-provider', ['api_key' => 'x'])->assertNotFound();
+        $this->postJson('/api/admin/ai-providers/made-up-provider', ['api_key' => 'x'])->assertNotFound();
+    }
+
+    public function test_update_by_id_changes_only_the_targeted_key_and_omitting_api_key_keeps_it(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $key = AiProviderCredential::create(['provider' => 'groq', 'api_key' => 'groq-key-aaaa', 'label' => 'Key 1']);
+
+        $this->putJson("/api/admin/ai-providers/keys/{$key->id}", ['default_model' => 'openai/gpt-oss-20b'])
+            ->assertOk()
+            ->assertJsonPath('data.has_key', true)
+            ->assertJsonPath('data.default_model', 'openai/gpt-oss-20b');
+
+        $this->assertSame('groq-key-aaaa', $key->fresh()->api_key);
+    }
+
+    public function test_destroy_removes_only_that_key(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
+        $keep = AiProviderCredential::create(['provider' => 'groq', 'api_key' => 'k1']);
+        $remove = AiProviderCredential::create(['provider' => 'groq', 'api_key' => 'k2']);
+
+        $this->deleteJson("/api/admin/ai-providers/keys/{$remove->id}")->assertOk();
+
+        $this->assertModelExists($keep);
+        $this->assertModelMissing($remove);
     }
 
     public function test_ai_support_settings_validate_the_provider_field(): void
@@ -105,6 +132,29 @@ class AiProviderCredentialTest extends TestCase
 
         $settings->update(['provider' => 'groq']);
         $this->assertInstanceOf(OpenAiCompatibleProviderClient::class, $factory->make($settings));
+    }
+
+    public function test_factory_wraps_multiple_keys_for_the_same_provider_in_a_rotating_client(): void
+    {
+        AiProviderCredential::create(['provider' => 'groq', 'api_key' => 'k1']);
+        AiProviderCredential::create(['provider' => 'groq', 'api_key' => 'k2']);
+
+        $settings = PlatformAiSupportSetting::current();
+        $settings->update(['provider' => 'groq']);
+
+        $this->assertInstanceOf(RotatingProviderClient::class, app(AiProviderClientFactory::class)->make($settings));
+    }
+
+    public function test_factory_skips_a_key_with_no_api_key_saved(): void
+    {
+        AiProviderCredential::create(['provider' => 'groq', 'label' => 'empty', 'api_key' => null]);
+        AiProviderCredential::create(['provider' => 'groq', 'api_key' => 'real-key']);
+
+        $settings = PlatformAiSupportSetting::current();
+        $settings->update(['provider' => 'groq']);
+
+        // Only one usable key -> a bare adapter, not a rotating wrapper.
+        $this->assertInstanceOf(OpenAiCompatibleProviderClient::class, app(AiProviderClientFactory::class)->make($settings));
     }
 
     // -- Safety net: a provider that returns null without throwing must never

@@ -3,6 +3,9 @@
 namespace App\Services\Support\AiProviders;
 
 use Anthropic\Client as AnthropicClient;
+use Anthropic\Core\Exceptions\AuthenticationException;
+use Anthropic\Core\Exceptions\PermissionDeniedException;
+use Anthropic\Core\Exceptions\RateLimitException;
 use Anthropic\Lib\Tools\BetaRunnableTool;
 use Illuminate\Support\Facades\Log;
 
@@ -63,6 +66,15 @@ class AnthropicProviderClient implements AiProviderClient
             }
 
             return $finalText !== null ? trim($finalText) : null;
+        } catch (RateLimitException|AuthenticationException|PermissionDeniedException $e) {
+            // This key is the reason, not the request — let RotatingProviderClient try the next one.
+            $retryAfter = null;
+            if (isset($e->response)) {
+                $header = $e->response->getHeaderLine('Retry-After');
+                $retryAfter = $header !== '' && is_numeric($header) ? (int) $header : null;
+            }
+            Log::warning('ai_support.provider_key_failed', ['provider' => 'anthropic', 'error' => $e->getMessage()]);
+            throw new AiProviderRateLimitedException('anthropic key failed: '.get_class($e), $retryAfter, $e);
         } catch (\Throwable $e) {
             Log::error('ai_support.provider_failed', ['provider' => 'anthropic', 'error' => $e->getMessage()]);
             throw $e;

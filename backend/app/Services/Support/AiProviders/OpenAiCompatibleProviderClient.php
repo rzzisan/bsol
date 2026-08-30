@@ -2,6 +2,7 @@
 
 namespace App\Services\Support\AiProviders;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -53,6 +54,13 @@ class OpenAiCompatibleProviderClient implements AiProviderClient
                         'provider' => $this->providerLabel, 'status' => $response->status(), 'body' => $response->json(),
                     ]);
 
+                    if ($this->isKeySpecificFailure($response)) {
+                        throw new AiProviderRateLimitedException(
+                            "{$this->providerLabel} key failed with status {$response->status()}",
+                            $this->retryAfterSeconds($response),
+                        );
+                    }
+
                     return null;
                 }
 
@@ -84,8 +92,28 @@ class OpenAiCompatibleProviderClient implements AiProviderClient
 
             return null; // exhausted iterations without a final text reply
         } catch (\Throwable $e) {
-            Log::error('ai_support.provider_failed', ['provider' => $this->providerLabel, 'error' => $e->getMessage()]);
+            if (! $e instanceof AiProviderRateLimitedException) {
+                Log::error('ai_support.provider_failed', ['provider' => $this->providerLabel, 'error' => $e->getMessage()]);
+            }
             throw $e;
         }
+    }
+
+    /** 429/401/403 are always key-specific; Groq's 413 "too many tokens this minute" is functionally a rate limit too. */
+    private function isKeySpecificFailure(Response $response): bool
+    {
+        $status = $response->status();
+        if (in_array($status, [429, 401, 403], true)) {
+            return true;
+        }
+
+        return $status === 413 && $response->json('error.code') === 'rate_limit_exceeded';
+    }
+
+    private function retryAfterSeconds(Response $response): ?int
+    {
+        $header = $response->header('Retry-After');
+
+        return $header !== '' && is_numeric($header) ? (int) $header : null;
     }
 }

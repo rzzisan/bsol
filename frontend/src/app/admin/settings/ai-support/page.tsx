@@ -28,12 +28,16 @@ type Settings = {
   system_prompt_extra: string | null;
 };
 
-type ProviderRow = {
-  provider: Provider;
+type KeyRow = {
+  id: number;
+  label: string | null;
   has_key: boolean;
   masked_key: string | null;
   default_model: string | null;
+  rate_limited_until: string | null;
 };
+
+type NewKeyDraft = { label: string; api_key: string; default_model: string };
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -50,6 +54,8 @@ const PROVIDER_META: Record<Provider, { label: string; free: boolean; keyUrl: st
   openrouter: { label: "OpenRouter", free: true, keyUrl: "openrouter.ai/models", suggestedModel: "minimax/minimax-m3:free" },
 };
 
+const EMPTY_DRAFT: NewKeyDraft = { label: "", api_key: "", default_model: "" };
+
 const labels = {
   bn: {
     title: "AI সাপোর্ট এজেন্ট",
@@ -62,16 +68,22 @@ const labels = {
     updated: "সেটিংস আপডেট হয়েছে",
     goHome: "হোমে যান",
     providersTitle: "AI প্রোভাইডার ও API Key",
-    providersIntro: "যতগুলো প্রোভাইডারের key দিতে চাও দাও — নিচে থেকে যেকোনো একটাকে active হিসেবে বেছে নেওয়া যাবে। Gemini, Groq ও OpenRouter-এর ফ্রি টিয়ার আছে। এর মধ্যে Groq সবচেয়ে স্থিতিশীল ফ্রি অপশন — Gemini-তে দ্রুত quota শেষ হতে পারে, আর OpenRouter-এর ফ্রি মডেল demand অনুযায়ী মাঝেমধ্যে সাময়িকভাবে rate-limit হয় (তখন AI নিরাপদে একজন অ্যাডমিনের কাছে পাঠিয়ে দেয়, silently আটকে থাকে না)।",
+    providersIntro: "যতগুলো প্রোভাইডারের key দিতে চাও দাও — একই প্রোভাইডারে একাধিক key যোগ করলে একটার টোকেন লিমিট শেষ হলে স্বয়ংক্রিয়ভাবে পরেরটাতে চলে যাবে। নিচে থেকে যেকোনো একটা প্রোভাইডারকে active হিসেবে বেছে নেওয়া যাবে। Gemini, Groq ও OpenRouter-এর ফ্রি টিয়ার আছে — Groq সবচেয়ে স্থিতিশীল।",
     free: "ফ্রি টিয়ার",
-    apiKeyLabel: "API Key",
-    apiKeyPlaceholderSaved: "সংরক্ষিত আছে — বদলাতে নতুন key লিখুন",
-    apiKeyPlaceholderEmpty: "API key পেস্ট করুন",
-    defaultModelLabel: "ডিফল্ট মডেল (সাজেশন, চাইলে বদলাও)",
-    getKeyFrom: "key নাও",
     savedTick: "✓ সংরক্ষিত",
-    notSaved: "key নেই",
-    saveProvider: "এই প্রোভাইডার সংরক্ষণ করুন",
+    coolingDown: "⏸ সাময়িক বিরতিতে",
+    noKeys: "এখনও কোনো key নেই",
+    keyLabel: "লেবেল",
+    keyLabelPlaceholder: "যেমন: Key 1 (ঐচ্ছিক)",
+    apiKeyLabel: "API Key",
+    apiKeyPlaceholderEmpty: "API key পেস্ট করুন",
+    defaultModelLabel: "মডেল",
+    getKeyFrom: "key নাও",
+    addKey: "+ নতুন Key যোগ করুন",
+    saveKey: "সংরক্ষণ করুন",
+    updateKey: "আপডেট করুন",
+    deleteKey: "মুছুন",
+    confirmDelete: "এই key-টা মুছে ফেলবেন?",
     activeSectionTitle: "কোন AI এজেন্ট চালু থাকবে",
     enabled: "AI এজেন্ট চালু রাখুন",
     enabledHint: "বন্ধ থাকলে সেলাররা শুধু অ্যাডমিনের উত্তরের অপেক্ষায় থাকবে, AI কিছু পাঠাবে না।",
@@ -96,16 +108,22 @@ const labels = {
     updated: "Settings updated",
     goHome: "Go Home",
     providersTitle: "AI Providers & API Keys",
-    providersIntro: "Add keys for as many providers as you like — pick any one below as the active agent. Gemini, Groq, and OpenRouter have free tiers. Groq is the most reliable free option — Gemini's free quota runs out quickly, and OpenRouter's free models get temporarily rate-limited by demand (the AI safely hands off to an admin when that happens, it never gets stuck silently).",
+    providersIntro: "Add keys for as many providers as you like — add several keys to the same provider and it'll automatically rotate to the next one when one hits its token limit. Pick any one provider below as the active agent. Gemini, Groq, and OpenRouter have free tiers — Groq is the most reliable.",
     free: "Free tier",
-    apiKeyLabel: "API Key",
-    apiKeyPlaceholderSaved: "Saved — type a new key to replace it",
-    apiKeyPlaceholderEmpty: "Paste API key",
-    defaultModelLabel: "Suggested default model (editable)",
-    getKeyFrom: "get a key",
     savedTick: "✓ Saved",
-    notSaved: "No key",
-    saveProvider: "Save this provider",
+    coolingDown: "⏸ Cooling down",
+    noKeys: "No keys yet",
+    keyLabel: "Label",
+    keyLabelPlaceholder: "e.g. Key 1 (optional)",
+    apiKeyLabel: "API Key",
+    apiKeyPlaceholderEmpty: "Paste API key",
+    defaultModelLabel: "Model",
+    getKeyFrom: "get a key",
+    addKey: "+ Add another key",
+    saveKey: "Save",
+    updateKey: "Update",
+    deleteKey: "Delete",
+    confirmDelete: "Delete this key?",
     activeSectionTitle: "Which AI agent is active",
     enabled: "Keep the AI agent enabled",
     enabledHint: "When off, sellers just wait for an admin reply — the AI sends nothing.",
@@ -121,6 +139,14 @@ const labels = {
   },
 };
 
+function formatTime(iso: string, locale: Locale) {
+  try {
+    return new Date(iso).toLocaleTimeString(locale === "bn" ? "bn-BD" : "en-US", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return iso;
+  }
+}
+
 export default function AiSupportSettingsPage() {
   const [locale, setLocale] = useState<Locale>(getStoredLocale);
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
@@ -135,19 +161,18 @@ export default function AiSupportSettingsPage() {
     daily_reply_count: 0,
     system_prompt_extra: "",
   });
-  const [providers, setProviders] = useState<Record<Provider, ProviderRow>>(
-    () =>
-      Object.fromEntries(
-        PROVIDERS.map((p) => [p, { provider: p, has_key: false, masked_key: null, default_model: null }]),
-      ) as Record<Provider, ProviderRow>,
+  const [keys, setKeys] = useState<Record<Provider, KeyRow[]>>(
+    () => Object.fromEntries(PROVIDERS.map((p) => [p, [] as KeyRow[]])) as Record<Provider, KeyRow[]>,
   );
-  const [keyDrafts, setKeyDrafts] = useState<Record<Provider, string>>(
-    () => Object.fromEntries(PROVIDERS.map((p) => [p, ""])) as Record<Provider, string>,
+  const [editDrafts, setEditDrafts] = useState<Record<number, string>>({});
+  const [newKeyDrafts, setNewKeyDrafts] = useState<Record<Provider, NewKeyDraft>>(
+    () => Object.fromEntries(PROVIDERS.map((p) => [p, { ...EMPTY_DRAFT }])) as Record<Provider, NewKeyDraft>,
   );
-  const [modelDrafts, setModelDrafts] = useState<Record<Provider, string>>(
-    () => Object.fromEntries(PROVIDERS.map((p) => [p, ""])) as Record<Provider, string>,
+  const [showAddForm, setShowAddForm] = useState<Record<Provider, boolean>>(
+    () => Object.fromEntries(PROVIDERS.map((p) => [p, false])) as Record<Provider, boolean>,
   );
-  const [savingProvider, setSavingProvider] = useState<Provider | null>(null);
+  const [busyKeyId, setBusyKeyId] = useState<number | null>(null);
+  const [addingProvider, setAddingProvider] = useState<Provider | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -166,6 +191,16 @@ export default function AiSupportSettingsPage() {
   const token = getStoredToken();
   const authHeaders = useCallback((): Record<string, string> => (token ? { Authorization: `Bearer ${token}` } : {}), [token]);
 
+  const loadProviders = useCallback(async () => {
+    const res = await fetch(`${API}/admin/ai-providers`, { headers: authHeaders() });
+    const data = await res.json();
+    if (res.ok && data?.data) {
+      const rows: Array<{ provider: Provider; keys: KeyRow[] }> = data.data;
+      setKeys(Object.fromEntries(rows.map((r) => [r.provider, r.keys])) as Record<Provider, KeyRow[]>);
+      setEditDrafts(Object.fromEntries(rows.flatMap((r) => r.keys.map((k) => [k.id, k.default_model ?? ""]))));
+    }
+  }, [authHeaders]);
+
   useEffect(() => {
     const storedUser = getStoredUser();
     if (!token || !storedUser) {
@@ -183,20 +218,12 @@ export default function AiSupportSettingsPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const [settingsRes, providersRes] = await Promise.all([
-          fetch(`${API}/admin/settings/ai-support`, { headers: authHeaders() }),
-          fetch(`${API}/admin/ai-providers`, { headers: authHeaders() }),
-        ]);
+        const settingsRes = await fetch(`${API}/admin/settings/ai-support`, { headers: authHeaders() });
         const settingsData = await settingsRes.json();
         if (settingsRes.ok && settingsData?.data) {
           setForm((prev) => ({ ...prev, ...settingsData.data }));
         }
-        const providersData = await providersRes.json();
-        if (providersRes.ok && providersData?.data) {
-          const rows: ProviderRow[] = providersData.data;
-          setProviders(Object.fromEntries(rows.map((r) => [r.provider, r])) as Record<Provider, ProviderRow>);
-          setModelDrafts(Object.fromEntries(rows.map((r) => [r.provider, r.default_model ?? ""])) as Record<Provider, string>);
-        }
+        await loadProviders();
         setMessage(t.loaded);
       } finally {
         setLoading(false);
@@ -221,7 +248,7 @@ export default function AiSupportSettingsPage() {
   const handleProviderChange = (nextProvider: Provider) => {
     setForm((prev) => {
       const looksUntouched = prev.model.trim() === "" || allSuggestedModels.includes(prev.model.trim());
-      const suggestion = providers[nextProvider]?.default_model || PROVIDER_META[nextProvider].suggestedModel;
+      const suggestion = keys[nextProvider]?.[0]?.default_model || PROVIDER_META[nextProvider].suggestedModel;
 
       return { ...prev, provider: nextProvider, model: looksUntouched ? suggestion : prev.model };
     });
@@ -256,28 +283,56 @@ export default function AiSupportSettingsPage() {
     }
   };
 
-  const saveProvider = async (provider: Provider) => {
-    setSavingProvider(provider);
+  const addKey = async (provider: Provider) => {
+    const draft = newKeyDrafts[provider];
+    if (!draft.api_key.trim()) return;
+    setAddingProvider(provider);
     try {
       const res = await fetch(`${API}/admin/ai-providers/${provider}`, {
-        method: "PUT",
+        method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
-          api_key: keyDrafts[provider] || undefined,
-          default_model: modelDrafts[provider] || null,
+          label: draft.label || null,
+          api_key: draft.api_key,
+          default_model: draft.default_model || null,
         }),
       });
-      const data = await res.json();
-      if (res.ok && data?.data) {
-        setProviders((prev) => ({ ...prev, [provider]: data.data }));
-        setKeyDrafts((prev) => ({ ...prev, [provider]: "" }));
+      if (res.ok) {
+        setNewKeyDrafts((prev) => ({ ...prev, [provider]: { ...EMPTY_DRAFT } }));
+        setShowAddForm((prev) => ({ ...prev, [provider]: false }));
+        await loadProviders();
       }
     } finally {
-      setSavingProvider(null);
+      setAddingProvider(null);
     }
   };
 
-  const activeHasKey = providers[form.provider]?.has_key ?? false;
+  const updateKey = async (id: number) => {
+    setBusyKeyId(id);
+    try {
+      const res = await fetch(`${API}/admin/ai-providers/keys/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ default_model: editDrafts[id] || null }),
+      });
+      if (res.ok) await loadProviders();
+    } finally {
+      setBusyKeyId(null);
+    }
+  };
+
+  const deleteKey = async (id: number) => {
+    if (!confirm(t.confirmDelete)) return;
+    setBusyKeyId(id);
+    try {
+      const res = await fetch(`${API}/admin/ai-providers/keys/${id}`, { method: "DELETE", headers: authHeaders() });
+      if (res.ok) await loadProviders();
+    } finally {
+      setBusyKeyId(null);
+    }
+  };
+
+  const activeHasKey = (keys[form.provider] ?? []).some((k) => k.has_key);
 
   if (state !== "ready") {
     return (
@@ -316,61 +371,127 @@ export default function AiSupportSettingsPage() {
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {PROVIDERS.map((p) => {
               const meta = PROVIDER_META[p];
-              const row = providers[p];
+              const providerKeys = keys[p] ?? [];
+              const draft = newKeyDrafts[p];
+
               return (
                 <div key={p} className="rounded-xl border border-[var(--border)] p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold">{meta.label}</span>
-                    <div className="flex items-center gap-1.5">
-                      {meta.free && (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                          {t.free}
-                        </span>
-                      )}
-                      <span className={`text-[10px] font-semibold ${row?.has_key ? "text-emerald-500" : "text-[var(--muted)]"}`}>
-                        {row?.has_key ? t.savedTick : t.notSaved}
+                    {meta.free && (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        {t.free}
                       </span>
-                    </div>
+                    )}
                   </div>
 
-                  <label className="mt-2 block">
-                    <span className="mb-1 block text-[11px] text-[var(--muted)]">{t.apiKeyLabel}</span>
-                    <input
-                      type="password"
-                      value={keyDrafts[p]}
-                      onChange={(e) => setKeyDrafts((prev) => ({ ...prev, [p]: e.target.value }))}
-                      placeholder={row?.has_key ? `${row.masked_key} — ${t.apiKeyPlaceholderSaved}` : t.apiKeyPlaceholderEmpty}
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <label className="mt-2 block">
-                    <span className="mb-1 block text-[11px] text-[var(--muted)]">{t.defaultModelLabel}</span>
-                    <input
-                      type="text"
-                      value={modelDrafts[p] || meta.suggestedModel}
-                      onChange={(e) => setModelDrafts((prev) => ({ ...prev, [p]: e.target.value }))}
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-                    />
-                  </label>
+                  <div className="mt-2 space-y-2">
+                    {providerKeys.length === 0 && <p className="text-[11px] text-[var(--muted)]">{t.noKeys}</p>}
+                    {providerKeys.map((k) => {
+                      const cooling = k.rate_limited_until && new Date(k.rate_limited_until) > new Date();
+                      return (
+                        <div key={k.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-xs font-semibold">{k.label || k.masked_key}</span>
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              {cooling && (
+                                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                  {t.coolingDown} {formatTime(k.rate_limited_until as string, locale)}
+                                </span>
+                              )}
+                              <span className="text-[9px] font-semibold text-emerald-500">{t.savedTick}</span>
+                            </div>
+                          </div>
+                          <p className="mt-0.5 truncate text-[10px] text-[var(--muted)]">{k.masked_key}</p>
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={editDrafts[k.id] ?? ""}
+                              onChange={(e) => setEditDrafts((prev) => ({ ...prev, [k.id]: e.target.value }))}
+                              placeholder={meta.suggestedModel}
+                              className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[11px]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void updateKey(k.id)}
+                              disabled={busyKeyId === k.id}
+                              className="shrink-0 rounded-md border border-[var(--border)] px-2 py-1 text-[10px] font-semibold text-[var(--foreground)] disabled:opacity-50"
+                            >
+                              {t.updateKey}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteKey(k.id)}
+                              disabled={busyKeyId === k.id}
+                              className="shrink-0 rounded-md border border-red-300 px-2 py-1 text-[10px] font-semibold text-red-600 disabled:opacity-50 dark:border-red-800"
+                            >
+                              {t.deleteKey}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                  <div className="mt-2 flex items-center justify-between">
-                    <a
-                      href={`https://${meta.keyUrl}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-[var(--accent)] hover:underline"
-                    >
-                      {meta.keyUrl} — {t.getKeyFrom}
-                    </a>
+                  {showAddForm[p] ? (
+                    <div className="mt-2 space-y-1.5 rounded-lg border border-dashed border-[var(--border)] p-2">
+                      <input
+                        type="text"
+                        value={draft.label}
+                        onChange={(e) => setNewKeyDrafts((prev) => ({ ...prev, [p]: { ...prev[p], label: e.target.value } }))}
+                        placeholder={t.keyLabelPlaceholder}
+                        className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[11px]"
+                      />
+                      <input
+                        type="password"
+                        value={draft.api_key}
+                        onChange={(e) => setNewKeyDrafts((prev) => ({ ...prev, [p]: { ...prev[p], api_key: e.target.value } }))}
+                        placeholder={t.apiKeyPlaceholderEmpty}
+                        className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[11px]"
+                      />
+                      <input
+                        type="text"
+                        value={draft.default_model}
+                        onChange={(e) => setNewKeyDrafts((prev) => ({ ...prev, [p]: { ...prev[p], default_model: e.target.value } }))}
+                        placeholder={meta.suggestedModel}
+                        className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-[11px]"
+                      />
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => void addKey(p)}
+                          disabled={addingProvider === p || !draft.api_key.trim()}
+                          className="rounded-md bg-[var(--accent)] px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
+                        >
+                          {addingProvider === p ? t.saving : t.saveKey}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddForm((prev) => ({ ...prev, [p]: false }))}
+                          className="rounded-md border border-[var(--border)] px-2 py-1 text-[10px] text-[var(--muted)]"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => void saveProvider(p)}
-                      disabled={savingProvider === p}
-                      className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                      onClick={() => setShowAddForm((prev) => ({ ...prev, [p]: true }))}
+                      className="mt-2 w-full rounded-lg border border-dashed border-[var(--border)] py-1.5 text-[11px] font-semibold text-[var(--accent)]"
                     >
-                      {savingProvider === p ? t.saving : t.saveProvider}
+                      {t.addKey}
                     </button>
-                  </div>
+                  )}
+
+                  <a
+                    href={`https://${meta.keyUrl}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 block text-[11px] text-[var(--accent)] hover:underline"
+                  >
+                    {meta.keyUrl} — {t.getKeyFrom}
+                  </a>
                 </div>
               );
             })}

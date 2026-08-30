@@ -2,6 +2,7 @@
 
 namespace App\Services\Support\AiProviders;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -52,6 +53,13 @@ class GeminiProviderClient implements AiProviderClient
                         'provider' => 'gemini', 'status' => $response->status(), 'body' => $response->json(),
                     ]);
 
+                    if (in_array($response->status(), [429, 401, 403], true)) {
+                        throw new AiProviderRateLimitedException(
+                            "gemini key failed with status {$response->status()}",
+                            $this->retryAfterSeconds($response),
+                        );
+                    }
+
                     return null;
                 }
 
@@ -89,8 +97,27 @@ class GeminiProviderClient implements AiProviderClient
 
             return null; // exhausted iterations without a final text reply
         } catch (\Throwable $e) {
-            Log::error('ai_support.provider_failed', ['provider' => 'gemini', 'error' => $e->getMessage()]);
+            if (! $e instanceof AiProviderRateLimitedException) {
+                Log::error('ai_support.provider_failed', ['provider' => 'gemini', 'error' => $e->getMessage()]);
+            }
             throw $e;
         }
+    }
+
+    /** Gemini's 429 body carries its own retry hint (error.details[].retryDelay, e.g. "50s") rather than a standard header. */
+    private function retryAfterSeconds(Response $response): ?int
+    {
+        $header = $response->header('Retry-After');
+        if ($header !== '' && is_numeric($header)) {
+            return (int) $header;
+        }
+
+        foreach ($response->json('error.details') ?? [] as $detail) {
+            if (isset($detail['retryDelay']) && preg_match('/^(\d+)s$/', $detail['retryDelay'], $m)) {
+                return (int) $m[1];
+            }
+        }
+
+        return null;
     }
 }

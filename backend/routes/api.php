@@ -1042,7 +1042,9 @@ Route::middleware(['staff_permission:orders', 'active_subscription:allow_deliver
         Route::get('/settings/ai-support', [PlatformAiSupportSettingController::class, 'show']);
         Route::put('/settings/ai-support', [PlatformAiSupportSettingController::class, 'update']);
         Route::get('/ai-providers', [AiProviderCredentialController::class, 'index']);
-        Route::put('/ai-providers/{provider}', [AiProviderCredentialController::class, 'update']);
+        Route::post('/ai-providers/{provider}', [AiProviderCredentialController::class, 'store']);
+        Route::put('/ai-providers/keys/{key}', [AiProviderCredentialController::class, 'update']);
+        Route::delete('/ai-providers/keys/{key}', [AiProviderCredentialController::class, 'destroy']);
         Route::prefix('ai-knowledge-base')->group(function () {
             Route::get('/', [AiKnowledgeBaseArticleController::class, 'index']);
             Route::post('/', [AiKnowledgeBaseArticleController::class, 'store']);
