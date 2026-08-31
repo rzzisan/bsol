@@ -409,7 +409,6 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
     Route::middleware('owner_only')->group(function () {
         Route::get('/sms/credit/rate', [SmsCreditPurchaseController::class, 'rate']);
         Route::get('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'myPurchases']);
-        Route::post('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'submitPayment']);
         Route::get('/sms/credit/purchases/{purchase}/invoice', [SmsCreditPurchaseController::class, 'invoicePdf']);
         Route::post('/sms/credit/pay/bkash/initiate', [SmsCreditBkashPaymentController::class, 'initiate']);
         Route::post('/sms/credit/pay/bkash-pgw/create', [SmsCreditBkashPgwPaymentController::class, 'create']);
@@ -432,7 +431,6 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::get('/order-credits/balance', [OrderCreditPurchaseController::class, 'balance']);
         Route::get('/order-credits/history', [OrderCreditPurchaseController::class, 'history']);
         Route::get('/order-credits/purchases', [OrderCreditPurchaseController::class, 'myPurchases']);
-        Route::post('/order-credits/purchases', [OrderCreditPurchaseController::class, 'submitPayment']);
     });
 
     // ── Storefront add-on self-service purchase — subscription_billing_context.md
@@ -440,7 +438,6 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
     Route::middleware('owner_only')->group(function () {
         Route::get('/storefront-addon/status', [StorefrontAddonPurchaseController::class, 'status']);
         Route::get('/storefront-addon/purchases', [StorefrontAddonPurchaseController::class, 'myPurchases']);
-        Route::post('/storefront-addon/purchases', [StorefrontAddonPurchaseController::class, 'submitPayment']);
     });
 
     // ── Platform gateway payments (seller→platform) — the same 7 merchant
@@ -462,7 +459,6 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
         Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
         Route::get('/subscription/invoice/preview', [SubscriptionController::class, 'invoicePreview']);
-        Route::post('/subscription/payments', [SubscriptionController::class, 'submitPayment']);
         Route::get('/subscription/payments/{payment}/invoice', [SubscriptionController::class, 'invoicePdf']);
         Route::post('/subscription/pay/bkash/initiate', [BkashPaymentController::class, 'initiate']);
 

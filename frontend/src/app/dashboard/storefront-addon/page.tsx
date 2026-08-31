@@ -8,8 +8,9 @@ import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-cl
 /**
  * Storefront add-on purchase — subscription_billing_context.md §9.2-D /
  * §9.6 step 4. Binary unlock (no wallet/balance concept, unlike
- * order-credits) — manual bKash only, same reasoning as
- * StorefrontAddonPurchaseController's docblock.
+ * order-credits). Pays via the platform's automated merchant gateways
+ * (PlatformGatewayPaymentPicker) — the old manual "send bKash + submit
+ * TrxID" flow was removed (online_payment_context.md §12).
  */
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -24,14 +25,7 @@ const t = {
     notActive: "স্টোরফ্রন্ট এই মুহূর্তে সক্রিয় নয়",
     unlockNow: "আনলক করুন",
     payTitle: "পেমেন্ট করুন",
-    payInstructions: "bKash সেন্ড মানি করুন",
-    senderNumber: "আপনার bKash নম্বর",
-    trxId: "ট্রানজেকশন আইডি (TrxID)",
-    screenshot: "স্ক্রিনশট (ঐচ্ছিক)",
-    submit: "সাবমিট করুন",
-    submitting: "সাবমিট হচ্ছে...",
     cancel: "বাতিল",
-    submitted: "সাবমিট হয়েছে, শীঘ্রই রিভিউ করা হবে।",
     historyTitle: "ক্রয়ের ইতিহাস",
     noHistory: "এখনো কোনো ক্রয় নেই।",
     statusPending: "পর্যালোচনাধীন",
@@ -49,14 +43,7 @@ const t = {
     notActive: "Storefront is not active right now",
     unlockNow: "Unlock now",
     payTitle: "Make payment",
-    payInstructions: "Send money via bKash",
-    senderNumber: "Your bKash number",
-    trxId: "Transaction ID (TrxID)",
-    screenshot: "Screenshot (optional)",
-    submit: "Submit",
-    submitting: "Submitting...",
     cancel: "Cancel",
-    submitted: "Submitted — it will be reviewed shortly.",
     historyTitle: "Purchase history",
     noHistory: "No purchases yet.",
     statusPending: "Pending review",
@@ -85,12 +72,7 @@ export default function StorefrontAddonPage() {
   const [status, setStatus] = useState<Status | null>(null);
   const [history, setHistory] = useState<PurchaseRow[]>([]);
   const [buying, setBuying] = useState(false);
-  const [senderNumber, setSenderNumber] = useState("");
-  const [trxId, setTrxId] = useState("");
-  const [screenshot, setScreenshot] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const load = async () => {
     const [statusRes, histRes] = await Promise.all([
@@ -106,36 +88,6 @@ export default function StorefrontAddonPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const submit = async () => {
-    if (!status?.package || !senderNumber.trim() || !trxId.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const body = new FormData();
-      body.append("addon_package_id", String(status.package.id));
-      body.append("sender_bkash_number", senderNumber.trim());
-      body.append("trx_id", trxId.trim());
-      if (screenshot) body.append("screenshot", screenshot);
-
-      const res = await fetch(`${API}/storefront-addon/purchases`, { method: "POST", headers: authHeaders, body });
-      const data = await res.json();
-      if (res.ok) {
-        setNotice(txt.submitted);
-        setBuying(false);
-        setSenderNumber("");
-        setTrxId("");
-        setScreenshot(null);
-        void load();
-      } else {
-        setError(data?.message ?? Object.values(data?.errors ?? {}).flat().join(" ") ?? txt.genericError);
-      }
-    } catch {
-      setError(txt.genericError);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const statusLabel = (s: PurchaseRow["status"]) =>
     s === "approved" ? txt.statusApproved : s === "rejected" ? txt.statusRejected : txt.statusPending;
@@ -186,10 +138,6 @@ export default function StorefrontAddonPage() {
       {buying && status?.package && (
         <section className="catv-panel mt-4 p-4 sm:p-5">
           <h3 className="text-base font-semibold">{txt.payTitle} — {status.package.name} (৳{status.package.price})</h3>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            {txt.payInstructions}: <span className="font-semibold text-[var(--foreground)]">{status.payment_instructions.bkash_number ?? "—"}</span>
-            {status.payment_instructions.bkash_type ? ` (${status.payment_instructions.bkash_type})` : ""}
-          </p>
 
           <PlatformGatewayPaymentPicker
             purpose="storefront_addon"
@@ -197,45 +145,9 @@ export default function StorefrontAddonPage() {
             locale={locale}
           />
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">{txt.senderNumber}</label>
-              <input
-                value={senderNumber}
-                onChange={(e) => setSenderNumber(e.target.value)}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">{txt.trxId}</label>
-              <input
-                value={trxId}
-                onChange={(e) => setTrxId(e.target.value)}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">{txt.screenshot}</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)}
-                className="w-full text-sm"
-              />
-            </div>
-          </div>
-
           {error && <p className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}
 
           <div className="mt-4 flex gap-2">
-            <button
-              type="button"
-              disabled={busy || !senderNumber.trim() || !trxId.trim()}
-              onClick={() => void submit()}
-              className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {busy ? txt.submitting : txt.submit}
-            </button>
             <button
               type="button"
               onClick={() => setBuying(false)}
@@ -246,8 +158,6 @@ export default function StorefrontAddonPage() {
           </div>
         </section>
       )}
-
-      {notice && <p className="mt-4 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">{notice}</p>}
 
       <section className="catv-panel mt-4 p-4 sm:p-5">
         <h3 className="text-base font-semibold">{txt.historyTitle}</h3>

@@ -106,56 +106,6 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    public function submitPayment(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'package_id' => ['required', 'integer', 'exists:subscription_packages,id'],
-            'sender_bkash_number' => ['required', 'string', 'max:20'],
-            'trx_id' => ['required', 'string', 'max:50', 'unique:subscription_payments,trx_id'],
-            'screenshot' => ['nullable', 'file', 'image', 'max:4096'],
-        ], [
-            'trx_id.unique' => 'This transaction ID has already been submitted. Each bKash transaction ID can only be used once.',
-        ]);
-
-        $package = SubscriptionPackage::findOrFail($validated['package_id']);
-        $user = auth()->user();
-
-        $invoice = $this->invoiceService->compute($user, $package);
-
-        if ($invoice['is_downgrade_blocked']) {
-            return response()->json([
-                'success' => false,
-                'message' => 'বর্তমান প্যাকেজের মেয়াদ শেষ না হওয়া পর্যন্ত এর চেয়ে ছোট প্যাকেজে যাওয়া যাবে না।',
-            ], 422);
-        }
-
-        $screenshotPath = null;
-        if ($request->hasFile('screenshot')) {
-            $screenshotPath = $request->file('screenshot')->store('subscription-payments/' . auth()->id(), 'public');
-        }
-
-        $payment = SubscriptionPayment::create([
-            'user_id' => auth()->id(),
-            'package_id' => $package->id,
-            'previous_package_id' => $invoice['is_upgrade'] ? $invoice['previous_package']['id'] : null,
-            'amount' => $invoice['payable_amount'],
-            'base_amount' => $invoice['base_amount'],
-            'proration_credit' => $invoice['proration_credit'],
-            'invoice_breakdown' => $invoice,
-            'payment_method' => 'bkash_manual',
-            'sender_bkash_number' => $validated['sender_bkash_number'],
-            'trx_id' => $validated['trx_id'],
-            'screenshot_path' => $screenshotPath,
-            'status' => 'pending',
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Payment submitted. It will be reviewed shortly.',
-            'data' => $payment,
-        ], 201);
-    }
-
     public function invoicePdf(SubscriptionPayment $payment): Response
     {
         abort_unless($payment->user_id === auth()->id(), 403);

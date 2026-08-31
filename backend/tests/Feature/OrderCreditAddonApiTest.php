@@ -58,40 +58,6 @@ class OrderCreditAddonApiTest extends TestCase
             ->assertJsonPath('data.available_balance', 0);
     }
 
-    public function test_submit_payment_computes_amount_server_side_from_the_package(): void
-    {
-        $package = $this->orderCreditPackage(['price' => 75]);
-        $owner = User::factory()->create();
-        Sanctum::actingAs($owner);
-
-        $res = $this->postJson('/api/order-credits/purchases', [
-            'addon_package_id' => $package->id,
-            'sender_bkash_number' => '01711111111',
-            'trx_id' => 'TRXTEST123',
-        ])->assertCreated();
-
-        $this->assertSame('75.00', $res->json('data.amount'));
-        $this->assertSame('pending', $res->json('data.status'));
-    }
-
-    public function test_duplicate_trx_id_is_rejected(): void
-    {
-        $package = $this->orderCreditPackage();
-        AddonPurchase::create([
-            'user_id' => User::factory()->create()->id, 'addon_package_id' => $package->id,
-            'amount' => 50, 'trx_id' => 'DUPLICATE1', 'status' => 'pending',
-        ]);
-
-        $owner = User::factory()->create();
-        Sanctum::actingAs($owner);
-
-        $this->postJson('/api/order-credits/purchases', [
-            'addon_package_id' => $package->id,
-            'sender_bkash_number' => '01711111111',
-            'trx_id' => 'DUPLICATE1',
-        ])->assertStatus(422);
-    }
-
     public function test_staff_cannot_purchase_order_credit(): void
     {
         $owner = User::factory()->create();

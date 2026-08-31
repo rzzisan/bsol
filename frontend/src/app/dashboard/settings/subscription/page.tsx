@@ -1,10 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Clock,
   CreditCard,
   FileText,
@@ -134,23 +132,11 @@ const text = {
     payingWithBkash: "bKash-এ পাঠানো হচ্ছে...",
     pgwLoading: "bKash পেমেন্ট লোড হচ্ছে...",
     pgwSelectPlan: "উপর থেকে একটা প্ল্যান বেছে নিলে bKash বাটন সক্রিয় হবে।",
-    showManual: "ম্যানুয়ালি পেমেন্ট করুন",
-    hideManual: "ম্যানুয়াল অপশন লুকান",
     bkashSuccess: "পেমেন্ট সফল হয়েছে — আপনার প্ল্যান সক্রিয় হয়ে গেছে।",
-    bkashFailed: "পেমেন্ট সম্পন্ন হয়নি। আবার চেষ্টা করুন অথবা নিচের ম্যানুয়াল অপশন ব্যবহার করুন।",
+    bkashFailed: "পেমেন্ট সম্পন্ন হয়নি। আবার চেষ্টা করুন।",
     bkashCancelled: "পেমেন্ট বাতিল করা হয়েছে।",
     bkashError: "কিছু একটা সমস্যা হয়েছে।",
     selectPlanFirst: "আগে একটা প্ল্যান নির্বাচন করুন।",
-    payInstructionsTitle: "bKash-এ পেমেন্ট পাঠান",
-    payInstructions: (num: string, type: string) =>
-      `নিচের bKash নম্বরে (${type}) টাকা Send Money করুন: ${num}। তারপর TrxID ও bKash নম্বর দিয়ে ফর্মটি জমা দিন — আমরা যাচাই করে আপনার প্ল্যান সক্রিয় করে দেব।`,
-    noBkashConfigured: "পেমেন্ট নম্বর এখনো সেট করা হয়নি। সাপোর্টের সাথে যোগাযোগ করুন।",
-    senderNumber: "আপনার bKash নম্বর",
-    trxId: "TrxID",
-    screenshot: "স্ক্রিনশট (ঐচ্ছিক)",
-    submit: "পেমেন্ট সাবমিট করুন",
-    submitting: "সাবমিট হচ্ছে...",
-    submitted: "পেমেন্ট সাবমিট হয়েছে। যাচাই হলে প্ল্যান সক্রিয় হবে।",
     history: "ইনভয়েস ও পেমেন্ট হিস্ট্রি",
     noHistory: "কোনো ইনভয়েস পাওয়া যায়নি।",
     loading: "লোড হচ্ছে...",
@@ -194,23 +180,11 @@ const text = {
     payingWithBkash: "Redirecting to bKash...",
     pgwLoading: "Loading bKash payment...",
     pgwSelectPlan: "Select a plan above to activate the bKash button.",
-    showManual: "Pay manually instead",
-    hideManual: "Hide manual option",
     bkashSuccess: "Payment successful — your plan is now active.",
-    bkashFailed: "Payment did not complete. Please try again or use the manual option below.",
+    bkashFailed: "Payment did not complete. Please try again.",
     bkashCancelled: "Payment was cancelled.",
     bkashError: "Something went wrong.",
     selectPlanFirst: "Select a plan first.",
-    payInstructionsTitle: "Send Payment via bKash",
-    payInstructions: (num: string, type: string) =>
-      `Send Money to this bKash number (${type}): ${num}. Then submit the form below with your TrxID and bKash number — we'll verify and activate your plan.`,
-    noBkashConfigured: "Payment number not configured yet. Please contact support.",
-    senderNumber: "Your bKash Number",
-    trxId: "TrxID",
-    screenshot: "Screenshot (optional)",
-    submit: "Submit Payment",
-    submitting: "Submitting...",
-    submitted: "Payment submitted. Your plan will activate once verified.",
     history: "Invoices & Payment History",
     noHistory: "No invoices found.",
     loading: "Loading...",
@@ -228,17 +202,14 @@ export default function Page() {
   const [plans, setPlans] = useState<Package[]>([]);
   const [subscription, setSubscription] = useState<MySubscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [form, setForm] = useState({ package_id: "", sender_bkash_number: "", trx_id: "" });
-  const [screenshot, setScreenshot] = useState<File | null>(null);
+  const [form, setForm] = useState({ package_id: "" });
   const [bkashPaying, setBkashPaying] = useState(false);
   const [pgwScriptLoaded, setPgwScriptLoaded] = useState(false);
   const [invoice, setInvoice] = useState<InvoicePreview | null>(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [liveRemainingSeconds, setLiveRemainingSeconds] = useState<number | null>(null);
-  const [showManualForm, setShowManualForm] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const load = async () => {
@@ -484,42 +455,6 @@ export default function Page() {
     }
   };
 
-  const submitPayment = async (e: FormEvent) => {
-    e.preventDefault();
-    const token = getStoredToken();
-    if (!token || !form.package_id) return;
-
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const body = new FormData();
-      body.append("package_id", form.package_id);
-      body.append("sender_bkash_number", form.sender_bkash_number);
-      body.append("trx_id", form.trx_id);
-      if (screenshot) body.append("screenshot", screenshot);
-
-      const res = await fetch(`${API}/subscription/payments`, {
-        method: "POST",
-        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-        body,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.message ?? t.error);
-        return;
-      }
-      setSuccess(t.submitted);
-      setForm({ package_id: "", sender_bkash_number: "", trx_id: "" });
-      setScreenshot(null);
-      await load();
-    } catch {
-      setError(t.error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const downloadInvoice = async (paymentId: number) => {
     setDownloadingId(paymentId);
     setError(null);
@@ -529,8 +464,6 @@ export default function Page() {
   };
 
   const statusLabel = subscription?.status ? (t.status[subscription.status] ?? subscription.status) : t.status.none;
-  const bkashNumber = subscription?.payment_instructions?.bkash_number ?? "";
-  const bkashType = subscription?.payment_instructions?.bkash_type ?? "Personal";
   const liveRemaining =
     liveRemainingSeconds !== null
       ? {
@@ -539,7 +472,6 @@ export default function Page() {
           minutes: Math.floor((liveRemainingSeconds % 3600) / 60),
         }
       : null;
-  const manualVisible = showManualForm || !subscription?.bkash_gateway_enabled;
 
   // Purely presentational: how much of the current cycle is left, for the
   // hero's progress ring — assumes the active package's own duration_days as
@@ -840,57 +772,6 @@ export default function Page() {
               >
                 {bkashPaying ? t.payingWithBkash : t.payWithBkash}
               </button>
-            )}
-
-            {subscription?.bkash_gateway_enabled ? (
-              <button
-                type="button"
-                onClick={() => setShowManualForm((v) => !v)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--border)] px-4 py-2.5 text-xs font-semibold text-[var(--muted)] transition hover:text-[var(--foreground)]"
-              >
-                {manualVisible ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                {manualVisible ? t.hideManual : t.showManual}
-              </button>
-            ) : null}
-
-            {manualVisible && (
-              <div className="mt-4 border-t border-[var(--border)] pt-4">
-                {bkashNumber ? (
-                  <p className="mb-3 text-sm">{t.payInstructions(bkashNumber, bkashType)}</p>
-                ) : (
-                  <p className="mb-3 text-sm text-amber-600">{t.noBkashConfigured}</p>
-                )}
-
-                <form onSubmit={submitPayment} className="grid gap-3 sm:grid-cols-3">
-                  <input
-                    required
-                    placeholder={t.senderNumber}
-                    value={form.sender_bkash_number}
-                    onChange={(e) => setForm((p) => ({ ...p, sender_bkash_number: e.target.value }))}
-                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
-                  />
-                  <input
-                    required
-                    placeholder={t.trxId}
-                    value={form.trx_id}
-                    onChange={(e) => setForm((p) => ({ ...p, trx_id: e.target.value }))}
-                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setScreenshot(e.target.files?.[0] ?? null)}
-                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--muted)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--accent)] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
-                  />
-                  <button
-                    type="submit"
-                    disabled={saving || !form.package_id || !bkashNumber || !invoice || invoice.is_downgrade_blocked}
-                    className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-105 disabled:opacity-70 sm:col-span-3"
-                  >
-                    {saving ? t.submitting : t.submit}
-                  </button>
-                </form>
-              </div>
             )}
 
             {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
