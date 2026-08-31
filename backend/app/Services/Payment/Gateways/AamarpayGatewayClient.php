@@ -4,6 +4,7 @@ namespace App\Services\Payment\Gateways;
 
 use App\Contracts\PaymentGatewayClient;
 use App\Models\PaymentGatewayCredential;
+use App\Models\PlatformPaymentGatewayCredential;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -23,7 +24,7 @@ class AamarpayGatewayClient implements PaymentGatewayClient
     private const SANDBOX_BASE = 'https://sandbox.aamarpay.com';
     private const LIVE_BASE = 'https://secure.aamarpay.com';
 
-    public function __construct(private readonly PaymentGatewayCredential $credential) {}
+    public function __construct(private readonly PaymentGatewayCredential|PlatformPaymentGatewayCredential $credential) {}
 
     private function baseUrl(): string
     {

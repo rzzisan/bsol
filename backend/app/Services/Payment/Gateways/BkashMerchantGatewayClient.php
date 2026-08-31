@@ -4,6 +4,7 @@ namespace App\Services\Payment\Gateways;
 
 use App\Contracts\PaymentGatewayClient;
 use App\Models\PaymentGatewayCredential;
+use App\Models\PlatformPaymentGatewayCredential;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -41,7 +42,7 @@ class BkashMerchantGatewayClient implements PaymentGatewayClient
     private const SANDBOX_BASE = 'https://tokenized.sandbox.bka.sh/v1.2.0-beta';
     private const LIVE_BASE = 'https://tokenized.pay.bka.sh/v1.2.0-beta';
 
-    public function __construct(private readonly PaymentGatewayCredential $credential) {}
+    public function __construct(private readonly PaymentGatewayCredential|PlatformPaymentGatewayCredential $credential) {}
 
     private function baseUrl(): string
     {
@@ -76,7 +77,14 @@ class BkashMerchantGatewayClient implements PaymentGatewayClient
 
     private function tokenCacheKey(): string
     {
-        return 'bkash_merchant_token_' . $this->credential->id;
+        // Prefixed with the credential's own table via class_basename — the
+        // seller-scoped PaymentGatewayCredential and the platform-wide
+        // PlatformPaymentGatewayCredential each have their own independent
+        // id sequence, so a seller row #5 and the platform row #5 would
+        // otherwise collide on the same cache key and can end up trading
+        // each other's cached id_token, causing wrong-credential 401s
+        // against bKash for whichever one didn't mint it.
+        return 'bkash_merchant_token_' . class_basename($this->credential) . '_' . $this->credential->id;
     }
 
     /** Grants (or returns a cached) id_token — same TTL discipline as the

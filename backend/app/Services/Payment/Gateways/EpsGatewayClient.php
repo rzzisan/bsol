@@ -4,6 +4,7 @@ namespace App\Services\Payment\Gateways;
 
 use App\Contracts\PaymentGatewayClient;
 use App\Models\PaymentGatewayCredential;
+use App\Models\PlatformPaymentGatewayCredential;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -43,7 +44,7 @@ class EpsGatewayClient implements PaymentGatewayClient
     private const SANDBOX_BASE = 'https://sandboxpgapi.eps.com.bd';
     private const LIVE_BASE = 'https://pgapi.eps.com.bd';
 
-    public function __construct(private readonly PaymentGatewayCredential $credential) {}
+    public function __construct(private readonly PaymentGatewayCredential|PlatformPaymentGatewayCredential $credential) {}
 
     private function baseUrl(): string
     {

@@ -62,6 +62,7 @@ const text = {
     languageLabel: "ভাষা", themeLabel: "থিম",
     settingsTitle: "পেমেন্ট রিসিভিং নম্বর",
     settingsDesc: "মার্চেন্টরা প্ল্যান কেনার সময় এই bKash নম্বরে টাকা পাঠাবে। এখানে পরিবর্তন করলে সাথে সাথে সব মার্চেন্টের পেমেন্ট পেজে আপডেট হয়ে যাবে।",
+    gatewaysLinkText: "সাবস্ক্রিপশন/এসএমএস ক্রেডিট/অ্যাড-অন পেমেন্টের জন্য SSLCommerz, bKash Merchant সহ ৭টি মার্চেন্ট গেটওয়ে চালু করতে চান? →",
     bkashNumber: "bKash নম্বর",
     bkashType: "অ্যাকাউন্ট টাইপ",
     saveSettings: "সংরক্ষণ করুন",
@@ -106,6 +107,7 @@ const text = {
     languageLabel: "Language", themeLabel: "Theme",
     settingsTitle: "Payment Receiving Number",
     settingsDesc: "Merchants will send money to this bKash number when buying a plan. Changing it here updates every merchant's payment page immediately.",
+    gatewaysLinkText: "Want to enable SSLCommerz, bKash Merchant & 5 more merchant gateways for subscription/SMS credit/add-on payments? →",
     bkashNumber: "bKash Number",
     bkashType: "Account Type",
     saveSettings: "Save Settings",
@@ -388,6 +390,12 @@ export default function AdminBillingPage() {
       <section className="catv-panel mb-5 p-4 sm:p-5">
         <h2 className="text-base font-semibold text-[var(--foreground)]">{t.settingsTitle}</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">{t.settingsDesc}</p>
+        <a
+          href="/admin/settings/platform-payment-gateways"
+          className="mt-2 inline-block text-xs font-semibold text-[var(--accent)] hover:underline"
+        >
+          {t.gatewaysLinkText}
+        </a>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <input

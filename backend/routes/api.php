@@ -92,6 +92,8 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\OrderPaymentController;
 use App\Http\Controllers\Api\PaymentGatewayCredentialController;
 use App\Http\Controllers\Api\PaymentGatewaySettingController;
+use App\Http\Controllers\Api\PlatformGatewayPaymentController;
+use App\Http\Controllers\Api\Admin\PlatformPaymentGatewayController;
 use App\Http\Controllers\Api\ProductMediaController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
@@ -316,6 +318,18 @@ Route::get('/sms/credit/pay/bkash/callback', [SmsCreditBkashPaymentController::c
 Route::get('/sms/credit/auto-recharge/agreement/callback', [SmsCreditAutoRechargeController::class, 'callback'])
     ->middleware('throttle:20,1');
 
+// Platform gateway payments (seller→platform: subscription, SMS credit,
+// order-credit add-on, storefront add-on) — same rationale as the bKash
+// callbacks above, no Sanctum token on the browser-redirect leg. See
+// online_payment_context.md §12, PlatformGatewayPaymentController.
+Route::get('/platform-gateway-payments/{purpose}/{provider}/callback/{id}', [PlatformGatewayPaymentController::class, 'callback'])
+    ->where('purpose', 'subscription|sms_credit|order_credit|storefront_addon')
+    ->middleware('throttle:20,1');
+// Server-to-server IPN — no path param, resolves the claim from the
+// payload's own fields (see PlatformGatewayPaymentController::ipn()).
+Route::post('/platform-gateway-payments/{provider}/ipn', [PlatformGatewayPaymentController::class, 'ipn'])
+    ->middleware('throttle:60,1');
+
 // ── WordPress/WooCommerce Connector (plugin-facing) ─────────────────────────
 // A different trust boundary from the auth:sanctum group below — authenticated
 // by a domain-bound PlatformApiKey (X-API-KEY + X-Client-Domain), not a
@@ -427,6 +441,18 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::get('/storefront-addon/status', [StorefrontAddonPurchaseController::class, 'status']);
         Route::get('/storefront-addon/purchases', [StorefrontAddonPurchaseController::class, 'myPurchases']);
         Route::post('/storefront-addon/purchases', [StorefrontAddonPurchaseController::class, 'submitPayment']);
+    });
+
+    // ── Platform gateway payments (seller→platform) — the same 7 merchant
+    // gateways sellers can offer their own customers are now available for
+    // paying the platform itself (subscription, SMS credit, order-credit
+    // add-on, storefront add-on), admin-configured. See
+    // online_payment_context.md §12. Owner-only, same reasoning as the 4
+    // purpose blocks above.
+    Route::middleware('owner_only')->prefix('platform-gateway-payments')->group(function () {
+        Route::get('/channels', [PlatformGatewayPaymentController::class, 'channels']);
+        Route::post('/{purpose}/initiate', [PlatformGatewayPaymentController::class, 'initiate'])
+            ->where('purpose', 'subscription|sms_credit|order_credit|storefront_addon');
     });
 
     // ── Subscription (self-service — must stay reachable even when expired) ───
@@ -924,6 +950,11 @@ Route::middleware(['staff_permission:orders', 'active_subscription:allow_deliver
 
         Route::get('/billing-settings', [AdminSubscriptionController::class, 'getBillingSettings']);
         Route::put('/billing-settings', [AdminSubscriptionController::class, 'updateBillingSettings']);
+
+        // Platform-wide merchant-gateway credentials for seller→platform
+        // billing — online_payment_context.md §12.
+        Route::get('/platform-payment-gateways', [PlatformPaymentGatewayController::class, 'index']);
+        Route::put('/platform-payment-gateways/{provider}', [PlatformPaymentGatewayController::class, 'save']);
 
         Route::get('/subscription-payments', [AdminSubscriptionController::class, 'listPayments']);
         Route::post('/subscription-payments/{payment}/approve', [AdminSubscriptionController::class, 'approvePayment']);

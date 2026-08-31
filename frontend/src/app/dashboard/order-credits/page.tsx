@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import UserShell from "@/components/user-shell";
+import PlatformGatewayPaymentPicker from "@/components/platform-gateway-payment-picker";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
 
 /**
@@ -205,6 +206,12 @@ export default function OrderCreditsPage() {
             {txt.payInstructions}: <span className="font-semibold text-[var(--foreground)]">{balance?.payment_instructions.bkash_number ?? "—"}</span>
             {balance?.payment_instructions.bkash_type ? ` (${balance.payment_instructions.bkash_type})` : ""}
           </p>
+
+          <PlatformGatewayPaymentPicker
+            purpose="order_credit"
+            payload={{ addon_package_id: buying.id }}
+            locale={locale}
+          />
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>

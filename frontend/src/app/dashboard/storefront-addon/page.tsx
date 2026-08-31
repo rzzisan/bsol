@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import UserShell from "@/components/user-shell";
+import PlatformGatewayPaymentPicker from "@/components/platform-gateway-payment-picker";
 import { getStoredLocale, getStoredToken, type Locale } from "@/lib/dashboard-client";
 
 /**
@@ -189,6 +190,12 @@ export default function StorefrontAddonPage() {
             {txt.payInstructions}: <span className="font-semibold text-[var(--foreground)]">{status.payment_instructions.bkash_number ?? "—"}</span>
             {status.payment_instructions.bkash_type ? ` (${status.payment_instructions.bkash_type})` : ""}
           </p>
+
+          <PlatformGatewayPaymentPicker
+            purpose="storefront_addon"
+            payload={{ addon_package_id: status.package.id }}
+            locale={locale}
+          />
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>

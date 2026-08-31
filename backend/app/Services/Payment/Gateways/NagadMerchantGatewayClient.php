@@ -4,6 +4,7 @@ namespace App\Services\Payment\Gateways;
 
 use App\Contracts\PaymentGatewayClient;
 use App\Models\PaymentGatewayCredential;
+use App\Models\PlatformPaymentGatewayCredential;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -61,7 +62,7 @@ class NagadMerchantGatewayClient implements PaymentGatewayClient
     private const SANDBOX_BASE = 'http://sandbox.mynagad.com:10080/remote-payment-gateway-1.0/api/dfs/';
     private const LIVE_BASE = 'https://api.mynagad.com/api/dfs/';
 
-    public function __construct(private readonly PaymentGatewayCredential $credential) {}
+    public function __construct(private readonly PaymentGatewayCredential|PlatformPaymentGatewayCredential $credential) {}
 
     private function baseUrl(): string
     {

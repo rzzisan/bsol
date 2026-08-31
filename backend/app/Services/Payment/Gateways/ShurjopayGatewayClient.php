@@ -4,6 +4,7 @@ namespace App\Services\Payment\Gateways;
 
 use App\Contracts\PaymentGatewayClient;
 use App\Models\PaymentGatewayCredential;
+use App\Models\PlatformPaymentGatewayCredential;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -24,7 +25,7 @@ class ShurjopayGatewayClient implements PaymentGatewayClient
     private const SANDBOX_BASE = 'https://sandbox.shurjopayment.com/api';
     private const LIVE_BASE = 'https://engine.shurjopayment.com/api';
 
-    public function __construct(private readonly PaymentGatewayCredential $credential) {}
+    public function __construct(private readonly PaymentGatewayCredential|PlatformPaymentGatewayCredential $credential) {}
 
     private function baseUrl(): string
     {

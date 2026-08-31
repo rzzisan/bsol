@@ -4,6 +4,7 @@ namespace App\Services\Payment;
 
 use App\Contracts\PaymentGatewayClient;
 use App\Models\PaymentGatewayCredential;
+use App\Models\PlatformPaymentGatewayCredential;
 use App\Services\Payment\Gateways\AamarpayGatewayClient;
 use App\Services\Payment\Gateways\BkashMerchantGatewayClient;
 use App\Services\Payment\Gateways\EpsGatewayClient;
@@ -18,6 +19,11 @@ use InvalidArgumentException;
  * All 7 originally planned providers now supported: Phase B1 (SSLCommerz),
  * Phase B2 (AamarPay, ZiniPay), Phase B3 (ShurjoPay, EPS), Phase C1/C2
  * (bKash Merchant, Nagad Merchant). See online_payment_context.md.
+ *
+ * Shared by both the seller-facing (PaymentGatewayCredential) and
+ * platform-wide (PlatformPaymentGatewayCredential, §12) credential sources
+ * — every gateway client only ever reads ->is_live/->credentials/->id from
+ * whichever one it's handed, so one factory + one PROVIDERS map serves both.
  */
 class PaymentGatewayFactory
 {
@@ -32,7 +38,7 @@ class PaymentGatewayFactory
         'nagad_merchant' => NagadMerchantGatewayClient::class,
     ];
 
-    public static function make(string $provider, PaymentGatewayCredential $credential): PaymentGatewayClient
+    public static function make(string $provider, PaymentGatewayCredential|PlatformPaymentGatewayCredential $credential): PaymentGatewayClient
     {
         $class = self::PROVIDERS[$provider] ?? null;
 

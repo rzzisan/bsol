@@ -1,5 +1,7 @@
 # Customer-Facing Online Payment — Context
 
+শেষ আপডেট: 2026-08-31 — **§১২: Platform Payment Gateways (seller→platform, ৭টা প্রোভাইডার) নতুন যোগ হয়েছে।** এতদিন প্ল্যাটফর্ম নিজে (সাবস্ক্রিপশন, এসএমএস ক্রেডিট, অর্ডার-ক্রেডিট অ্যাড-অন, স্টোরফ্রন্ট অ্যাড-অন) পেমেন্ট নিত শুধু bKash দিয়ে (`PlatformBillingSetting`, tokenized/pgw দুই ভ্যারিয়েন্ট)। ব্যবহারকারীর অনুরোধ অনুযায়ী — সেলার নিজের কাস্টমারদের থেকে পেমেন্ট নিতে যে ৭টা গেটওয়ে ব্যবহার করতে পারে (SSLCommerz, AamarPay, ZiniPay, ShurjoPay, EPS, bKash Merchant, Nagad Merchant), সেই একই ৭টা এখন প্ল্যাটফর্ম-ওয়াইড অ্যাডমিন ক্রেডেনশিয়াল হিসেবেও সেট করা যায়, admin একাধিক একসাথে চালু রাখতে পারে, আর সেলার পেমেন্টের সময় যেকোনো একটা বেছে নিতে পারে। বিস্তারিত নিচে §১২। Older entries kept as-is:
+
 শেষ আপডেট: 2026-08-28 — **P2 (payment gateway sandbox verify) status অন্য ফাইলে সংশোধন** — `feature_roadmap_context.md`/`production_audit_report_context.md §৭`-এ EPS ভুলভাবে এখনো "Not started" দেখাচ্ছিল, যদিও এই ফাইলেই (§৯.১ নিচে) EPS-এর real sandbox verify+fix ২০২৬-০৮-১৯-এই documented ছিল — এখন সেই দুই ফাইল sync হয়েছে। এই ফাইলের নিজের content অপরিবর্তিত, শুধু `NagadMerchantGatewayClient::verifyPayment()`-এ success-path-এও raw response log যোগ হয়েছে (§১১-এর "confidence note" অনুযায়ী — real sandbox test ছাড়া Nagad এখনো unconfirmed, এই logging শুধু ভবিষ্যতের debug দ্রুত করবে, verify করে না)। Older entries kept as-is:
 
 শেষ আপডেট: 2026-08-19 (৫) — **WordPress/WooCommerce-এও সব ৭টা গেটওয়ে লাইভ।** `bsol-connect` প্লাগিন (v1.19.0) এখন এই একই `OnlinePaymentService` ইঞ্জিনকে delegate করে WooCommerce checkout-এ সব channel অফার করে — বিস্তারিত `wordpress_connect_context.md §১২`।
@@ -244,5 +246,41 @@ Initialize ও complete-এর শেপ SDK-এর সোর্স কোড �
   - Strict Anti-Tampering Check: Verifies `customer_order_id` in response matches our `merchantTranId`.
 - **Frontend Settings**:
   - Tab-based Settings UI updated with ShurjoPay credentials (`username`, `password`, `prefix`) and secure password toggle.
+
+## ১২. Platform Payment Gateways — seller→platform, ৭টা প্রোভাইডার (২০২৬-০৮-৩১)
+
+### কেন
+এই পুরো ফাইল এতদিন **customer→seller** পেমেন্ট নিয়ে ছিল। কিন্তু প্ল্যাটফর্ম নিজেও সেলারদের থেকে টাকা নেয় — সাবস্ক্রিপশন renewal, SMS ক্রেডিট, অর্ডার-ক্রেডিট অ্যাড-অন, স্টোরফ্রন্ট অ্যাড-অন (৪টা সারফেস, `subscription_billing_context.md`) — আর এই **seller→platform** দিকটা এতদিন শুধু bKash-নির্ভর ছিল (`PlatformBillingSetting`, admin একটাই সিঙ্গেল-টেন্যান্ট রো, `bkash_api_type` দিয়ে tokenized/pgw টগল)। ব্যবহারকারীর সিদ্ধান্ত: সেলার নিজের কাস্টমারদের জন্য যে ৭টা গেটওয়ে ইন্টিগ্রেট করতে পারে (§৬-১১), প্ল্যাটফর্মের নিজের পেমেন্ট নেওয়ার জন্যও ঠিক সেই একই ৭টা থাকা উচিত। Admin একাধিক গেটওয়ে একসাথে চালু রাখতে পারবে; সেলার পেমেন্টের সময় সেগুলোর মধ্য থেকে যেকোনো একটা বেছে নেবে। পুরনো bKash-only ফ্লো (manual + `PlatformBillingSetting`-ভিত্তিক gateway) অপরিবর্তিত/সহাবস্থানে থাকছে — এটা একটা সংযোজন, প্রতিস্থাপন না।
+
+### Data model
+- **`platform_payment_gateway_credentials`** — `payment_gateway_credentials`-এর (সেলার-ভিত্তিক) প্ল্যাটফর্ম-ওয়াইড সিস্টার টেবিল। `user_id` নেই — `provider` একাই unique (single-tenant admin setting)। একই ৭টা provider string, একই shape (`enabled`, `is_live`, `credentials` — `encrypted:array`)।
+- **`platform_gateway_payments`** — কাস্টমার-facing `order_online_payments`-এর সমতুল্য, কিন্তু ৪টা ভিন্ন purpose টেবিলের (`subscription_payments`/`sms_credit_purchases`/`addon_purchases`×২ type) জন্য একটাই polymorphic-স্টাইল claim row (`purpose` string + `payable_id`, কোনো real polymorphic morph না — ৪টা ভিন্ন টেবিল, তাই টাইপ-সেফ dispatch একটা `match()`-এই)। `provider_payment_id`/`provider_trx_id`/`gateway_response`/`status` (`initiated`|`completed`|`failed`) — same idempotency discipline।
+
+### Provider abstraction reuse — নতুন কোনো গেটওয়ে ক্লাস লাগেনি
+৭টা গেটওয়ে ক্লাসের প্রতিটাই (`SslcommerzGatewayClient` ইত্যাদি) কনস্ট্রাক্টরে শুধু `$credential->is_live`/`$credential->credentials[...]`/`$credential->id` পড়ে — কোনো `user_id`-নির্ভর লজিক নেই। তাই প্রতিটা ক্লাসের কনস্ট্রাক্টর টাইপ-হিন্ট `PaymentGatewayCredential|PlatformPaymentGatewayCredential` (union type) করে দেওয়া হয়েছে, আর `PaymentGatewayFactory::make()`ও একই ইউনিয়ন নেয় — একটাই factory + একটাই PROVIDERS ম্যাপ দুই দিকেই কাজ করে। ৭টা ক্লাসের ভেতরের কোনো লজিক পাল্টায়নি।
+
+**⚠️ ফিক্স করা একটা সম্ভাব্য বাগ (ship হওয়ার আগেই ধরা পড়েছে):** `BkashMerchantGatewayClient::tokenCacheKey()` আগে শুধু `'bkash_merchant_token_' . $this->credential->id` ব্যবহার করত। যেহেতু সেলার-টেবিল আর প্ল্যাটফর্ম-টেবিলের id sequence সম্পূর্ণ আলাদা, সেলার-ক্রেডেনশিয়াল #৫ আর প্ল্যাটফর্ম-ক্রেডেনশিয়াল #৫ একই cache key-তে কোলাইড করত — একে অন্যের cached id_token ব্যবহার করে ফেলার ঝুঁকি ছিল (401 auth error, ডেটা লিক না, কিন্তু ভুল ক্রেডেনশিয়াল দিয়ে bKash কল)। ফিক্স: cache key-তে `class_basename($this->credential)` যোগ করা হয়েছে যাতে দুই সোর্স আলাদা namespace-এ থাকে।
+
+### `PlatformGatewayPaymentService` — নতুন সার্ভিস, ৪টা সারফেসেই শেয়ার্ড
+`App\Services\OnlinePaymentService`-এর gateway_auto অর্ধেকটার (`initiateGateway`/`completeGatewayCallback`) হুবহু একই ডিসিপ্লিন — **verify সবসময় নিজের stored `provider_payment_id` দিয়ে, callback-এর কোনো ফিল্ড কখনো trust করা হয় না** (tamper-প্রুফ), আর `lockForUpdate()`+`isTerminal()` guard দিয়ে idempotent।
+
+- `enabledChannels()` — admin যা enable+configure করেছে তার তালিকা (৪টা সারফেসের ফ্রন্টএন্ড পেজেই একই এন্ডপয়েন্ট রিইউজ হয়)।
+- `initiate($purpose, $user, $provider, $input, $callbackBaseUrl)` — `$purpose` অনুযায়ী (`subscription`|`sms_credit`|`order_credit`|`storefront_addon`) সেই সারফেসের বিদ্যমান manual-submit লজিকই পুনরায় ব্যবহার করে ঠিক সেই একই `pending` রো তৈরি করে (`payment_method` শুধু `"bkash_manual"`-এর বদলে `"gateway:{provider}"`), তারপর `PlatformGatewayPayment` claim + গেটওয়ে সেশন তৈরি করে।
+- `completeCallback($claim, $callbackData)` — verify করে, সফল হলে সেই সারফেসের বিদ্যমান "approve হলে কী হয়" cascade-টাই কল করে: `SubscriptionActivationService::activate()`, `SmsCreditService::recharge()`, বা `AddonApplyService::apply()` (order_credit ও storefront_addon দুটোই — টাইপ `AddonPackage.type` দিয়ে ভেতরেই ব্রাঞ্চ হয়)। ব্যর্থ হলে payable রো `rejected`-এ মার্ক হয় — ঠিক manual-reject-এর মতোই একটা `admin_note` সহ।
+
+### Routes
+- Admin CRUD (is_admin group): `GET/PUT /admin/platform-payment-gateways[/{provider}]`।
+- Seller-facing (owner_only group, ৪টা সারফেসের রুট-ব্লকের ঠিক পরেই): `GET /platform-gateway-payments/channels`, `POST /platform-gateway-payments/{purpose}/initiate`।
+- Public (Sanctum টোকেন ছাড়া — bKash callback-গুলোর মতোই একই কারণ, গেটওয়ে সরাসরি ব্রাউজার রিডাইরেক্ট করে): `GET /platform-gateway-payments/{purpose}/{provider}/callback/{id}`, `POST /platform-gateway-payments/{provider}/ipn`।
+
+### Frontend
+- `lib/gateway-providers.ts` — ৭টা provider-এর শেয়ার্ড মেটাডেটা (লেবেল/রং/ফিল্ড-স্কিমা), `dashboard/settings/payments/page.tsx`-এর (সেলার-facing) নিজস্ব constant-এর সাথে ভিজ্যুয়ালি consistent কিন্তু আলাদা ফাইল (সেই পেজ একটা client component-স্কোপড কনস্ট্যান্ট, reusable lib export না বলে)।
+- `admin/settings/platform-payment-gateways/page.tsx` — অ্যাডমিন সেটিংস পেজ (নতুন মেনু আইটেম, `/admin/billing` থেকেও একটা discoverability লিংক)।
+- `components/platform-gateway-payment-picker.tsx` — একটাই শেয়ার্ড রিইউজেবল উইজেট, ৪টা সেলার পেজেই (`dashboard/settings/subscription`, `dashboard/sms/credit`, `dashboard/order-credits`, `dashboard/storefront-addon`) ড্রপ-ইন করা হয়েছে। Admin কোনো গেটওয়ে চালু না করলে **কিছুই রেন্ডার করে না** — প্রতিটা পেজ আগের মতোই (manual-only) থাকে যতক্ষণ না admin অন্তত একটা প্রোভাইডার চালু করে।
+
+### Test coverage
+`PlatformPaymentGatewayCredentialApiTest` (৫টা: non-admin ব্লক, index, save+mask roundtrip, masked-placeholder-না-overwrite, unknown-provider-404), `PlatformGatewayPaymentTest` (৯টা: channels listing, misconfigured-credential exclusion, disabled-provider initiate-reject, ৪টা সারফেসেরই end-to-end initiate→verify→apply — সাবস্ক্রিপশন activate, SMS ক্রেডিট recharge, order-credit wallet grant, storefront addon activate — tampering-প্রতিরোধ প্রমাণ (spoofed tran_id রিজেক্ট), idempotency (দ্বিতীয় callback/IPN no-op))। Full suite: বেসলাইনের ৮১টা unrelated failure (tracking/connect/collection-history ইত্যাদি — SQLite-vs-Postgres, `now()`/`ON CONFLICT` সিনট্যাক্স, এই ব্যাচের কোনো ফাইলের সাথে সম্পর্কহীন) ছাড়া সব পাস, বেসলাইনের সাথে failure-সেট হুবহু ডিফ করে মিলিয়ে দেখা হয়েছে।
+
+**লাইভ ভেরিফিকেশন** (disposable admin+seller+package, tinker দিয়ে তৈরি, production API-তে curl): admin দিয়ে SSLCommerz enable করে seller-এর channels endpoint-এ দেখানো নিশ্চিত করা হয়েছে, তারপর subscription initiate কল করে দেখা গেছে সঠিক pending `SubscriptionPayment` (`payment_method=gateway:sslcommerz`) + `PlatformGatewayPayment` claim (`status=initiated`) তৈরি হচ্ছে (fake sandbox credential দিয়ে SSLCommerz-এর নিজস্ব sandbox reject করেছে বলে redirect_url পাওয়া যায়নি — এটাই প্রত্যাশিত, real merchant credential ছাড়া এর বেশি ভেরিফাই করা সম্ভব না; পুরো happy-path ইতিমধ্যে PHPUnit-এ `Http::fake()` দিয়ে প্রমাণিত)। সব টেস্ট ডেটা (users, token, package, payment, claim, credential) মুছে ফেলা হয়েছে।
 
 

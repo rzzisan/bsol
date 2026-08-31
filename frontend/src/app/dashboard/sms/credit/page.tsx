@@ -13,6 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import UserShell from "@/components/user-shell";
+import PlatformGatewayPaymentPicker from "@/components/platform-gateway-payment-picker";
 import { GlowBackdrop, HistoryRow, ReceiptCard, ReceiptRow, SectionHeader } from "@/components/billing-ui";
 import { getStoredLocale, getStoredToken, openAuthenticatedPdf, type Locale } from "@/lib/dashboard-client";
 
@@ -632,6 +633,14 @@ export default function Page() {
           {/* Bill payment */}
           <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
             <SectionHeader icon={CreditCard}>{t.payTitle}</SectionHeader>
+
+            {isValidAmount && (
+              <PlatformGatewayPaymentPicker
+                purpose="sms_credit"
+                payload={{ credits }}
+                locale={locale}
+              />
+            )}
 
             {rateInfo?.bkash_gateway_enabled && rateInfo.bkash_api_type === "pgw" && (
               <div className="mb-3">

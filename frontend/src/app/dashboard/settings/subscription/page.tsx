@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import UserShell from "@/components/user-shell";
+import PlatformGatewayPaymentPicker from "@/components/platform-gateway-payment-picker";
 import {
   GlowBackdrop,
   HistoryRow,
@@ -794,6 +795,15 @@ export default function Page() {
           {/* Bill payment */}
           <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
             <SectionHeader icon={CreditCard}>{t.payTitle}</SectionHeader>
+
+            {form.package_id && (
+              <PlatformGatewayPaymentPicker
+                purpose="subscription"
+                payload={{ package_id: form.package_id }}
+                locale={locale}
+                disabled={!invoice || invoice.is_downgrade_blocked}
+              />
+            )}
 
             {subscription?.bkash_gateway_enabled && subscription.bkash_api_type === "pgw" && (
               <div className="mb-3">
