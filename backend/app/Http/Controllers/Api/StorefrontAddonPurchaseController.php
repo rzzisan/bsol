@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AddonPackage;
 use App\Models\AddonPurchase;
-use App\Models\PlatformBillingSetting;
 use App\Services\StorefrontAddonService;
 use Illuminate\Http\JsonResponse;
 
@@ -25,7 +24,6 @@ class StorefrontAddonPurchaseController extends Controller
     public function status(): JsonResponse
     {
         $owner = auth()->user()->shopOwner();
-        $billingSettings = PlatformBillingSetting::getSetting();
 
         return response()->json([
             'success' => true,
@@ -34,10 +32,6 @@ class StorefrontAddonPurchaseController extends Controller
                 'addon_active' => $this->storefrontAddonService->hasActiveAddon($owner),
                 'addon_until' => $this->storefrontAddonService->hasActiveAddon($owner) ? $owner->storefront_addon_until : null,
                 'package' => AddonPackage::where('type', 'storefront')->where('is_active', true)->orderBy('price')->first(['id', 'name', 'price']),
-                'payment_instructions' => [
-                    'bkash_number' => $billingSettings->bkash_number,
-                    'bkash_type' => $billingSettings->bkash_type,
-                ],
             ],
         ]);
     }

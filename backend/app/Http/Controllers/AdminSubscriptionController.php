@@ -25,8 +25,6 @@ class AdminSubscriptionController extends Controller
     public function updateBillingSettings(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'bkash_number' => ['nullable', 'string', 'max:20', 'regex:/^[0-9]{11}$/'],
-            'bkash_type' => ['required', Rule::in(['Personal', 'Merchant', 'Agent'])],
             'bkash_app_key' => ['nullable', 'string', 'max:255'],
             'bkash_app_secret' => ['nullable', 'string', 'max:255'],
             'bkash_username' => ['nullable', 'string', 'max:255'],

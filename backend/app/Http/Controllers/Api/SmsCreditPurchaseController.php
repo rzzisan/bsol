@@ -41,10 +41,6 @@ class SmsCreditPurchaseController extends Controller
                 'bkash_gateway_enabled' => $billingSettings->hasBkashGateway(),
                 'bkash_api_type' => PlatformBillingSetting::resolvedBkashApiType(),
                 'bkash_pgw_script_url' => $this->bkashPgw->scriptUrl(),
-                'payment_instructions' => [
-                    'bkash_number' => $billingSettings->bkash_number,
-                    'bkash_type' => $billingSettings->bkash_type,
-                ],
             ],
         ]);
     }

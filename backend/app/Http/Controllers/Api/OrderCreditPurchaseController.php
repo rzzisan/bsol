@@ -7,7 +7,6 @@ use App\Models\AddonPackage;
 use App\Models\AddonPurchase;
 use App\Models\OrderCreditHistory;
 use App\Models\OrderCreditWallet;
-use App\Models\PlatformBillingSetting;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -34,17 +33,12 @@ class OrderCreditPurchaseController extends Controller
     public function balance(): JsonResponse
     {
         $wallet = OrderCreditWallet::walletFor(auth()->id());
-        $billingSettings = PlatformBillingSetting::getSetting();
 
         return response()->json([
             'success' => true,
             'data' => [
                 'available_balance' => $wallet->availableBalance(),
                 'expires_at' => $wallet->isExpired() ? null : $wallet->expires_at,
-                'payment_instructions' => [
-                    'bkash_number' => $billingSettings->bkash_number,
-                    'bkash_type' => $billingSettings->bkash_type,
-                ],
             ],
         ]);
     }

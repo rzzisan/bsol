@@ -299,4 +299,13 @@ Initialize ও complete-এর শেপ SDK-এর সোর্স কোড �
 
 Production-এ deploy করে লাইভ কার্ল-চেক করা হয়েছে: ৪টা `POST` এন্ডপয়েন্টই এখন ৪০৪/৪০৫ রিটার্ন করে, বাকি সব রুট (GET listing/invoice, admin approve/reject, gateway channels/initiate) অপরিবর্তিত।
 
+### ১৩.১ ফলো-আপ ফিক্স — অ্যাডমিনের "Payment Receiving Number" সেটিং-ও রিমুভ (একই দিনে)
+
+ব্যবহারকারী দেখান `/admin/billing` পেজে তখনো "Payment Receiving Number" (bKash নম্বর + Personal/Merchant/Agent টাইপ) এডিট করার UI বহাল ছিল — সেলার-facing ম্যানুয়াল ফর্ম সরানোর পর এই admin সেটিং সম্পূর্ণ **dead** হয়ে গিয়েছিল (কোনো পেজ আর `payment_instructions.bkash_number` দেখাচ্ছিল না, admin এটা বদলালেও বাস্তবে কিছুই হতো না) — তাই এটাও রিমুভ করা হয়েছে:
+
+- **Backend**: `AdminSubscriptionController::updateBillingSettings()`-এর ভ্যালিডেশন থেকে `bkash_number`/`bkash_type` সরানো হয়েছে (`bkash_type` আগে `required` ছিল — সরিয়ে না দিলে ফ্রন্টএন্ড আর পাঠাবে না বলে সেভই ব্যর্থ হতো)। ৪টা কন্ট্রোলারের রেসপন্স থেকেই (`SubscriptionController::mySubscription()`, `SmsCreditPurchaseController::rate()`, `OrderCreditPurchaseController::balance()`, `StorefrontAddonPurchaseController::status()`) `payment_instructions` key সম্পূর্ণ সরানো হয়েছে (ব্যবহৃত হচ্ছিল না, কোনো ফ্রন্টএন্ড আর পড়ছিল না)।
+- **যা সরানো হয়নি**: `PlatformBillingSetting` মডেল/টেবিলের `bkash_number`/`bkash_type` কলাম দুটো অপরিবর্তিত (historical data, নতুন migration লাগেনি) — শুধু সেট/দেখানোর UI+API path বন্ধ করা হয়েছে।
+- **Frontend**: `/admin/billing` পেজ থেকে পুরো "Payment Receiving Number" কার্ড (নম্বর ইনপুট + টাইপ ড্রপডাউন) সরানো হয়েছে — শুধু "bKash Payment Gateway (auto-verified)" সেকশনটাই (যেটা এখনো functional, tokenized/pgw automated flow) এই প্যানেলে থাকছে। §১২-এর discovery link (নতুন multi-gateway পেজের দিকে) প্যানেলের উপরেই রাখা হয়েছে।
+- **যাচাই**: প্রোডাকশনে curl দিয়ে নিশ্চিত করা হয়েছে `bkash_number`/`bkash_type` ছাড়াই PUT সফল হয় (আগে ৪২২ হতো)। টেস্ট টগল করার সময় আসল প্রোডাকশন `bkash_sandbox`/`bkash_api_type` ভ্যালু (false/pgw) সাময়িকভাবে বদলে গিয়েছিল — সাথে সাথেই আগের ভ্যালুতে ফিরিয়ে দেওয়া হয়েছে, disposable admin ইউজারও মুছে ফেলা হয়েছে। Full suite: বেসলাইনের সাথে অপরিবর্তিত (কোনো টেস্ট এই এন্ডপয়েন্ট কভার করত না বলে টেস্ট বদলাতে হয়নি)।
+
 

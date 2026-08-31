@@ -59,7 +59,6 @@ type Status = {
   addon_active: boolean;
   addon_until: string | null;
   package: { id: number; name: string; price: string } | null;
-  payment_instructions: { bkash_number: string | null; bkash_type: string | null };
 };
 type PurchaseRow = { id: number; amount: string; status: "pending" | "approved" | "rejected"; created_at: string };
 

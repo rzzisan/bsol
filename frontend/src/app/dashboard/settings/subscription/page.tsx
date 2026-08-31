@@ -89,7 +89,6 @@ interface MySubscription {
   days_left: number | null;
   remaining: RemainingTime | null;
   is_expired: boolean;
-  payment_instructions: { bkash_number: string | null; bkash_type: string | null };
   bkash_gateway_enabled: boolean;
   bkash_api_type: "tokenized" | "pgw";
   bkash_pgw_script_url: string;

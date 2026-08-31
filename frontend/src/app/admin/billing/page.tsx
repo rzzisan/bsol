@@ -18,13 +18,10 @@ import {
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "") || "/api";
 
 type PaymentStatus = "pending" | "approved" | "rejected";
-type BkashType = "Personal" | "Merchant" | "Agent";
 
 type BkashApiType = "tokenized" | "pgw";
 
 interface BillingSettings {
-  bkash_number: string | null;
-  bkash_type: BkashType;
   bkash_app_key: string | null;
   bkash_app_secret_set: boolean;
   bkash_username: string | null;
@@ -60,11 +57,7 @@ const text = {
     menuSms: "এসএমএস", menuSmsGateway: "এসএমএস গেটওয়ে", menuSmsSend: "এসএমএস সেন্ড", menuSmsHistory: "এসএমএস হিস্টোরি", menuSmsCredit: "এসএমএস ক্রেডিট",
     menuPackages: "প্যাকেজ", menuBilling: "বিলিং", menuReports: "রিপোর্ট", menuSettings: "সেটিংস", menuEmailSettings: "ইমেইল সেটিংস",
     languageLabel: "ভাষা", themeLabel: "থিম",
-    settingsTitle: "পেমেন্ট রিসিভিং নম্বর",
-    settingsDesc: "মার্চেন্টরা প্ল্যান কেনার সময় এই bKash নম্বরে টাকা পাঠাবে। এখানে পরিবর্তন করলে সাথে সাথে সব মার্চেন্টের পেমেন্ট পেজে আপডেট হয়ে যাবে।",
     gatewaysLinkText: "সাবস্ক্রিপশন/এসএমএস ক্রেডিট/অ্যাড-অন পেমেন্টের জন্য SSLCommerz, bKash Merchant সহ ৭টি মার্চেন্ট গেটওয়ে চালু করতে চান? →",
-    bkashNumber: "bKash নম্বর",
-    bkashType: "অ্যাকাউন্ট টাইপ",
     saveSettings: "সংরক্ষণ করুন",
     savingSettings: "সংরক্ষণ হচ্ছে...",
     settingsSaved: "বিলিং সেটিংস সংরক্ষণ হয়েছে।",
@@ -105,11 +98,7 @@ const text = {
     menuSms: "SMS", menuSmsGateway: "SMS Gateway", menuSmsSend: "Send SMS", menuSmsHistory: "SMS History", menuSmsCredit: "SMS Credit",
     menuPackages: "Packages", menuBilling: "Billing", menuReports: "Reports", menuSettings: "Settings", menuEmailSettings: "Email Settings",
     languageLabel: "Language", themeLabel: "Theme",
-    settingsTitle: "Payment Receiving Number",
-    settingsDesc: "Merchants will send money to this bKash number when buying a plan. Changing it here updates every merchant's payment page immediately.",
     gatewaysLinkText: "Want to enable SSLCommerz, bKash Merchant & 5 more merchant gateways for subscription/SMS credit/add-on payments? →",
-    bkashNumber: "bKash Number",
-    bkashType: "Account Type",
     saveSettings: "Save Settings",
     savingSettings: "Saving...",
     settingsSaved: "Billing settings saved.",
@@ -154,8 +143,6 @@ export default function AdminBillingPage() {
   const [actingId, setActingId] = useState<number | null>(null);
 
   const [settings, setSettings] = useState<BillingSettings>({
-    bkash_number: "",
-    bkash_type: "Personal",
     bkash_app_key: "",
     bkash_app_secret_set: false,
     bkash_username: "",
@@ -240,8 +227,6 @@ export default function AdminBillingPage() {
       const data = await res.json();
       if (res.ok && data?.data) {
         setSettings({
-          bkash_number: data.data.bkash_number ?? "",
-          bkash_type: data.data.bkash_type ?? "Personal",
           bkash_app_key: data.data.bkash_app_key ?? "",
           bkash_app_secret_set: Boolean(data.data.bkash_app_secret_set),
           bkash_username: data.data.bkash_username ?? "",
@@ -278,8 +263,6 @@ export default function AdminBillingPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          bkash_number: settings.bkash_number || null,
-          bkash_type: settings.bkash_type,
           bkash_app_key: settings.bkash_app_key || null,
           bkash_app_secret: bkashAppSecretInput || undefined,
           bkash_username: settings.bkash_username || null,
@@ -388,34 +371,14 @@ export default function AdminBillingPage() {
       onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
     >
       <section className="catv-panel mb-5 p-4 sm:p-5">
-        <h2 className="text-base font-semibold text-[var(--foreground)]">{t.settingsTitle}</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">{t.settingsDesc}</p>
         <a
           href="/admin/settings/platform-payment-gateways"
-          className="mt-2 inline-block text-xs font-semibold text-[var(--accent)] hover:underline"
+          className="mb-3 inline-block text-xs font-semibold text-[var(--accent)] hover:underline"
         >
           {t.gatewaysLinkText}
         </a>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <input
-            placeholder={t.bkashNumber}
-            value={settings.bkash_number ?? ""}
-            onChange={(e) => setSettings((s) => ({ ...s, bkash_number: e.target.value }))}
-            className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
-          />
-          <select
-            value={settings.bkash_type}
-            onChange={(e) => setSettings((s) => ({ ...s, bkash_type: e.target.value as BkashType }))}
-            className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
-          >
-            {(["Personal", "Merchant", "Agent"] as const).map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="mt-6 border-t border-[var(--border)] pt-4">
+        <div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-[var(--foreground)]">{t.gatewayTitle}</h3>
             <span

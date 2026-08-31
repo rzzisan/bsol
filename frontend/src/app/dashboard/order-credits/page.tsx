@@ -65,7 +65,6 @@ type PurchaseRow = {
 };
 type Balance = {
   available_balance: number; expires_at: string | null;
-  payment_instructions: { bkash_number: string | null; bkash_type: string | null };
 };
 
 export default function OrderCreditsPage() {

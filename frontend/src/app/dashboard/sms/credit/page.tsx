@@ -36,7 +36,6 @@ interface RateInfo {
   bkash_gateway_enabled: boolean;
   bkash_api_type: "tokenized" | "pgw";
   bkash_pgw_script_url: string;
-  payment_instructions: { bkash_number: string | null; bkash_type: string | null };
 }
 
 interface Purchase {
