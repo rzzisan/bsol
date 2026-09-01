@@ -15,9 +15,15 @@ use Illuminate\Http\Request;
  * SMS-credit auto-recharge — connect/disconnect a saved bKash agreement +
  * threshold/top-up settings. See auto_top_up_context.md. Owner-only
  * (`owner_only` middleware in routes/api.php), same as every other billing
- * route in this file's neighborhood (SmsCreditBkashPaymentController etc.)
+ * route in this file's neighborhood (PlatformGatewayPaymentController etc.)
  * — this is a recurring-charge authorization, credential-equivalent, never
  * staff-delegable.
+ *
+ * Uses BkashPaymentGatewayClient's Agreement API directly (createAgreement/
+ * executeAgreement/cancelAgreement) — a fundamentally different bKash
+ * product from the one-time payments in PlatformGatewayPaymentService
+ * (§13.2), which is why this is the one place that still injects the
+ * client directly instead of going through that service.
  */
 class SmsCreditAutoRechargeController extends Controller
 {

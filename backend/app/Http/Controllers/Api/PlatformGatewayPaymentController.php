@@ -48,6 +48,44 @@ class PlatformGatewayPaymentController extends Controller
         return response()->json(['success' => true, 'data' => ['redirect_url' => $result['redirect_url']]]);
     }
 
+    /**
+     * bKash classic Checkout ("PGW") widget — called directly by bKash's
+     * own bKash-checkout.js (via its createRequest callback) while the
+     * seller stays authenticated on our page, no redirect. Response shape
+     * (`{paymentID}` on success, `{paymentID: null, message}` on failure)
+     * matches exactly what the widget's own callback expects — it never
+     * checks the HTTP status, only whether `paymentID` is present. See
+     * PlatformGatewayPaymentService::createBkashPgwSession().
+     */
+    public function bkashPgwCreate(Request $request, string $purpose): JsonResponse
+    {
+        try {
+            $result = $this->paymentService->createBkashPgwSession($purpose, $request->user(), $request->all());
+
+            return response()->json(['paymentID' => $result['paymentID']]);
+        } catch (\Throwable $e) {
+            return response()->json(['paymentID' => null, 'message' => $e->getMessage()], 422);
+        }
+    }
+
+    /** Called by the widget's executeRequestOnAuthorization callback once
+     *  the seller has authorized payment in the bKash popup. See
+     *  PlatformGatewayPaymentService::executeBkashPgwSession(). */
+    public function bkashPgwExecute(Request $request, string $purpose, string $paymentId): JsonResponse
+    {
+        try {
+            $result = $this->paymentService->executeBkashPgwSession($purpose, $paymentId, $request->user());
+
+            if (($result['transactionStatus'] ?? null) !== 'Completed') {
+                return response()->json(array_merge(['message' => 'Payment was not completed.'], $result), 502);
+            }
+
+            return response()->json($result);
+        } catch (\Throwable $e) {
+            return response()->json(['paymentID' => null, 'message' => $e->getMessage()], 404);
+        }
+    }
+
     /** Browser-redirect leg — no Sanctum token (gateway redirects the
      *  payer's own browser here directly), same rationale as
      *  BkashPaymentController::callback() and OnlinePaymentController's

@@ -36,6 +36,18 @@ const t = {
     activeChannelsCount: "টি গেটওয়ে সক্রিয়",
     securityNotice: "সকল সিক্রেট কি ও পাসওয়ার্ড ডাটাবেজে এনক্রিপ্ট করে সুরক্ষিত রাখা হয়।",
     usedFor: "ব্যবহৃত হবে: সাবস্ক্রিপশন, এসএমএস ক্রেডিট, অর্ডার ক্রেডিট, স্টোরফ্রন্ট অ্যাড-অন — এই ৪টি সেলফ-সার্ভিস পেমেন্টে।",
+    configured: "কনফিগার করা আছে",
+    notConfigured: "কনফিগার করা হয়নি",
+    apiType: "bKash API টাইপ",
+    apiTypeTokenized: "Tokenized Checkout",
+    apiTypePgw: "PGW / Checkout API (widget)",
+    apiTypeHint: "bKash আপনাকে যেটা ইস্যু করেছে সেটাই বেছে নিন — দুই ধরনের ক্রেডেনশিয়াল একে অপরের বদলে কাজ করে না।",
+    appKey: "App Key",
+    appSecret: "App Secret",
+    appSecretSetHint: "সেট করা আছে — বদলাতে নতুন ভ্যালু লিখুন",
+    username: "Username",
+    password: "Password",
+    passwordSetHint: "সেট করা আছে — বদলাতে নতুন ভ্যালু লিখুন",
   },
   en: {
     title: "Platform Payment Gateways",
@@ -54,6 +66,18 @@ const t = {
     activeChannelsCount: "active gateway(s)",
     securityNotice: "All secret keys and passwords are encrypted at rest.",
     usedFor: "Used for: subscription, SMS credit, order-credit, storefront add-on self-service payments.",
+    configured: "Configured",
+    notConfigured: "Not configured",
+    apiType: "bKash API type",
+    apiTypeTokenized: "Tokenized Checkout",
+    apiTypePgw: "PGW / Checkout API (widget)",
+    apiTypeHint: "Pick whichever bKash actually issued you — the two credential sets are not interchangeable.",
+    appKey: "App Key",
+    appSecret: "App Secret",
+    appSecretSetHint: "Already set — enter a new value to change it",
+    username: "Username",
+    password: "Password",
+    passwordSetHint: "Already set — enter a new value to change it",
   },
 };
 
@@ -64,6 +88,30 @@ type GatewayCredentialForm = {
 };
 
 const EMPTY: GatewayCredentialForm = { enabled: false, is_live: false, credentials: {} };
+
+// bKash Merchant (§13.2) is deliberately NOT one of the generic
+// platform_payment_gateway_credentials providers — its credentials live in
+// PlatformBillingSetting instead (shared with the SMS-credit auto-recharge
+// Agreement feature, which can't move — see PlatformGatewayPaymentService's
+// docblock). So this one tab loads/saves via /admin/billing-settings
+// instead of /admin/platform-payment-gateways/{provider}, and has its own
+// api_type selector (tokenized vs PGW) that no other provider needs.
+type BkashSettings = {
+  app_key: string;
+  app_secret: string;
+  app_secret_set: boolean;
+  username: string;
+  password: string;
+  password_set: boolean;
+  sandbox: boolean;
+  api_type: "tokenized" | "pgw";
+  configured: boolean;
+};
+
+const EMPTY_BKASH: BkashSettings = {
+  app_key: "", app_secret: "", app_secret_set: false, username: "", password: "", password_set: false,
+  sandbox: true, api_type: "tokenized", configured: false,
+};
 
 export default function PlatformPaymentGatewaysPage() {
   const [locale, setLocale] = useState<Locale>(getStoredLocale);
@@ -84,6 +132,7 @@ export default function PlatformPaymentGatewaysPage() {
   const [activeTab, setActiveTab] = useState<string>(GATEWAY_PROVIDER_META[0].provider);
   const [loading, setLoading] = useState(true);
   const [forms, setForms] = useState<Record<string, GatewayCredentialForm>>({});
+  const [bkash, setBkash] = useState<BkashSettings>(EMPTY_BKASH);
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [visibleSecrets, setVisibleSecrets] = useState<Record<string, boolean>>({});
@@ -92,21 +141,79 @@ export default function PlatformPaymentGatewaysPage() {
     void (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API}/admin/platform-payment-gateways`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) return;
-        const d = await res.json();
-        const rows: Array<{ provider: string; enabled: boolean; is_live: boolean; credentials: Record<string, string> }> =
-          d.data?.credentials ?? [];
-        const map: Record<string, GatewayCredentialForm> = {};
-        for (const row of rows) {
-          map[row.provider] = { enabled: row.enabled, is_live: row.is_live, credentials: row.credentials ?? {} };
+        const [gatewaysRes, billingRes] = await Promise.all([
+          fetch(`${API}/admin/platform-payment-gateways`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API}/admin/billing-settings`, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+
+        if (gatewaysRes.ok) {
+          const d = await gatewaysRes.json();
+          const rows: Array<{ provider: string; enabled: boolean; is_live: boolean; credentials: Record<string, string> }> =
+            d.data?.credentials ?? [];
+          const map: Record<string, GatewayCredentialForm> = {};
+          for (const row of rows) {
+            map[row.provider] = { enabled: row.enabled, is_live: row.is_live, credentials: row.credentials ?? {} };
+          }
+          setForms(map);
         }
-        setForms(map);
+
+        if (billingRes.ok) {
+          const d = await billingRes.json();
+          if (d.data) {
+            setBkash({
+              app_key: d.data.bkash_app_key ?? "",
+              app_secret: "",
+              app_secret_set: Boolean(d.data.bkash_app_secret_set),
+              username: d.data.bkash_username ?? "",
+              password: "",
+              password_set: Boolean(d.data.bkash_password_set),
+              sandbox: d.data.bkash_sandbox ?? true,
+              api_type: (d.data.bkash_api_type as "tokenized" | "pgw") ?? "tokenized",
+              configured: Boolean(d.data.bkash_gateway_configured),
+            });
+          }
+        }
       } finally {
         setLoading(false);
       }
     })();
   }, [token]);
+
+  const saveBkash = async () => {
+    setSaving("bkash_merchant");
+    setMessage(null);
+    try {
+      const res = await fetch(`${API}/admin/billing-settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          bkash_app_key: bkash.app_key || null,
+          bkash_app_secret: bkash.app_secret || undefined,
+          bkash_username: bkash.username || null,
+          bkash_password: bkash.password || undefined,
+          bkash_sandbox: bkash.sandbox,
+          bkash_api_type: bkash.api_type,
+        }),
+      });
+      const d = await res.json().catch(() => null);
+      if (res.ok && d?.data) {
+        setMessage({ ok: true, text: txt.saveSuccess });
+        setBkash((prev) => ({
+          ...prev,
+          app_secret: "",
+          app_secret_set: Boolean(d.data.bkash_app_secret_set),
+          password: "",
+          password_set: Boolean(d.data.bkash_password_set),
+          configured: Boolean(d.data.bkash_gateway_configured),
+        }));
+      } else {
+        const firstFieldError = d?.errors ? Object.values(d.errors as Record<string, string[]>)[0]?.[0] : undefined;
+        setMessage({ ok: false, text: firstFieldError ?? d?.message ?? txt.saveError });
+      }
+    } finally {
+      setSaving(null);
+    }
+  };
 
   const form = (provider: string): GatewayCredentialForm => forms[provider] ?? EMPTY;
   const setForm = (provider: string, patch: Partial<GatewayCredentialForm>) =>
@@ -139,9 +246,10 @@ export default function PlatformPaymentGatewaysPage() {
     }
   };
 
-  const activeCount = Object.values(forms).filter((f) => f.enabled).length;
+  const activeCount = Object.values(forms).filter((f) => f.enabled).length + (bkash.configured ? 1 : 0);
   const current = GATEWAY_PROVIDER_META.find((g) => g.provider === activeTab)!;
   const currentForm = form(activeTab);
+  const isBkashTab = activeTab === "bkash_merchant";
 
   return (
     <CatvShell
@@ -194,7 +302,8 @@ export default function PlatformPaymentGatewaysPage() {
           <div className="catv-panel p-2">
             <div className="flex flex-wrap gap-1.5" role="tablist">
               {GATEWAY_PROVIDER_META.map((g) => {
-                const f = form(g.provider);
+                const isBkash = g.provider === "bkash_merchant";
+                const isEnabled = isBkash ? bkash.configured : form(g.provider).enabled;
                 const isSelected = activeTab === g.provider;
                 return (
                   <button
@@ -212,7 +321,7 @@ export default function PlatformPaymentGatewaysPage() {
                     }`}
                   >
                     <span>{g.label}</span>
-                    {f.enabled && <span className="h-2 w-2 rounded-full bg-emerald-400" />}
+                    {isEnabled && <span className="h-2 w-2 rounded-full bg-emerald-400" />}
                   </button>
                 );
               })}
@@ -225,81 +334,159 @@ export default function PlatformPaymentGatewaysPage() {
                 <div className="flex items-center gap-2.5">
                   <h3 className="text-base font-bold sm:text-lg">{current.label}</h3>
                   <span className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${current.badgeBg} ${current.badgeColor}`}>
-                    {currentForm.enabled ? txt.enabled : txt.disabled}
+                    {isBkashTab
+                      ? (bkash.configured ? txt.configured : txt.notConfigured)
+                      : (currentForm.enabled ? txt.enabled : txt.disabled)}
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-[var(--muted)] sm:text-sm">{current.description[locale]}</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium hover:bg-[var(--background)]/50">
-                  <input
-                    type="checkbox"
-                    checked={currentForm.is_live}
-                    onChange={(e) => setForm(activeTab, { is_live: e.target.checked })}
-                    className="h-4 w-4 rounded accent-[var(--accent)]"
-                  />
-                  <span className="font-semibold">{txt.liveMode}</span>
-                </label>
-                <div className="h-4 w-px bg-[var(--border)]" />
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium hover:bg-[var(--background)]/50">
-                  <input
-                    type="checkbox"
-                    checked={currentForm.enabled}
-                    onChange={(e) => setForm(activeTab, { enabled: e.target.checked })}
-                    className="h-4 w-4 rounded accent-[var(--accent)]"
-                  />
-                  <span className={`font-semibold ${currentForm.enabled ? "text-emerald-400" : "text-[var(--muted)]"}`}>{txt.enable}</span>
-                </label>
+                {isBkashTab ? (
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium hover:bg-[var(--background)]/50">
+                    <input
+                      type="checkbox"
+                      checked={!bkash.sandbox}
+                      onChange={(e) => setBkash((prev) => ({ ...prev, sandbox: !e.target.checked }))}
+                      className="h-4 w-4 rounded accent-[var(--accent)]"
+                    />
+                    <span className="font-semibold">{txt.liveMode}</span>
+                  </label>
+                ) : (
+                  <>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium hover:bg-[var(--background)]/50">
+                      <input
+                        type="checkbox"
+                        checked={currentForm.is_live}
+                        onChange={(e) => setForm(activeTab, { is_live: e.target.checked })}
+                        className="h-4 w-4 rounded accent-[var(--accent)]"
+                      />
+                      <span className="font-semibold">{txt.liveMode}</span>
+                    </label>
+                    <div className="h-4 w-px bg-[var(--border)]" />
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium hover:bg-[var(--background)]/50">
+                      <input
+                        type="checkbox"
+                        checked={currentForm.enabled}
+                        onChange={(e) => setForm(activeTab, { enabled: e.target.checked })}
+                        className="h-4 w-4 rounded accent-[var(--accent)]"
+                      />
+                      <span className={`font-semibold ${currentForm.enabled ? "text-emerald-400" : "text-[var(--muted)]"}`}>{txt.enable}</span>
+                    </label>
+                  </>
+                )}
               </div>
             </div>
 
             <div
               className={`mb-6 flex items-center gap-2 rounded-xl border p-3.5 text-xs ${
-                currentForm.is_live ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "border-amber-500/20 bg-amber-500/10 text-amber-400"
+                (isBkashTab ? !bkash.sandbox : currentForm.is_live) ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "border-amber-500/20 bg-amber-500/10 text-amber-400"
               }`}
             >
               <Radio className="h-4 w-4 shrink-0 animate-pulse" />
-              <span className="font-semibold">{currentForm.is_live ? txt.liveMode : txt.sandboxMode}</span>
+              <span className="font-semibold">{(isBkashTab ? !bkash.sandbox : currentForm.is_live) ? txt.liveMode : txt.sandboxMode}</span>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {current.fields.map((field) => {
-                const uniqueKey = `${activeTab}_${field.key}`;
-                const isPassword = field.type === "password";
-                const isVisible = visibleSecrets[uniqueKey];
-                return (
-                  <label key={field.key} className="block">
-                    <span className="mb-1.5 flex items-center justify-between text-xs font-semibold text-[var(--muted)]">
-                      <span>{field.label}</span>
-                      {isPassword && (
-                        <span className="flex items-center gap-1 text-[10px] opacity-70">
-                          <Lock className="h-3 w-3" /> Encrypted
-                        </span>
-                      )}
-                    </span>
-                    <div className="relative">
-                      <input
-                        type={isPassword && !isVisible ? "password" : "text"}
-                        value={currentForm.credentials[field.key] ?? ""}
-                        onChange={(e) => setForm(activeTab, { credentials: { [field.key]: e.target.value } })}
-                        placeholder={field.placeholder}
-                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 pr-10 text-sm font-mono outline-none transition focus:border-[var(--accent)]"
-                      />
-                      {isPassword && (
-                        <button
-                          type="button"
-                          onClick={() => toggleSecret(uniqueKey)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--muted)] hover:text-[var(--foreground)]"
-                        >
-                          {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      )}
-                    </div>
+            {isBkashTab ? (
+              <>
+                <label className="mb-4 block max-w-xs">
+                  <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">{txt.apiType}</span>
+                  <select
+                    value={bkash.api_type}
+                    onChange={(e) => setBkash((prev) => ({ ...prev, api_type: e.target.value as "tokenized" | "pgw" }))}
+                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+                  >
+                    <option value="tokenized">{txt.apiTypeTokenized}</option>
+                    <option value="pgw">{txt.apiTypePgw}</option>
+                  </select>
+                  <span className="mt-1 block text-xs text-[var(--muted)]">{txt.apiTypeHint}</span>
+                </label>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">{txt.appKey}</span>
+                    <input
+                      value={bkash.app_key}
+                      onChange={(e) => setBkash((prev) => ({ ...prev, app_key: e.target.value }))}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-sm font-mono outline-none focus:border-[var(--accent)]"
+                    />
                   </label>
-                );
-              })}
-            </div>
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center justify-between text-xs font-semibold text-[var(--muted)]">
+                      <span>{txt.appSecret}</span>
+                      <span className="flex items-center gap-1 text-[10px] opacity-70"><Lock className="h-3 w-3" /> Encrypted</span>
+                    </span>
+                    <input
+                      type="password"
+                      value={bkash.app_secret}
+                      onChange={(e) => setBkash((prev) => ({ ...prev, app_secret: e.target.value }))}
+                      placeholder={bkash.app_secret_set ? txt.appSecretSetHint : undefined}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-sm font-mono outline-none focus:border-[var(--accent)]"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">{txt.username}</span>
+                    <input
+                      value={bkash.username}
+                      onChange={(e) => setBkash((prev) => ({ ...prev, username: e.target.value }))}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-sm font-mono outline-none focus:border-[var(--accent)]"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 flex items-center justify-between text-xs font-semibold text-[var(--muted)]">
+                      <span>{txt.password}</span>
+                      <span className="flex items-center gap-1 text-[10px] opacity-70"><Lock className="h-3 w-3" /> Encrypted</span>
+                    </span>
+                    <input
+                      type="password"
+                      value={bkash.password}
+                      onChange={(e) => setBkash((prev) => ({ ...prev, password: e.target.value }))}
+                      placeholder={bkash.password_set ? txt.passwordSetHint : undefined}
+                      className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 text-sm font-mono outline-none focus:border-[var(--accent)]"
+                    />
+                  </label>
+                </div>
+              </>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {current.fields.map((field) => {
+                  const uniqueKey = `${activeTab}_${field.key}`;
+                  const isPassword = field.type === "password";
+                  const isVisible = visibleSecrets[uniqueKey];
+                  return (
+                    <label key={field.key} className="block">
+                      <span className="mb-1.5 flex items-center justify-between text-xs font-semibold text-[var(--muted)]">
+                        <span>{field.label}</span>
+                        {isPassword && (
+                          <span className="flex items-center gap-1 text-[10px] opacity-70">
+                            <Lock className="h-3 w-3" /> Encrypted
+                          </span>
+                        )}
+                      </span>
+                      <div className="relative">
+                        <input
+                          type={isPassword && !isVisible ? "password" : "text"}
+                          value={currentForm.credentials[field.key] ?? ""}
+                          onChange={(e) => setForm(activeTab, { credentials: { [field.key]: e.target.value } })}
+                          placeholder={field.placeholder}
+                          className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-2.5 pr-10 text-sm font-mono outline-none transition focus:border-[var(--accent)]"
+                        />
+                        {isPassword && (
+                          <button
+                            type="button"
+                            onClick={() => toggleSecret(uniqueKey)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--muted)] hover:text-[var(--foreground)]"
+                          >
+                            {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="mt-5 flex items-center gap-2 text-xs text-[var(--muted)] opacity-80">
               <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
@@ -308,7 +495,7 @@ export default function PlatformPaymentGatewaysPage() {
 
             <div className="mt-6 flex justify-end border-t border-[var(--border)] pt-4">
               <button
-                onClick={() => void save(activeTab)}
+                onClick={() => void (isBkashTab ? saveBkash() : save(activeTab))}
                 disabled={saving === activeTab}
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
               >

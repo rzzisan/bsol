@@ -33,6 +33,8 @@ const t = {
     statusRejected: "প্রত্যাখ্যাত",
     genericError: "কিছু একটা সমস্যা হয়েছে, আবার চেষ্টা করুন।",
     coTerminousNote: "এই Add-on আপনার মূল সাবস্ক্রিপশনের মেয়াদ অনুযায়ী চলবে — রিনিউ করলে এটাও নবায়ন হবে (যতক্ষণ সক্রিয় থাকে)।",
+    paymentSuccess: "পেমেন্ট সফল হয়েছে — স্টোরফ্রন্ট আনলক হয়ে গেছে।",
+    paymentFailed: "পেমেন্ট সম্পন্ন হয়নি। আবার চেষ্টা করুন।",
   },
   en: {
     title: "Storefront Add-on",
@@ -51,6 +53,8 @@ const t = {
     statusRejected: "Rejected",
     genericError: "Something went wrong, please try again.",
     coTerminousNote: "This add-on runs alongside your main subscription — it renews automatically while active whenever your plan renews.",
+    paymentSuccess: "Payment successful — storefront unlocked.",
+    paymentFailed: "Payment did not complete. Please try again.",
   },
 };
 
@@ -72,6 +76,7 @@ export default function StorefrontAddonPage() {
   const [history, setHistory] = useState<PurchaseRow[]>([]);
   const [buying, setBuying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = async () => {
     const [statusRes, histRes] = await Promise.all([
@@ -84,6 +89,20 @@ export default function StorefrontAddonPage() {
   };
 
   useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Returning from a redirect-based gateway checkout — see
+  // PlatformGatewayPaymentController::callback().
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get("payment_result");
+    if (!result) return;
+
+    if (result === "success") setNotice(txt.paymentSuccess);
+    else setError(txt.paymentFailed);
+
+    window.history.replaceState(null, "", window.location.pathname);
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -102,6 +121,8 @@ export default function StorefrontAddonPage() {
       pageTitle={{ bn: t.bn.title, en: t.en.title }}
       pageSubtitle={{ bn: t.bn.subtitle, en: t.en.subtitle }}
     >
+      {notice && <p className="mb-4 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">{notice}</p>}
+
       <section className="catv-panel p-4 sm:p-5">
         <div className="flex items-center gap-3">
           <span className={`h-3 w-3 shrink-0 rounded-full ${isUnlocked ? "bg-emerald-500" : "bg-red-400"}`} />
@@ -141,7 +162,12 @@ export default function StorefrontAddonPage() {
           <PlatformGatewayPaymentPicker
             purpose="storefront_addon"
             payload={{ addon_package_id: status.package.id }}
+            amount={Number(status.package.price)}
             locale={locale}
+            onPaid={() => {
+              setBuying(false);
+              void load();
+            }}
           />
 
           {error && <p className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}

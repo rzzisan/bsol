@@ -35,11 +35,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DigitalDeliveryController;
 use App\Http\Controllers\Api\DigitalProductFileController;
 use App\Http\Controllers\Api\Admin\DigitalProductSettingsController;
-use App\Http\Controllers\Api\BkashPaymentController;
-use App\Http\Controllers\Api\BkashPgwPaymentController;
 use App\Http\Controllers\Api\SmsCreditAutoRechargeController;
-use App\Http\Controllers\Api\SmsCreditBkashPaymentController;
-use App\Http\Controllers\Api\SmsCreditBkashPgwPaymentController;
 use App\Http\Controllers\Api\OrderCreditPurchaseController;
 use App\Http\Controllers\Api\SmsCreditPurchaseController;
 use App\Http\Controllers\Api\StorefrontAddonPurchaseController;
@@ -299,19 +295,6 @@ Route::post('/facebook/webhook', [FacebookWebhookController::class, 'receive'])
 Route::get('/facebook/connect/callback', [FacebookConnectController::class, 'callback'])
     ->middleware('throttle:20,1');
 
-// bKash Payment Gateway callback — bKash redirects the payer's browser here
-// directly after checkout, so (like the Facebook callback above) it can't
-// carry a Sanctum bearer token. The unguessable paymentID from the earlier
-// authenticated /subscription/pay/bkash/initiate call is what ties this
-// back to the right SubscriptionPayment row. See §16.4, BkashPaymentController.
-Route::get('/subscription/pay/bkash/callback', [BkashPaymentController::class, 'callback'])
-    ->middleware('throttle:20,1');
-
-// Same rationale as the subscription bKash callback above — see
-// SmsCreditBkashPaymentController, subscription_billing_context.md §3.
-Route::get('/sms/credit/pay/bkash/callback', [SmsCreditBkashPaymentController::class, 'callback'])
-    ->middleware('throttle:20,1');
-
 // Same rationale again — the bKash Agreement consent flow's browser
 // redirect, no Sanctum token. See SmsCreditAutoRechargeController,
 // auto_top_up_context.md.
@@ -410,9 +393,6 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::get('/sms/credit/rate', [SmsCreditPurchaseController::class, 'rate']);
         Route::get('/sms/credit/purchases', [SmsCreditPurchaseController::class, 'myPurchases']);
         Route::get('/sms/credit/purchases/{purchase}/invoice', [SmsCreditPurchaseController::class, 'invoicePdf']);
-        Route::post('/sms/credit/pay/bkash/initiate', [SmsCreditBkashPaymentController::class, 'initiate']);
-        Route::post('/sms/credit/pay/bkash-pgw/create', [SmsCreditBkashPgwPaymentController::class, 'create']);
-        Route::post('/sms/credit/pay/bkash-pgw/execute/{paymentId}', [SmsCreditBkashPgwPaymentController::class, 'execute']);
 
         // Auto-recharge (auto_top_up_context.md) — same owner-only gate,
         // same reasoning: a saved recurring-charge authorization is
@@ -450,6 +430,17 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::get('/channels', [PlatformGatewayPaymentController::class, 'channels']);
         Route::post('/{purpose}/initiate', [PlatformGatewayPaymentController::class, 'initiate'])
             ->where('purpose', 'subscription|sms_credit|order_credit|storefront_addon');
+
+        // bKash classic Checkout API ("PGW") — JS-widget flow, no redirect
+        // callback needed (bKash's own widget calls these two directly
+        // while the seller stays authenticated on our page). Generalizes
+        // the old per-surface BkashPgwPaymentController/
+        // SmsCreditBkashPgwPaymentController pair across all 4 purposes —
+        // see §13.2, PlatformGatewayPaymentService::createBkashPgwSession().
+        Route::post('/{purpose}/bkash-pgw/create', [PlatformGatewayPaymentController::class, 'bkashPgwCreate'])
+            ->where('purpose', 'subscription|sms_credit|order_credit|storefront_addon');
+        Route::post('/{purpose}/bkash-pgw/execute/{paymentId}', [PlatformGatewayPaymentController::class, 'bkashPgwExecute'])
+            ->where('purpose', 'subscription|sms_credit|order_credit|storefront_addon');
     });
 
     // ── Subscription (self-service — must stay reachable even when expired) ───
@@ -460,13 +451,6 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
         Route::get('/subscription/invoice/preview', [SubscriptionController::class, 'invoicePreview']);
         Route::get('/subscription/payments/{payment}/invoice', [SubscriptionController::class, 'invoicePdf']);
-        Route::post('/subscription/pay/bkash/initiate', [BkashPaymentController::class, 'initiate']);
-
-        // bKash classic Checkout API ("PGW") — JS-widget flow, no redirect
-        // callback needed (widget calls these two directly while the seller
-        // stays authenticated on our page). See §18, BkashPgwPaymentController.
-        Route::post('/subscription/pay/bkash-pgw/create', [BkashPgwPaymentController::class, 'create']);
-        Route::post('/subscription/pay/bkash-pgw/execute/{paymentId}', [BkashPgwPaymentController::class, 'execute']);
     });
 
     // ── Staff/Team sub-account role (owner-only) — staff_team_role_context.md §3.6 ──

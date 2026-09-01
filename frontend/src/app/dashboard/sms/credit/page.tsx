@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   CreditCard,
   FileText,
-  Loader2,
   MessageSquare,
   RefreshCw,
   Wallet,
@@ -17,25 +16,15 @@ import { getStoredLocale, getStoredToken, openAuthenticatedPdf, type Locale } fr
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
-// bKash classic Checkout API ("PGW") widget — same contract as the
-// subscription page's widget integration, see SAAS_MODULE_CONTEXT.md §18.
-declare global {
-  interface Window {
-    bKash?: {
-      init: (config: Record<string, unknown>) => void;
-      create: () => { onSuccess: (data: unknown) => void; onError: () => void };
-      execute: () => { onSuccess: (data: unknown) => void; onError: () => void };
-    };
-  }
-}
-
 interface RateInfo {
   rate_per_credit: number;
   currency: string;
   balance: number;
+  // Still needed for the auto-recharge panel's gate below — that feature
+  // uses bKash's Agreement API directly (SmsCreditAutoRechargeController),
+  // unrelated to the one-time-payment api_type consolidated into
+  // PlatformGatewayPaymentPicker in §13.2.
   bkash_gateway_enabled: boolean;
-  bkash_api_type: "tokenized" | "pgw";
-  bkash_pgw_script_url: string;
 }
 
 interface Purchase {
@@ -74,15 +63,9 @@ const text = {
     rate: "প্রতি ক্রেডিট",
     totalPrice: "মোট মূল্য",
     payTitle: "বিল পেমেন্ট",
-    payWithBkash: "bKash দিয়ে সাথে সাথে পে করুন",
-    payingWithBkash: "bKash-এ পাঠানো হচ্ছে...",
-    pgwLoading: "bKash পেমেন্ট লোড হচ্ছে...",
-    pgwSelectAmount: "উপরে ক্রেডিট পরিমাণ দিলে bKash বাটন সক্রিয় হবে।",
     bkashSuccess: "পেমেন্ট সফল হয়েছে — ক্রেডিট যোগ হয়ে গেছে।",
     bkashFailed: "পেমেন্ট সম্পন্ন হয়নি। আবার চেষ্টা করুন।",
-    bkashCancelled: "পেমেন্ট বাতিল করা হয়েছে।",
     bkashError: "কিছু একটা সমস্যা হয়েছে।",
-    enterAmountFirst: "আগে ক্রেডিট পরিমাণ লিখুন।",
     history: "ইনভয়েস ও কেনাকাটার ইতিহাস",
     noHistory: "কোনো ক্রয় পাওয়া যায়নি।",
     loading: "লোড হচ্ছে...",
@@ -120,15 +103,9 @@ const text = {
     rate: "Rate per credit",
     totalPrice: "Total Price",
     payTitle: "Bill Payment",
-    payWithBkash: "Pay Instantly with bKash",
-    payingWithBkash: "Redirecting to bKash...",
-    pgwLoading: "Loading bKash payment...",
-    pgwSelectAmount: "Enter a credit amount above to activate the bKash button.",
     bkashSuccess: "Payment successful — credits have been added.",
     bkashFailed: "Payment did not complete. Please try again.",
-    bkashCancelled: "Payment was cancelled.",
     bkashError: "Something went wrong.",
-    enterAmountFirst: "Enter a credit amount first.",
     history: "Invoices & Purchase History",
     noHistory: "No purchases found.",
     loading: "Loading...",
@@ -167,8 +144,6 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [creditsInput, setCreditsInput] = useState("");
-  const [bkashPaying, setBkashPaying] = useState(false);
-  const [pgwScriptLoaded, setPgwScriptLoaded] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const [autoRecharge, setAutoRecharge] = useState<AutoRechargeInfo | null>(null);
@@ -229,13 +204,13 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Returning from the bKash gateway redirect — see SmsCreditBkashPaymentController::callback().
+  // Returning from a redirect-based gateway checkout — see
+  // PlatformGatewayPaymentController::callback().
   useEffect(() => {
-    const bkashStatus = new URLSearchParams(window.location.search).get("bkash_status");
-    if (!bkashStatus) return;
+    const result = new URLSearchParams(window.location.search).get("payment_result");
+    if (!result) return;
 
-    if (bkashStatus === "success") setSuccess(t.bkashSuccess);
-    else if (bkashStatus === "cancelled") setError(t.bkashCancelled);
+    if (result === "success") setSuccess(t.bkashSuccess);
     else setError(t.bkashFailed);
 
     window.history.replaceState(null, "", window.location.pathname);
@@ -258,130 +233,6 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load bKash's classic Checkout widget script when the platform is set to
-  // the PGW api type — mirrors the subscription page, see SAAS_MODULE_CONTEXT.md §18.
-  useEffect(() => {
-    if (rateInfo?.bkash_api_type !== "pgw" || !rateInfo.bkash_pgw_script_url) return;
-
-    const existing = document.getElementById("bkash-pgw-script") as HTMLScriptElement | null;
-    if (existing) {
-      if (window.bKash) setPgwScriptLoaded(true);
-      else existing.addEventListener("load", () => setPgwScriptLoaded(true));
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "bkash-pgw-script";
-    script.src = rateInfo.bkash_pgw_script_url;
-    script.async = true;
-    script.onload = () => setPgwScriptLoaded(true);
-    script.onerror = () => setError(t.bkashError);
-    document.body.appendChild(script);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rateInfo?.bkash_api_type, rateInfo?.bkash_pgw_script_url]);
-
-  // (Re-)initialize the bKash widget into #bKash_button whenever the script
-  // is ready or the credit amount changes.
-  useEffect(() => {
-    if (!pgwScriptLoaded || rateInfo?.bkash_api_type !== "pgw" || !isValidAmount || !window.bKash) return;
-
-    const amount = totalPrice.toFixed(2);
-    const creditsToBuy = credits;
-    let currentPaymentId: string | null = null;
-
-    const bkashConfig = {
-      paymentMode: "checkout",
-      paymentRequest: { amount, intent: "sale", currency: "BDT" },
-
-      createRequest: () => {
-        const token = getStoredToken();
-        fetch(`${API}/sms/credit/pay/bkash-pgw/create`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ credits: creditsToBuy }),
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data && data.paymentID) {
-              currentPaymentId = data.paymentID as string;
-              window.bKash?.create().onSuccess(data);
-            } else {
-              window.bKash?.create().onError();
-              setError((data?.message as string) ?? t.bkashError);
-            }
-          })
-          .catch(() => {
-            window.bKash?.create().onError();
-            setError(t.bkashError);
-          });
-      },
-
-      executeRequestOnAuthorization: () => {
-        const token = getStoredToken();
-        fetch(`${API}/sms/credit/pay/bkash-pgw/execute/${currentPaymentId}`, {
-          method: "POST",
-          headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data && data.paymentID) {
-              setSuccess(t.bkashSuccess);
-              setError(null);
-              void load();
-            } else {
-              window.bKash?.execute().onError();
-              setError((data?.message as string) ?? t.bkashFailed);
-            }
-          })
-          .catch(() => {
-            window.bKash?.execute().onError();
-            setError(t.bkashFailed);
-          });
-      },
-
-      onClose: () => {
-        // Seller closed the bKash popup without paying — no-op, they can retry.
-      },
-    };
-
-    try {
-      window.bKash.init(bkashConfig);
-    } catch (e) {
-      console.error("bKash PGW widget: init() threw", e);
-      setError(`bKash widget init failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pgwScriptLoaded, rateInfo?.bkash_api_type, credits, isValidAmount]);
-
-  const payWithBkash = async () => {
-    const token = getStoredToken();
-    if (!token) return;
-    if (!isValidAmount) {
-      setError(t.enterAmountFirst);
-      return;
-    }
-
-    setBkashPaying(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const res = await fetch(`${API}/sms/credit/pay/bkash/initiate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ credits }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.data?.bkash_url) {
-        setError(data?.message ?? t.bkashError);
-        setBkashPaying(false);
-        return;
-      }
-      window.location.href = data.data.bkash_url;
-    } catch {
-      setError(t.bkashError);
-      setBkashPaying(false);
-    }
-  };
 
   const downloadInvoice = async (purchaseId: number) => {
     setDownloadingId(purchaseId);
@@ -568,43 +419,10 @@ export default function Page() {
               <PlatformGatewayPaymentPicker
                 purpose="sms_credit"
                 payload={{ credits }}
+                amount={totalPrice}
                 locale={locale}
+                onPaid={() => void load()}
               />
-            )}
-
-            {rateInfo?.bkash_gateway_enabled && rateInfo.bkash_api_type === "pgw" && (
-              <div className="mb-3">
-                {!isValidAmount ? (
-                  <p className="mb-2 text-xs text-[var(--muted)]">{t.pgwSelectAmount}</p>
-                ) : !pgwScriptLoaded ? (
-                  <p className="mb-2 flex items-center gap-2 text-xs text-[var(--muted)]">
-                    <Loader2 size={13} className="animate-spin" /> {t.pgwLoading}
-                  </p>
-                ) : null}
-                {/* bKash's classic Checkout ("PGW") SDK looks for this exact id
-                    (underscore, <button> tag) — see subscription page / §18. */}
-                <button
-                  type="button"
-                  id="bKash_button"
-                  disabled={!isValidAmount || !pgwScriptLoaded}
-                  className="w-full rounded-xl px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
-                  style={{ background: "linear-gradient(135deg, #E2136E, #b90f59)" }}
-                >
-                  {t.payWithBkash}
-                </button>
-              </div>
-            )}
-
-            {rateInfo?.bkash_gateway_enabled && rateInfo.bkash_api_type === "tokenized" && (
-              <button
-                type="button"
-                onClick={() => void payWithBkash()}
-                disabled={bkashPaying || !isValidAmount}
-                className="mb-3 w-full rounded-xl px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 disabled:opacity-60"
-                style={{ background: "linear-gradient(135deg, #E2136E, #b90f59)" }}
-              >
-                {bkashPaying ? t.payingWithBkash : t.payWithBkash}
-              </button>
             )}
 
             {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}

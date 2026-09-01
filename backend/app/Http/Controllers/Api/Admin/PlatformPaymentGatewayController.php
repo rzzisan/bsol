@@ -4,15 +4,16 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PlatformPaymentGatewayCredential;
-use App\Services\Payment\PaymentGatewayFactory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Admin CRUD for the platform's own merchant-gateway credentials (the same
- * 7 providers as PaymentGatewayCredentialController, but for
- * seller→platform billing instead of customer→seller checkout). See
- * online_payment_context.md §12. Mirrors PaymentGatewayCredentialController
+ * Admin CRUD for the platform's own merchant-gateway credentials (6 of the
+ * 7 providers PaymentGatewayCredentialController offers sellers, for
+ * seller→platform billing instead of customer→seller checkout — bKash
+ * Merchant is deliberately excluded here, see PlatformPaymentGatewayCredential's
+ * docblock and online_payment_context.md §13.2; it's configured on
+ * /admin/billing-settings instead). Mirrors PaymentGatewayCredentialController
  * almost exactly, minus the per-seller user_id scoping.
  */
 class PlatformPaymentGatewayController extends Controller
@@ -24,7 +25,7 @@ class PlatformPaymentGatewayController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'supported_providers' => PaymentGatewayFactory::supportedProviders(),
+                'supported_providers' => PlatformPaymentGatewayCredential::PROVIDERS,
                 'credentials' => $rows->map(fn (PlatformPaymentGatewayCredential $row) => $row->masked())->values(),
             ],
         ]);

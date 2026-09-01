@@ -7,7 +7,6 @@ use App\Models\PlatformBillingSetting;
 use App\Models\SmsCreditPurchase;
 use App\Models\SmsCreditSetting;
 use App\Services\InvoicePdfService;
-use App\Services\Payment\BkashPgwPaymentGatewayClient;
 use App\Services\SmsCreditService;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,14 +22,12 @@ class SmsCreditPurchaseController extends Controller
 {
     public function __construct(
         private readonly SmsCreditService $creditService,
-        private readonly BkashPgwPaymentGatewayClient $bkashPgw,
         private readonly InvoicePdfService $invoicePdfService,
     ) {}
 
     public function rate(): JsonResponse
     {
         $settings = SmsCreditSetting::getSetting();
-        $billingSettings = PlatformBillingSetting::getSetting();
 
         return response()->json([
             'success' => true,
@@ -38,9 +35,10 @@ class SmsCreditPurchaseController extends Controller
                 'rate_per_credit' => (float) $settings->rate_per_credit,
                 'currency' => $settings->currency,
                 'balance' => $this->creditService->getBalance(auth()->id()),
-                'bkash_gateway_enabled' => $billingSettings->hasBkashGateway(),
-                'bkash_api_type' => PlatformBillingSetting::resolvedBkashApiType(),
-                'bkash_pgw_script_url' => $this->bkashPgw->scriptUrl(),
+                // Still needed — the auto-recharge panel's gate (§13.2,
+                // unrelated to one-time payments) depends on whether
+                // bKash's Agreement API is configured at all.
+                'bkash_gateway_enabled' => PlatformBillingSetting::getSetting()->hasBkashGateway(),
             ],
         ]);
     }

@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\PlatformBillingSetting;
 use App\Models\SubscriptionPackage;
 use App\Models\SubscriptionPayment;
 use App\Services\InvoicePdfService;
-use App\Services\Payment\BkashPgwPaymentGatewayClient;
 use App\Services\SubscriptionInvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +14,6 @@ use Symfony\Component\HttpFoundation\Response;
 class SubscriptionController extends Controller
 {
     public function __construct(
-        private readonly BkashPgwPaymentGatewayClient $bkashPgw,
         private readonly SubscriptionInvoiceService $invoiceService,
         private readonly InvoicePdfService $invoicePdfService,
     ) {}
@@ -63,7 +60,6 @@ class SubscriptionController extends Controller
     public function mySubscription(): JsonResponse
     {
         $user = auth()->user()->load('subscriptionPackage');
-        $billingSettings = PlatformBillingSetting::getSetting();
 
         $daysLeft = $user->subscription_ends_at
             ? max(0, now()->diffInDays($user->subscription_ends_at, false))
@@ -90,9 +86,6 @@ class SubscriptionController extends Controller
                 'days_left' => $daysLeft,
                 'remaining' => $remaining,
                 'is_expired' => $user->isSubscriptionExpired(),
-                'bkash_gateway_enabled' => $billingSettings->hasBkashGateway(),
-                'bkash_api_type' => PlatformBillingSetting::resolvedBkashApiType(),
-                'bkash_pgw_script_url' => $this->bkashPgw->scriptUrl(),
                 'recent_payments' => $user->subscriptionPayments()
                     ->with('package:id,name,slug')
                     ->latest()

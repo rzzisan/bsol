@@ -35,6 +35,8 @@ const t = {
     statusApproved: "অনুমোদিত",
     statusRejected: "প্রত্যাখ্যাত",
     genericError: "কিছু একটা সমস্যা হয়েছে, আবার চেষ্টা করুন।",
+    paymentSuccess: "পেমেন্ট সফল হয়েছে — ক্রেডিট যোগ হয়ে গেছে।",
+    paymentFailed: "পেমেন্ট সম্পন্ন হয়নি। আবার চেষ্টা করুন।",
   },
   en: {
     title: "Order Credit Add-on",
@@ -55,6 +57,8 @@ const t = {
     statusApproved: "Approved",
     statusRejected: "Rejected",
     genericError: "Something went wrong, please try again.",
+    paymentSuccess: "Payment successful — credits have been added.",
+    paymentFailed: "Payment did not complete. Please try again.",
   },
 };
 
@@ -78,6 +82,7 @@ export default function OrderCreditsPage() {
   const [history, setHistory] = useState<PurchaseRow[]>([]);
   const [buying, setBuying] = useState<AddonPackageRow | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = async () => {
     const [balRes, pkgRes, histRes] = await Promise.all([
@@ -96,6 +101,20 @@ export default function OrderCreditsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Returning from a redirect-based gateway checkout — see
+  // PlatformGatewayPaymentController::callback().
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get("payment_result");
+    if (!result) return;
+
+    if (result === "success") setNotice(txt.paymentSuccess);
+    else setError(txt.paymentFailed);
+
+    window.history.replaceState(null, "", window.location.pathname);
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const statusLabel = (s: PurchaseRow["status"]) =>
     s === "approved" ? txt.statusApproved : s === "rejected" ? txt.statusRejected : txt.statusPending;
   const statusColor = (s: PurchaseRow["status"]) =>
@@ -108,6 +127,8 @@ export default function OrderCreditsPage() {
       pageTitle={{ bn: t.bn.title, en: t.en.title }}
       pageSubtitle={{ bn: t.bn.subtitle, en: t.en.subtitle }}
     >
+      {notice && <p className="mb-4 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">{notice}</p>}
+
       <section className="catv-panel p-4 sm:p-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{txt.balance}</p>
         <p className="mt-1 text-3xl font-bold text-[var(--accent)]">{balance?.available_balance ?? 0}</p>
@@ -154,7 +175,12 @@ export default function OrderCreditsPage() {
           <PlatformGatewayPaymentPicker
             purpose="order_credit"
             payload={{ addon_package_id: buying.id }}
+            amount={Number(buying.price)}
             locale={locale}
+            onPaid={() => {
+              setBuying(null);
+              void load();
+            }}
           />
 
           {error && <p className="mt-3 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}

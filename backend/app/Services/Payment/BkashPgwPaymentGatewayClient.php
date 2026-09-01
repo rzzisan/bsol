@@ -16,12 +16,15 @@ use Illuminate\Support\Facades\Log;
  * domain, different endpoint paths, and (client-side) a JS-widget flow
  * instead of a full-page redirect.
  *
- * Flow: bKash's own `bKash-checkout.js` widget (loaded on the subscription
- * page) drives the UI. It calls back into two functions we register with
- * `bKash.init()` — createRequest and executeRequestOnAuthorization — which
- * in turn AJAX our own backend (BkashPgwPaymentController), which is what
- * actually calls grantToken()/createPayment()/executePayment() here. The
- * app_secret/password never reach the browser, only paymentID does.
+ * Flow: bKash's own `bKash-checkout.js` widget (loaded on whichever billing
+ * page the seller is paying from) drives the UI. It calls back into two
+ * functions we register with `bKash.init()` — createRequest and
+ * executeRequestOnAuthorization — which in turn AJAX our own backend
+ * (PlatformGatewayPaymentController::bkashPgwCreate/bkashPgwExecute, §13.2 —
+ * generalized across all 4 billing surfaces, previously one dedicated
+ * controller pair per surface), which is what actually calls
+ * grantToken()/createPayment()/executePayment() here. The app_secret/
+ * password never reach the browser, only paymentID does.
  */
 class BkashPgwPaymentGatewayClient
 {

@@ -31,9 +31,12 @@ class PlatformPaymentGatewayCredentialApiTest extends TestCase
         $response = $this->getJson('/api/admin/platform-payment-gateways');
 
         $response->assertOk();
-        foreach (['sslcommerz', 'aamarpay', 'zinipay', 'shurjopay', 'eps', 'bkash_merchant', 'nagad_merchant'] as $provider) {
+        // bkash_merchant is deliberately NOT here (§13.2) — it's configured
+        // via /admin/billing-settings (PlatformBillingSetting) instead.
+        foreach (['sslcommerz', 'aamarpay', 'zinipay', 'shurjopay', 'eps', 'nagad_merchant'] as $provider) {
             $this->assertContains($provider, $response->json('data.supported_providers'));
         }
+        $this->assertNotContains('bkash_merchant', $response->json('data.supported_providers'));
         $this->assertSame([], $response->json('data.credentials'));
     }
 

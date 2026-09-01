@@ -10,9 +10,10 @@ use App\Support\FrontendUrl;
 /**
  * Activates a user's subscription from an approved payment — shared by
  * manual admin approval (AdminSubscriptionController::approvePayment) and
- * bKash gateway auto-approval (BkashPaymentController::callback), so both
- * paths extend an already-active subscription the same way instead of
- * clobbering remaining days.
+ * every automated-gateway auto-approval path (PlatformGatewayPaymentService,
+ * §12/§13.2 — redirect-based gateways and the bKash PGW widget flow alike),
+ * so all of them extend an already-active subscription the same way
+ * instead of clobbering remaining days.
  */
 class SubscriptionActivationService
 {
