@@ -323,7 +323,7 @@ export default function Page() {
       pageTitle={{ bn: text.bn.pageTitle, en: text.en.pageTitle }}
       pageSubtitle={{ bn: text.bn.pageSubtitle, en: text.en.pageSubtitle }}
     >
-      <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
+      <section className="catv-panel mb-4 p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-[var(--foreground)]">
             {editingId ? t.editTitle : t.createTitle}
@@ -443,7 +443,7 @@ export default function Page() {
         {error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}
       </section>
 
-      <section className="catv-panel mx-4 mb-6 overflow-hidden">
+      <section className="catv-panel mb-6 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="border-b border-[var(--border)] text-left text-xs uppercase text-[var(--muted)]">

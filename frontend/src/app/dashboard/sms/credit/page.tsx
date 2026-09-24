@@ -331,11 +331,11 @@ export default function Page() {
       pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
       {loading ? (
-        <p className="mx-4 text-sm text-[var(--muted)]">{t.loading}</p>
+        <p className="text-sm text-[var(--muted)]">{t.loading}</p>
       ) : (
         <>
           {/* Balance hero */}
-          <section className="catv-panel relative mx-4 mb-4 overflow-hidden">
+          <section className="catv-panel relative mb-4 overflow-hidden">
             <div
               className="relative p-5 sm:p-6"
               style={{
@@ -363,7 +363,7 @@ export default function Page() {
           </section>
 
           {/* Amount picker */}
-          <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
+          <section className="catv-panel mb-4 p-4 sm:p-5">
             <SectionHeader icon={MessageSquare}>{t.quickPick}</SectionHeader>
             <div className="mb-4 flex flex-wrap gap-2">
               {QUICK_AMOUNTS.map((amt) => {
@@ -412,7 +412,7 @@ export default function Page() {
           </section>
 
           {/* Bill payment */}
-          <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
+          <section className="catv-panel mb-4 p-4 sm:p-5">
             <SectionHeader icon={CreditCard}>{t.payTitle}</SectionHeader>
 
             {isValidAmount && (
@@ -435,7 +435,7 @@ export default function Page() {
               (staff accounts get a 403 from this owner-only endpoint and
               autoRecharge stays null, so the panel is simply omitted). */}
           {rateInfo?.bkash_gateway_enabled && autoRecharge ? (
-            <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
+            <section className="catv-panel mb-4 p-4 sm:p-5">
               <SectionHeader icon={RefreshCw}>{t.autoTitle}</SectionHeader>
               <p className="mb-3 text-xs text-[var(--muted)]">{t.autoDesc}</p>
 
@@ -522,7 +522,7 @@ export default function Page() {
           ) : null}
 
           {/* History */}
-          <section className="catv-panel mx-4 mb-6 overflow-hidden">
+          <section className="catv-panel mb-6 overflow-hidden">
             <div className="p-4 pb-1 sm:px-5">
               <SectionHeader icon={FileText}>{t.history}</SectionHeader>
             </div>

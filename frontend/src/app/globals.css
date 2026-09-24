@@ -46,14 +46,27 @@ html {
   scroll-behavior: smooth;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   background: radial-gradient(circle at 8% 6%, rgba(255, 238, 208, 0.65), transparent 45%),
     radial-gradient(circle at 92% 5%, rgba(210, 241, 225, 0.55), transparent 40%), var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* A long <option> label otherwise stretches a select past its container. */
+select,
+input,
+textarea {
+  max-width: 100%;
 }
 
 a {
@@ -471,6 +484,10 @@ a {
 
 .catv-modal {
   width: min(560px, 100%);
+  /* Tall forms (profile) must scroll inside the dialog on short phone screens. */
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
@@ -600,13 +617,68 @@ a {
     padding: 0.75rem;
   }
 
+  .catv-topbar-title {
+    overflow-wrap: anywhere;
+  }
+
   .catv-topbar-right {
     width: 100%;
+    gap: 0.35rem;
   }
 
   .catv-search {
     flex: 1;
     min-width: 140px;
+  }
+
+  .catv-chip {
+    height: 32px;
+    padding: 0 0.6rem;
+    font-size: 0.72rem;
+  }
+
+  /* Keep the user pill on the same row as the chips: long emails were
+     forcing it onto its own line (or past the screen edge). */
+  .catv-user-menu {
+    min-width: 0;
+    flex: 1 1 0;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .catv-user-box {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .catv-user-box > div {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .catv-user-name,
+  .catv-user-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 30vw;
+  }
+
+  .catv-content {
+    padding: 0.75rem;
+    padding-bottom: 6rem;
+  }
+
+  .catv-modal-actions {
+    flex-wrap: wrap;
+  }
+
+  /* iOS Safari zooms the whole page when a focused field is under 16px
+     and never zooms back out — the app uses text-sm/xs on most inputs. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
   }
 }
 

@@ -657,7 +657,7 @@ export default function OrdersPage() {
       {/* Status change modal */}
       {statusModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && closeStatusModal()}>
-          <div className="w-full max-w-sm rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-1 text-base font-bold">{txt.changeStatusTitle}</h3>
             <p className="mb-4 text-xs text-[var(--muted)]">{statusModal.order_number}</p>
             <div className="grid gap-3">
@@ -688,7 +688,7 @@ export default function OrdersPage() {
       {/* Payment collection modal */}
       {paymentModalOrderId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && closePaymentModal()}>
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-1 text-base font-bold">{txt.paymentModalTitle}</h3>
             <p className="mb-4 text-xs text-[var(--muted)]">{paymentSummary?.order_number ?? "..."}</p>
 

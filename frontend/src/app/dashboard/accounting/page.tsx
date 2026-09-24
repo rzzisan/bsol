@@ -134,7 +134,7 @@ export default function Page() {
       pageTitle={{ bn: text.bn.title, en: text.en.title }}
       pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
-      <section className="mx-4 mb-4 grid gap-3 sm:grid-cols-3">
+      <section className="mb-4 grid gap-3 sm:grid-cols-3">
         <div className="catv-panel p-4">
           <p className="text-xs text-[var(--muted)]">{t.cards.income}</p>
           <p className="mt-2 text-xl font-bold text-emerald-600">{money(summary.income)}</p>
@@ -149,7 +149,7 @@ export default function Page() {
         </div>
       </section>
 
-      <section className="catv-panel mx-4 mb-6 overflow-hidden">
+      <section className="catv-panel mb-6 overflow-hidden">
         <div className="border-b border-[var(--border)] px-4 py-3 text-sm font-semibold">{t.recent}</div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">

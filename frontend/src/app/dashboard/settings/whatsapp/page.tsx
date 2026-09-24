@@ -205,10 +205,10 @@ export default function Page() {
       pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
       {loading ? (
-        <p className="mx-4 text-sm text-[var(--muted)]">{t.loading}</p>
+        <p className="text-sm text-[var(--muted)]">{t.loading}</p>
       ) : (
         <>
-          <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
+          <section className="catv-panel mb-4 p-4 sm:p-5">
             <SectionHeader icon={MessageCircle}>{t.title}</SectionHeader>
             <p className="mb-4 text-xs text-[var(--muted)]">{t.intro}</p>
 

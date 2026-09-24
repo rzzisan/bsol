@@ -63,7 +63,7 @@ export function IconPickerField({ label, value, onChange, locale = "bn" }: { lab
       </button>
 
       {open ? (
-        <div className="absolute z-20 mt-1 w-72 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg">
+        <div className="absolute z-20 mt-1 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-lg">
           <input
             autoFocus
             value={query}

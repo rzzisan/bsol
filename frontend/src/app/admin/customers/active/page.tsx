@@ -665,7 +665,7 @@ export default function ActiveCustomersPage() {
       {/* Add / Edit Modal */}
       {(modalMode === "add" || modalMode === "edit") && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 shadow-2xl">
             <h2 className="mb-4 text-lg font-bold text-[var(--foreground)]">
               {modalMode === "add" ? t.addTitle : t.editTitle}
             </h2>
@@ -775,7 +775,7 @@ export default function ActiveCustomersPage() {
 
       {modalMode === "settings" && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 shadow-2xl">
             <h2 className="mb-2 text-lg font-bold text-[var(--foreground)]">
               {t.settingsTitle}
             </h2>
@@ -871,7 +871,7 @@ export default function ActiveCustomersPage() {
       {/* Delete Modal */}
       {modalMode === "delete" && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 shadow-2xl">
             <h2 className="mb-3 text-lg font-bold text-[var(--foreground)]">
               {t.deleteTitle}
             </h2>

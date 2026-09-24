@@ -702,7 +702,7 @@ function CredentialRevealModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-t-2xl bg-[var(--surface)] p-5 sm:rounded-2xl sm:p-6"
+        className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-t-2xl bg-[var(--surface)] p-5 sm:rounded-2xl sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-semibold text-[var(--foreground)]">{tt.credentialTitle}</h2>

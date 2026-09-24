@@ -882,7 +882,7 @@ export default function OrderDetailPage() {
       {statusOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={e => e.target === e.currentTarget && setStatusOpen(false)}>
-          <div className="w-full max-w-sm rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-4 text-base font-bold">{txt.changeStatus}</h3>
 
             <div className="grid gap-3">
@@ -921,7 +921,7 @@ export default function OrderDetailPage() {
       {deleteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={e => e.target === e.currentTarget && setDeleteOpen(false)}>
-          <div className="w-full max-w-sm rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <p className="mb-5 text-sm">{txt.confirmDelete} <span className="font-mono font-semibold text-[var(--accent)]">{order.order_number}</span></p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setDeleteOpen(false)}

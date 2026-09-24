@@ -220,7 +220,7 @@ export default function VariantsTab({ productId, productName, productThumbnail =
       {/* ── Generate combinations ─────────────────────────────────────── */}
       {hasOptions && (
         <div className="border border-[var(--border)] rounded-lg p-4 bg-[var(--surface-soft)]">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-semibold text-[var(--foreground)]">{t.generateHeading}</p>
               <p className="text-xs text-[var(--muted)] mt-0.5">
@@ -315,7 +315,7 @@ export default function VariantsTab({ productId, productName, productThumbnail =
 
       {/* ── Variant table ─────────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">
             {t.variantsHeading}
             {variants.length > 0 && (

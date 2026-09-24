@@ -564,7 +564,7 @@ export default function SmsCreditPage() {
       {/* Recharge Modal */}
       {rechargeUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 shadow-2xl">
             <h2 className="mb-1 text-lg font-bold text-[var(--foreground)]">{t.rechargeTitle}</h2>
             <p className="mb-4 text-sm text-[var(--muted)]">
               {t.rechargeFor}{" "}

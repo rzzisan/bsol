@@ -182,7 +182,7 @@ export default function CategoriesPage() {
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && closeModal()}>
-          <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-md rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-4 text-base font-bold">{modal === "add" ? txt.modalAdd : txt.modalEdit}</h3>
             {formError && <div className="mb-3 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-400">{formError}</div>}
             <div className="grid gap-3">

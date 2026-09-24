@@ -477,7 +477,7 @@ export default function ProductsPage() {
       {/* Media Modal */}
       {mediaProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && closeMedia()}>
-          <div className="w-full max-w-4xl rounded-2xl bg-[var(--surface)] p-5 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-4xl rounded-2xl bg-[var(--surface)] p-5 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-base font-bold">Media: {mediaProduct.name}</h3>
               <button onClick={closeMedia} className="rounded-lg border border-[var(--border)] px-3 py-1 text-sm">Close</button>
@@ -512,7 +512,7 @@ export default function ProductsPage() {
       {/* Add / Edit Modal */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && closeModal()}>
-          <div className="w-full max-w-lg rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-lg rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-4 text-base font-bold">
               {modal === "add" ? txt.modalAddTitle : txt.modalEditTitle}
             </h3>

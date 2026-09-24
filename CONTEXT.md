@@ -1321,3 +1321,17 @@ SaaS-এর URL কাঠামো বদলে গেছে। **প্রত�
 সাবস্ক্রিপশন এক্সপায়ার্ড শপে পাবলিক ল্যান্ডিং পেজ/স্টোরফ্রন্ট থেকে আসা অর্ডার এখন `orders.held_at` সেট করে স্টোর হয়, `Order`-এর নতুন global scope `HeldOrderScope` অথেন্টিকেটেড (সেলার/স্টাফ) রিকোয়েস্ট থেকে লুকিয়ে রাখে (পাবলিক থ্যাংক-ইউ পেজ/job/console প্রভাবিত না); সেলার ড্যাশবোর্ডে শুধু "আপনার N টি নতুন অর্ডার প্লেস হয়েছে — রিনিউ করুন" ব্যানার দেখে। **৭ দিন** ধরে রাখা হয় (রিনিউ করলে `SubscriptionActivationService::activate()`/`mySubscription()` release করে; না করলে দৈনিক `app:purge-held-orders` মুছে দেয়), **স্টক কমে না**। হোল্ড অবস্থায় Customer রেকর্ড, COD অ্যাকাউন্টিং, OTP SMS, Facebook CAPI ইভেন্ট, অনলাইন পেমেন্ট (ফলে অর্ডার জোর-COD) ও ডিজিটাল অর্ডার বন্ধ। বিস্তারিত ডিজাইন, লুকানোর কৌশল (কোন raw query-তে আলাদা ফিল্টার লাগল), ট্রেড-অফ ও টেস্ট: `subscription_billing_context.md §13`।
 
 **সেলারের মেয়াদ-শেষ আচরণের পূর্ণ চিত্র (আপডেটেড):** (১) `active_subscription` গেট সব লেখা-রুটে `402` (delivered/returned/cancelled স্ট্যাটাস ছাড়া; বিলিং/সাপোর্ট রুট সবসময় খোলা), (২) পাবলিক অর্ডার held (এই সেকশন), (৩) ডেটা কখনো মুছে না (held অর্ডার ছাড়া, ৭ দিন পর)।
+
+
+## ৩৪. Mobile-first UI নিয়ম ও ২০২৬-০৯-২৪ মোবাইল পলিশ ✅ (কোড-লেভেল; real-device verify বাকি)
+
+বিস্তারিত ফিক্স-তালিকা: `pre_launch_polish_context.md` §থ ব্যাচ ৪। নতুন ড্যাশবোর্ড/অ্যাডমিন UI লেখার সময় বাধ্যতামূলক নিয়ম:
+
+- **মডাল/ডায়ালগ:** ওভারলে `fixed inset-0 z-50 flex items-center justify-center p-4`, ভেতরের কার্ডে সবসময় `max-h-[90dvh] overflow-y-auto` ও `p-4 sm:p-6`। (এর অভাবে লম্বা ফর্ম ফোনে উপর-নিচ কেটে যায়।)
+- **টেবিল:** ৫+ কলামের বা ইনলাইন-এডিট টেবিল ফোনে পড়ার অযোগ্য — `md:hidden` কার্ড-লিস্ট + `hidden md:block` টেবিল জোড়া দিন (উদাহরণ: `components/orders/order-item-grid.tsx`, `components/products/variant-table.tsx`)। ন্যূনতম: `overflow-x-auto` wrapper।
+- **গাটার:** পেজের টপ-লেভেল `.catv-panel`/section-এ `mx-*` দেবেন না — `.catv-content` (`globals.css`) ইতিমধ্যে padding দেয় (ফোনে `0.75rem`, নিচে ফ্লোটিং সাপোর্ট বাটনের জন্য `6rem`)।
+- **ইনপুট:** ফোনে (`≤640px`) সব `input/select/textarea` গ্লোবালি ≥16px (iOS ফোকাস-জুম এড়াতে) — পেজ-লেভেলে `text-xs` দিয়ে এটা ভাঙার চেষ্টা করবেন না।
+- **হেডার রো** (শিরোনাম + বাটন): `flex flex-wrap items-center justify-between gap-2`।
+- **গ্রিড:** `grid-cols-N` (N≥3) সবসময় `sm:`/`md:`-প্রিফিক্সসহ, বেস `grid-cols-1`/`grid-cols-2`।
+- **ভ্যালিডেশন:** অন্তত ৩৬০px প্রস্থে (DevTools/আসল ফোন) bn ও en দুই ভাষায়, light/dark দুই থিমে দেখুন।
+

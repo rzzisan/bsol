@@ -186,7 +186,7 @@ export default function BlacklistPage() {
       {addOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={e => e.target === e.currentTarget && setAddOpen(false)}>
-          <div className="w-full max-w-sm rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-4 text-base font-bold">{txt.modalTitle}</h3>
             <div className="grid gap-3">
               <label>

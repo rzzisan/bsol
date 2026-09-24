@@ -198,7 +198,7 @@ export default function Page() {
       pageTitle={{ bn: text.bn.title, en: text.en.title }}
       pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
-      <div className="mx-4 mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         {(Object.keys(t.ranges) as RangeKey[]).map((key) => (
           <button
             key={key}
@@ -215,12 +215,12 @@ export default function Page() {
       </div>
 
       {error && (
-        <div className="mx-4 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
           {error}
         </div>
       )}
 
-      <section className="mx-4 mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="catv-panel p-4">
           <p className="text-xs text-[var(--muted)]">{t.cards.total_orders}</p>
           <p className="mt-2 text-xl font-bold text-[var(--foreground)]">
@@ -253,7 +253,7 @@ export default function Page() {
         </div>
       </section>
 
-      <section className="catv-panel mx-4 mb-4 p-4">
+      <section className="catv-panel mb-4 p-4">
         <h3 className="mb-3 text-sm font-semibold text-[var(--foreground)]">{t.funnelTitle}</h3>
         {loading ? (
           <p className="py-6 text-center text-sm text-[var(--muted)]">{t.loading}</p>
@@ -272,7 +272,7 @@ export default function Page() {
         )}
       </section>
 
-      <section className="catv-panel mx-4 mb-4 p-4">
+      <section className="catv-panel mb-4 p-4">
         <h3 className="mb-3 text-sm font-semibold text-[var(--foreground)]">{t.trendTitle}</h3>
         {loading ? (
           <p className="py-6 text-center text-sm text-[var(--muted)]">{t.loading}</p>
@@ -302,7 +302,7 @@ export default function Page() {
         )}
       </section>
 
-      <section className="catv-panel mx-4 mb-6 overflow-hidden">
+      <section className="catv-panel mb-6 overflow-hidden">
         <div className="border-b border-[var(--border)] px-4 py-3 text-sm font-semibold">{t.productsTitle}</div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">

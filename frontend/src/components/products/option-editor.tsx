@@ -149,7 +149,7 @@ export default function OptionEditor({ productId, options, token, apiBase, onOpt
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">{t.heading}</h3>
         <button
           onClick={() => setAdding(true)}
@@ -246,7 +246,7 @@ function OptionRow({
 
   return (
     <div className="border border-[var(--border)] rounded-lg p-4 bg-[var(--surface)]">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
           <span className="text-sm font-semibold text-[var(--foreground)]">{option.name}</span>
           <span className="ml-2 text-xs text-[var(--muted)] bg-[var(--surface-soft)] px-2 py-0.5 rounded">

@@ -166,7 +166,7 @@ export default function Page() {
       pageTitle={{ bn: text.bn.pageTitle, en: text.en.pageTitle }}
       pageSubtitle={{ bn: text.bn.pageSubtitle, en: text.en.pageSubtitle }}
     >
-      <section className="mx-4 mb-6 grid gap-4 lg:grid-cols-[320px_1fr]">
+      <section className="mb-6 grid gap-4 lg:grid-cols-[320px_1fr]">
         <div className="catv-panel overflow-hidden">
           <div className="max-h-[70vh] divide-y divide-[var(--border)] overflow-y-auto">
             {loading ? (

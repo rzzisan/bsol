@@ -1149,7 +1149,7 @@ export default function AdminPackagesPage() {
       {/* ── Edit Package Modal ── */}
       {editPkg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-4 text-base font-semibold text-[var(--foreground)]">
               {t.editTitle}: <span className="text-[var(--accent)]">{editPkg.name}</span>
             </h3>
@@ -1310,7 +1310,7 @@ export default function AdminPackagesPage() {
       {/* ── Delete Confirm Modal ── */}
       {deletePkg && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-2 text-base font-semibold text-[var(--foreground)]">{t.deleteConfirmTitle}</h3>
             <p className="mb-5 text-sm text-[var(--muted)]">
               <strong>{deletePkg.name}</strong> — {t.deleteConfirmMsg}

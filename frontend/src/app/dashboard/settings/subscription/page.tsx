@@ -337,11 +337,11 @@ export default function Page() {
       pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
       {loading ? (
-        <p className="mx-4 text-sm text-[var(--muted)]">{t.loading}</p>
+        <p className="text-sm text-[var(--muted)]">{t.loading}</p>
       ) : (
         <>
           {/* Current plan hero */}
-          <section className="catv-panel relative mx-4 mb-4 overflow-hidden">
+          <section className="catv-panel relative mb-4 overflow-hidden">
             <div
               className="relative p-5 sm:p-6"
               style={{
@@ -409,7 +409,7 @@ export default function Page() {
           </section>
 
           {/* Plan picker */}
-          <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
+          <section className="catv-panel mb-4 p-4 sm:p-5">
             <SectionHeader icon={Sparkles}>{t.plans}</SectionHeader>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {plans.map((p) => {
@@ -523,7 +523,7 @@ export default function Page() {
 
           {/* Invoice preview */}
           {form.package_id && (
-            <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
+            <section className="catv-panel mb-4 p-4 sm:p-5">
               <SectionHeader icon={Receipt}>{t.invoiceTitle}</SectionHeader>
               {invoiceLoading || !invoice ? (
                 <p className="flex items-center gap-2 text-xs text-[var(--muted)]">
@@ -558,7 +558,7 @@ export default function Page() {
           )}
 
           {/* Bill payment */}
-          <section className="catv-panel mx-4 mb-4 p-4 sm:p-5">
+          <section className="catv-panel mb-4 p-4 sm:p-5">
             <SectionHeader icon={CreditCard}>{t.payTitle}</SectionHeader>
 
             {form.package_id && (
@@ -577,7 +577,7 @@ export default function Page() {
           </section>
 
           {/* History */}
-          <section className="catv-panel mx-4 mb-6 overflow-hidden">
+          <section className="catv-panel mb-6 overflow-hidden">
             <div className="p-4 pb-1 sm:px-5">
               <SectionHeader icon={FileText}>{t.history}</SectionHeader>
             </div>

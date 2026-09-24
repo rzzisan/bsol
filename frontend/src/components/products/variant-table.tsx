@@ -168,7 +168,7 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
     <div className="space-y-2">
       {/* Bulk actions */}
       {bulkIds.size > 0 && (
-        <div className="flex gap-2 items-center bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded px-3 py-2">
+        <div className="flex flex-wrap gap-2 items-center bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded px-3 py-2">
           <span className="text-xs text-[var(--accent)] font-medium">{t.selected(bulkIds.size)}</span>
           <button onClick={() => bulkToggleActive(true)} className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">{t.activate}</button>
           <button onClick={() => bulkToggleActive(false)} className="text-xs bg-[var(--muted)] text-white px-2 py-1 rounded hover:opacity-90">{t.deactivate}</button>
@@ -176,7 +176,113 @@ export default function VariantTable({ variants, token, apiBase, productId, prod
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
+      {/* Mobile: one card per variant — the 10-column table below is desktop-only. */}
+      <div className="space-y-2 md:hidden">
+        {variants.map((variant) => {
+          const isEditing = editingId === variant.id;
+          const optionDrivenImage = variant.options.find((opt) => !!opt.image_url)?.image_url ?? null;
+          const effectiveImage = variant.image_url || optionDrivenImage || productThumbnail;
+          const inputCls = "mt-1 w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40";
+          return (
+            <div key={variant.id} className={`rounded-lg border border-[var(--border)] p-3 ${!variant.is_active ? "opacity-60" : ""}`}>
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={bulkIds.has(variant.id)}
+                  onChange={(e) => {
+                    const next = new Set(bulkIds);
+                    if (e.target.checked) next.add(variant.id); else next.delete(variant.id);
+                    setBulkIds(next);
+                  }}
+                  className="mt-1 h-4 w-4 shrink-0 rounded"
+                />
+                {effectiveImage ? (
+                  <img src={effectiveImage} alt={variant.sku} className="h-10 w-10 shrink-0 rounded border border-[var(--border)] object-cover" />
+                ) : (
+                  <span className="h-10 w-10 shrink-0 rounded border border-[var(--border)] bg-[var(--surface-soft)]" title={t.noImage} />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap gap-1">
+                    {variant.options.map((opt) => (
+                      <span
+                        key={opt.option_value_id}
+                        className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--foreground)]"
+                        style={opt.option_type === "color_swatch" && opt.color_hex
+                          ? { borderColor: opt.color_hex, backgroundColor: `${opt.color_hex}22` }
+                          : undefined}
+                      >
+                        <span className="text-[var(--muted)]">{opt.option_name}:</span>
+                        {opt.label || opt.value}
+                      </span>
+                    ))}
+                  </div>
+                  {!isEditing && <p className="mt-1 break-all font-mono text-xs text-[var(--muted)]">{variant.sku}</p>}
+                </div>
+                <button
+                  onClick={() => toggleActive(variant)}
+                  aria-label={t.colActive}
+                  className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors ${variant.is_active ? "bg-green-500" : "bg-[var(--border)]"}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.is_active ? "translate-x-5" : "translate-x-1"}`} />
+                </button>
+              </div>
+
+              {isEditing ? (
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--muted)]">
+                  <label className="col-span-2">{t.colSku}
+                    <input className={inputCls} value={editRow.sku ?? ""} onChange={(e) => setEditRow({ ...editRow, sku: e.target.value })} />
+                  </label>
+                  <label>{t.colPrice}
+                    <input type="number" className={inputCls} value={editRow.regular_price ?? ""} onChange={(e) => setEditRow({ ...editRow, regular_price: e.target.value as unknown as string })} />
+                  </label>
+                  <label>{t.colStock}
+                    <input type="number" className={inputCls} value={editRow.stock_qty ?? ""} onChange={(e) => setEditRow({ ...editRow, stock_qty: parseInt(e.target.value) || 0 })} />
+                  </label>
+                  <label className="col-span-2">{t.colDiscount}
+                    <div className="flex gap-2">
+                      <input type="number" className={inputCls} value={editRow.discount ?? ""} onChange={(e) => setEditRow({ ...editRow, discount: e.target.value as unknown as string })} />
+                      <select
+                        className="mt-1 rounded border border-[var(--border)] bg-[var(--background)] px-2 text-sm text-[var(--foreground)]"
+                        value={editRow.discount_type ?? "amount"}
+                        onChange={(e) => setEditRow({ ...editRow, discount_type: e.target.value as "amount" | "percent" })}
+                      >
+                        <option value="amount">৳</option>
+                        <option value="percent">%</option>
+                      </select>
+                    </div>
+                  </label>
+                  <p className="col-span-2 text-sm font-semibold text-green-700">
+                    {t.colSelling}: {liveSellingPrice != null ? `৳${liveSellingPrice.toLocaleString()}` : `৳${parseFloat(variant.selling_price).toLocaleString()}`}
+                  </p>
+                  <div className="col-span-2 flex gap-2">
+                    <button onClick={saveEdit} disabled={saving} className="flex-1 rounded bg-[var(--accent)] px-3 py-2 text-sm text-white disabled:opacity-50">
+                      {saving ? t.savingShort : t.save}
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="flex-1 rounded border border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]">
+                      {t.cancel}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                    <div><dt className="text-[var(--muted)]">{t.colPrice}</dt><dd>৳{parseFloat(variant.regular_price).toLocaleString()}</dd></div>
+                    <div><dt className="text-[var(--muted)]">{t.colDiscount}</dt><dd>{parseFloat(variant.discount) > 0 ? `${parseFloat(variant.discount)}${variant.discount_type === "percent" ? "%" : "৳"}` : "—"}</dd></div>
+                    <div><dt className="text-[var(--muted)]">{t.colSelling}</dt><dd className="font-semibold text-green-700">৳{parseFloat(variant.selling_price).toLocaleString()}</dd></div>
+                    <div><dt className="text-[var(--muted)]">{t.colStock}</dt><dd className={variant.is_low_stock ? "font-medium text-orange-500" : ""}>{variant.stock_qty}{variant.is_low_stock && " ⚠"}</dd></div>
+                  </dl>
+                  <div className="mt-2 flex gap-4 border-t border-[var(--border)] pt-2 text-sm">
+                    <button onClick={() => startEdit(variant)} className="text-[var(--accent)]">{t.edit}</button>
+                    <button onClick={() => deleteVariant(variant.id)} className="text-red-500">{t.del}</button>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg md:block border border-[var(--border)]">
         <table className="w-full text-sm">
           <thead className="bg-[var(--surface-soft)] text-xs text-[var(--muted)] uppercase tracking-wide">
             <tr>

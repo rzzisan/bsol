@@ -147,7 +147,7 @@ export default function Page() {
       pageTitle={{ bn: text.bn.title, en: text.en.title }}
       pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
-      <section className="catv-panel mx-4 mb-4 p-4">
+      <section className="catv-panel mb-4 p-4">
         <form onSubmit={addExpense} className="grid gap-3 md:grid-cols-4">
           <select
             value={form.category}
@@ -188,7 +188,7 @@ export default function Page() {
         {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
       </section>
 
-      <section className="catv-panel mx-4 mb-6 overflow-hidden">
+      <section className="catv-panel mb-6 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="text-left text-xs uppercase text-[var(--muted)]">

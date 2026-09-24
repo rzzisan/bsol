@@ -213,7 +213,7 @@ export default function BulkImportOrdersPage() {
           </div>
 
           {preview.invalid_count > 0 && (
-            <div className="mt-4 max-h-64 overflow-y-auto rounded-xl border border-[var(--border)]">
+            <div className="mt-4 max-h-64 overflow-auto rounded-xl border border-[var(--border)]">
               <table className="w-full text-xs">
                 <thead className="bg-[var(--surface-soft)]">
                   <tr className="text-left">

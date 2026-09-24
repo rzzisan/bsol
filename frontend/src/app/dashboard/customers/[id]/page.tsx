@@ -332,7 +332,7 @@ export default function CustomerDetailPage() {
       {/* Edit modal */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && setModal(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-md rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-4 text-base font-bold">{txt.editTitle}</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               {(["name","phone","email","address","notes"] as const).map(field => (

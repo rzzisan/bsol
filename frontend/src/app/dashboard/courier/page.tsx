@@ -735,7 +735,7 @@ export default function BookParcelPage() {
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={e => e.target === e.currentTarget && setModal(null)}>
-          <div className="w-full max-w-lg rounded-2xl bg-[var(--surface)] p-6 shadow-xl overflow-y-auto max-h-[90vh]">
+          <div className="w-full max-w-lg rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl overflow-y-auto max-h-[90vh]">
             <h3 className="mb-1 text-base font-bold">{txt.modalTitle}</h3>
             <p className="mb-4 text-xs text-[var(--muted)]">{modal.order_number} — {modal.customer_name ?? modal.customer_phone}</p>
 
@@ -1055,7 +1055,7 @@ export default function BookParcelPage() {
       {bulkModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={e => e.target === e.currentTarget && setBulkModal(false)}>
-          <div className="w-full max-w-xl rounded-2xl bg-[var(--surface)] p-6 shadow-xl overflow-y-auto max-h-[90vh]">
+          <div className="w-full max-w-xl rounded-2xl bg-[var(--surface)] p-4 sm:p-6 shadow-xl overflow-y-auto max-h-[90vh]">
             <h3 className="mb-1 text-base font-bold">{txt.bulkTitle}</h3>
             <p className="mb-3 text-xs text-[var(--muted)]">{selectedIds.size} {txt.selectedCount}</p>
             <p className="mb-4 text-xs text-[var(--muted)]">{txt.bulkHint}</p>

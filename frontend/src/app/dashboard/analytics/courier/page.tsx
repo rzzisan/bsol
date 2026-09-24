@@ -116,7 +116,7 @@ export default function Page() {
       pageTitle={{ bn: text.bn.title, en: text.en.title }}
       pageSubtitle={{ bn: text.bn.subtitle, en: text.en.subtitle }}
     >
-      <div className="mx-4 mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         {(Object.keys(t.ranges) as RangeKey[]).map((key) => (
           <button
             key={key}
@@ -133,12 +133,12 @@ export default function Page() {
       </div>
 
       {error && (
-        <div className="mx-4 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
           {error}
         </div>
       )}
 
-      <section className="mx-4 mb-6 grid gap-3">
+      <section className="mb-6 grid gap-3">
         {loading ? (
           <div className="catv-panel p-8 text-center text-sm text-[var(--muted)]">{t.loading}</div>
         ) : couriers.length === 0 ? (

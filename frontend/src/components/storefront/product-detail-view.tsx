@@ -248,7 +248,7 @@ export default function ProductDetailView({ product, home }: { product: ProductD
                             {group.items.map((item, ii) => (
                               <tr key={ii} className="border-t border-slate-100">
                                 <td className="w-1/3 px-4 py-1.5 text-slate-500">{item.label}</td>
-                                <td className="px-4 py-1.5">{item.value}</td>
+                                <td className="break-words px-4 py-1.5">{item.value}</td>
                               </tr>
                             ))}
                           </tbody>

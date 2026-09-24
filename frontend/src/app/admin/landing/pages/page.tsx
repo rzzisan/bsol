@@ -643,7 +643,7 @@ export default function AdminLandingPagesPage() {
       {/* ── Lock Modal ── */}
       {lockTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-2 text-base font-semibold text-[var(--foreground)]">
               {t.lockModalTitle}: <span className="text-[var(--accent)]">{lockTarget.title}</span>
             </h3>
@@ -683,7 +683,7 @@ export default function AdminLandingPagesPage() {
       {/* ── Unlock Confirm Modal ── */}
       {unlockTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <h3 className="mb-2 text-base font-semibold text-[var(--foreground)]">{t.unlockConfirmTitle}</h3>
             <p className="mb-5 text-sm text-[var(--muted)]">
               <strong>{unlockTarget.title}</strong> — {t.unlockConfirmMsg}

@@ -326,7 +326,7 @@ export default function AdminLandingTemplatesPage() {
 
       {deleteTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6 shadow-xl">
             <p className="mb-5 text-sm text-[var(--foreground)]">
               <strong>{locale === "bn" ? deleteTarget.name_bn : deleteTarget.name_en ?? deleteTarget.name_bn}</strong> — {t.deleteConfirm}
             </p>
