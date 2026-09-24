@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Transaction;
+use App\Models\AbandonedCheckout;
 use App\Models\Customer;
 use App\Models\LandingPage;
 use App\Models\LandingPageProduct;
@@ -236,5 +237,47 @@ class HeldOrdersTest extends TestCase
 
         Sanctum::actingAs($owner);
         $this->assertNotSame($heldNumber, Order::generateOrderNumber($owner->id));
+    }
+
+    public function test_abandoned_checkout_that_became_a_held_order_is_hidden_then_reappears_on_release_and_is_purged_with_it(): void
+    {
+        [$owner, $product] = $this->shop(expired: true);
+        $page = LandingPage::firstOrFail();
+        $checkout = AbandonedCheckout::create([
+            'user_id' => $owner->id, 'landing_page_id' => $page->id, 'source' => 'landing_page',
+            'session_token' => 'sess-1', 'customer_phone' => '01712345678', 'customer_name' => 'Karim',
+            'status' => 'active', 'last_activity_at' => now()->subHour(),
+        ]);
+
+        // Placing the order converts the matching abandoned checkout (by phone).
+        $this->placeLandingOrder($product)->assertCreated();
+        $this->assertSame('converted', $checkout->fresh()->status);
+
+        Sanctum::actingAs($owner);
+        $this->assertSame(0, count($this->getJson('/api/landing/abandoned-checkouts')->assertOk()->json('data')));
+
+        // Renewal releases the order — the row shows up again, linked to it.
+        $owner->update(['subscription_status' => 'active', 'subscription_ends_at' => now()->addDays(30)]);
+        app(HeldOrderService::class)->release($owner->fresh());
+        $rows = $this->getJson('/api/landing/abandoned-checkouts')->assertOk()->json('data');
+        $this->assertCount(1, $rows);
+        $this->assertNotNull($rows[0]['order']);
+    }
+
+    public function test_purging_an_expired_held_order_also_deletes_its_abandoned_checkout(): void
+    {
+        [$owner, $product] = $this->shop(expired: true);
+        $page = LandingPage::firstOrFail();
+        AbandonedCheckout::create([
+            'user_id' => $owner->id, 'landing_page_id' => $page->id, 'source' => 'landing_page',
+            'session_token' => 'sess-2', 'customer_phone' => '01712345678', 'status' => 'active',
+            'last_activity_at' => now()->subHour(),
+        ]);
+        $this->placeLandingOrder($product)->assertCreated();
+        $this->heldOrder()->forceFill(['held_at' => now()->subDays(HeldOrderService::WINDOW_DAYS + 1)])->save();
+
+        app(HeldOrderService::class)->purgeExpired();
+
+        $this->assertSame(0, AbandonedCheckout::withoutGlobalScopes()->count());
     }
 }

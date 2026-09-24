@@ -582,7 +582,7 @@ Addon purchase-এর পুরো পেমেন্ট পাইপলাই�
 ### জেনেসুনে মেনে নেওয়া ট্রেড-অফ
 - Held অর্ডারের Facebook CAPI ইভেন্ট রিলিজের সময় পুনরায় পাঠানো হয় না (IP/user-agent সেভ করা নেই) — বিজ্ঞাপন conversion হারায়।
 - Held অর্ডারের OTP রিলিজের পর আর পাঠানো হয় না; ল্যান্ডিং-পেজ conversion attribution রিলিজের পর ফেরত আসে না।
-- Abandoned checkout আগের মতোই অর্ডার তৈরির সময় `converted` হয় (নাহলে সেলার ইতিমধ্যে অর্ডার-করা কাস্টমারকে recovery মেসেজ পাঠাত)।
+- Abandoned checkout আগের মতোই অর্ডার তৈরির সময় `converted` হয় (নাহলে সেলার ইতিমধ্যে অর্ডার-করা কাস্টমারকে recovery মেসেজ পাঠাত) — কিন্তু held অর্ডারে রূপান্তরিত row সেলারের abandoned-checkouts থেকেও লুকানো (`HeldOrderCheckoutScope`, `AbandonedCheckout`-এর global scope — অথেন্টিকেটেড রিকোয়েস্টে `order_id` held অর্ডার হলে বাদ)। release হলে row ফিরে আসে (অর্ডারসহ); ৭ দিন পর purge-এ অর্ডারের সাথে ওই row-ও `forceDelete` হয় (নাহলে অর্ডারবিহীন `converted` row হয়ে ভেসে উঠত)। টেস্ট: `HeldOrdersTest` (এখন ১২টা)।
 - Facebook CAPI/OTP/অ্যাট্রিবিউশনের এই ঘাটতি চাইলে ভবিষ্যতে ip/ua সেভ করে পূরণ করা যায়।
 
 ### Test coverage

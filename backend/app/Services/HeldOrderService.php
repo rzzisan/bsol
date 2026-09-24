@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\AbandonedCheckout;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\Scopes\HeldOrderCheckoutScope;
 use App\Models\Scopes\HeldOrderScope;
 use App\Models\User;
 use App\Support\PhoneIntelCache;
@@ -89,6 +91,12 @@ class HeldOrderService
             ->whereNotNull('held_at')
             ->where('held_at', '<', now()->subDays(self::WINDOW_DAYS))
             ->each(function (Order $order) use (&$count) {
+                // The abandoned checkout that converted into this order was
+                // hidden alongside it (HeldOrderCheckoutScope); delete it too
+                // instead of letting it resurface as a converted row with no order.
+                AbandonedCheckout::withoutGlobalScope(HeldOrderCheckoutScope::class)
+                    ->where('order_id', $order->id)
+                    ->forceDelete();
                 $order->forceDelete();
                 $count++;
             });
