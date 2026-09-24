@@ -77,7 +77,9 @@ class Customer extends Model
                 $customer->address = $order->customer_address;
         }
 
+        // Held orders (subscription expired, not yet released) don't count.
         $agg = Order::whereIn('user_id', $shopUserIds)
+            ->whereNull('held_at')
             ->where('customer_phone', $order->customer_phone)
             ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total),0) as spent, MAX(created_at) as last_at')
             ->first();

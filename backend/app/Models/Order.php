@@ -8,10 +8,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\Scopes\HeldOrderScope;
 
 class Order extends Model
 {
     use SoftDeletes;
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new HeldOrderScope());
+    }
 
     protected $fillable = [
         'user_id', 'order_number', 'public_token', 'customer_name', 'customer_phone', 'customer_email',
@@ -42,6 +48,9 @@ class Order extends Model
         // OrderStatusService::transition()'s atomic claim, never
         // client-writable. subscription_billing_context.md §9.2-A.
         'quota_consumed_at' => 'datetime',
+        // Also absent from $fillable — set/cleared only by HeldOrderService.
+        // subscription_billing_context.md §13.
+        'held_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -155,7 +164,9 @@ class Order extends Model
     {
         $shopUserIds = (array) $shopUserIds;
         $prefix = 'ORD-' . now()->format('Ymd') . '-';
-        $last   = static::whereIn('user_id', $shopUserIds)
+        // Held orders keep consuming numbers even while hidden from the
+        // signed-in seller, or a manual order made the same day could collide.
+        $last   = static::withoutGlobalScope(HeldOrderScope::class)->whereIn('user_id', $shopUserIds)
             ->where('order_number', 'like', $prefix . '%')
             ->orderByDesc('id')
             ->value('order_number');

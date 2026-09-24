@@ -11,3 +11,4 @@ Artisan::command('inspire', function () {
 Schedule::command('app:expire-subscriptions')->daily();
 Schedule::command('app:purge-tracking-events')->dailyAt('03:30');
 Schedule::command('app:sync-courier-statuses')->hourly();
+Schedule::command('app:purge-held-orders')->dailyAt('03:45');

@@ -4,6 +4,9 @@ interface SubscriptionBannerProps {
   status: string;
   daysLeft: number | null;
   isExpired: boolean;
+  /** Customer orders placed while expired, hidden until renewal (backend HeldOrderService). */
+  heldOrders?: number;
+  heldExpireAt?: string | null;
   locale?: "en" | "bn";
 }
 
@@ -16,6 +19,9 @@ const text = {
     expiringTitle: (days: number) => `আপনার প্ল্যানের মেয়াদ ${days} দিনের মধ্যে শেষ হবে`,
     expiringMessage: "সেবা বিঘ্নিত না হতে এখনই রিনিউ করুন।",
     renewButton: "প্ল্যান দেখুন",
+    heldTitle: (n: number) => `আপনার ${n}টি নতুন অর্ডার প্লেস হয়েছে`,
+    heldMessage: (date: string | null) =>
+      `দেখতে হলে প্ল্যান রিনিউ করুন।${date ? ` ${date}-এর মধ্যে রিনিউ না করলে এই অর্ডারগুলো মুছে যাবে।` : ""}`,
   },
   en: {
     expiredTitle: "Your subscription has expired",
@@ -25,10 +31,20 @@ const text = {
     expiringTitle: (days: number) => `Your plan expires in ${days} day(s)`,
     expiringMessage: "Renew now to avoid any service interruption.",
     renewButton: "View Plans",
+    heldTitle: (n: number) => `You have ${n} new order${n === 1 ? "" : "s"} waiting`,
+    heldMessage: (date: string | null) =>
+      `Renew your plan to view them.${date ? ` Orders not released by ${date} will be deleted.` : ""}`,
   },
 };
 
-export default function SubscriptionBanner({ status, daysLeft, isExpired, locale = "en" }: SubscriptionBannerProps) {
+export default function SubscriptionBanner({
+  status,
+  daysLeft,
+  isExpired,
+  heldOrders = 0,
+  heldExpireAt = null,
+  locale = "en",
+}: SubscriptionBannerProps) {
   const t = text[locale];
 
   if (!isExpired && (daysLeft === null || daysLeft > 5)) return null;
@@ -40,6 +56,9 @@ export default function SubscriptionBanner({ status, daysLeft, isExpired, locale
     ? t.trialTitle(daysLeft ?? 0)
     : t.expiringTitle(daysLeft ?? 0);
   const message = isExpired ? t.expiredMessage : isTrial ? t.trialMessage : t.expiringMessage;
+  const heldDate = heldExpireAt
+    ? new Date(heldExpireAt).toLocaleDateString(locale === "bn" ? "bn-BD" : "en-GB")
+    : null;
 
   return (
     <div
@@ -56,6 +75,12 @@ export default function SubscriptionBanner({ status, daysLeft, isExpired, locale
         <p className={`mt-1 text-sm ${isExpired ? "text-rose-700 dark:text-rose-200" : "text-amber-700 dark:text-amber-200"}`}>
           {message}
         </p>
+        {isExpired && heldOrders > 0 && (
+          <div className="mt-3 rounded-md bg-rose-100 p-3 dark:bg-rose-900">
+            <p className="font-semibold text-rose-900 dark:text-rose-100">{t.heldTitle(heldOrders)}</p>
+            <p className="mt-1 text-sm text-rose-800 dark:text-rose-200">{t.heldMessage(heldDate)}</p>
+          </div>
+        )}
       </div>
       <a
         href="/dashboard/settings/subscription"

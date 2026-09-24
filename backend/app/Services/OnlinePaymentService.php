@@ -34,6 +34,12 @@ class OnlinePaymentService
      *  public checkout should offer. */
     public function getEnabledWalletChannels(int $shopOwnerId): array
     {
+        // No online payment while the shop's subscription is expired —
+        // orders are held, plain COD (HeldOrderService).
+        if (app(HeldOrderService::class)->ownerIsLapsed($shopOwnerId)) {
+            return [];
+        }
+
         $settings = PaymentGatewaySetting::where('user_id', $shopOwnerId)->first();
         return $settings?->activeWalletChannels() ?? [];
     }
@@ -45,6 +51,12 @@ class OnlinePaymentService
      */
     public function submitWalletClaim(Order $order, string $provider, string $senderNumber, string $trxId, ?UploadedFile $screenshot): OrderOnlinePayment
     {
+        if ($order->held_at !== null) {
+            throw ValidationException::withMessages([
+                'order' => ['এই শপে এখন অনলাইন পেমেন্ট নেওয়া যাচ্ছে না।'],
+            ]);
+        }
+
         $settings = PaymentGatewaySetting::where('user_id', $order->user_id)->first();
         $enabled = collect($settings?->activeWalletChannels() ?? [])->pluck('provider');
 
@@ -235,6 +247,10 @@ class OnlinePaymentService
      *  appear as a live checkout option. */
     public function getEnabledGatewayChannels(int $shopOwnerId): array
     {
+        if (app(HeldOrderService::class)->ownerIsLapsed($shopOwnerId)) {
+            return [];
+        }
+
         return PaymentGatewayCredential::where('user_id', $shopOwnerId)
             ->where('enabled', true)
             ->get()
@@ -253,6 +269,12 @@ class OnlinePaymentService
      */
     public function initiateGateway(Order $order, string $provider, string $callbackBaseUrl): array
     {
+        if ($order->held_at !== null) {
+            throw ValidationException::withMessages([
+                'order' => ['এই শপে এখন অনলাইন পেমেন্ট নেওয়া যাচ্ছে না।'],
+            ]);
+        }
+
         $credential = PaymentGatewayCredential::where('user_id', $order->user_id)
             ->where('provider', $provider)
             ->where('enabled', true)

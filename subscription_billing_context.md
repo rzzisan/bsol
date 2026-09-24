@@ -557,3 +557,33 @@ Addon purchase-এর পুরো পেমেন্ট পাইপলাই�
 - **লাইভ প্রোডাকশন ভেরিফিকেশন** (disposable package (`max_landing_pages:2`) + seller + shop, tinker দিয়ে তৈরি): ২টা পেজ তৈরি (দুটোই `201`) → তৃতীয়টা → `402 landing_page_limit_reached` সঠিক মেসেজ সহ। সব টেস্ট ডেটা (৩টা পেজ, শপ প্রোফাইল, সেলার+টোকেন, প্যাকেজ) মুছে ফেলা হয়েছে।
 
 **পরবর্তী ধাপ (§9.6):** Tracking boost addon (শেষ ধাপ, ল্যান্ডিং পেজের প্যাটার্ন কিছুটা রিইউজ হবে)।
+
+
+## 13. মেয়াদ-শেষ সেলারের "held orders" — পাবলিক অর্ডার স্টোর হয় কিন্তু সেলার দেখে না (২০২৬-০৯-২৪)
+
+### সমস্যা
+আগে সাবস্ক্রিপশন এক্সপায়ার হলেও পাবলিক ল্যান্ডিং পেজ/স্টোরফ্রন্টের `POST` অর্ডার রুট (`active_subscription`-এর বাইরে) স্বাভাবিকভাবেই অর্ডার নিত — সেলার সেগুলো দেখতেও পেত, শুধু প্রসেস (pending→confirmed ইত্যাদি) করতে পারত না (`402`)। অর্থাৎ রিনিউ করার কোনো তাগিদ ছিল না।
+
+### সিদ্ধান্ত (ব্যবহারকারীর প্রস্তাব)
+মেয়াদ শেষে কাস্টমারের অর্ডার **ডাটাবেসে স্টোর হবে, কিন্তু সেলারকে দেখানো হবে না**। সেলার শুধু দেখবে "আপনার N টি নতুন অর্ডার প্লেস হয়েছে — দেখতে হলে রিনিউ করুন।" রিনিউ করলে অর্ডারগুলো প্রকাশ পাবে। **ধরে রাখার সময়: ৭ দিন** (`HeldOrderService::WINDOW_DAYS`); ৭ দিনের মধ্যে রিনিউ না করলে অর্ডার মুছে যায়। **স্টক কমে না।**
+
+### কীভাবে কাজ করে
+- **`orders.held_at`** (nullable timestamp, migration `2026_09_24_100000`) — NULL = স্বাভাবিক অর্ডার। `$fillable`-এ নেই, শুধু `HeldOrderService` সেট/ক্লিয়ার করে।
+- **হোল্ডের শর্ত:** `LandingPageOrderService::create()` ও `StorefrontOrderService::create()` — শপ-ওনারের `isSubscriptionExpired()` হলে অর্ডার তৈরির পরপরই `held_at = now()`। Connect/WooCommerce অর্ডার আগে থেকেই `402`-এ ব্লক, তাই এই ফিচারের বাইরে।
+- **লুকানো — `HeldOrderScope` (`Order`-এর global scope):** যখন রিকোয়েস্টে কোনো অথেন্টিকেটেড ইউজার আছে (`auth()->hasUser()` — সেলার/স্টাফ/ইম্পারসোনেটিং অ্যাডমিন), `held_at IS NULL` ফিল্টার বসে। ২২টা ফাইলে আলাদা আলাদা ফিল্টার না বসিয়ে এক জায়গায়। পাবলিক ফ্লো (থ্যাংক-ইউ পেজ, OTP, পেমেন্ট callback), queue job ও console command **অথেন্টিকেটেড না** বলে held অর্ডার দেখতে পায় — এটা ইচ্ছাকৃত, কাস্টমারের থ্যাংক-ইউ পেজ যেন কাজ করে। অথেন্টিকেটেড রিকোয়েস্টের ভেতরেও held দরকার হলে `withoutGlobalScope(HeldOrderScope::class)` (ব্যানার কাউন্ট, release, `Order::generateOrderNumber()` যাতে একই দিনের নম্বর কলিশন না হয়)।
+- **যেসব raw query Eloquent scope বাইপাস করে:** `AnalyticsController`-এর ২টা `join('orders')` কোয়েরিতে `whereNull('orders.held_at')` যোগ; `Customer::syncFromOrder()`-এর aggregate-এ `whereNull('held_at')` (পাবলিক রিকোয়েস্টে scope থাকে না বলে নাহলে customer টোটাল-এ held অর্ডার ঢুকে যেত)।
+- **হোল্ড থাকা অবস্থায় যা হয় না (side-effect বন্ধ):** Customer রেকর্ড, COD অ্যাকাউন্টিং এন্ট্রি (`onOrderCreated`/`onCourierChargeUpdated`), ল্যান্ডিং-পেজ visit attribution, COD OTP SMS (সেলারের SMS ক্রেডিট খরচ হতো), Facebook CAPI `Purchase` ইভেন্ট (সেলারের বিজ্ঞাপনে conversion যেত অথচ সে অর্ডার দেখতে পায় না)। স্টক/কোটা কমে না (এগুলো আগে থেকেই স্ট্যাটাস ট্রানজিশনে কমে, আর hidden অর্ডারের ট্রানজিশন হয় না)।
+- **অনলাইন পেমেন্ট বন্ধ:** `OnlinePaymentService::getEnabledWalletChannels()/getEnabledGatewayChannels()` মেয়াদ-শেষ শপে `[]` দেয় (ল্যান্ডিং, স্টোরফ্রন্ট দুটোই এই মেথড ব্যবহার করে); `publicChannels()` তখন `cod_enabled` জোর করে `true`; held অর্ডারে `submitWalletClaim`/`initiateGateway` `ValidationException` দেয়; held অর্ডারের `payment_method` জোর করে `cod`। কারণ: অনলাইন পেমেন্টে টাকা কেটে অর্ডার কনফার্ম হতো সেলারের অজান্তে।
+- **ডিজিটাল প্রোডাক্ট:** মেয়াদ-শেষ শপে ডিজিটাল অর্ডার `422` (ডিজিটাল ডেলিভারি পেমেন্ট-ট্রিগারড, COD নিষিদ্ধ, অনলাইন পেমেন্ট বন্ধ — অর্ডার পূর্ণ করা অসম্ভব)।
+- **রিনিউ → release:** `SubscriptionActivationService::activate()` (ম্যানুয়াল approve ও সব গেটওয়ে পাথ) শেষে `HeldOrderService::release($user)` — ৭ দিনের ভেতরের held অর্ডারের `held_at` ক্লিয়ার + বাদ পড়া bookkeeping (Customer sync, PhoneIntel bump, অ্যাকাউন্টিং) একবার রিপ্লে। **safety net:** `SubscriptionController::mySubscription()` (প্রতিটা ড্যাশবোর্ড লোডে কল হয়) প্ল্যান লাইভ থাকলে release চালায় — অ্যাডমিন সরাসরি তারিখ বদলালেও কাজ করে।
+- **মুছে ফেলা:** নতুন `app:purge-held-orders` (প্রতিদিন ০৩:৪৫) — `held_at` ৭ দিনের বেশি পুরনো অর্ডার `forceDelete` (items/status-log ইত্যাদি DB cascade)।
+- **ব্যানার:** `GET /subscription/me` এখন `held_orders_count` ও `held_orders_expire_at` (সবচেয়ে পুরনো held অর্ডার কবে মুছবে) দেয়; `SubscriptionBanner` মেয়াদ-শেষ ব্যানারের ভেতরে "আপনার N টি নতুন অর্ডার প্লেস হয়েছে" ব্লক দেখায়। `SupportDiagnosticsService`-এ `held_orders_waiting_for_renewal` যোগ (সাপোর্ট AI যেন "অর্ডার আসছে না" উত্তর না দেয়)।
+
+### জেনেসুনে মেনে নেওয়া ট্রেড-অফ
+- Held অর্ডারের Facebook CAPI ইভেন্ট রিলিজের সময় পুনরায় পাঠানো হয় না (IP/user-agent সেভ করা নেই) — বিজ্ঞাপন conversion হারায়।
+- Held অর্ডারের OTP রিলিজের পর আর পাঠানো হয় না; ল্যান্ডিং-পেজ conversion attribution রিলিজের পর ফেরত আসে না।
+- Abandoned checkout আগের মতোই অর্ডার তৈরির সময় `converted` হয় (নাহলে সেলার ইতিমধ্যে অর্ডার-করা কাস্টমারকে recovery মেসেজ পাঠাত)।
+- Facebook CAPI/OTP/অ্যাট্রিবিউশনের এই ঘাটতি চাইলে ভবিষ্যতে ip/ua সেভ করে পূরণ করা যায়।
+
+### Test coverage
+`HeldOrdersTest` (১০টা): স্বাভাবিক শপে হোল্ড নয়; expired-এ side-effect ছাড়া held + COD জোর + স্টক অপরিবর্তিত + কোনো job queue হয়নি; সেলারের কাছে hidden কিন্তু কাস্টমারের থ্যাংক-ইউ পেজ কাজ করে + banner কাউন্ট; অনলাইন চ্যানেল খালি/`cod_enabled` true; ডিজিটাল অর্ডার `422`; স্টোরফ্রন্ট অর্ডারও held; রিনিউতে release + bookkeeping রিপ্লে; ৭ দিনের পুরনো release হয় না ও purge হয়; `mySubscription` lazy release; অর্ডার নম্বর কলিশন নেই। Full suite: বেসলাইনের ৮১ ফেইলিওরের সাথে হুবহু ডিফ (রিগ্রেশন নেই), ৬৭৯ পাস।

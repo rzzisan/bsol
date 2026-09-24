@@ -29,6 +29,9 @@ class LandingPageOrderService
             $shopUserIds = $pageOwner?->shopUserIds() ?? [$page->user_id];
             $subtotal = 0;
             $landingProducts = $page->products->keyBy('product_id');
+            // Shop's subscription expired — store the order but keep it
+            // hidden from the seller until renewal (HeldOrderService).
+            $held = app(HeldOrderService::class)->ownerIsLapsed($shopOwnerId);
 
             $order = Order::create([
                 'user_id' => $shopOwnerId,
@@ -51,7 +54,9 @@ class LandingPageOrderService
                 // pick doesn't pre-mark the order paid, it just tells the
                 // thank-you page which payment step to show next. See
                 // online_payment_context.md.
-                'payment_method' => $validated['payment_method'] ?? 'cod',
+                // Online payment is switched off while held (nobody could
+                // verify/confirm it), so the order is plain COD.
+                'payment_method' => $held ? 'cod' : ($validated['payment_method'] ?? 'cod'),
                 'payment_status' => 'due',
                 'shipping_charge' => (float) ($validated['shipping_charge'] ?? data_get($page->content, 'shipping.inside_dhaka', 80)),
                 'discount' => 0,
@@ -62,6 +67,10 @@ class LandingPageOrderService
                 'fraud_score' => 0,
                 'risk_level' => 'low',
             ]);
+
+            if ($held) {
+                app(HeldOrderService::class)->hold($order);
+            }
 
             foreach ($lineItems as $item) {
                 $productId = (int) $item['product_id'];
@@ -120,15 +129,20 @@ class LandingPageOrderService
                 'changed_by' => null,
             ]);
 
-            // Link recent visits to this order for conversion tracking
-            $this->linkVisitsToOrder($order, $page);
+            // A held order skips all of this (attribution, customer record,
+            // accounting) — HeldOrderService::release() replays the
+            // customer/accounting part on renewal.
+            if (! $held) {
+                // Link recent visits to this order for conversion tracking
+                $this->linkVisitsToOrder($order, $page);
 
-            Customer::syncFromOrder($order);
-            PhoneIntelCache::bump($order->customer_phone);
+                Customer::syncFromOrder($order);
+                PhoneIntelCache::bump($order->customer_phone);
 
-            $accounting = app(AccountingService::class);
-            $accounting->onOrderCreated($order);
-            $accounting->onCourierChargeUpdated($order);
+                $accounting = app(AccountingService::class);
+                $accounting->onOrderCreated($order);
+                $accounting->onCourierChargeUpdated($order);
+            }
 
             return $order->fresh(['items']);
         });

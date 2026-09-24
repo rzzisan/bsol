@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SubscriptionPackage;
 use App\Models\SubscriptionPayment;
+use App\Services\HeldOrderService;
 use App\Services\InvoicePdfService;
 use App\Services\SubscriptionInvoiceService;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,7 @@ class SubscriptionController extends Controller
     public function __construct(
         private readonly SubscriptionInvoiceService $invoiceService,
         private readonly InvoicePdfService $invoicePdfService,
+        private readonly HeldOrderService $heldOrders,
     ) {}
 
     public function plans(): JsonResponse
@@ -61,6 +63,13 @@ class SubscriptionController extends Controller
     {
         $user = auth()->user()->load('subscriptionPackage');
 
+        // Safety net for renewal paths that don't go through
+        // SubscriptionActivationService (admin editing the dates, a failed
+        // release): once the plan is live again, surface any held orders.
+        if (! $user->isSubscriptionExpired()) {
+            $this->heldOrders->release($user);
+        }
+
         $daysLeft = $user->subscription_ends_at
             ? max(0, now()->diffInDays($user->subscription_ends_at, false))
             : null;
@@ -86,6 +95,10 @@ class SubscriptionController extends Controller
                 'days_left' => $daysLeft,
                 'remaining' => $remaining,
                 'is_expired' => $user->isSubscriptionExpired(),
+                // Orders customers placed while expired, hidden until renewal
+                // (subscription_billing_context.md §13).
+                'held_orders_count' => $this->heldOrders->heldCount($user->id),
+                'held_orders_expire_at' => $this->heldOrders->oldestExpiresAt($user->id),
                 'recent_payments' => $user->subscriptionPayments()
                     ->with('package:id,name,slug')
                     ->latest()

@@ -48,6 +48,8 @@ class SupportDiagnosticsService
             'abandoned_checkouts_last_7_days' => $recentAbandonedCheckouts, // >0 = real traffic is reaching checkout but not completing (different cause than zero traffic)
             'subscription_status' => $user->subscription_status,
             'subscription_expired' => $user->isSubscriptionExpired(),
+            // >0 = customers ARE ordering but the orders are hidden until the seller renews (HeldOrderService) — the real answer to "no new orders".
+            'held_orders_waiting_for_renewal' => app(\App\Services\HeldOrderService::class)->heldCount($user->shopOwnerId()),
         ];
     }
 

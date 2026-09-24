@@ -276,6 +276,27 @@ class LandingPageController extends Controller
             }
         }
 
+        // Digital fulfillment is triggered by a verified online payment, and
+        // online payment is off while the shop's subscription is expired
+        // (held orders are plain COD — see HeldOrderService), so a digital
+        // order could never be completed. Refuse it up front.
+        if (
+            $productTypes->first() === \App\Models\Product::TYPE_DIGITAL
+            && app(\App\Services\HeldOrderService::class)->ownerIsLapsed(
+                $page->user?->shopOwnerId() ?? $page->user_id
+            )
+        ) {
+            $message = $language === 'en'
+                ? 'This shop is temporarily unable to sell digital products. Please try again later.'
+                : 'এই শপ সাময়িকভাবে ডিজিটাল প্রোডাক্ট বিক্রি করতে পারছে না। পরে আবার চেষ্টা করুন।';
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+                'errors' => ['items' => [$message]],
+            ], 422);
+        }
+
         $order = app(LandingPageOrderService::class)->create($page, $validated, $lineItems, $resolvedFields);
 
         // Checkout submit is same-origin on the seller's own subdomain, so
@@ -294,7 +315,9 @@ class LandingPageController extends Controller
         // payment channel (bkash/nagad/rocket) already proves real intent
         // by sending real money and submitting a TrxID, so there's no
         // second verification gate needed on top. See online_payment_context.md.
-        if ($order->payment_method === 'cod') {
+        // Held orders (shop subscription expired) skip the OTP SMS — it would
+        // spend the seller's SMS credit on an order they can't see yet.
+        if ($order->payment_method === 'cod' && $order->held_at === null) {
             app(CheckoutOtpService::class)->maybeSendForOrder($page->content['settings'] ?? [], $order);
         }
         app(AbandonedCheckoutService::class)->convertMatching(
@@ -311,15 +334,19 @@ class LandingPageController extends Controller
         // wordpress_connect_context.md. No-ops for sellers with no enabled
         // tracking_destinations row (T2 — TrackingIngestService checks this,
         // not the retired facebook_pixel_settings table).
-        SendFacebookCapiPurchaseEventJob::dispatch(
-            $order->id,
-            $request->ip(),
-            $request->userAgent(),
-            // Non-null in practice — publishing requires a subdomain — but the
-            // job's signature is strict, so don't let a draft edge case fatal
-            // a real checkout.
-            $this->publicUrlFor($page) ?? FrontendUrl::platform(),
-        );
+        // Not fired for a held order — reporting a conversion the seller
+        // can't see yet would still feed their ad account.
+        if ($order->held_at === null) {
+            SendFacebookCapiPurchaseEventJob::dispatch(
+                $order->id,
+                $request->ip(),
+                $request->userAgent(),
+                // Non-null in practice — publishing requires a subdomain — but the
+                // job's signature is strict, so don't let a draft edge case fatal
+                // a real checkout.
+                $this->publicUrlFor($page) ?? FrontendUrl::platform(),
+            );
+        }
 
         return response()->json([
             'success' => true,

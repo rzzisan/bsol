@@ -65,6 +65,12 @@ class OnlinePaymentController extends Controller
             ));
         }
 
+        // Expired shop: online channels are already empty (OnlinePaymentService);
+        // COD is the only way left to order, so it can't be page-disabled.
+        if (app(\App\Services\HeldOrderService::class)->ownerIsLapsed($ownerId)) {
+            $codEnabled = true;
+        }
+
         return response()->json([
             'success' => true,
             'data' => [

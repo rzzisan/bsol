@@ -2,6 +2,8 @@
 আংশিক পড়ে কাজ শুরু করা হলে সেটি invalid execution হিসেবে গণ্য হবে।
 # Hybrid Stack Server Context
 
+Last updated: 2026-09-24 — **§৩৩: মেয়াদ-শেষ সেলারের held orders** — পাবলিক ল্যান্ডিং/স্টোরফ্রন্ট অর্ডার স্টোর হয় কিন্তু সেলার দেখে না, রিনিউ করলে প্রকাশ পায় (৭ দিন ধরে রাখা, স্টক কমে না)। বিস্তারিত `subscription_billing_context.md §13`। Older entries kept as-is:
+
 Last updated: 2026-08-10 — **§৩১ যোগ হয়েছে: Staff/Team sub-account role এখন মাস্টার mandatory rule হিসেবে যোগ করা হয়েছে — নতুন যেকোনো ফিচার/মডিউল তৈরির আগে অবশ্যই পড়তে হবে** (সম্পূর্ণ reference: `staff_team_role_context.md`)। Older entries kept as-is:
 
 Last updated: 2026-07-28 — Supervisor fully removed from frontend management (§28), landing pages bilingual bn/en support + dashboard-wide instant language-switch fix via LocaleContext (§29, §30).
@@ -1312,3 +1314,10 @@ SaaS-এর URL কাঠামো বদলে গেছে। **প্রত�
 - **`SESSION_DOMAIN` কখনো `.zyrotechbd.com` করা যাবে না**, আর auth টোকেন কখনো `localStorage` থেকে কুকিতে সরানো যাবে না — কুকি ডোমেইন-স্কোপড, `localStorage` origin-স্কোপড; এই পার্থক্যটাই ক্রস-সেলার টোকেন চুরি অসম্ভব করে রাখে।
 - **কোনো অ্যাকাউন্ট নিজের নয় এমন সাবডোমেইনে লগইন করতে পারবে না**, এবং সেলার সাবডোমেইনে কখনো লগইন ফর্ম রেন্ডার করা যাবে না। admin সাপোর্টের একমাত্র পথ প্ল্যাটফর্ম origin থেকে impersonation (Admin → Active Customers → "দেখুন")।
 - **`x-bsol-shop-subdomain` কখনো ক্লায়েন্ট থেকে গ্রহণ করা যাবে না** — proxy সেট করে, proxy-ই ইনবাউন্ড কপি মুছে দেয়।
+
+
+## ৩৩. মেয়াদ-শেষ সেলারের "held orders" — অর্ডার স্টোর হয়, সেলার দেখে না, রিনিউ করলে প্রকাশ পায় ✅ সম্পন্ন (২০২৬-০৯-২৪)
+
+সাবস্ক্রিপশন এক্সপায়ার্ড শপে পাবলিক ল্যান্ডিং পেজ/স্টোরফ্রন্ট থেকে আসা অর্ডার এখন `orders.held_at` সেট করে স্টোর হয়, `Order`-এর নতুন global scope `HeldOrderScope` অথেন্টিকেটেড (সেলার/স্টাফ) রিকোয়েস্ট থেকে লুকিয়ে রাখে (পাবলিক থ্যাংক-ইউ পেজ/job/console প্রভাবিত না); সেলার ড্যাশবোর্ডে শুধু "আপনার N টি নতুন অর্ডার প্লেস হয়েছে — রিনিউ করুন" ব্যানার দেখে। **৭ দিন** ধরে রাখা হয় (রিনিউ করলে `SubscriptionActivationService::activate()`/`mySubscription()` release করে; না করলে দৈনিক `app:purge-held-orders` মুছে দেয়), **স্টক কমে না**। হোল্ড অবস্থায় Customer রেকর্ড, COD অ্যাকাউন্টিং, OTP SMS, Facebook CAPI ইভেন্ট, অনলাইন পেমেন্ট (ফলে অর্ডার জোর-COD) ও ডিজিটাল অর্ডার বন্ধ। বিস্তারিত ডিজাইন, লুকানোর কৌশল (কোন raw query-তে আলাদা ফিল্টার লাগল), ট্রেড-অফ ও টেস্ট: `subscription_billing_context.md §13`।
+
+**সেলারের মেয়াদ-শেষ আচরণের পূর্ণ চিত্র (আপডেটেড):** (১) `active_subscription` গেট সব লেখা-রুটে `402` (delivered/returned/cancelled স্ট্যাটাস ছাড়া; বিলিং/সাপোর্ট রুট সবসময় খোলা), (২) পাবলিক অর্ডার held (এই সেকশন), (৩) ডেটা কখনো মুছে না (held অর্ডার ছাড়া, ৭ দিন পর)।

@@ -39,6 +39,8 @@ class StorefrontOrderService
     {
         return DB::transaction(function () use ($shopOwnerId, $shopUserIds, $validated, $lineItems, $products) {
             $subtotal = 0;
+            // See LandingPageOrderService::create() — held while expired.
+            $held = app(HeldOrderService::class)->ownerIsLapsed($shopOwnerId);
 
             $order = Order::create([
                 'user_id' => $shopOwnerId,
@@ -54,7 +56,7 @@ class StorefrontOrderService
                 'source' => 'storefront',
                 'source_ref' => null,
                 'status' => 'pending',
-                'payment_method' => $validated['payment_method'] ?? 'cod',
+                'payment_method' => $held ? 'cod' : ($validated['payment_method'] ?? 'cod'),
                 'payment_status' => 'due',
                 'shipping_charge' => (float) ($validated['shipping_charge'] ?? 0),
                 'discount' => 0,
@@ -64,6 +66,10 @@ class StorefrontOrderService
                 'fraud_score' => 0,
                 'risk_level' => 'low',
             ]);
+
+            if ($held) {
+                app(HeldOrderService::class)->hold($order);
+            }
 
             foreach ($lineItems as $item) {
                 $productId = (int) $item['product_id'];
@@ -119,12 +125,14 @@ class StorefrontOrderService
                 'changed_by' => null,
             ]);
 
-            Customer::syncFromOrder($order);
-            PhoneIntelCache::bump($order->customer_phone);
+            if (! $held) {
+                Customer::syncFromOrder($order);
+                PhoneIntelCache::bump($order->customer_phone);
 
-            $accounting = app(AccountingService::class);
-            $accounting->onOrderCreated($order);
-            $accounting->onCourierChargeUpdated($order);
+                $accounting = app(AccountingService::class);
+                $accounting->onOrderCreated($order);
+                $accounting->onCourierChargeUpdated($order);
+            }
 
             return $order->fresh(['items']);
         });

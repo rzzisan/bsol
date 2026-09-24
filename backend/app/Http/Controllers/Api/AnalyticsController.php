@@ -86,6 +86,7 @@ class AnalyticsController extends Controller
             ->join('products', 'products.id', '=', DB::raw('COALESCE(order_items.product_id, product_variants.product_id)'))
             ->whereIn('orders.user_id', $userId)
             ->whereNull('orders.deleted_at')
+            ->whereNull('orders.held_at')
             ->whereDate('orders.created_at', '>=', $from)
             ->whereDate('orders.created_at', '<=', $to)
             ->selectRaw("
@@ -211,6 +212,7 @@ class AnalyticsController extends Controller
             ->join('orders', 'orders.id', '=', 'order_status_logs.order_id')
             ->whereIn('orders.user_id', $userId)
             ->whereNull('orders.deleted_at')
+            ->whereNull('orders.held_at')
             ->where('order_status_logs.new_status', 'delivered')
             ->whereNotNull('orders.courier_name')
             ->whereDate('orders.created_at', '>=', $from)

@@ -1,5 +1,7 @@
 # F-Commerce SaaS — Module Context
 
+Last updated: 2026-09-24 — **§29: মেয়াদ-শেষ সেলারের held orders — ✅ সম্পন্ন ও লাইভ।** বিস্তারিত `subscription_billing_context.md §13`। Older entries kept as-is:
+
 Last updated: 2026-08-22 (৪) — **§23: Bulk/CSV Order Import — ✅ সম্পন্ন ও লাইভ, প্লাস একটা real cross-shop `order_number` collision বাগ ফিক্স (প্ল্যাটফর্ম-ওয়াইড, শুধু এই ফিচারের না)।** টেমপ্লেট → preview → commit ফ্লো, নতুন `OrderBulkImportService`। বিস্তারিত §23, `feature_roadmap_context.md`। Older entries kept as-is:
 
 Last updated: 2026-08-22 (৩) — **§22: Onboarding "Getting Started" Checklist — ✅ সম্পন্ন ও লাইভ, অডিটের P1 প্রায়োরিটি বন্ধ হলো।** dashboard-এ dismissible checklist (প্রোফাইল/পণ্য/কুরিয়ার/পেমেন্ট, সব live-derived) + opt-in ডেমো-পণ্য লোডার (সবসময় inactive, স্টোরফ্রন্ট/অর্ডার থেকে verified-absent)। বিস্তারিত `onboarding_checklist_context.md`, `feature_roadmap_context.md`, `production_audit_report_context.md §৭`। Older entries kept as-is:
@@ -1336,3 +1338,10 @@ Backend-vs-frontend gap অডিটে ধরা পড়েছিল: `/admin
 ফিক্স: `max_staff` কে validation whitelist-এ যোগ করা হয়েছে (দুই মেথডেই), `features.*` validation যোগ। Admin ফর্মে (create + edit দুই জায়গায়) `max_staff` নাম্বার ইনপুট আর `features`-এর জন্য line-per-bullet টেক্সটএরিয়া (সেলার সাইডে যেভাবে array-কে সরাসরি `<li>` হিসেবে রেন্ডার করে, ঠিক সেভাবেই — কোনো key-mapping নেই বলে এই ফরম্যাটই সবচেয়ে সরল ও সঠিক)। প্যাকেজ টেবিলে নতুন "ম্যাক্স স্টাফ" কলাম।
 
 **পরবর্তী ধাপ:** Tracking boost addon (§9.6 ধাপ ৬, শেষ ধাপ)।
+
+
+## 29. মেয়াদ-শেষ সেলারের "held orders" — অর্ডার স্টোর হয়, সেলার দেখে না, রিনিউ করলে প্রকাশ পায় ✅ সম্পন্ন (২০২৬-০৯-২৪)
+
+সাবস্ক্রিপশন এক্সপায়ার্ড শপে পাবলিক ল্যান্ডিং পেজ/স্টোরফ্রন্ট থেকে আসা অর্ডার এখন `orders.held_at` সেট করে স্টোর হয়, `Order`-এর নতুন global scope `HeldOrderScope` অথেন্টিকেটেড (সেলার/স্টাফ) রিকোয়েস্ট থেকে লুকিয়ে রাখে (পাবলিক থ্যাংক-ইউ পেজ/job/console প্রভাবিত না); সেলার ড্যাশবোর্ডে শুধু "আপনার N টি নতুন অর্ডার প্লেস হয়েছে — রিনিউ করুন" ব্যানার দেখে। **৭ দিন** ধরে রাখা হয় (রিনিউ করলে `SubscriptionActivationService::activate()`/`mySubscription()` release করে; না করলে দৈনিক `app:purge-held-orders` মুছে দেয়), **স্টক কমে না**। হোল্ড অবস্থায় Customer রেকর্ড, COD অ্যাকাউন্টিং, OTP SMS, Facebook CAPI ইভেন্ট, অনলাইন পেমেন্ট (ফলে অর্ডার জোর-COD) ও ডিজিটাল অর্ডার বন্ধ। বিস্তারিত ডিজাইন, লুকানোর কৌশল (কোন raw query-তে আলাদা ফিল্টার লাগল), ট্রেড-অফ ও টেস্ট: `subscription_billing_context.md §13`।
+
+**সেলারের মেয়াদ-শেষ আচরণের পূর্ণ চিত্র (আপডেটেড):** (১) `active_subscription` গেট সব লেখা-রুটে `402` (delivered/returned/cancelled স্ট্যাটাস ছাড়া; বিলিং/সাপোর্ট রুট সবসময় খোলা), (২) পাবলিক অর্ডার held (এই সেকশন), (৩) ডেটা কখনো মুছে না (held অর্ডার ছাড়া, ৭ দিন পর)।

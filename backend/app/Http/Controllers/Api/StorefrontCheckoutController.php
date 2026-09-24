@@ -119,6 +119,16 @@ class StorefrontCheckoutController extends Controller
                 );
         }
 
+        // See LandingPageController::publicSubmitOrder() — no digital orders
+        // while the shop's subscription is expired (no online payment then).
+        if (
+            $productTypes->first() === Product::TYPE_DIGITAL
+            && app(\App\Services\HeldOrderService::class)->ownerIsLapsed($ownerId)
+        ) {
+            $message = 'এই শপ সাময়িকভাবে ডিজিটাল প্রোডাক্ট বিক্রি করতে পারছে না। পরে আবার চেষ্টা করুন।';
+            return response()->json(['success' => false, 'message' => $message, 'errors' => ['items' => [$message]]], 422);
+        }
+
         $order = app(StorefrontOrderService::class)->create($ownerId, $shopUserIds, $validated, $lineItems, $products->all());
 
         // Checkout is same-origin on the seller's own subdomain, so Meta's
@@ -136,12 +146,15 @@ class StorefrontCheckoutController extends Controller
         // (resolves the seller's tracking_destinations from Order.user_id,
         // never assumed landing_page) — same dispatch call landing-page
         // checkout already uses, no job changes needed.
-        \App\Jobs\SendFacebookCapiPurchaseEventJob::dispatch(
-            $order->id,
-            $request->ip(),
-            $request->userAgent(),
-            \App\Support\FrontendUrl::forUserPath($order->user, "order/{$order->public_token}"),
-        );
+        // Skipped for a held order (subscription expired) — see LandingPageController.
+        if ($order->held_at === null) {
+            \App\Jobs\SendFacebookCapiPurchaseEventJob::dispatch(
+                $order->id,
+                $request->ip(),
+                $request->userAgent(),
+                \App\Support\FrontendUrl::forUserPath($order->user, "order/{$order->public_token}"),
+            );
+        }
 
         return response()->json([
             'success' => true,

@@ -55,6 +55,16 @@ class SubscriptionActivationService
             'subscription_ends_at' => $newEndsAt,
         ]);
 
+        // Orders customers placed while the subscription was expired become
+        // visible now (HeldOrderService, subscription_billing_context.md §13).
+        // Best-effort — a failure here must not undo a paid activation, and
+        // mySubscription() retries the release on the next dashboard load.
+        try {
+            app(HeldOrderService::class)->release($user);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         // Storefront add-on (§9.2-D) — co-terminous with the main cycle,
         // kept in sync here on every renewal/upgrade. No-op if the seller
         // never had it, or it already lapsed.
