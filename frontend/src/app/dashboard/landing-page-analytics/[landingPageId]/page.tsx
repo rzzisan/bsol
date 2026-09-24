@@ -245,7 +245,7 @@ export default function LandingPageAnalyticsDashboard() {
             <div className="bg-[var(--surface)] p-6 rounded-lg border border-[var(--border)] overflow-hidden">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Daily Statistics</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="catv-cards w-full text-sm">
                   <thead className="bg-[var(--surface-soft)] text-[var(--muted)]">
                     <tr className="border-b border-[var(--border)]">
                       <th className="text-left py-2 px-4 font-medium">Date</th>
@@ -308,7 +308,7 @@ export default function LandingPageAnalyticsDashboard() {
             <div className="bg-[var(--surface)] p-6 rounded-lg border border-[var(--border)] overflow-hidden">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Recent Visitors</h2>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="catv-cards w-full text-sm">
                   <thead className="bg-[var(--surface-soft)] text-[var(--muted)]">
                     <tr className="border-b border-[var(--border)]">
                       <th className="text-left py-2 px-4 font-medium">IP Address</th>

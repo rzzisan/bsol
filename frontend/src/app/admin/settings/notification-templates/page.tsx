@@ -679,7 +679,7 @@ export default function NotificationTemplatesPage() {
 
         <article className="catv-panel overflow-hidden xl:col-span-7">
           <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
+            <table className="catv-cards min-w-full border-collapse text-sm">
               <thead className="bg-[var(--accent)] text-white">
                 <tr>
                   <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">Name</th>

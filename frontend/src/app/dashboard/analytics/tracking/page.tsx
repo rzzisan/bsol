@@ -329,7 +329,7 @@ export default function TrackingLogPage() {
             <p className="text-sm text-[var(--muted)]">{tr.noEvents}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse text-xs">
+              <table className="catv-cards min-w-full border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-left text-[var(--muted)]">
                     <th className="px-2 py-2 font-medium">{tr.colEvent}</th>

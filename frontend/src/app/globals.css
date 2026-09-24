@@ -792,3 +792,69 @@ a {
     transition: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------
+   Table -> card layout on phones. Opt in with class `catv-cards` on the
+   <table>; components/table-card-labels.tsx stamps each <td> with the
+   matching column header as data-label. Two value columns per card;
+   the first cell (usually the name/title), cells without a header
+   (actions/checkbox) and colspan rows (loading/empty) span the full width.
+   Above 767px nothing changes — the normal table renders.
+   --------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  table.catv-cards,
+  table.catv-cards tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  table.catv-cards thead {
+    display: none;
+  }
+
+  table.catv-cards tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 0.75rem;
+    margin: 0.5rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  table.catv-cards td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  table.catv-cards td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 1px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  table.catv-cards td[data-label=""]::before,
+  table.catv-cards td:not([data-label])::before {
+    display: none;
+  }
+
+  table.catv-cards td:first-child,
+  table.catv-cards td[data-label=""],
+  table.catv-cards td[colspan] {
+    grid-column: 1 / -1;
+  }
+
+  table.catv-cards td[colspan] {
+    text-align: center;
+  }
+}

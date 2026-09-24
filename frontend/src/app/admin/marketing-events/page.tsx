@@ -360,7 +360,7 @@ export default function AdminMarketingEventsPage() {
             <p className="text-sm text-[var(--muted)]">{t.noChannels}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse text-xs">
+              <table className="catv-cards min-w-full border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-left text-[var(--muted)]">
                     <th className="px-2 py-2 font-medium">{t.colChannel}</th>
@@ -396,7 +396,7 @@ export default function AdminMarketingEventsPage() {
             <p className="text-sm text-[var(--muted)]">{t.noCampaigns}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse text-xs">
+              <table className="catv-cards min-w-full border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-left text-[var(--muted)]">
                     <th className="px-2 py-2 font-medium">{t.colCampaign}</th>
@@ -476,7 +476,7 @@ export default function AdminMarketingEventsPage() {
             <p className="text-sm text-[var(--muted)]">{t.noEvents}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse text-xs">
+              <table className="catv-cards min-w-full border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-left text-[var(--muted)]">
                     <th className="px-2 py-2 font-medium">{t.colEvent}</th>

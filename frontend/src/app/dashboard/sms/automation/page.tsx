@@ -445,7 +445,7 @@ export default function Page() {
 
       <section className="catv-panel mb-6 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="catv-cards min-w-full text-sm">
             <thead className="border-b border-[var(--border)] text-left text-xs uppercase text-[var(--muted)]">
               <tr>
                 <th className="px-3 py-2">{t.fields.name}</th>

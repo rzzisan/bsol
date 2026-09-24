@@ -270,7 +270,7 @@ export default function AdminBillingPage() {
         {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
 
         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse text-sm">
+          <table className="catv-cards min-w-full border-collapse text-sm">
             <thead className="bg-[var(--accent)] text-white">
               <tr>
                 <th className="border border-[var(--border)] px-3 py-2 text-left font-semibold">{t.table.user}</th>

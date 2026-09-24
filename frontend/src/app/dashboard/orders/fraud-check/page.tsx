@@ -327,7 +327,7 @@ export default function FraudCheckPage() {
                   <p className="text-xs text-[var(--muted)]">{txt.noOrders}</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
+                    <table className="catv-cards w-full text-xs">
                       <thead>
                         <tr className="border-b border-[var(--border)] text-left text-[var(--muted)] uppercase">
                           <th className="pb-2 pr-4">{txt.orderNo}</th>

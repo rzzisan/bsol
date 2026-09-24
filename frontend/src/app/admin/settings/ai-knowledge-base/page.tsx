@@ -287,7 +287,7 @@ export default function AiKnowledgeBasePage() {
           {loadingList && <p className="text-center text-xs text-[var(--muted)]">{t.loading}</p>}
           {!loadingList && articles.length === 0 && <p className="text-center text-xs text-[var(--muted)]">{t.empty}</p>}
           {!loadingList && articles.length > 0 && (
-            <table className="min-w-full border-collapse text-sm">
+            <table className="catv-cards min-w-full border-collapse text-sm">
               <thead className="bg-[var(--accent)] text-white">
                 <tr>
                   <th className="px-3 py-2 text-left">{t.colTitle}</th>

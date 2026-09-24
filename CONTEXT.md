@@ -1328,7 +1328,7 @@ SaaS-এর URL কাঠামো বদলে গেছে। **প্রত�
 বিস্তারিত ফিক্স-তালিকা: `pre_launch_polish_context.md` §থ ব্যাচ ৪। নতুন ড্যাশবোর্ড/অ্যাডমিন UI লেখার সময় বাধ্যতামূলক নিয়ম:
 
 - **মডাল/ডায়ালগ:** ওভারলে `fixed inset-0 z-50 flex items-center justify-center p-4`, ভেতরের কার্ডে সবসময় `max-h-[90dvh] overflow-y-auto` ও `p-4 sm:p-6`। (এর অভাবে লম্বা ফর্ম ফোনে উপর-নিচ কেটে যায়।)
-- **টেবিল:** ৫+ কলামের বা ইনলাইন-এডিট টেবিল ফোনে পড়ার অযোগ্য — `md:hidden` কার্ড-লিস্ট + `hidden md:block` টেবিল জোড়া দিন (উদাহরণ: `components/orders/order-item-grid.tsx`, `components/products/variant-table.tsx`)। ন্যূনতম: `overflow-x-auto` wrapper।
+- **টেবিল:** নতুন ডেটা-টেবিলে `<table className="catv-cards …">` দিন — ফোনে (`≤767px`) স্বয়ংক্রিয়ভাবে কার্ডে রূপ নেয় (লেবেল `<th>` থেকে `components/table-card-labels.tsx` বসায়; `<thead>` বাধ্যতামূলক, হেডারবিহীন অ্যাকশন কলাম পূর্ণ প্রস্থে যায়)। ইনলাইন-এডিট/ইনপুটওয়ালা জটিল টেবিলে হাতে-লেখা `md:hidden` কার্ড + `hidden md:block` টেবিল (উদাহরণ: `components/orders/order-item-grid.tsx`, `components/products/variant-table.tsx`)। সবসময় `overflow-x-auto` wrapper রাখুন।
 - **গাটার:** পেজের টপ-লেভেল `.catv-panel`/section-এ `mx-*` দেবেন না — `.catv-content` (`globals.css`) ইতিমধ্যে padding দেয় (ফোনে `0.75rem`, নিচে ফ্লোটিং সাপোর্ট বাটনের জন্য `6rem`)।
 - **ইনপুট:** ফোনে (`≤640px`) সব `input/select/textarea` গ্লোবালি ≥16px (iOS ফোকাস-জুম এড়াতে) — পেজ-লেভেলে `text-xs` দিয়ে এটা ভাঙার চেষ্টা করবেন না।
 - **হেডার রো** (শিরোনাম + বাটন): `flex flex-wrap items-center justify-between gap-2`।

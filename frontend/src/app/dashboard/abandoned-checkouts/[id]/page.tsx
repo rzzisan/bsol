@@ -357,7 +357,7 @@ export default function AbandonedCheckoutDetailPage() {
               <p className="py-6 text-center text-sm text-[var(--muted)]">{txt.noItems}</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="catv-cards w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--muted)] uppercase">
                       <th className="px-3 py-2">{txt.itemName}</th>

@@ -247,7 +247,7 @@ function LandingPagesContent() {
           <div className="p-5 text-sm text-[var(--muted)]">{t.noPages}</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="catv-cards w-full text-sm">
               <thead className="bg-[var(--surface-soft)] text-left text-[var(--muted)]">
                 <tr>
                   <th className="px-4 py-3 font-medium">ID</th>

@@ -219,7 +219,7 @@ export default function CollectionHistoryPage() {
 
       {/* Table */}
       <div className="catv-panel overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="catv-cards w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--muted)] uppercase">
               <th className="px-3 py-3">{txt.colDate}</th>
