@@ -579,6 +579,9 @@ Addon purchase-এর পুরো পেমেন্ট পাইপলাই�
 - **মুছে ফেলা:** নতুন `app:purge-held-orders` (প্রতিদিন ০৩:৪৫) — `held_at` ৭ দিনের বেশি পুরনো অর্ডার `forceDelete` (items/status-log ইত্যাদি DB cascade)।
 - **ব্যানার:** `GET /subscription/me` এখন `held_orders_count` ও `held_orders_expire_at` (সবচেয়ে পুরনো held অর্ডার কবে মুছবে) দেয়; `SubscriptionBanner` মেয়াদ-শেষ ব্যানারের ভেতরে "আপনার N টি নতুন অর্ডার প্লেস হয়েছে" ব্লক দেখায়। `SupportDiagnosticsService`-এ `held_orders_waiting_for_renewal` যোগ (সাপোর্ট AI যেন "অর্ডার আসছে না" উত্তর না দেয়)।
 
+### Leads (abandoned checkouts)-ও held (২০২৬-০৯-২৪, ফলো-আপ)
+মেয়াদ-শেষ শপে ল্যান্ডিং পেজ থেকে ক্যাপচার হওয়া abandoned checkout (লিড) ক্যাপচার চলতেই থাকে, কিন্তু `abandoned_checkouts.held_at` (migration `2026_09_24_110000`) সেট হয় — `AbandonedCheckoutService::capture()` এ `ownerIsLapsed` চেক। `HeldOrderCheckoutScope` এখন দুটো জিনিস লুকায়: (ক) `held_at` সেট থাকা লিড, (খ) held অর্ডারে রূপান্তরিত checkout। রিনিউতে `release()` ৭ দিনের ভেতরের লিড আনহাইড করে; `purgeExpired()` ৭ দিনের পুরনো held লিড মুছে। `GET /subscription/me` এ `held_leads_count` যোগ, ব্যানার "N টি নতুন অর্ডার এবং M টি নতুন লিড" দেখায়। লিডের `user_id` পেজ-ক্রিয়েটর (স্টাফও হতে পারে) — তাই `shopUserIds()` দিয়ে খোঁজা হয়। **স্কোপের বাইরে:** Facebook Messenger লিড (`dashboard/leads`, Meta webhook থেকে আসে) — এগুলো hold করা হয়নি।
+
 ### জেনেসুনে মেনে নেওয়া ট্রেড-অফ
 - Held অর্ডারের Facebook CAPI ইভেন্ট রিলিজের সময় পুনরায় পাঠানো হয় না (IP/user-agent সেভ করা নেই) — বিজ্ঞাপন conversion হারায়।
 - Held অর্ডারের OTP রিলিজের পর আর পাঠানো হয় না; ল্যান্ডিং-পেজ conversion attribution রিলিজের পর ফেরত আসে না।

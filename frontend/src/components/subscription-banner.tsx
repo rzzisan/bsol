@@ -6,6 +6,8 @@ interface SubscriptionBannerProps {
   isExpired: boolean;
   /** Customer orders placed while expired, hidden until renewal (backend HeldOrderService). */
   heldOrders?: number;
+  /** Abandoned-checkout leads captured while expired, also hidden until renewal. */
+  heldLeads?: number;
   heldExpireAt?: string | null;
   locale?: "en" | "bn";
 }
@@ -19,9 +21,12 @@ const text = {
     expiringTitle: (days: number) => `আপনার প্ল্যানের মেয়াদ ${days} দিনের মধ্যে শেষ হবে`,
     expiringMessage: "সেবা বিঘ্নিত না হতে এখনই রিনিউ করুন।",
     renewButton: "প্ল্যান দেখুন",
-    heldTitle: (n: number) => `আপনার ${n}টি নতুন অর্ডার প্লেস হয়েছে`,
+    heldTitle: (orders: number, leads: number) =>
+      [orders > 0 ? `${orders}টি নতুন অর্ডার প্লেস হয়েছে` : "", leads > 0 ? `${leads}টি নতুন লিড এসেছে` : ""]
+        .filter(Boolean)
+        .join(" এবং "),
     heldMessage: (date: string | null) =>
-      `দেখতে হলে প্ল্যান রিনিউ করুন।${date ? ` ${date}-এর মধ্যে রিনিউ না করলে এই অর্ডারগুলো মুছে যাবে।` : ""}`,
+      `দেখতে হলে প্ল্যান রিনিউ করুন।${date ? ` ${date}-এর মধ্যে রিনিউ না করলে এগুলো মুছে যাবে।` : ""}`,
   },
   en: {
     expiredTitle: "Your subscription has expired",
@@ -31,7 +36,10 @@ const text = {
     expiringTitle: (days: number) => `Your plan expires in ${days} day(s)`,
     expiringMessage: "Renew now to avoid any service interruption.",
     renewButton: "View Plans",
-    heldTitle: (n: number) => `You have ${n} new order${n === 1 ? "" : "s"} waiting`,
+    heldTitle: (orders: number, leads: number) =>
+      `You have ${[orders > 0 ? `${orders} new order${orders === 1 ? "" : "s"}` : "", leads > 0 ? `${leads} new lead${leads === 1 ? "" : "s"}` : ""]
+        .filter(Boolean)
+        .join(" and ")} waiting`,
     heldMessage: (date: string | null) =>
       `Renew your plan to view them.${date ? ` Orders not released by ${date} will be deleted.` : ""}`,
   },
@@ -42,6 +50,7 @@ export default function SubscriptionBanner({
   daysLeft,
   isExpired,
   heldOrders = 0,
+  heldLeads = 0,
   heldExpireAt = null,
   locale = "en",
 }: SubscriptionBannerProps) {
@@ -75,9 +84,9 @@ export default function SubscriptionBanner({
         <p className={`mt-1 text-sm ${isExpired ? "text-rose-700 dark:text-rose-200" : "text-amber-700 dark:text-amber-200"}`}>
           {message}
         </p>
-        {isExpired && heldOrders > 0 && (
+        {isExpired && (heldOrders > 0 || heldLeads > 0) && (
           <div className="mt-3 rounded-md bg-rose-100 p-3 dark:bg-rose-900">
-            <p className="font-semibold text-rose-900 dark:text-rose-100">{t.heldTitle(heldOrders)}</p>
+            <p className="font-semibold text-rose-900 dark:text-rose-100">{locale === "bn" ? "আপনার " : ""}{t.heldTitle(heldOrders, heldLeads)}</p>
             <p className="mt-1 text-sm text-rose-800 dark:text-rose-200">{t.heldMessage(heldDate)}</p>
           </div>
         )}

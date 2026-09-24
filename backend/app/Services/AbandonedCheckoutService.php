@@ -48,16 +48,24 @@ class AbandonedCheckoutService
             'last_activity_at' => now(),
         ];
 
+        // Expired shop: keep capturing (so nothing is lost), but hold the lead
+        // hidden until renewal — see HeldOrderService.
+        $held = app(HeldOrderService::class)->ownerIsLapsed($page->user?->shopOwnerId() ?? $page->user_id);
+
         if ($checkout) {
             $checkout->update($attributes);
-
-            return $checkout;
+        } else {
+            $checkout = AbandonedCheckout::create(array_merge($attributes, [
+                'landing_page_id' => $page->id,
+                'session_token' => $data['session_token'],
+            ]));
         }
 
-        return AbandonedCheckout::create(array_merge($attributes, [
-            'landing_page_id' => $page->id,
-            'session_token' => $data['session_token'],
-        ]));
+        if ($held && $checkout->held_at === null) {
+            $checkout->forceFill(['held_at' => now()])->save();
+        }
+
+        return $checkout;
     }
 
     public function resume(LandingPage $page, string $token): ?AbandonedCheckout

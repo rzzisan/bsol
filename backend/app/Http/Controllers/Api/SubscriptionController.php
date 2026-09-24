@@ -98,6 +98,7 @@ class SubscriptionController extends Controller
                 // Orders customers placed while expired, hidden until renewal
                 // (subscription_billing_context.md §13).
                 'held_orders_count' => $this->heldOrders->heldCount($user->id),
+                'held_leads_count' => $this->heldOrders->heldLeadsCount($user->id),
                 'held_orders_expire_at' => $this->heldOrders->oldestExpiresAt($user->id),
                 'recent_payments' => $user->subscriptionPayments()
                     ->with('package:id,name,slug')

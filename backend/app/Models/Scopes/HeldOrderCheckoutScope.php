@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
 
 /**
- * Companion to HeldOrderScope for AbandonedCheckout: a checkout that
+ * Companion to HeldOrderScope for AbandonedCheckout. Hides (a) leads
+ * captured while the shop's subscription was expired (`held_at`), and (b) a checkout that
  * converted into a *held* order (shop subscription expired, see
  * HeldOrderService) must vanish from the seller's abandoned-checkout
  * views too, or it would show up as a "converted" row pointing at an order
@@ -24,6 +25,9 @@ class HeldOrderCheckoutScope implements Scope
         }
 
         $table = $model->getTable();
+
+        // A lead captured while the shop's subscription was expired.
+        $builder->whereNull("{$table}.held_at");
 
         $builder->whereNotExists(function ($q) use ($table) {
             $q->selectRaw('1')

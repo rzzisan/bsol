@@ -521,7 +521,7 @@ export default function UserShell({
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [state, setState] = useState<"loading" | "unauthenticated" | "forbidden" | "ready">("loading");
-  const [subscription, setSubscription] = useState<{ status: string; days_left: number | null; is_expired: boolean; held_orders_count: number; held_orders_expire_at: string | null } | null>(null);
+  const [subscription, setSubscription] = useState<{ status: string; days_left: number | null; is_expired: boolean; held_orders_count: number; held_leads_count: number; held_orders_expire_at: string | null } | null>(null);
   const [facebookLeadsUnread, setFacebookLeadsUnread] = useState(0);
   const [whatsappUnread, setWhatsappUnread] = useState(0);
 
@@ -604,6 +604,7 @@ export default function UserShell({
           days_left: data.data.days_left,
           is_expired: data.data.is_expired,
           held_orders_count: data.data.held_orders_count ?? 0,
+          held_leads_count: data.data.held_leads_count ?? 0,
           held_orders_expire_at: data.data.held_orders_expire_at ?? null,
         });
       } catch {
@@ -813,6 +814,7 @@ export default function UserShell({
             daysLeft={subscription.days_left}
             isExpired={subscription.is_expired}
             heldOrders={subscription.held_orders_count}
+            heldLeads={subscription.held_leads_count}
             heldExpireAt={subscription.held_orders_expire_at}
             locale={locale}
           />

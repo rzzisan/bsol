@@ -280,4 +280,45 @@ class HeldOrdersTest extends TestCase
 
         $this->assertSame(0, AbandonedCheckout::withoutGlobalScopes()->count());
     }
+
+    private function capture(string $session, string $phone = '01799990000')
+    {
+        return $this->postJson("https://shopa.{$this->apex()}/api/public/landing-pages/offer/abandoned-checkout", [
+            'session_token' => $session,
+            'customer_name' => 'Lead',
+            'customer_phone' => $phone,
+        ]);
+    }
+
+    public function test_leads_captured_while_expired_are_hidden_counted_and_released_on_renewal(): void
+    {
+        [$owner, $product] = $this->shop(expired: true);
+
+        $this->capture('lead-1')->assertOk();
+        $this->assertNotNull(AbandonedCheckout::withoutGlobalScopes()->firstOrFail()->held_at);
+
+        Sanctum::actingAs($owner);
+        $this->assertCount(0, $this->getJson('/api/landing/abandoned-checkouts')->assertOk()->json('data'));
+        $me = $this->getJson('/api/subscription/me')->assertOk();
+        $this->assertSame(1, $me->json('data.held_leads_count'));
+
+        $owner->update(['subscription_status' => 'active', 'subscription_ends_at' => now()->addDays(30)]);
+        app(HeldOrderService::class)->release($owner->fresh());
+
+        $this->assertCount(1, $this->getJson('/api/landing/abandoned-checkouts')->assertOk()->json('data'));
+        $this->assertSame(0, $this->getJson('/api/subscription/me')->json('data.held_leads_count'));
+    }
+
+    public function test_leads_of_a_live_shop_are_not_held_and_old_held_leads_are_purged(): void
+    {
+        [$owner, $product] = $this->shop(expired: false);
+        $this->capture('lead-live')->assertOk();
+        $this->assertNull(AbandonedCheckout::withoutGlobalScopes()->firstOrFail()->held_at);
+
+        AbandonedCheckout::withoutGlobalScopes()->firstOrFail()
+            ->forceFill(['held_at' => now()->subDays(HeldOrderService::WINDOW_DAYS + 1)])->save();
+        app(HeldOrderService::class)->purgeExpired();
+
+        $this->assertSame(0, AbandonedCheckout::withoutGlobalScopes()->count());
+    }
 }

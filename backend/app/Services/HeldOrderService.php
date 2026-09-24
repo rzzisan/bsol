@@ -48,6 +48,27 @@ class HeldOrderService
             ->where('held_at', '>=', now()->subDays(self::WINDOW_DAYS));
     }
 
+    /** AbandonedCheckout.user_id is the page creator, which may be a staff sub-account. */
+    private function shopUserIds(int $ownerId): array
+    {
+        return User::find($ownerId)?->shopUserIds() ?? [$ownerId];
+    }
+
+    /** Held leads (abandoned checkouts not tied to an order) still inside the window. */
+    private function releasableLeads(int $ownerId)
+    {
+        return AbandonedCheckout::withoutGlobalScope(HeldOrderCheckoutScope::class)
+            ->whereIn('user_id', $this->shopUserIds($ownerId))
+            ->whereNull('order_id')
+            ->whereNotNull('held_at')
+            ->where('held_at', '>=', now()->subDays(self::WINDOW_DAYS));
+    }
+
+    public function heldLeadsCount(int $ownerId): int
+    {
+        return $this->releasableLeads($ownerId)->count();
+    }
+
     public function heldCount(int $ownerId): int
     {
         return $this->releasable($ownerId)->count();
@@ -67,6 +88,13 @@ class HeldOrderService
      */
     public function release(User $owner): int
     {
+        // Leads first: unhide everything captured during the lapse.
+        AbandonedCheckout::withoutGlobalScope(HeldOrderCheckoutScope::class)
+            ->whereIn('user_id', $owner->shopUserIds())
+            ->whereNotNull('held_at')
+            ->where('held_at', '>=', now()->subDays(self::WINDOW_DAYS))
+            ->update(['held_at' => null]);
+
         $orders = $this->releasable($owner->id)->get();
         $accounting = app(AccountingService::class);
 
@@ -86,6 +114,12 @@ class HeldOrderService
     public function purgeExpired(): int
     {
         $count = 0;
+
+        // Leads that were never converted into an order.
+        AbandonedCheckout::withoutGlobalScope(HeldOrderCheckoutScope::class)
+            ->whereNotNull('held_at')
+            ->where('held_at', '<', now()->subDays(self::WINDOW_DAYS))
+            ->forceDelete();
 
         Order::withoutGlobalScope(HeldOrderScope::class)
             ->whereNotNull('held_at')

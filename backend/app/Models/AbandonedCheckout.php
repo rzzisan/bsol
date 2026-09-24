@@ -48,6 +48,9 @@ class AbandonedCheckout extends Model
         'items' => 'array',
         'subtotal' => 'decimal:2',
         'last_activity_at' => 'datetime',
+        // Not fillable — set/cleared only by HeldOrderService /
+        // AbandonedCheckoutService::capture (subscription_billing_context.md §13).
+        'held_at' => 'datetime',
     ];
 
     protected $appends = ['is_abandoned'];
