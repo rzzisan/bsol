@@ -659,15 +659,14 @@ export default function OrdersPage() {
               <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.dueCol}</th>
               <th className="px-3 py-3">{txt.status}</th>
               <th className="px-3 py-3 hidden md:table-cell">{txt.historyCol}</th>
-              <th className="px-3 py-3 hidden md:table-cell">{txt.date}</th>
               <th className="px-3 py-3 text-right">{txt.actions}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
+              <tr><td colSpan={9} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
+              <tr><td colSpan={9} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
             ) : orders.map(o => (
               <tr key={o.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-soft)]">
                 <td className="px-3 py-3">
@@ -676,6 +675,7 @@ export default function OrdersPage() {
                 </td>
                 <td className="px-3 py-3">
                   <p className="font-mono text-xs text-[var(--accent)]">{o.order_number}</p>
+                  <p className="mt-0.5 whitespace-nowrap text-[11px] text-[var(--muted)]">{fmtDate(o.created_at)}</p>
                   {o.platform_api_key_id && siteDomainById.get(o.platform_api_key_id) ? (
                     <p
                       title={siteDomainById.get(o.platform_api_key_id)}
@@ -727,7 +727,6 @@ export default function OrdersPage() {
                 <td className="px-3 py-3 hidden md:table-cell">
                   <HistoryCell h={o.phone_history} txt={txt} />
                 </td>
-                <td className="px-3 py-3 hidden md:table-cell text-xs text-[var(--muted)]">{fmtDate(o.created_at)}</td>
                 <td className="px-3 py-3 text-right">
                   <RowActions
                     orderId={o.id}
