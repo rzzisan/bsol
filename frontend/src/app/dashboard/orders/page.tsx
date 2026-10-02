@@ -693,6 +693,15 @@ export default function OrdersPage() {
                 <td className="px-3 py-3">
                   <p className="font-medium">{o.customer_name ?? "—"}</p>
                   <p className="text-xs text-[var(--muted)]">{o.customer_phone}</p>
+                  {/* Phones hide the address/history columns — show them here instead. */}
+                  <div className="mt-1 space-y-1.5 md:hidden">
+                    {o.customer_address ? (
+                      <p className="line-clamp-2 max-w-[12rem] text-xs">
+                        {[o.customer_address, o.customer_area, o.customer_thana, o.customer_district].filter(Boolean).join(", ")}
+                      </p>
+                    ) : null}
+                    <HistoryCell h={o.phone_history} txt={txt} />
+                  </div>
                 </td>
                 <td className="px-3 py-3 hidden md:table-cell">
                   <HistoryCell h={o.phone_history} txt={txt} />
