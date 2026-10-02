@@ -112,6 +112,10 @@ const text = {
     invoiceUpgradeNote: "আপগ্রেড — বর্তমান প্যাকেজের বাকি মেয়াদের মূল্য এই ইনভয়েস থেকে বাদ দেওয়া হয়েছে।",
     invoiceRenewalNote: "একই প্যাকেজ রিনিউ — বর্তমান মেয়াদের সাথে নতুন মেয়াদ যোগ হবে।",
     payTitle: "বিল পেমেন্ট",
+    freeNote: "এই প্যাকেজের জন্য কোনো পেমেন্ট প্রয়োজন নেই।",
+    activateFree: "প্যাকেজ চালু করুন",
+    activating: "চালু হচ্ছে...",
+    freeActivated: "প্যাকেজ সফলভাবে চালু হয়েছে।",
     bkashSuccess: "পেমেন্ট সফল হয়েছে — আপনার প্ল্যান সক্রিয় হয়ে গেছে।",
     bkashFailed: "পেমেন্ট সম্পন্ন হয়নি। আবার চেষ্টা করুন।",
     history: "ইনভয়েস ও পেমেন্ট হিস্ট্রি",
@@ -153,6 +157,10 @@ const text = {
     invoiceUpgradeNote: "Upgrade — the unused value of your current plan has been deducted from this invoice.",
     invoiceRenewalNote: "Same-plan renewal — the new period will be added to your current plan.",
     payTitle: "Bill Payment",
+    freeNote: "No payment is required for this plan.",
+    activateFree: "Activate plan",
+    activating: "Activating...",
+    freeActivated: "Your plan is now active.",
     bkashSuccess: "Payment successful — your plan is now active.",
     bkashFailed: "Payment did not complete. Please try again.",
     history: "Invoices & Payment History",
@@ -179,6 +187,7 @@ export default function Page() {
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [liveRemainingSeconds, setLiveRemainingSeconds] = useState<number | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [activatingFree, setActivatingFree] = useState(false);
 
   const load = async () => {
     const token = getStoredToken();
@@ -287,6 +296,35 @@ export default function Page() {
       cancelled = true;
     };
   }, [form.package_id]);
+
+  // Zero payable (free package, or credit covers the upgrade): no gateway
+  // involved — the backend activates directly.
+  const activateFree = async () => {
+    const token = getStoredToken();
+    if (!token || !form.package_id) return;
+    setActivatingFree(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`${API}/subscription/activate-free`, {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ package_id: Number(form.package_id) }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const first = data?.errors ? (Object.values(data.errors)[0] as string[] | undefined)?.[0] : undefined;
+        setError(first ?? data?.message ?? t.error);
+        return;
+      }
+      setSuccess(t.freeActivated);
+      await load();
+    } catch {
+      setError(t.error);
+    } finally {
+      setActivatingFree(false);
+    }
+  };
 
   const downloadInvoice = async (paymentId: number) => {
     setDownloadingId(paymentId);
@@ -561,7 +599,21 @@ export default function Page() {
           <section className="catv-panel mb-4 p-4 sm:p-5">
             <SectionHeader icon={CreditCard}>{t.payTitle}</SectionHeader>
 
-            {form.package_id && (
+            {form.package_id && invoice && invoice.payable_amount <= 0 && !invoice.is_downgrade_blocked && (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-[var(--muted)]">{t.freeNote}</p>
+                <button
+                  type="button"
+                  onClick={() => void activateFree()}
+                  disabled={activatingFree}
+                  className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {activatingFree ? t.activating : t.activateFree}
+                </button>
+              </div>
+            )}
+
+            {form.package_id && !(invoice && invoice.payable_amount <= 0 && !invoice.is_downgrade_blocked) && (
               <PlatformGatewayPaymentPicker
                 purpose="subscription"
                 payload={{ package_id: form.package_id }}

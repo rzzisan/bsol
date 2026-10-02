@@ -450,6 +450,7 @@ Route::middleware(['auth:sanctum', 'force_password_change'])->group(function () 
         Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
         Route::get('/subscription/me', [SubscriptionController::class, 'mySubscription']);
         Route::get('/subscription/invoice/preview', [SubscriptionController::class, 'invoicePreview']);
+        Route::post('/subscription/activate-free', [SubscriptionController::class, 'activateFree'])->middleware('throttle:10,1');
         Route::get('/subscription/payments/{payment}/invoice', [SubscriptionController::class, 'invoicePdf']);
     });
 

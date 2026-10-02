@@ -7,9 +7,11 @@ use App\Models\SubscriptionPackage;
 use App\Models\SubscriptionPayment;
 use App\Services\HeldOrderService;
 use App\Services\InvoicePdfService;
+use App\Services\SubscriptionActivationService;
 use App\Services\SubscriptionInvoiceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 class SubscriptionController extends Controller
@@ -18,6 +20,7 @@ class SubscriptionController extends Controller
         private readonly SubscriptionInvoiceService $invoiceService,
         private readonly InvoicePdfService $invoicePdfService,
         private readonly HeldOrderService $heldOrders,
+        private readonly SubscriptionActivationService $activationService,
     ) {}
 
     public function plans(): JsonResponse
@@ -107,6 +110,68 @@ class SubscriptionController extends Controller
                     ->get(),
             ],
         ]);
+    }
+
+    /**
+     * Activates a plan whose payable amount is zero — a free package (Trial)
+     * or an upgrade fully covered by the proration credit. There is nothing
+     * to charge, so the gateway flow (which needs a positive amount) can't
+     * be used. A genuinely free package (base price 0) can be taken once per
+     * account, otherwise Trial could be re-claimed forever.
+     * subscription_billing_context.md §2.5.
+     */
+    public function activateFree(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'package_id' => ['required', 'integer', 'exists:subscription_packages,id'],
+        ]);
+
+        $user = $request->user();
+        $package = SubscriptionPackage::where('is_active', true)->findOrFail($validated['package_id']);
+        $invoice = $this->invoiceService->compute($user, $package);
+
+        if ($invoice['is_downgrade_blocked']) {
+            throw ValidationException::withMessages([
+                'package_id' => ['বর্তমান প্যাকেজের মেয়াদ শেষ না হওয়া পর্যন্ত এর চেয়ে ছোট প্যাকেজে যাওয়া যাবে না।'],
+            ]);
+        }
+
+        if ((float) $invoice['payable_amount'] > 0) {
+            throw ValidationException::withMessages([
+                'package_id' => ['এই প্যাকেজের জন্য পেমেন্ট প্রয়োজন।'],
+            ]);
+        }
+
+        if ((float) $invoice['base_amount'] <= 0) {
+            $alreadyUsed = $user->subscription_package_id === $package->id
+                || SubscriptionPayment::where('user_id', $user->id)
+                    ->where('package_id', $package->id)
+                    ->where('status', 'approved')
+                    ->exists();
+
+            if ($alreadyUsed) {
+                throw ValidationException::withMessages([
+                    'package_id' => ['এই ফ্রি প্যাকেজটি আপনি আগেই ব্যবহার করেছেন। অন্য একটি প্যাকেজ বেছে নিন।'],
+                ]);
+            }
+        }
+
+        $payment = SubscriptionPayment::create([
+            'user_id' => $user->id,
+            'package_id' => $package->id,
+            'previous_package_id' => $invoice['is_upgrade'] ? $invoice['previous_package']['id'] : null,
+            'amount' => 0,
+            'base_amount' => $invoice['base_amount'],
+            'proration_credit' => $invoice['proration_credit'],
+            'invoice_breakdown' => $invoice,
+            'payment_method' => 'free',
+            'status' => 'approved',
+            'reviewed_at' => now(),
+        ]);
+
+        $this->activationService->activate($payment);
+
+        return response()->json(['success' => true]);
     }
 
     public function invoicePdf(SubscriptionPayment $payment): Response

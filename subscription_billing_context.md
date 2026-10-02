@@ -122,6 +122,14 @@ $table->json('invoice_breakdown')->nullable();            // পুরো হি
 - প্যাকেজ সিলেক্ট করলে (upgrade হলে) → **Invoice preview panel/modal**: বর্তমান প্যাকেজ, নতুন প্যাকেজ, মূল দাম, বাকি মেয়াদের ছাড় (টাকায়), পরিশোধযোগ্য অর্থ, নতুন মেয়াদ শেষের তারিখ — এরপর "ইনভয়েস পরিশোধ করুন" বাটনে existing bKash/manual flow চলবে (invoice preview-এর `package_id`-ই পাঠানো হবে, amount সবসময় সার্ভার recompute করবে)।
 - Design system rules (CONTEXT.md §22) মেনে চলা বাধ্যতামূলক — token color, bilingual, mobile-first, dark/light।
 
+### 2.7a শূন্য-মূল্যের প্যাকেজ (Trial) চালু করা — ✅ সম্পন্ন (২০২৬-১০-০২)
+
+**বাগ:** `payable_amount = 0` হলে (Trial প্যাকেজ, বা প্রোরেশন ক্রেডিট পুরো দাম কাভার করলে) পেমেন্ট বাটন disabled থাকত — গেটওয়ে ফ্লো ধনাত্মক অ্যামাউন্ট চায়, তাই প্ল্যান চালু করার কোনো পথ ছিল না।
+
+**ফিক্স:** `POST /api/subscription/activate-free` (`SubscriptionController::activateFree`, owner-only, `throttle:10,1`)। পেমেন্ট ফ্লো ছাড়াই সরাসরি `approved` `SubscriptionPayment` (`payment_method=free`, `amount=0`) তৈরি করে `SubscriptionActivationService::activate()` চালায় (হেল্ড-অর্ডার রিলিজ, storefront add-on সিঙ্ক ইত্যাদি আগের মতোই)। সার্ভার-সাইড নিয়ম: (১) downgrade-blocked হলে ৪২২; (২) `payable_amount > 0` হলে ৪২২ (বিনামূল্যে পেইড প্ল্যান নেওয়ার পথ বন্ধ); (৩) **সত্যিকারের ফ্রি প্যাকেজ (`base_amount = 0`) প্রতি অ্যাকাউন্টে একবারই** — ইউজারের বর্তমান/আগের প্যাকেজ সেটাই হলে বা সেই প্যাকেজে approved পেমেন্ট থাকলে ৪২২, নইলে Trial বারবার রিনিউ করে চিরকাল ফ্রি চালানো যেত। (সাইনআপে ডিফল্ট Trial পাওয়া ইউজারও এতে "ব্যবহৃত" গণ্য।) ক্রেডিট-কাভার্ড আপগ্রেড (base > 0, payable = 0) এই সীমার বাইরে।
+
+**Frontend:** `dashboard/settings/subscription/page.tsx` — invoice preview-এ `payable_amount <= 0` হলে গেটওয়ে picker-এর বদলে "প্যাকেজ চালু করুন" বাটন; সফল হলে সাবস্ক্রিপশন রিলোড। টেস্ট: `FreePlanActivationTest`।
+
 ### 2.8 Verification checklist (আগের bKash কাজের মতোই)
 - Tinker দিয়ে proration formula rollback-wrapped টেস্ট (কয়েকটা scenario: same-day upgrade, mid-cycle upgrade, expired-then-purchase, downgrade attempt reject)
 - `php artisan route:list` দিয়ে নতুন route/middleware ভেরিফাই
