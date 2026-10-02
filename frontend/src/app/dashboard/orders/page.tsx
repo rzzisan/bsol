@@ -28,12 +28,6 @@ const statusColor: Record<Status, string> = {
   returned:   "bg-orange-500/15 text-orange-400",
 };
 
-const riskColor: Record<string, string> = {
-  low:    "bg-emerald-500/10 text-emerald-400",
-  medium: "bg-yellow-500/10 text-yellow-400",
-  high:   "bg-red-500/10 text-red-400",
-};
-
 const t = {
   bn: {
     pageTitle: "অর্ডার তালিকা",
@@ -52,7 +46,6 @@ const t = {
     paidCol: "জমা",
     dueCol: "বকেয়া",
     status: "স্ট্যাটাস",
-    risk: "ঝুঁকি",
     historyCol: "ডেলিভারি হিস্ট্রি",
     historyNew: "নতুন কাস্টমার",
     historyOrders: "অর্ডার",
@@ -66,7 +59,6 @@ const t = {
     invoiceFailed: "ইনভয়েস তৈরি করা যায়নি।",
     statusNames: { pending:"অপেক্ষমান", confirmed:"নিশ্চিত", processing:"প্রক্রিয়াধীন",
                    shipped:"পাঠানো হয়েছে", delivered:"ডেলিভারি হয়েছে", cancelled:"বাতিল", returned:"ফেরত" },
-    riskNames: { low:"কম", medium:"মাঝারি", high:"উচ্চ" },
     otpVerifiedBadge: "OTP ভেরিফাইড",
     onlinePaymentPendingBadge: (method: string) => `${method} — পেমেন্ট বাকি`,
     totalOrders: "মোট অর্ডার",
@@ -130,7 +122,6 @@ const t = {
     paidCol: "Paid",
     dueCol: "Due",
     status: "Status",
-    risk: "Risk",
     historyCol: "Delivery history",
     historyNew: "New customer",
     historyOrders: "orders",
@@ -144,7 +135,6 @@ const t = {
     invoiceFailed: "Could not generate the invoice.",
     statusNames: { pending:"Pending", confirmed:"Confirmed", processing:"Processing",
                    shipped:"Shipped", delivered:"Delivered", cancelled:"Cancelled", returned:"Returned" },
-    riskNames: { low:"Low", medium:"Medium", high:"High" },
     otpVerifiedBadge: "OTP verified",
     onlinePaymentPendingBadge: (method: string) => `${method} — payment pending`,
     totalOrders: "Total Orders",
@@ -588,7 +578,6 @@ export default function OrdersPage() {
               <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.paidCol}</th>
               <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.dueCol}</th>
               <th className="px-3 py-3">{txt.status}</th>
-              <th className="px-3 py-3 hidden md:table-cell">{txt.risk}</th>
               <th className="px-3 py-3 hidden md:table-cell">{txt.historyCol}</th>
               <th className="px-3 py-3 hidden md:table-cell">{txt.date}</th>
               <th className="px-3 py-3 text-right">{txt.actions}</th>
@@ -596,9 +585,9 @@ export default function OrdersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={11} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={11} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
             ) : orders.map(o => (
               <tr key={o.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-soft)]">
                 <td className="px-3 py-3">
@@ -652,11 +641,6 @@ export default function OrdersPage() {
                       </span>
                     ) : null}
                   </div>
-                </td>
-                <td className="px-3 py-3 hidden md:table-cell">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${riskColor[o.risk_level] ?? ""}`}>
-                    {txt.riskNames[o.risk_level as keyof typeof txt.riskNames] ?? o.risk_level}
-                  </span>
                 </td>
                 <td className="px-3 py-3 hidden md:table-cell">
                   <HistoryCell h={o.phone_history} txt={txt} />
