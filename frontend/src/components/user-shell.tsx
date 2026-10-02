@@ -235,9 +235,14 @@ function buildMenu(t: typeof menuText.bn, facebookLeadsUnread: number, whatsappU
         { key: "all-orders", label: t.allOrders, href: "/dashboard/orders" },
         { key: "create-order", label: t.createOrder, href: "/dashboard/orders/create" },
         { key: "bulk-import-orders", label: t.bulkImportOrders, href: "/dashboard/orders/bulk-import" },
-        { key: "fraud-check", label: t.fraudCheck, href: "/dashboard/orders/fraud-check" },
         { key: "blacklist", label: t.blacklist, href: "/dashboard/orders/blacklist" },
       ],
+    },
+    {
+      key: "fraud-check",
+      label: t.fraudCheck,
+      icon: "🔍",
+      href: "/dashboard/orders/fraud-check",
     },
     {
       key: "products",
