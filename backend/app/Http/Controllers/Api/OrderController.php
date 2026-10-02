@@ -78,6 +78,7 @@ class OrderController extends Controller
         $perPage = min((int) ($request->per_page ?? 20), 100);
         $orders  = $query->withPaymentTotals()->orderByDesc('created_at')->paginate($perPage);
         Order::attachDueAmounts($orders->getCollection());
+        $this->attachPhoneHistory($orders->getCollection());
 
         return response()->json([
             'success' => true,
@@ -89,6 +90,71 @@ class OrderController extends Controller
                 'per_page'     => $orders->perPage(),
             ],
         ]);
+    }
+
+    /**
+     * Fraud-history summary for the list's "customer history" column
+     * (WooCommerce-style delivery-success progress). One grouped query for
+     * the whole page over the indexed phone10 expression
+     * (idx_orders_phone10), plus the already-cached courier stats — never a
+     * live courier API call. Counts every seller's orders (same shared
+     * signal FraudController::computeScore uses); only finished outcomes
+     * (delivered/cancelled/returned) enter the success ratio, so a first-time
+     * customer's own pending order doesn't skew it.
+     */
+    private function attachPhoneHistory($orders): void
+    {
+        $phones = $orders->map(fn ($o) => PhoneIntelCache::phone10($o->customer_phone))
+            ->filter(fn ($p) => strlen($p) === 10)
+            ->unique()
+            ->values();
+
+        if ($phones->isEmpty()) {
+            return;
+        }
+
+        $expr = "right(regexp_replace(customer_phone, '\\D', '', 'g'), 10)";
+
+        $own = Order::query()
+            ->whereRaw("{$expr} IN (" . $phones->map(fn () => '?')->implode(',') . ')', $phones->all())
+            ->selectRaw("{$expr} AS p,
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE status = 'delivered') AS delivered,
+                COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled,
+                COUNT(*) FILTER (WHERE status = 'returned') AS returned")
+            ->groupBy('p')
+            ->get()
+            ->keyBy('p');
+
+        $courier = DB::table('courier_fraud_stats')
+            ->whereIn(DB::raw('right(phone_number, 10)'), $phones->all())
+            ->where('status', 'ok')
+            ->selectRaw('right(phone_number, 10) AS p, SUM(total_parcels) AS parcels, SUM(total_delivered) AS delivered, SUM(total_cancelled) AS cancelled')
+            ->groupBy('p')
+            ->get()
+            ->keyBy('p');
+
+        $orders->each(function ($order) use ($own, $courier) {
+            $p = PhoneIntelCache::phone10($order->customer_phone);
+            $row = $own->get($p);
+            $c = $courier->get($p);
+
+            $delivered = (int) ($row->delivered ?? 0);
+            $failed = (int) ($row->cancelled ?? 0) + (int) ($row->returned ?? 0);
+            $finished = $delivered + $failed;
+            $courierParcels = (int) ($c->parcels ?? 0);
+
+            $order->setAttribute('phone_history', [
+                'total' => (int) ($row->total ?? 0),
+                'delivered' => $delivered,
+                'failed' => $failed,
+                'success_rate' => $finished > 0 ? (int) round($delivered / $finished * 100) : null,
+                'courier_parcels' => $courierParcels,
+                'courier_success_rate' => $courierParcels > 0
+                    ? (int) round(((int) ($c->delivered ?? 0)) / $courierParcels * 100)
+                    : null,
+            ]);
+        });
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────────

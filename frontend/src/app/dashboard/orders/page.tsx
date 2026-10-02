@@ -53,6 +53,11 @@ const t = {
     dueCol: "বকেয়া",
     status: "স্ট্যাটাস",
     risk: "ঝুঁকি",
+    historyCol: "ডেলিভারি হিস্ট্রি",
+    historyNew: "নতুন কাস্টমার",
+    historyOrders: "অর্ডার",
+    historyCourier: "কুরিয়ার",
+    historyParcels: "পার্সেল",
     date: "তারিখ",
     actions: "অ্যাকশন",
     view: "দেখুন",
@@ -126,6 +131,11 @@ const t = {
     dueCol: "Due",
     status: "Status",
     risk: "Risk",
+    historyCol: "Delivery history",
+    historyNew: "New customer",
+    historyOrders: "orders",
+    historyCourier: "Courier",
+    historyParcels: "parcels",
     date: "Date",
     actions: "Actions",
     view: "View",
@@ -183,6 +193,10 @@ const t = {
   },
 };
 
+type PhoneHistory = {
+  total: number; delivered: number; failed: number; success_rate: number | null;
+  courier_parcels: number; courier_success_rate: number | null;
+};
 type Order = {
   id: number; order_number: string; customer_name: string | null;
   customer_phone: string; total: string; status: Status;
@@ -192,9 +206,38 @@ type Order = {
   platform_api_key_id: number | null;
   paid_amount?: number | string | null;
   due_amount?: number | string | null;
+  phone_history?: PhoneHistory;
 };
 type Stats = { total: number; today: number; pending: number; delivered: number };
 type WpSite = { id: number; domain: string; status: string };
+
+/** WooCommerce-style delivery-success progress for the order's phone number. */
+function HistoryCell({ h, txt }: { h?: PhoneHistory; txt: { historyNew: string; historyOrders: string; historyCourier: string; historyParcels: string } }) {
+  if (!h) return <span className="text-xs text-[var(--muted)]">—</span>;
+  const rate = h.success_rate;
+  const color = rate === null ? "bg-[var(--border)]" : rate >= 80 ? "bg-emerald-500" : rate >= 50 ? "bg-amber-500" : "bg-red-500";
+  return (
+    <div className="w-36 space-y-1">
+      {rate === null ? (
+        <p className="text-xs font-medium text-[var(--muted)]">{txt.historyNew}</p>
+      ) : (
+        <>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold">{rate}%</span>
+            <span className="text-[var(--muted)]">{h.delivered}/{h.delivered + h.failed}</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-red-500/20" role="progressbar" aria-valuenow={rate} aria-valuemin={0} aria-valuemax={100}>
+            <div className={`h-full rounded-full ${color}`} style={{ width: `${rate}%` }} />
+          </div>
+        </>
+      )}
+      <p className="text-[11px] leading-tight text-[var(--muted)]">
+        {h.total} {txt.historyOrders}
+        {h.courier_parcels > 0 ? ` · ${txt.historyCourier} ${h.courier_parcels} ${txt.historyParcels}${h.courier_success_rate !== null ? ` (${h.courier_success_rate}%)` : ""}` : ""}
+      </p>
+    </div>
+  );
+}
 
 const PURPOSES = ["advance", "courier_charge", "full_payment", "other"] as const;
 const METHODS = ["cash", "bank", "bkash", "nagad", "rocket", "upay", "other"] as const;
@@ -546,15 +589,16 @@ export default function OrdersPage() {
               <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.dueCol}</th>
               <th className="px-3 py-3">{txt.status}</th>
               <th className="px-3 py-3 hidden md:table-cell">{txt.risk}</th>
+              <th className="px-3 py-3 hidden md:table-cell">{txt.historyCol}</th>
               <th className="px-3 py-3 hidden md:table-cell">{txt.date}</th>
               <th className="px-3 py-3 text-right">{txt.actions}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
+              <tr><td colSpan={11} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
+              <tr><td colSpan={11} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
             ) : orders.map(o => (
               <tr key={o.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-soft)]">
                 <td className="px-3 py-3">
@@ -613,6 +657,9 @@ export default function OrdersPage() {
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${riskColor[o.risk_level] ?? ""}`}>
                     {txt.riskNames[o.risk_level as keyof typeof txt.riskNames] ?? o.risk_level}
                   </span>
+                </td>
+                <td className="px-3 py-3 hidden md:table-cell">
+                  <HistoryCell h={o.phone_history} txt={txt} />
                 </td>
                 <td className="px-3 py-3 hidden md:table-cell text-xs text-[var(--muted)]">{fmtDate(o.created_at)}</td>
                 <td className="px-3 py-3 text-right">

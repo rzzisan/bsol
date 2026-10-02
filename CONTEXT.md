@@ -1339,3 +1339,11 @@ SaaS-এর URL কাঠামো বদলে গেছে। **প্রত�
 
 সেলার ড্যাশবোর্ডের টপবারে দ্রুত-যাওয়ার পিল লিংক: **Orders, Fraud Check, Send SMS**। `CatvShell`-এর নতুন optional `shortcuts` prop; `UserShell` `SHORTCUT_KEYS` (`user-shell.tsx`) থেকে মেনুর key ধরে লিংক বের করে — মেনু আগেই স্টাফ-পারমিশনে ফিল্টার হওয়া, তাই স্টাফ যে মডিউলে ঢুকতে পারে না তার শর্টকাটও দেখে না (লেবেল bn/en মেনু থেকেই আসে)। নতুন শর্টকাট যোগ করতে শুধু `SHORTCUT_KEYS`-এ মেনু-key যোগ করুন। অ্যাডমিন শেলে শর্টকাট নেই। একই দিনে **Fraud Check সাইডবারে Orders-এর সাব-মেনু থেকে সরিয়ে আলাদা টপ-লেভেল মেনু** করা হয়েছে (key `fraud-check`, URL অপরিবর্তিত `/dashboard/orders/fraud-check`; স্টাফ-পারমিশন ম্যাপ `fraud` আগের মতোই; Blacklist Orders-এর নিচেই আছে)। ফোনে আলাদা সারিতে, অনুভূমিক-স্ক্রলযোগ্য। CSS: `.catv-topbar-shortcuts`/`.catv-shortcut` (`globals.css`)।
 
+
+## ৩৫. অর্ডার লিস্টে "ডেলিভারি হিস্ট্রি" কলাম (WooCommerce-স্টাইল প্রগ্রেস) ✅ (২০২৬-১০-০২)
+
+`/dashboard/orders` টেবিলে নতুন কলাম: অর্ডারের ফোন নম্বরের আগের ডেলিভারি সাফল্যের হার — প্রগ্রেস বার (সবুজ ≥৮০%, হলুদ ৫০–৭৯%, লাল <৫০%), `হার% · delivered/finished`, নিচে মোট অর্ডার সংখ্যা ও (থাকলে) কুরিয়ার পার্সেল/সাফল্য। ইতিহাস না থাকলে "নতুন কাস্টমার"। শুধু `md+`-এ দেখায় (ঝুঁকি কলামের মতো)।
+
+- **ব্যাকএন্ড:** `OrderController::index` → `attachPhoneHistory()` — পেজের সব ফোনের জন্য **একটাই** grouped কোয়েরি (ইনডেক্সড `idx_orders_phone10` এক্সপ্রেশনে), সব সেলারের অর্ডার মিলিয়ে (`FraudController::computeScore`-এর shared সিগন্যালের মতোই; held অর্ডার বাদ — global scope)। হার = `delivered / (delivered + cancelled + returned)`; pending/চলমান অর্ডার হিসাবে ধরা হয় না, তাই নতুন কাস্টমারের নিজের অর্ডার হারকে বিকৃত করে না। কুরিয়ার অংশ শুধু `courier_fraud_stats`-এ আগে থেকে ক্যাশ থাকা `status=ok` ডেটা — লিস্ট লোডে কখনো লাইভ কুরিয়ার API কল হয় না। রেসপন্স ফিল্ড: `phone_history{total, delivered, failed, success_rate, courier_parcels, courier_success_rate}`।
+- **ফ্রন্টএন্ড:** `HistoryCell` (`dashboard/orders/page.tsx`)।
+
