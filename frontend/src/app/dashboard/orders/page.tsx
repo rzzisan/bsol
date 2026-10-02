@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import UserShell from "@/components/user-shell";
 import { getStoredLocale, getStoredToken, openAuthenticatedPdf, type Locale } from "@/lib/dashboard-client";
 
@@ -200,6 +200,86 @@ type Order = {
 };
 type Stats = { total: number; today: number; pending: number; delivered: number };
 type WpSite = { id: number; domain: string; status: string };
+
+/** Per-row "⋯" menu (invoice / payment / view). The dropdown is position:fixed
+ *  from the button's rect because the table sits in an overflow container
+ *  that would clip an absolutely-positioned menu. */
+function RowActions({ orderId, labels, invoiceBusy, onInvoice, onPayment }: {
+  orderId: number;
+  labels: { invoice: string; invoicePreparing: string; payment: string; view: string; more: string };
+  invoiceBusy: boolean;
+  onInvoice: () => void;
+  onPayment: () => void;
+}) {
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pos) return;
+    const close = () => setPos(null);
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuRef.current?.contains(target) || btnRef.current?.contains(target)) return;
+      close();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [pos]);
+
+  const toggle = () => {
+    if (pos) { setPos(null); return; }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  };
+
+  const item = "block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[var(--surface-soft)] disabled:opacity-50";
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        aria-label={labels.more}
+        aria-haspopup="menu"
+        aria-expanded={pos !== null}
+        className="rounded-lg border border-[var(--border)] px-2 py-1 text-base leading-none hover:bg-[var(--surface)]"
+      >
+        ⋯
+      </button>
+      {pos && (
+        <div
+          ref={menuRef}
+          role="menu"
+          style={{ position: "fixed", top: pos.top, right: pos.right }}
+          className="z-50 min-w-[9rem] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 text-left shadow-xl"
+        >
+          <Link href={`/dashboard/orders/${orderId}`} role="menuitem" className={item} onClick={() => setPos(null)}>
+            {labels.view}
+          </Link>
+          <button type="button" role="menuitem" className={item} disabled={invoiceBusy}
+            onClick={() => { setPos(null); onInvoice(); }}>
+            {invoiceBusy ? labels.invoicePreparing : labels.invoice}
+          </button>
+          <button type="button" role="menuitem" className={item}
+            onClick={() => { setPos(null); onPayment(); }}>
+            {labels.payment}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
 
 /** WooCommerce-style delivery-success progress for the order's phone number. */
 function HistoryCell({ h, txt }: { h?: PhoneHistory; txt: { historyNew: string; historyOrders: string; historyCourier: string; historyParcels: string } }) {
@@ -594,7 +674,17 @@ export default function OrdersPage() {
                   <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelect(o.id)}
                     className="accent-[var(--accent)]" />
                 </td>
-                <td className="px-3 py-3 font-mono text-xs text-[var(--accent)]">{o.order_number}</td>
+                <td className="px-3 py-3">
+                  <p className="font-mono text-xs text-[var(--accent)]">{o.order_number}</p>
+                  {o.platform_api_key_id && siteDomainById.get(o.platform_api_key_id) ? (
+                    <p
+                      title={siteDomainById.get(o.platform_api_key_id)}
+                      className="mt-0.5 max-w-[9rem] truncate text-[11px] text-[var(--muted)]"
+                    >
+                      {siteDomainById.get(o.platform_api_key_id)}
+                    </p>
+                  ) : null}
+                </td>
                 <td className="px-3 py-3">
                   <p className="font-medium">{o.customer_name ?? "—"}</p>
                   <p className="text-xs text-[var(--muted)]">{o.customer_phone}</p>
@@ -610,8 +700,8 @@ export default function OrdersPage() {
                     </span>
                   ) : "—"}
                 </td>
-                <td className="px-3 py-3">
-                  <div className="flex flex-wrap items-center gap-1.5">
+                <td className="px-3 py-3 whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
                     <button onClick={() => openStatusModal(o)}
                       className={`rounded-full px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80 ${statusColor[o.status] ?? ""}`}>
                       {txt.statusNames[o.status]}
@@ -624,43 +714,28 @@ export default function OrdersPage() {
                         OTP
                       </span>
                     ) : null}
-                    {o.payment_method !== "cod" && o.payment_status !== "paid" ? (
-                      <span
-                        title={txt.onlinePaymentPendingBadge(ONLINE_PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method)}
-                        className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-500"
-                      >
-                        {ONLINE_PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method} ⏳
-                      </span>
-                    ) : null}
-                    {o.platform_api_key_id && siteDomainById.get(o.platform_api_key_id) ? (
-                      <span
-                        title={siteDomainById.get(o.platform_api_key_id)}
-                        className="rounded-full bg-[var(--muted)]/15 px-2 py-0.5 text-xs font-medium text-[var(--muted)]"
-                      >
-                        {siteDomainById.get(o.platform_api_key_id)}
-                      </span>
-                    ) : null}
                   </div>
+                  {o.payment_method !== "cod" && o.payment_status !== "paid" ? (
+                    <p
+                      title={txt.onlinePaymentPendingBadge(ONLINE_PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method)}
+                      className="mt-1 text-[11px] font-semibold text-amber-500"
+                    >
+                      ⏳ {ONLINE_PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method}
+                    </p>
+                  ) : null}
                 </td>
                 <td className="px-3 py-3 hidden md:table-cell">
                   <HistoryCell h={o.phone_history} txt={txt} />
                 </td>
                 <td className="px-3 py-3 hidden md:table-cell text-xs text-[var(--muted)]">{fmtDate(o.created_at)}</td>
                 <td className="px-3 py-3 text-right">
-                  <div className="flex justify-end gap-1.5">
-                    <button onClick={() => void downloadInvoice(o.id)} disabled={downloadingInvoiceId === o.id}
-                      className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)] disabled:opacity-50">
-                      {downloadingInvoiceId === o.id ? txt.invoicePreparing : txt.invoice}
-                    </button>
-                    <button onClick={() => openPaymentModal(o)}
-                      className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]">
-                      {txt.payment}
-                    </button>
-                    <Link href={`/dashboard/orders/${o.id}`}
-                      className="rounded-lg border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--surface)]">
-                      {txt.view}
-                    </Link>
-                  </div>
+                  <RowActions
+                    orderId={o.id}
+                    labels={{ invoice: txt.invoice, invoicePreparing: txt.invoicePreparing, payment: txt.payment, view: txt.view, more: txt.actions }}
+                    invoiceBusy={downloadingInvoiceId === o.id}
+                    onInvoice={() => void downloadInvoice(o.id)}
+                    onPayment={() => openPaymentModal(o)}
+                  />
                 </td>
               </tr>
             ))}
