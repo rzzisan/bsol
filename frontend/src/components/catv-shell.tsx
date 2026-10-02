@@ -35,6 +35,8 @@ type CatvShellProps = {
   userMeta?: string;
   currentUser?: AuthUser | null;
   menu: ShellMenuItem[];
+  /** Quick-access links shown in the top bar (e.g. Orders, Fraud Check, Send SMS). */
+  shortcuts?: Array<{ key: string; label: string; href: string }>;
   activeKey: string;
   defaultExpandedKey?: string | null;
   onToggleLocale: () => void;
@@ -67,6 +69,7 @@ export default function CatvShell({
   userMeta,
   currentUser,
   menu,
+  shortcuts,
   activeKey,
   defaultExpandedKey = null,
   onToggleLocale,
@@ -429,6 +432,20 @@ export default function CatvShell({
               <p className="catv-topbar-sub">{subtitle}</p>
             </div>
           </div>
+
+          {shortcuts && shortcuts.length > 0 ? (
+            <nav className="catv-topbar-shortcuts" aria-label="Shortcuts">
+              {shortcuts.map((s) => (
+                <Link
+                  key={s.key}
+                  href={s.href}
+                  className={`catv-shortcut ${activeKey === s.key ? "active" : ""}`}
+                >
+                  {s.label}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
 
           <div className="catv-topbar-right">
             {searchPlaceholder ? (

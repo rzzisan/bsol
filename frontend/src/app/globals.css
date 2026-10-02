@@ -332,6 +332,45 @@ a {
   opacity: 0.9;
 }
 
+.catv-topbar-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.catv-topbar-shortcuts::-webkit-scrollbar {
+  display: none;
+}
+
+.catv-shortcut {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.catv-shortcut:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.catv-shortcut.active {
+  background: #fff;
+  color: var(--accent);
+  border-color: #fff;
+}
+
 .catv-topbar-right {
   display: flex;
   align-items: center;
@@ -624,6 +663,16 @@ a {
   .catv-topbar-right {
     width: 100%;
     gap: 0.35rem;
+  }
+
+  .catv-topbar-shortcuts {
+    width: 100%;
+  }
+
+  .catv-shortcut {
+    height: 32px;
+    padding: 0 0.7rem;
+    font-size: 0.74rem;
   }
 
   .catv-search {

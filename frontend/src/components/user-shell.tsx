@@ -436,6 +436,9 @@ function filterMenuForStaff(menu: ShellMenuItem[], user: AuthUser | null): Shell
     });
 }
 
+/** Menu keys surfaced as top-bar shortcut links, in display order. */
+const SHORTCUT_KEYS = ["all-orders", "fraud-check", "sms-send"];
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type UserShellProps = {
@@ -670,6 +673,20 @@ export default function UserShell({
     [t, facebookLeadsUnread, whatsappUnread, user],
   );
 
+  // Top-bar quick links. Resolved from the (already staff-permission-filtered)
+  // menu, so a staff member never sees a shortcut to a module they can't open.
+  const shortcuts = useMemo(
+    () =>
+      SHORTCUT_KEYS.flatMap((key) => {
+        for (const item of menu) {
+          const hit = item.key === key ? item : item.children?.find((c) => c.key === key);
+          if (hit?.href) return [{ key, label: hit.label, href: hit.href }];
+        }
+        return [];
+      }),
+    [menu],
+  );
+
   const title = pageTitle ? pageTitle[locale] : t.sidebarTitle;
   const subtitle = pageSubtitle ? pageSubtitle[locale] : "";
 
@@ -777,6 +794,7 @@ export default function UserShell({
       userMeta={user?.email}
       currentUser={user}
       menu={menu}
+      shortcuts={shortcuts}
       activeKey={activeKey}
       defaultExpandedKey={defaultExpandedKey ?? null}
       onToggleLocale={toggleLocale}
