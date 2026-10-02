@@ -658,12 +658,12 @@ export default function OrdersPage() {
               </th>
               <th className="px-3 py-3">{txt.orderNo}</th>
               <th className="px-3 py-3">{txt.customer}</th>
+              <th className="px-3 py-3 hidden md:table-cell">{txt.historyCol}</th>
               <th className="px-3 py-3 hidden md:table-cell">{txt.address}</th>
               <th className="px-3 py-3 text-right">{txt.total}</th>
               <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.paidCol}</th>
               <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.dueCol}</th>
               <th className="px-3 py-3">{txt.status}</th>
-              <th className="px-3 py-3 hidden md:table-cell">{txt.historyCol}</th>
               <th className="px-3 py-3 text-right">{txt.actions}</th>
             </tr>
           </thead>
@@ -693,6 +693,9 @@ export default function OrdersPage() {
                 <td className="px-3 py-3">
                   <p className="font-medium">{o.customer_name ?? "—"}</p>
                   <p className="text-xs text-[var(--muted)]">{o.customer_phone}</p>
+                </td>
+                <td className="px-3 py-3 hidden md:table-cell">
+                  <HistoryCell h={o.phone_history} txt={txt} />
                 </td>
                 <td className="px-3 py-3 hidden md:table-cell">
                   {o.customer_address ? (
@@ -740,9 +743,6 @@ export default function OrdersPage() {
                       ⏳ {ONLINE_PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method}
                     </p>
                   ) : null}
-                </td>
-                <td className="px-3 py-3 hidden md:table-cell">
-                  <HistoryCell h={o.phone_history} txt={txt} />
                 </td>
                 <td className="px-3 py-3 text-right">
                   <RowActions
