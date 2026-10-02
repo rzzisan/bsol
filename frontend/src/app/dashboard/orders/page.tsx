@@ -52,6 +52,7 @@ const t = {
     historyCourier: "কুরিয়ার",
     historyParcels: "পার্সেল",
     date: "তারিখ",
+    address: "ঠিকানা",
     actions: "অ্যাকশন",
     view: "দেখুন",
     invoice: "ইনভয়েস",
@@ -128,6 +129,7 @@ const t = {
     historyCourier: "Courier",
     historyParcels: "parcels",
     date: "Date",
+    address: "Address",
     actions: "Actions",
     view: "View",
     invoice: "Invoice",
@@ -197,6 +199,8 @@ type Order = {
   paid_amount?: number | string | null;
   due_amount?: number | string | null;
   phone_history?: PhoneHistory;
+  customer_address?: string | null; customer_district?: string | null;
+  customer_thana?: string | null; customer_area?: string | null;
 };
 type Stats = { total: number; today: number; pending: number; delivered: number };
 type WpSite = { id: number; domain: string; status: string };
@@ -654,6 +658,7 @@ export default function OrdersPage() {
               </th>
               <th className="px-3 py-3">{txt.orderNo}</th>
               <th className="px-3 py-3">{txt.customer}</th>
+              <th className="px-3 py-3 hidden md:table-cell">{txt.address}</th>
               <th className="px-3 py-3 text-right">{txt.total}</th>
               <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.paidCol}</th>
               <th className="px-3 py-3 text-right hidden lg:table-cell">{txt.dueCol}</th>
@@ -664,9 +669,9 @@ export default function OrdersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.loading}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-[var(--muted)]">{txt.noOrders}</td></tr>
             ) : orders.map(o => (
               <tr key={o.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-soft)]">
                 <td className="px-3 py-3">
@@ -688,6 +693,18 @@ export default function OrdersPage() {
                 <td className="px-3 py-3">
                   <p className="font-medium">{o.customer_name ?? "—"}</p>
                   <p className="text-xs text-[var(--muted)]">{o.customer_phone}</p>
+                </td>
+                <td className="px-3 py-3 hidden md:table-cell">
+                  {o.customer_address ? (
+                    <p title={o.customer_address} className="line-clamp-2 max-w-[14rem] text-xs">{o.customer_address}</p>
+                  ) : (
+                    <p className="text-xs text-[var(--muted)]">—</p>
+                  )}
+                  {[o.customer_area, o.customer_thana, o.customer_district].filter(Boolean).length > 0 ? (
+                    <p className="mt-0.5 max-w-[14rem] truncate text-[11px] text-[var(--muted)]">
+                      {[o.customer_area, o.customer_thana, o.customer_district].filter(Boolean).join(", ")}
+                    </p>
+                  ) : null}
                 </td>
                 <td className="px-3 py-3 text-right font-semibold">৳{Number(o.total).toLocaleString()}</td>
                 <td className="px-3 py-3 text-right hidden lg:table-cell text-emerald-500">
