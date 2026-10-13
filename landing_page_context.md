@@ -437,3 +437,11 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 - **মোবাইল sticky অর্ডার বাটন:** `content.settings.sticky_cta_enabled` (ডিফল্ট true, `mergeLandingContent`-এ)। hero বা checkout ফর্ম দেখা গেলে লুকায় (IntersectionObserver)।
 - **OG/Twitter metadata:** `app/lp/[slug]/page.tsx` — ছবি = hero background → প্রথম প্রোডাক্টের variant/thumbnail।
 - সব `<img>`-এ `loading="lazy" decoding="async"`; `fonts.ts`-এ শুধু Hind Siliguri preload, বাকি ৫টা `preload: false`।
+
+## ২৪. ধাপ ২: duplicate, ভাসমান বাটন, Undo, শেয়ার ছবি, Custom CSS (2026-10-13)
+
+- **Duplicate:** `POST /landing/pages/{id}/duplicate` → `LandingPageController::duplicate()`। content/theme/seo/custom_css/products কপি করে নতুন **draft** বানায় (`"<title> (copy)"`, slug `<slug>-copy`, `-2` ইত্যাদি)। admin lock ও published অবস্থা কপি হয় না, প্যাকেজ লিমিট মানে। লিস্ট পেজে "কপি করুন" বাটন। টেস্ট: `tests/Feature/LandingPageDuplicateTest.php`।
+- **ভাসমান কল/WhatsApp বাটন:** `content.contact.{whatsapp, floating_buttons}` (ডিফল্ট বন্ধ)। WhatsApp নাম্বার খালি হলে `contact.phone` ব্যবহার হয়; `01XXXXXXXXX` → `wa.me/8801...`।
+- **ব্লক ডিলিটে Undo:** বিল্ডারে ১০ সেকেন্ডের টোস্ট, ব্লক আগের জায়গায় ফেরত আসে।
+- **শেয়ার ছবি:** `seo_meta.og_image`, `generateMetadata`-তে প্রথম অগ্রাধিকার।
+- **Custom CSS:** বিল্ডারের Settings ট্যাবে textarea (admin-template মোডে নেই); save payload-এ `custom_css` এখন পাঠানো হয়।

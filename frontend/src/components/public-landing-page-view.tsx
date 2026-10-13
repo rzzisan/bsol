@@ -269,7 +269,7 @@ export type PublicLandingPage = {
     countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
     video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
     spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
-    contact?: { phone?: string | null };
+    contact?: { phone?: string | null; whatsapp?: string | null; floating_buttons?: boolean | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
     settings?: { language?: "bn" | "en" | null; phone_validation_enabled?: boolean | null; phone_validation_message?: string | null } | null;
     layout_order?: Array<string | LayoutEntry>;
@@ -277,10 +277,20 @@ export type PublicLandingPage = {
   seo_meta?: {
     meta_title?: string | null;
     meta_description?: string | null;
+    og_image?: string | null;
   } | null;
   custom_css?: string | null;
   products?: PublicProduct[];
 };
+
+// wa.me needs the number in international form without "+" or spaces; a
+// local Bangladeshi 01XXXXXXXXX number gets the 880 country code.
+function whatsappLink(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return null;
+  const international = /^01\d{9}$/.test(digits) ? `88${digits}` : digits;
+  return `https://wa.me/${international}`;
+}
 
 function money(value: string | number | null | undefined) {
   const amount = Number(value ?? 0);
@@ -1142,6 +1152,9 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const defaultSettings = getDefaultSettings(language);
   const checkoutFields = (content.checkout_fields && content.checkout_fields.length > 0 ? content.checkout_fields : getDefaultCheckoutFields(language)).filter((field) => field.enabled);
   const stickyCtaEnabled = content.settings?.sticky_cta_enabled ?? true;
+  const floatingButtonsEnabled = content.contact?.floating_buttons ?? false;
+  const floatingPhone = content.contact?.phone?.trim() || "";
+  const floatingWhatsapp = whatsappLink(content.contact?.whatsapp?.trim() || floatingPhone);
   const phoneValidationEnabled = content.settings?.phone_validation_enabled ?? defaultSettings.phone_validation_enabled;
   const phoneValidationMessage = content.settings?.phone_validation_message || defaultSettings.phone_validation_message;
   const shippingCharge = shippingZone === "inside"
@@ -1861,6 +1874,21 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             </a>
           </p>
         </footer>
+      ) : null}
+
+      {floatingButtonsEnabled && (floatingPhone || floatingWhatsapp) ? (
+        <div className={`fixed right-4 z-40 flex flex-col gap-3 sm:bottom-6 ${stickyCtaEnabled ? "bottom-24" : "bottom-4"}`}>
+          {floatingWhatsapp ? (
+            <a href={floatingWhatsapp} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" className="flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition hover:scale-105">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true"><path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.79-1.47-1.76-1.65-2.06-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.61-.92-2.21-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.21 3.08.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.09 1.75-.72 2-1.41.25-.69.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35zM12.04 21.5h-.01a9.4 9.4 0 0 1-4.8-1.31l-.34-.2-3.57.94.95-3.48-.22-.36A9.42 9.42 0 0 1 2.6 12.04C2.6 6.84 6.84 2.6 12.05 2.6a9.38 9.38 0 0 1 6.68 2.77 9.38 9.38 0 0 1 2.76 6.68c0 5.2-4.24 9.45-9.45 9.45zm8.04-17.49A11.3 11.3 0 0 0 12.04.7C5.78.7.69 5.79.69 12.04c0 2 .52 3.95 1.52 5.67L.6 23.3l5.72-1.5a11.33 11.33 0 0 0 5.72 1.46h.01c6.25 0 11.34-5.09 11.34-11.34 0-3.03-1.18-5.88-3.31-8.02z" /></svg>
+            </a>
+          ) : null}
+          {floatingPhone ? (
+            <a href={`tel:${floatingPhone}`} aria-label={t.contactLabel} className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition hover:scale-105" style={{ backgroundColor: theme.primary }}>
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+            </a>
+          ) : null}
+        </div>
       ) : null}
 
       {stickyCtaEnabled ? (

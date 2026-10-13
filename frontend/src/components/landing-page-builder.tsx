@@ -332,6 +332,14 @@ const text = {
     insideDhaka: "ঢাকার ভিতরে (ডেলিভারি চার্জ)",
     outsideDhaka: "ঢাকার বাইরে (ডেলিভারি চার্জ)",
     contactPhone: "যোগাযোগ ফোন নাম্বার (ঐচ্ছিক)",
+    whatsappNumber: "WhatsApp নাম্বার (খালি রাখলে ফোন নাম্বারই ব্যবহার হবে)",
+    floatingButtons: "পেজের কোণে ভাসমান কল ও WhatsApp বাটন দেখান",
+    ogImage: "শেয়ার ছবি (Facebook/Messenger-এ লিংক শেয়ার করলে দেখাবে)",
+    ogImageHint: "খালি রাখলে hero ছবি, না থাকলে প্রথম প্রোডাক্টের ছবি ব্যবহার হবে। ১২০০×৬৩০ মাপ সবচেয়ে ভালো।",
+    customCss: "কাস্টম CSS (অ্যাডভান্সড)",
+    customCssHint: "শুধু এই পেজে প্রযোজ্য হবে। ভুল CSS পেজের ডিজাইন ভেঙে দিতে পারে।",
+    blockRemoved: "ব্লক মুছে ফেলা হয়েছে।",
+    undo: "ফেরত আনুন",
     addBlockHere: "ব্লক যোগ করুন",
     livePreview: "লাইভ প্রিভিউ",
     livePreviewHint: "মার্চেন্ট ঠিক এই ভিউ-টাই লাইভ পেজে দেখবে — একই কম্পোনেন্ট ব্যবহার করা হয়েছে।",
@@ -462,6 +470,14 @@ const text = {
     insideDhaka: "Inside Dhaka (delivery charge)",
     outsideDhaka: "Outside Dhaka (delivery charge)",
     contactPhone: "Contact phone (optional)",
+    whatsappNumber: "WhatsApp number (leave empty to use the phone number)",
+    floatingButtons: "Show floating call and WhatsApp buttons in the page corner",
+    ogImage: "Share image (shown when the link is shared on Facebook/Messenger)",
+    ogImageHint: "If empty, the hero image is used, else the first product's photo. 1200×630 works best.",
+    customCss: "Custom CSS (advanced)",
+    customCssHint: "Applies to this page only. Broken CSS can break the page's design.",
+    blockRemoved: "Block removed.",
+    undo: "Undo",
     addBlockHere: "Add block",
     livePreview: "Live preview",
     livePreviewHint: "This is exactly what a merchant will see on the live page — same component.",
@@ -532,6 +548,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const [shippingInsideDhaka, setShippingInsideDhaka] = useState("80");
   const [shippingOutsideDhaka, setShippingOutsideDhaka] = useState("120");
   const [contactPhone, setContactPhone] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [floatingButtons, setFloatingButtons] = useState(false);
+  const [ogImage, setOgImage] = useState("");
+  const [customCss, setCustomCss] = useState("");
+  const [lastRemoved, setLastRemoved] = useState<{ type: BlockType; item: Item; itemIndex: number; layoutIndex: number } | null>(null);
   const [thankYouTitle, setThankYouTitle] = useState(getDefaultThankYou("bn").title ?? "");
   const [thankYouMessage, setThankYouMessage] = useState(getDefaultThankYou("bn").message ?? "");
   const [thankYouShowSummary, setThankYouShowSummary] = useState(true);
@@ -682,6 +703,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setShippingInsideDhaka(String(merged.shipping?.inside_dhaka ?? 80));
       setShippingOutsideDhaka(String(merged.shipping?.outside_dhaka ?? 120));
       setContactPhone(merged.contact?.phone ?? "");
+      setWhatsappNumber(merged.contact?.whatsapp ?? "");
+      setFloatingButtons(merged.contact?.floating_buttons ?? false);
       setThankYouTitle(merged.thank_you?.title ?? "");
       setThankYouMessage(merged.thank_you?.message ?? "");
       setThankYouShowSummary(merged.thank_you?.show_order_summary ?? true);
@@ -798,6 +821,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setShippingInsideDhaka(String(merged.shipping?.inside_dhaka ?? 80));
           setShippingOutsideDhaka(String(merged.shipping?.outside_dhaka ?? 120));
           setContactPhone(merged.contact?.phone ?? "");
+      setWhatsappNumber(merged.contact?.whatsapp ?? "");
+      setFloatingButtons(merged.contact?.floating_buttons ?? false);
           const tplTheme = (initialTemplate.theme_settings ?? null) as ThemeSettings | null;
           if (tplTheme) {
             setTheme({
@@ -834,6 +859,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setStatus(loadedPage.status === "published" ? "published" : "draft");
           setMetaTitle(loadedPage.seo_meta?.meta_title ?? loadedPage.title ?? "");
           setMetaDescription(loadedPage.seo_meta?.meta_description ?? "");
+          setOgImage(loadedPage.seo_meta?.og_image ?? "");
+          setCustomCss(loadedPage.custom_css ?? "");
           setHeroHeadline(merged.hero?.headline ?? loadedPage.title ?? "");
           setHeroSubheadline(merged.hero?.subheadline ?? "");
           setHeroCtaText(merged.hero?.cta_text ?? "");
@@ -847,6 +874,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setShippingInsideDhaka(String(merged.shipping?.inside_dhaka ?? 80));
           setShippingOutsideDhaka(String(merged.shipping?.outside_dhaka ?? 120));
           setContactPhone(merged.contact?.phone ?? "");
+      setWhatsappNumber(merged.contact?.whatsapp ?? "");
+      setFloatingButtons(merged.contact?.floating_buttons ?? false);
           setThankYouTitle(merged.thank_you?.title ?? loadedThankYou.title ?? "");
           setThankYouMessage(merged.thank_you?.message ?? loadedThankYou.message ?? "");
           setThankYouShowSummary(merged.thank_you?.show_order_summary ?? true);
@@ -911,9 +940,40 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   }
 
   function removeBlock(type: BlockType, id: string) {
+    const item = contentState[type].find((candidate) => candidate.id === id);
+    if (item) {
+      setLastRemoved({
+        type,
+        item,
+        itemIndex: contentState[type].indexOf(item),
+        layoutIndex: layoutEntries.findIndex((entry) => entry.type === type && entry.id === id),
+      });
+    }
     setContentState((prev) => ({ ...prev, [type]: prev[type].filter((item) => item.id !== id) }));
     setLayoutEntries((prev) => prev.filter((entry) => !(entry.type === type && entry.id === id)));
   }
+
+  function undoRemoveBlock() {
+    if (!lastRemoved) return;
+    const { type, item, itemIndex, layoutIndex } = lastRemoved;
+    setContentState((prev) => {
+      const next = [...prev[type]];
+      next.splice(Math.min(itemIndex, next.length), 0, item);
+      return { ...prev, [type]: next };
+    });
+    setLayoutEntries((prev) => {
+      const next = [...prev];
+      next.splice(layoutIndex < 0 ? next.length : Math.min(layoutIndex, next.length), 0, { type, id: item.id });
+      return next;
+    });
+    setLastRemoved(null);
+  }
+
+  useEffect(() => {
+    if (!lastRemoved) return;
+    const timer = window.setTimeout(() => setLastRemoved(null), 10000);
+    return () => window.clearTimeout(timer);
+  }, [lastRemoved]);
 
   function duplicateBlock(type: BlockType, id: string) {
     const source = contentState[type].find((item) => item.id === id);
@@ -1102,7 +1162,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
 
   function applyMediaPick(url: string) {
     if (!mediaTarget) return;
-    if (mediaTarget.type === "hero") {
+    if (mediaTarget.type === "hero" && mediaTarget.field === "og_image") {
+      setOgImage(url);
+    } else if (mediaTarget.type === "hero") {
       setHeroImage(url);
     } else {
       patchItem(mediaTarget.type, mediaTarget.id, { [mediaTarget.field]: url });
@@ -1168,7 +1230,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       products_section_title: productsTitle || null,
       products_section_subtitle: productsSubtitle || null,
       checkout_fields: checkoutFields,
-      contact: { phone: contactPhone || null },
+      contact: { phone: contactPhone || null, whatsapp: whatsappNumber || null, floating_buttons: floatingButtons },
       shipping: {
         inside_dhaka: toNumberOrNull(shippingInsideDhaka) ?? 80,
         outside_dhaka: toNumberOrNull(shippingOutsideDhaka) ?? 120,
@@ -1210,11 +1272,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     template: page?.template ?? null,
     theme_settings: theme,
     content: buildContent() as PublicLandingPage["content"],
-    seo_meta: { meta_title: metaTitle || title, meta_description: metaDescription || null },
-    custom_css: page?.custom_css ?? null,
+    seo_meta: { meta_title: metaTitle || title, meta_description: metaDescription || null, og_image: ogImage || null },
+    custom_css: customCss || null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, stickyCtaEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, whatsappNumber, floatingButtons, ogImage, customCss, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, stickyCtaEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   // Everything a save sends, as one string, so "unsaved changes" is a plain
   // comparison against what was last loaded or saved.
@@ -1287,7 +1349,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
         slug: slug.trim() || undefined,
         status,
         content,
-        seo_meta: { meta_title: metaTitle || title, meta_description: metaDescription || null },
+        seo_meta: { meta_title: metaTitle || title, meta_description: metaDescription || null, og_image: ogImage || null },
+        custom_css: customCss || null,
         theme_settings: theme,
         template_id: selectedTemplateId ?? undefined,
         products: selectedProducts.map((item, index) => ({
@@ -1708,6 +1771,10 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <TextField label={t.metaTitle} value={metaTitle} onChange={setMetaTitle} />
                 <TextAreaField label={t.metaDescription} value={metaDescription} onChange={setMetaDescription} />
+                <div className="md:col-span-2">
+                  <ImagePickerField label={t.ogImage} value={ogImage} locale={locale} onPick={() => setMediaTarget({ type: "hero", id: "seo", field: "og_image" })} />
+                  <p className="mt-1 text-xs text-[var(--muted)]">{t.ogImageHint}</p>
+                </div>
               </div>
             </div>
 
@@ -1745,6 +1812,13 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
                 <div className="md:col-span-2">
                   <TextField label={t.contactPhone} value={contactPhone} onChange={setContactPhone} />
                 </div>
+                <div className="md:col-span-2">
+                  <TextField label={t.whatsappNumber} value={whatsappNumber} onChange={setWhatsappNumber} />
+                </div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)] md:col-span-2">
+                  <input type="checkbox" checked={floatingButtons} onChange={(e) => setFloatingButtons(e.target.checked)} className="accent-[var(--accent)]" />
+                  {t.floatingButtons}
+                </label>
               </div>
             </div>
           </div>
@@ -2045,6 +2119,23 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
               <p className="mt-1 text-xs text-[var(--muted)]">{t.stickyCtaEnabledHint}</p>
             </div>
 
+            {!isAdminTemplateMode ? (
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-[var(--foreground)]">{t.customCss}</span>
+                  <textarea
+                    value={customCss}
+                    onChange={(e) => setCustomCss(e.target.value)}
+                    rows={6}
+                    spellCheck={false}
+                    placeholder=".lp-shell h2 { letter-spacing: -0.01em; }"
+                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 font-mono text-xs text-[var(--foreground)]"
+                  />
+                </label>
+                <p className="mt-1 text-xs text-[var(--muted)]">{t.customCssHint}</p>
+              </div>
+            ) : null}
+
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
               <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.paymentChannelsTitle}</h4>
               <label className="mt-2 flex items-center gap-2 text-sm text-[var(--foreground)]">
@@ -2197,6 +2288,15 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
               })}
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {lastRemoved ? (
+        <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--foreground)] shadow-lg">
+          {t.blockRemoved}
+          <button type="button" onClick={undoRemoveBlock} className="font-semibold text-[var(--accent)] hover:underline">
+            {t.undo}
+          </button>
         </div>
       ) : null}
 

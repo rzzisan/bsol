@@ -129,7 +129,7 @@ export type LandingPageRecord = {
     countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
     video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
     spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
-    contact?: { phone?: string | null };
+    contact?: { phone?: string | null; whatsapp?: string | null; floating_buttons?: boolean | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
     thank_you?: ThankYouConfig | null;
     settings?: LandingPageSettings | null;
@@ -139,6 +139,7 @@ export type LandingPageRecord = {
   seo_meta?: {
     meta_title?: string | null;
     meta_description?: string | null;
+    og_image?: string | null;
     [key: string]: unknown;
   } | null;
   custom_css?: string | null;
@@ -231,7 +232,7 @@ export type LandingPageContent = {
   countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
   video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
   spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
-  contact?: { phone?: string | null };
+  contact?: { phone?: string | null; whatsapp?: string | null; floating_buttons?: boolean | null };
   shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
   thank_you?: ThankYouConfig | null;
   settings?: LandingPageSettings | null;

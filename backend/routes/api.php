@@ -505,6 +505,7 @@ Route::middleware('active_subscription')->group(function () {
         Route::put('/landing/pages/{id}', [LandingPageController::class, 'update'])->where('id', '[0-9]+');
         Route::delete('/landing/pages/{id}', [LandingPageController::class, 'destroy'])->where('id', '[0-9]+');
         Route::post('/landing/pages/{id}/publish', [LandingPageController::class, 'publish'])->where('id', '[0-9]+');
+        Route::post('/landing/pages/{id}/duplicate', [LandingPageController::class, 'duplicate'])->where('id', '[0-9]+');
 
         Route::prefix('landing/analytics')->group(function () {
             Route::get('/{landingPageId}/statistics', [LandingPageAnalyticsController::class, 'getStatistics'])->where('landingPageId', '[0-9]+');
