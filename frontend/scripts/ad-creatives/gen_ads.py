@@ -566,6 +566,529 @@ THEMES = {
         chips=["Two-Factor Authentication", "অ্যাডমিন অ্যাক্টিভিটি লগ", "রোল-ভিত্তিক অ্যাক্সেস"],
         cta="ফ্রি অ্যাকাউন্ট খুলুন →",
     ),
+
+    # -----------------------------------------------------------------
+    # Digital-product-only seller campaign (added 2026-09-02) — targets
+    # sellers who'll use the platform purely for e-book/course/software
+    # sales, never a physical product. No courier/waybill mentions here
+    # by design — that audience doesn't need it. Grounded in
+    # digital_product_context.md / SAAS_MODULE_CONTEXT.md §20 (Phase 1
+    # shipped 2026-08-20): hosted-file/external-URL delivery, email/SMS
+    # channel, OTP-gated download, COD excluded (wallet+gateway only),
+    # mixed cart blocked.
+    # -----------------------------------------------------------------
+    "digital_master": dict(
+        badge="শুধু ডিজিটাল প্রোডাক্ট বিক্রেতাদের জন্য",
+        headline=["কুরিয়ার ছাড়াই বিক্রি করুন", "|ই-বুক, কোর্স, সফটওয়্যার|"],
+        chips=["ইনস্ট্যান্ট ডেলিভারি", "OTP-গেটেড ডাউনলোড", "ইমেইল/SMS ডেলিভারি", "স্টক-কুরিয়ার লাগে না"],
+        subtext="পেমেন্ট কনফার্ম হলেই কাস্টমার সাথে সাথে প্রোডাক্ট পেয়ে যাবে",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "digital_instant": dict(
+        badge="ইনস্ট্যান্ট ডেলিভারি সিস্টেম",
+        headline=["পেমেন্ট হলেই", "|সেকেন্ডেই| ডেলিভারি"],
+        chips=["অটোমেটেড পেমেন্ট গেটওয়ে", "ইনস্ট্যান্ট ডাউনলোড লিংক", "কোনো ম্যানুয়াল কাজ নেই"],
+        subtext="কাস্টমারকে অপেক্ষা করাতে হবে না — পে করার সাথে সাথেই প্রোডাক্ট রেডি",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "digital_security": dict(
+        badge="পাইরেসি প্রোটেকশন",
+        headline=["লিংক শেয়ার হলেও", "|অন্য কেউ| ডাউনলোড পারবে না"],
+        chips=["OTP-ভেরিফাইড ডাউনলোড", "প্রাইভেট ফাইল হোস্টিং", "প্রতি অর্ডারে আলাদা লিংক"],
+        subtext="আপনার কনটেন্ট সুরক্ষিত থাকবে, শুধু আসল কাস্টমারই অ্যাক্সেস পাবে",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "digital_no_inventory": dict(
+        badge="কোনো স্টক বা গোডাউন লাগবে না",
+        headline=["একবার আপলোড করুন,", "|বারবার| বিক্রি করুন"],
+        chips=["কোনো ইনভেন্টরি নেই", "ওয়্যারহাউজ লাগে না", "একই ফাইলে আনলিমিটেড বিক্রি"],
+        subtext="ফিজিক্যাল প্রোডাক্টের ঝামেলা ছাড়াই ব্যবসা চালান",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "digital_creators": dict(
+        badge="কোর্স ও ই-বুক ক্রিয়েটরদের জন্য",
+        headline=["আপনার |কোর্স বা ই-বুক|", "বিক্রি করুন প্রফেশনালি"],
+        chips=["নিজের ল্যান্ডিং পেজ", "সিকিউর ডেলিভারি", "কাস্টমার রিভিউ"],
+        subtext="আলাদা কোর্স-প্ল্যাটফর্মের কমিশন দিতে হবে না — নিজের দামে, নিজের শপে বিক্রি করুন",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "digital_channels": dict(
+        badge="মাল্টি-চ্যানেল অটো-ডেলিভারি",
+        headline=["কাস্টমার পাবে", "|ইমেইল বা SMS|-এ, অটোমেটিক"],
+        chips=["ইমেইল ডেলিভারি", "SMS ডেলিভারি", "ডাউনলোড লিংক/এক্সটার্নাল URL"],
+        subtext="প্রতিটা প্রোডাক্টে আলাদা ডেলিভারি চ্যানেল সেট করতে পারবেন",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "digital_payment": dict(
+        badge="ইনস্ট্যান্ট পেমেন্ট = ইনস্ট্যান্ট ডেলিভারি",
+        headline=["পেমেন্ট কনফার্ম,", "|ডেলিভারিও| একই সেকেন্ডে"],
+        chips=["SSLCommerz", "bKash", "Nagad", "পার্সোনাল ওয়ালেট"],
+        subtext="ডিজিটাল প্রোডাক্টে COD নেই — পেমেন্ট কনফার্ম হলেই সরাসরি ডেলিভারি ট্রিগার হয়",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "digital_storefront": dict(
+        badge="ডিজিটাল প্রোডাক্টের জন্যও ফুল প্ল্যাটফর্ম",
+        headline=["স্টোরফ্রন্ট, ট্র্যাকিং —", "|সবই| ডিজিটাল প্রোডাক্টেও"],
+        chips=["নিজের সাবডোমেইনে শপ", "Facebook Pixel + CAPI", "সেলস অ্যানালিটিক্স"],
+        subtext="ফিজিক্যাল প্রোডাক্টের জন্য যা আছে, ডিজিটাল প্রোডাক্টেও একই সুবিধা পাবেন",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "digital_cta": dict(
+        badge="কার্ড ছাড়াই, ৫ মিনিটে",
+        headline=["আজই |ডিজিটাল প্রোডাক্ট|", "বিক্রি শুরু করুন"],
+        chips=["ইনস্ট্যান্ট ডেলিভারি", "OTP-গেটেড ডাউনলোড", "কুরিয়ার লাগে না"],
+        subtext="প্রোডাক্ট আপলোড করুন, পেমেন্ট গেটওয়ে কানেক্ট করুন — ব্যস, বিক্রি শুরু",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # -----------------------------------------------------------------
+    # Landing-page-builder-only campaign (added 2026-09-02) — targets
+    # sellers who run (or want to run) Facebook/Instagram ads and need a
+    # dedicated single-product campaign page, not the full storefront.
+    # Grounded in landing_page_context.md: block builder (§7-9,18),
+    # checkout-time OTP (§10, CheckoutOtpController), per-seller
+    # subdomain publish, visit/order analytics
+    # (LandingPageAnalyticsController), abandoned-checkout recovery +
+    # resume-checkout link + customer-value badge (§19), product
+    # variant support (§20).
+    # -----------------------------------------------------------------
+    "lp_master": dict(
+        badge="সিঙ্গেল-প্রোডাক্ট ক্যাম্পেইন পেজ",
+        headline=["একটা প্রোডাক্টের জন্য", "|হাই-কনভার্টিং| পেজ বানান"],
+        chips=["ব্লক-বিল্ডার", "OTP চেকআউট", "নিজের সাবডোমেইনে পাবলিশ", "ভিজিট-অর্ডার অ্যানালিটিক্স"],
+        subtext="বিজ্ঞাপনের ট্রাফিক থেকে সরাসরি অর্ডারে কনভার্ট করুন",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "lp_builder": dict(
+        badge="কোনো কোডিং লাগবে না",
+        headline=["ড্র্যাগ-ড্রপেই", "|নিজের| ল্যান্ডিং পেজ বানান"],
+        chips=["ফিচার গ্রিড ব্লক", "ট্রাস্ট ব্যাজ ব্লক", "মিডিয়া লাইব্রেরি", "থিম/ডিজাইন প্যানেল"],
+        subtext="ডেভেলপার ছাড়াই কয়েক মিনিটে প্রফেশনাল পেজ রেডি",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "lp_otp_checkout": dict(
+        badge="ফেইক অর্ডার প্রোটেকশন চেকআউটেই",
+        headline=["চেকআউটেই", "|OTP| দিয়ে ভেরিফাই"],
+        chips=["ফোন OTP ভেরিফিকেশন", "ফেইক অর্ডার ফিল্টার", "রিয়েল কাস্টমার শনাক্ত"],
+        subtext="ল্যান্ডিং পেজেই ফেইক অর্ডার আটকে দিন, কুরিয়ারে পাঠানোর আগেই",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "lp_abandoned_cart": dict(
+        badge="হারানো সেল ফিরিয়ে আনুন",
+        headline=["চেকআউট শেষ না করলেও", "|সেল| হারাবেন না"],
+        chips=["অ্যাবানডন্ড চেকআউট ট্র্যাকিং", "রিজিউম-চেকআউট লিংক", "কাস্টমার-ভ্যালু ব্যাজ"],
+        subtext="কে অর্ডার অসম্পূর্ণ রেখে গেছে জানুন, এক ক্লিকেই আবার কনভার্ট করুন",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "lp_analytics": dict(
+        badge="প্রতিটা ভিজিট ট্র্যাক হয়",
+        headline=["কতজন এলো,", "|কতজন| অর্ডার করলো — দেখুন"],
+        chips=["ভিজিট অ্যানালিটিক্স", "কনভার্সন রেট", "অর্ডার-টু-ভিজিট রেশিও"],
+        subtext="কোন বিজ্ঞাপন কাজ করছে বুঝে বাজেট ঠিক জায়গায় খরচ করুন",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "lp_subdomain": dict(
+        badge="নিজের সাবডোমেইনে লাইভ",
+        headline=["পেজ বানিয়ে", "|৫ মিনিটেই| লাইভ করুন"],
+        chips=["ফ্রি সাবডোমেইন", "SSL সিকিউরিটি", "বিজ্ঞাপনে সরাসরি লিংক দিন"],
+        subtext="আলাদা হোস্টিং-ডোমেইন কিনতে হবে না",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "lp_variants": dict(
+        badge="সাইজ, কালার — সব অপশন একই পেজে",
+        headline=["একই পেজে", "|ভ্যারিয়েন্ট| সিলেক্ট করে অর্ডার"],
+        chips=["প্রোডাক্ট ভ্যারিয়েন্ট সাপোর্ট", "সাইজ/কালার সিলেকশন", "স্টক-সঠিক অর্ডার"],
+        subtext="কাস্টমার সরাসরি পেজ থেকেই সঠিক ভ্যারিয়েন্ট বেছে অর্ডার করবে",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "lp_customer_trust": dict(
+        badge="নতুন vs পুরাতন কাস্টমার আলাদা করে দেখুন",
+        headline=["কে |বিশ্বস্ত| কাস্টমার,", "চেকআউটেই বুঝে যান"],
+        chips=["কাস্টমার-ভ্যালু ব্যাজ", "রিটার্নিং কাস্টমার শনাক্ত", "বিনামূল্যে, এক্সটার্নাল API লাগে না"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "lp_cta": dict(
+        badge="আজই বানান, আজই পাবলিশ করুন",
+        headline=["আপনার প্রথম", "|ল্যান্ডিং পেজ| বানান আজই"],
+        chips=["ফ্রি টেমপ্লেট", "৫ মিনিটে লাইভ", "OTP চেকআউট সহ"],
+        subtext="সাইনআপ করুন, প্রোডাক্ট যোগ করুন, বিজ্ঞাপন চালান",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # -----------------------------------------------------------------
+    # Incomplete order / abandoned checkout recovery campaign (added
+    # 2026-09-02) — its own dedicated ad set, deeper than the single
+    # `lp_abandoned_cart` angle in the landing-page campaign above.
+    # Grounded in landing_page_context.md §19 — scope is landing pages
+    # only (not storefront, no `abandoned` mentions in
+    # seller_storefront_context.md), and the doc explicitly says
+    # automated WhatsApp/SMS/Email recovery-message sending was NOT
+    # built (owner decision) — copy here must never claim automated
+    # follow-up, only capture/resume-link/dashboard + manual outreach.
+    # -----------------------------------------------------------------
+    "incomplete_master": dict(
+        badge="ইনকমপ্লিট অর্ডার রিকভারি",
+        headline=["চেকআউট শেষ না করলেও", "|অর্ডার| হারাবেন না"],
+        chips=["অটো-ক্যাপচার", "রিজিউম-চেকআউট লিংক", "কাস্টমার-ভ্যালু ব্যাজ", "CSV এক্সপোর্ট"],
+        subtext="কাস্টমার ফর্ম পূরণ করা শুরু করলেই ট্র্যাক হয়ে যায় — সাবমিট না করলেও",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "incomplete_capture": dict(
+        badge="সাবমিট করার আগেই ধরা পড়ে",
+        headline=["টাইপ করা শুরু করলেই", "|অটোমেটিক| ক্যাপচার হয়"],
+        chips=["নাম/ফোন এন্ট্রি হলেই ট্র্যাক", "কোনো ক্রন জব লাগে না", "ডুপ্লিকেট রো হয় না"],
+        subtext="২০ মিনিট অ্যাক্টিভিটি না থাকলে নিজে থেকেই 'অ্যাবানডন্ড' হিসেবে দেখা যায়",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "incomplete_resume_link": dict(
+        badge="এক ক্লিকেই আগের জায়গা থেকে শুরু",
+        headline=["রিজিউম লিংক পাঠান,", "|কাস্টমার| আবার ফিরে আসবে"],
+        chips=["এক ক্লিকে কপি করুন", "কার্ট ও তথ্য অটো-প্রিফিল", "নতুন করে টাইপ লাগবে না"],
+        subtext="আগে যা যা লিখেছিল, ফিরে এসে সবকিছু আগের মতোই পাবে",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "incomplete_customer_value": dict(
+        badge="কে আগের কাস্টমার, সাথে সাথে দেখুন",
+        headline=["এই লিড কি আগে থেকেই", "|কাস্টমার|? এক নজরে জানুন"],
+        chips=["মোট অর্ডার ও খরচের হিস্ট্রি", "রিস্ক লেভেল", "বিনামূল্যে, এক্সটার্নাল API লাগে না"],
+        subtext="কাকে আগে ফলোআপ করবেন বুঝে অগ্রাধিকার ঠিক করুন",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "incomplete_dashboard": dict(
+        badge="সব অসম্পূর্ণ অর্ডার এক জায়গায়",
+        headline=["প্রতিটা অসম্পূর্ণ অর্ডার", "|এক ড্যাশবোর্ডে| ম্যানেজ করুন"],
+        chips=["ফিল্টার ও সার্চ", "CSV এক্সপোর্ট", "ডিসমিস বা ডিলিট"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "incomplete_manual_followup": dict(
+        badge="নিজের চ্যানেলেই ফলোআপ করুন",
+        headline=["রিজিউম লিংক কপি করে", "|WhatsApp বা কলে| পাঠান"],
+        chips=["এক ক্লিকে লিংক কপি", "নিজের নম্বর থেকেই মেসেজ", "থার্ড-পার্টি টুল লাগে না"],
+        subtext="আপনি যেভাবে কাস্টমারের সাথে কথা বলেন, ঠিক সেভাবেই ফলোআপ করুন",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "incomplete_convert": dict(
+        badge="ফলোআপের ফলাফলও ট্র্যাক হয়",
+        headline=["রিয়েল অর্ডারে কনভার্ট হলে", "|অটোমেটিক| আপডেট হয়"],
+        chips=["অর্ডারের সাথে অটো-লিংক", "কনভার্সন স্ট্যাটাস", "ফলোআপ কাজ করছে কিনা বুঝুন"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "incomplete_cta": dict(
+        badge="আজই চালু করুন",
+        headline=["হারানো অর্ডার", "|ফিরিয়ে আনা| শুরু করুন আজই"],
+        chips=["ল্যান্ডিং পেজেই বিল্ট-ইন", "সেটআপ লাগে না", "সাইনআপের সাথেই রেডি"],
+        subtext="নতুন কিছু চালু করতে হবে না — ল্যান্ডিং পেজ থাকলেই কাজ করে",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # ===================================================================
+    # Per-module deep-dive campaigns (added 2026-09-02) — "standard" depth
+    # (user-selected: 3-4 angles per module, fewer for genuinely thin
+    # modules rather than padding). Each module keeps its original single
+    # generic theme (courier/fraud/payments/marketing/storefront/hosting/
+    # accounting/collection_history/staff_team/invoice_pdf/bulk_import/
+    # onboarding/ai_support/woocommerce/analytics/security_2fa above) and
+    # gets new theme keys below for the additional angles — no existing
+    # key is touched. Messenger lead-capture is deliberately NOT one of
+    # the marketing angles: pages_messaging is still rejected in App
+    # Review (facebook_integration_context.md §10) so it doesn't actually
+    # work yet for a new seller who isn't admin/dev/tester on the Meta
+    # app — same caution already applied to WhatsApp/auto-top-up.
+    # ===================================================================
+
+    # --- Courier (3) ---
+    "courier_waybill": dict(
+        badge="ব্র্যান্ডেড ওয়েবিল ও স্টিকার",
+        headline=["প্রতিটা অর্ডারের", "|ওয়েবিল/লেবেল| এক ক্লিকে"],
+        chips=["২২টা স্টিকার টেমপ্লেট", "Pathao-স্টাইল লেবেল", "সরাসরি প্রিন্ট"],
+        subtext="সেলার-সিলেক্টেবল ডিজাইন, প্রিভিউ থাম্বনেইল সহ",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "courier_realtime": dict(
+        badge="রিয়েল-টাইম স্ট্যাটাস সিঙ্ক",
+        headline=["কুরিয়ারের প্যানেলে", "|বারবার| চেক করতে হবে না"],
+        chips=["অটো স্ট্যাটাস আপডেট", "৫টা কুরিয়ার একসাথে", "অর্ডার টাইমলাইনে লগ"],
+        subtext="ডেলিভারি হলো কিনা জানতে আলাদা করে কুরিয়ার সাইটে যেতে হবে না",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "courier_bulk": dict(
+        badge="একসাথে অনেক অর্ডার বুকিং",
+        headline=["একটা একটা করে না,", "|বাল্ক বুকিং| করুন"],
+        chips=["মাল্টি-অর্ডার সিলেক্ট", "এক ক্লিকে সব বুক", "সময় বাঁচান"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Fraud (3) ---
+    "fraud_return_history": dict(
+        badge="৫টা কুরিয়ারের রিটার্ন-হিস্ট্রি একসাথে",
+        headline=["এই কাস্টমার আগে কতবার", "|রিটার্ন| করেছে? জানুন আগেই"],
+        chips=["অ্যাগ্রিগেটেড রিটার্ন স্কোর", "৫টা কুরিয়ারের ডেটা", "অটো রিস্ক ক্যালকুলেশন"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "fraud_blacklist": dict(
+        badge="বারবার সমস্যা করা কাস্টমার আটকান",
+        headline=["একবার ব্ল্যাকলিস্ট করুন,", "|বারবার| ফেইক অর্ডার বন্ধ"],
+        chips=["কাস্টমার ব্ল্যাকলিস্ট", "অটো-ফ্ল্যাগ রিপিট অ্যাবিউজার", "শপ-ওয়াইড প্রোটেকশন"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "fraud_otp": dict(
+        badge="চেকআউটেই ভেরিফিকেশন",
+        headline=["OTP দিয়ে", "|রিয়েল কাস্টমার| শনাক্ত করুন"],
+        chips=["ফোন OTP ভেরিফিকেশন", "কুরিয়ারে পাঠানোর আগেই ফিল্টার", "কম রিটার্ন, কম খরচ"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Payments (3) ---
+    "payments_gateways": dict(
+        badge="৭টা অটোমেটেড গেটওয়ে",
+        headline=["SSLCommerz, bKash, Nagad —", "|৭টা গেটওয়েই| রেডি"],
+        chips=["SSLCommerz", "bKash Merchant", "Nagad Merchant", "AamarPay/ZiniPay/ShurjoPay/EPS"],
+        subtext="ইনস্ট্যান্ট অটো-ভেরিফাই, ম্যানুয়াল TrxID রিভিউ করতে হবে না",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "payments_wallet": dict(
+        badge="মার্চেন্ট অ্যাকাউন্ট নেই? সমস্যা নেই",
+        headline=["পার্সোনাল bKash/Nagad নম্বরেও", "|পেমেন্ট| নিতে পারবেন"],
+        chips=["পার্সোনাল ওয়ালেট সাপোর্ট", "স্ক্রিনশট ভেরিফাই", "কোনো মার্চেন্ট রেজিস্ট্রেশন লাগে না"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "payments_choice": dict(
+        badge="কাস্টমারের পছন্দ, আপনার সুবিধা",
+        headline=["কাস্টমার |যেভাবেই| পে করুক,", "আপনি টাকা পাবেন"],
+        chips=["মাল্টি-গেটওয়ে চেকআউট", "COD-ও সাপোর্টেড", "একই ড্যাশবোর্ডে সব পেমেন্ট"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Marketing (2 — Messenger deliberately excluded, App Review pending) ---
+    "marketing_sms": dict(
+        badge="অর্ডার স্ট্যাটাসে অটো SMS",
+        headline=["অর্ডার কনফার্ম থেকে ডেলিভারি —", "|প্রতিটা ধাপে| অটো SMS"],
+        chips=["স্ট্যাটাস-ট্রিগারড অটোমেশন", "মাল্টি-গেটওয়ে SMS", "ক্রেডিট সিস্টেম সহ"],
+        subtext="কাস্টমারকে ম্যানুয়ালি মেসেজ করতে হবে না",
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "marketing_notification": dict(
+        badge="SMS + ইমেইল, এক জায়গা থেকে",
+        headline=["সব নোটিফিকেশন টেমপ্লেট", "|এক জায়গায়| ম্যানেজ করুন"],
+        chips=["SMS টেমপ্লেট", "ইমেইল টেমপ্লেট", "ইউজ-কেস অনুযায়ী বাইন্ডিং"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Storefront (3) ---
+    "storefront_themes": dict(
+        badge="রেডি থিম, নিজের মতো সাজান",
+        headline=["পছন্দের |থিম| বেছে নিন,", "নিজের শপ সাজান"],
+        chips=["Standard টেমপ্লেট", "CareSolution টেমপ্লেট", "কালার/ব্র্যান্ডিং কাস্টমাইজ"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "storefront_reviews": dict(
+        badge="কাস্টমার রিভিউ = বিশ্বাস",
+        headline=["প্রোডাক্ট পেজেই", "|কাস্টমার রিভিউ| দেখান"],
+        chips=["বিল্ট-ইন রিভিউ সিস্টেম", "নতুন কাস্টমারের আস্থা বাড়ায়", "কোনো এক্সটার্নাল প্লাগইন লাগে না"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "storefront_seo": dict(
+        badge="গুগলেও খুঁজে পাওয়া যাবে",
+        headline=["শুধু বিজ্ঞাপন না,", "|গুগল সার্চেও| দেখা যাবে"],
+        chips=["SEO-রেডি পেজ", "sitemap ও OG ট্যাগ", "স্ট্রাকচার্ড ডেটা"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Hosting (2 — thin module, kept honest) ---
+    "hosting_speed": dict(
+        badge="আজই শুরু করুন",
+        headline=["সাইনআপ থেকে লাইভ শপ —", "|৫ মিনিটেই|"],
+        chips=["কোনো টেকনিক্যাল সেটআপ নেই", "ফ্রি সাবডোমেইন", "তাৎক্ষণিক অ্যাক্সেস"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "hosting_ssl": dict(
+        badge="সিকিউরিটি বিল্ট-ইন",
+        headline=["SSL, আপটাইম, সার্ভার —", "|সব| আমরাই সামলাই"],
+        chips=["ফ্রি SSL সার্টিফিকেট", "৯৯.৯% আপটাইম", "কোনো এক্সট্রা খরচ নেই"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Accounting (3) ---
+    "accounting_ledger": dict(
+        badge="অর্ডার হলেই হিসাব লেখা হয়",
+        headline=["অর্ডার কনফার্ম বা ডেলিভারি —", "|লেজার| অটো আপডেট"],
+        chips=["অর্ডার-ট্রিগারড এন্ট্রি", "ম্যানুয়াল টাইপ করতে হয় না", "রিয়েল-টাইম হিসাব"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "accounting_courier_charge": dict(
+        badge="কুরিয়ার চার্জও হিসাবে থাকে",
+        headline=["ডেলিভারি চার্জ", "|আলাদা করে| ট্র্যাক করতে হবে না"],
+        chips=["অটো এক্সপেন্স এন্ট্রি", "কুরিয়ার-ভিত্তিক ব্রেকডাউন", "আসল প্রফিট বুঝুন"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "accounting_reports": dict(
+        badge="সামারি, এক্সপেন্স, প্রফিট",
+        headline=["মাস শেষে |প্রফিট| কত,", "রিপোর্টেই দেখুন"],
+        chips=["সামারি রিপোর্ট", "এক্সপেন্স ব্রেকডাউন", "প্রফিট ক্যালকুলেশন"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Collection history (2) ---
+    "collection_sources": dict(
+        badge="ম্যানুয়াল + কুরিয়ার COD, এক জায়গায়",
+        headline=["সব উৎসের কালেকশন", "|এক লিস্টে| দেখুন"],
+        chips=["ম্যানুয়াল কালেকশন", "কুরিয়ার COD", "ইউনিফাইড টাইমলাইন"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "collection_staff_filter": dict(
+        badge="কে কালেক্ট করলো, জানুন",
+        headline=["স্টাফ ও তারিখ দিয়ে", "|ফিল্টার| করে খুঁজুন"],
+        chips=["স্টাফ-ভিত্তিক ফিল্টার", "তারিখ রেঞ্জ", "অর্ডার নম্বর সার্চ"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Staff/team (3) ---
+    "staff_roles": dict(
+        badge="রোল-ভিত্তিক অ্যাক্সেস",
+        headline=["কে কোন মডিউল দেখবে,", "|আপনি| ঠিক করবেন"],
+        chips=["মডিউল-ভিত্তিক পারমিশন", "একাধিক স্টাফ অ্যাকাউন্ট", "কাস্টমাইজেবল রোল"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "staff_owner_control": dict(
+        badge="সংবেদনশীল সেটিংস শুধু আপনার হাতে",
+        headline=["কুরিয়ার-পেমেন্ট সেটিংস", "|শুধু| আপনি পাল্টাবেন"],
+        chips=["ওনার-অনলি সেটিংস", "স্টাফ কখনো টাচ করতে পারবে না", "নিয়ন্ত্রণ থাকবে আপনার হাতেই"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "staff_tracking": dict(
+        badge="স্টাফ পারফরম্যান্স দেখুন",
+        headline=["কোন স্টাফ কী করলো,", "|ট্র্যাক| থাকবে"],
+        chips=["অ্যাক্টিভিটি ভিজিবিলিটি", "দায়িত্ব বণ্টন সহজ", "টিম বড় হলেও নিয়ন্ত্রণ থাকবে"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Invoice/PDF (2) ---
+    "invoice_branded": dict(
+        badge="নিজের ব্র্যান্ডে ইনভয়েস",
+        headline=["প্রতিটা অর্ডারের", "|ব্র্যান্ডেড ইনভয়েস| রেডি"],
+        chips=["PDF ইনভয়েস", "নিজের শপের নাম/লোগো", "কাস্টমারকে দিন সরাসরি"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "invoice_instant": dict(
+        badge="ম্যানুয়ালি বানাতে হবে না",
+        headline=["এক ক্লিকে", "|জেনারেট, প্রিন্ট, ডাউনলোড|"],
+        chips=["ইনস্ট্যান্ট জেনারেশন", "ওয়ার্ড/এক্সেলে বানানো লাগবে না", "প্রতিটা অর্ডারে রেডি"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Bulk import (3) ---
+    "bulk_products": dict(
+        badge="হাজার প্রোডাক্ট এক CSV-তে",
+        headline=["প্রোডাক্ট একটা একটা", "|টাইপ| করতে হবে না"],
+        chips=["CSV প্রোডাক্ট ইমপোর্ট", "টেমপ্লেট ডাউনলোড", "বাল্কে ক্যাটালগ রেডি"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "bulk_orders": dict(
+        badge="অন্য প্ল্যাটফর্ম থেকে সুইচ করছেন?",
+        headline=["পুরনো অর্ডার ডেটা", "|কয়েক মিনিটেই| ইমপোর্ট"],
+        chips=["CSV অর্ডার ইমপোর্ট", "মাইগ্রেশন সহজ", "একসাথে অনেক অর্ডার"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "bulk_validation": dict(
+        badge="ভুল ডেটা আগেই ধরা পড়ে",
+        headline=["কমিট করার আগেই", "|ভুল সারি| হাইলাইট হয়"],
+        chips=["প্রিভিউ-তে ভ্যালিডেশন", "শুধু সঠিক সারি সেভ হয়", "কোনো করাপ্টেড ডেটা ঢোকে না"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Onboarding (3) ---
+    "onboarding_checklist": dict(
+        badge="ধাপে ধাপে গাইড",
+        headline=["কী করতে হবে,", "|চেকলিস্টই| বলে দেবে"],
+        chips=["প্রোফাইল-প্রোডাক্ট-কুরিয়ার-পেমেন্ট", "লাইভ ডেটা থেকে ধাপ", "ডিসমিসেবল"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "onboarding_demo": dict(
+        badge="খালি ড্যাশবোর্ডে আটকাবেন না",
+        headline=["ডেমো ডেটা দিয়ে", "|আগেই| প্রিভিউ দেখুন"],
+        chips=["৩টা ডেমো প্রোডাক্ট", "লাইভ শপে কখনো দেখাবে না", "ফিচার বুঝে তারপর শুরু করুন"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "onboarding_help": dict(
+        badge="প্রতি পেজেই সাহায্য",
+        headline=["কোথাও আটকে গেলে,", "|হেল্প গাইড| রেডি"],
+        chips=["প্রতি পেজে গাইড", "একা লাগবে না", "নতুন সেলারদের জন্য বিশেষভাবে বানানো"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- AI support (3) ---
+    "ai_diagnosis": dict(
+        badge="\"কেন কাজ করছে না\" — তাৎক্ষণিক উত্তর",
+        headline=["সমস্যার |কারণ|", "সাথে সাথেই বলে দেবে"],
+        chips=["রিয়েল অ্যাকাউন্ট ডেটা দেখে ডায়াগনোসিস", "SMS/পেমেন্ট/অর্ডার ইস্যু", "এজেন্টের জন্য অপেক্ষা নেই"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "ai_helpbutton": dict(
+        badge="প্রতি পেজে হেল্প বাটন",
+        headline=["\"এটা কীভাবে ব্যবহার করব?\"", "|এক ক্লিকেই| উত্তর"],
+        chips=["পেজ-স্পেসিফিক গাইড", "কোনো ডকুমেন্টেশন খুঁজতে হবে না", "সব ড্যাশবোর্ড পেজেই আছে"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "ai_escalation": dict(
+        badge="বুঝে-শুনে টিমে পাঠায়",
+        headline=["না বুঝলে চুপচাপ না,", "|জিজ্ঞেস| করে টিকেট খোলে"],
+        chips=["জরুরি হলে সরাসরি এসকেলেট", "সাধারণ প্রশ্নে আগে জিজ্ঞেস করে", "পুরো চ্যাট-ইতিহাস টিকেটে যোগ হয়"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- WooCommerce (3) ---
+    "woo_sync": dict(
+        badge="দুই দিকেই সিঙ্ক হয়",
+        headline=["WordPress আর BSOL —", "|প্রোডাক্ট/অর্ডার| সবসময় মিলবে"],
+        chips=["টু-ওয়ে সিঙ্ক", "রিয়েল-টাইম আপডেট", "ম্যানুয়াল মেলাতে হবে না"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "woo_courier_payment": dict(
+        badge="একই ইঞ্জিন, নিজের সাইটেও",
+        headline=["WooCommerce অর্ডারেও", "|৫টা কুরিয়ার| বুক করুন"],
+        chips=["একই কুরিয়ার ইঞ্জিন", "একই পেমেন্ট গেটওয়ে", "একই ড্যাশবোর্ড থেকে ম্যানেজ"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "woo_extra": dict(
+        badge="ফ্রড ও ট্র্যাকিংও পোর্ট হয়ে যায়",
+        headline=["OTP চেকআউট, ফ্রড প্রোটেকশন,", "Pixel — |সবই| ওয়ার্ডপ্রেসে"],
+        chips=["চেকআউট OTP", "ফ্রড ফিল্টার", "Facebook CAPI"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Analytics (3) ---
+    "analytics_sales": dict(
+        badge="সেলস ফানেল রিয়েল ডেটায়",
+        headline=["কোন প্রোডাক্ট", "|সবচেয়ে বেশি| বিক্রি হচ্ছে"],
+        chips=["সেলস ফানেল", "টপ প্রোডাক্ট", "ডেইলি ট্রেন্ড"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "analytics_customer": dict(
+        badge="কাস্টমার ইন্টেলিজেন্স",
+        headline=["কে VIP, কে |রিস্কি|", "কাস্টমার — আলাদা করে দেখুন"],
+        chips=["লয়াল/VIP/রিস্কি সেগমেন্ট", "রিপিট-বায়ার রেট", "এলাকা-ভিত্তিক ব্রেকডাউন"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "analytics_courier": dict(
+        badge="কুরিয়ার-ভিত্তিক পারফরম্যান্স",
+        headline=["কোন কুরিয়ারে", "|সাকসেস রেট| সবচেয়ে ভালো"],
+        chips=["সাকসেস/রিটার্ন রেট", "গড় ডেলিভারি সময়", "চার্জ তুলনা"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+
+    # --- Security (2) ---
+    "security_totp": dict(
+        badge="TOTP 2FA, RFC 6238",
+        headline=["পাসওয়ার্ড ছাড়াও", "|দ্বিতীয় স্তরের| সুরক্ষা"],
+        chips=["Authenticator App সাপোর্ট", "রিকভারি কোড", "লগইন চ্যালেঞ্জ ফ্লো"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
+    "security_audit": dict(
+        badge="কে কী পরিবর্তন করলো",
+        headline=["গুরুত্বপূর্ণ অ্যাডমিন অ্যাকশনের", "|অডিট লগ| থাকবে"],
+        chips=["ইউজার/প্যাকেজ পরিবর্তন লগ", "পেমেন্ট অ্যাপ্রুভাল লগ", "স্কেল বাড়লেও জবাবদিহিতা"],
+        cta="ফ্রি অ্যাকাউন্ট খুলুন →",
+    ),
 }
 
 # ---------------------------------------------------------------------------
@@ -596,6 +1119,83 @@ MANIFEST = [
     ("landscape-analytics-dark",          1200, 630, "analytics",          "dark", "landscape"),
     ("landscape-security-dark",           1200, 630, "security_2fa",       "dark", "landscape"),
 
+    # Digital-product-only seller campaign (landscape)
+    ("landscape-digital-master-dark",       1200, 630, "digital_master",       "dark", "landscape"),
+    ("landscape-digital-instant-dark",      1200, 630, "digital_instant",      "dark", "landscape"),
+    ("landscape-digital-security-dark",     1200, 630, "digital_security",     "dark", "landscape"),
+    ("landscape-digital-no-inventory-dark", 1200, 630, "digital_no_inventory", "dark", "landscape"),
+    ("landscape-digital-creators-dark",     1200, 630, "digital_creators",     "dark", "landscape"),
+    ("landscape-digital-channels-dark",     1200, 630, "digital_channels",     "dark", "landscape"),
+    ("landscape-digital-payment-dark",      1200, 630, "digital_payment",      "dark", "landscape"),
+    ("landscape-digital-storefront-dark",   1200, 630, "digital_storefront",   "dark", "landscape"),
+    ("landscape-digital-cta-dark",          1200, 630, "digital_cta",          "dark", "landscape"),
+
+    # Landing-page-builder-only campaign (landscape)
+    ("landscape-lp-master-dark",          1200, 630, "lp_master",          "dark", "landscape"),
+    ("landscape-lp-builder-dark",         1200, 630, "lp_builder",         "dark", "landscape"),
+    ("landscape-lp-otp-checkout-dark",    1200, 630, "lp_otp_checkout",    "dark", "landscape"),
+    ("landscape-lp-abandoned-cart-dark",  1200, 630, "lp_abandoned_cart",  "dark", "landscape"),
+    ("landscape-lp-analytics-dark",       1200, 630, "lp_analytics",       "dark", "landscape"),
+    ("landscape-lp-subdomain-dark",       1200, 630, "lp_subdomain",       "dark", "landscape"),
+    ("landscape-lp-variants-dark",        1200, 630, "lp_variants",        "dark", "landscape"),
+    ("landscape-lp-customer-trust-dark",  1200, 630, "lp_customer_trust",  "dark", "landscape"),
+    ("landscape-lp-cta-dark",             1200, 630, "lp_cta",             "dark", "landscape"),
+
+    # Incomplete order / abandoned checkout recovery campaign (landscape)
+    ("landscape-incomplete-master-dark",          1200, 630, "incomplete_master",          "dark", "landscape"),
+    ("landscape-incomplete-capture-dark",         1200, 630, "incomplete_capture",         "dark", "landscape"),
+    ("landscape-incomplete-resume-link-dark",     1200, 630, "incomplete_resume_link",     "dark", "landscape"),
+    ("landscape-incomplete-customer-value-dark",  1200, 630, "incomplete_customer_value",  "dark", "landscape"),
+    ("landscape-incomplete-dashboard-dark",       1200, 630, "incomplete_dashboard",       "dark", "landscape"),
+    ("landscape-incomplete-manual-followup-dark", 1200, 630, "incomplete_manual_followup", "dark", "landscape"),
+    ("landscape-incomplete-convert-dark",         1200, 630, "incomplete_convert",         "dark", "landscape"),
+    ("landscape-incomplete-cta-dark",             1200, 630, "incomplete_cta",             "dark", "landscape"),
+
+    # Per-module deep-dive campaigns (landscape) — standard depth (2026-09-02)
+    ("landscape-courier-waybill-dark",          1200, 630, "courier_waybill",          "dark", "landscape"),
+    ("landscape-courier-realtime-dark",         1200, 630, "courier_realtime",         "dark", "landscape"),
+    ("landscape-courier-bulk-dark",             1200, 630, "courier_bulk",             "dark", "landscape"),
+    ("landscape-fraud-return-history-dark",     1200, 630, "fraud_return_history",     "dark", "landscape"),
+    ("landscape-fraud-blacklist-dark",          1200, 630, "fraud_blacklist",          "dark", "landscape"),
+    ("landscape-fraud-otp-dark",                1200, 630, "fraud_otp",                "dark", "landscape"),
+    ("landscape-payments-gateways-dark",        1200, 630, "payments_gateways",        "dark", "landscape"),
+    ("landscape-payments-wallet-dark",          1200, 630, "payments_wallet",          "dark", "landscape"),
+    ("landscape-payments-choice-dark",          1200, 630, "payments_choice",          "dark", "landscape"),
+    ("landscape-marketing-sms-dark",            1200, 630, "marketing_sms",            "dark", "landscape"),
+    ("landscape-marketing-notification-dark",   1200, 630, "marketing_notification",   "dark", "landscape"),
+    ("landscape-storefront-themes-dark",        1200, 630, "storefront_themes",        "dark", "landscape"),
+    ("landscape-storefront-reviews-dark",       1200, 630, "storefront_reviews",       "dark", "landscape"),
+    ("landscape-storefront-seo-dark",           1200, 630, "storefront_seo",           "dark", "landscape"),
+    ("landscape-hosting-speed-dark",            1200, 630, "hosting_speed",            "dark", "landscape"),
+    ("landscape-hosting-ssl-dark",              1200, 630, "hosting_ssl",              "dark", "landscape"),
+    ("landscape-accounting-ledger-dark",        1200, 630, "accounting_ledger",        "dark", "landscape"),
+    ("landscape-accounting-courier-charge-dark",1200, 630, "accounting_courier_charge","dark", "landscape"),
+    ("landscape-accounting-reports-dark",       1200, 630, "accounting_reports",       "dark", "landscape"),
+    ("landscape-collection-sources-dark",       1200, 630, "collection_sources",       "dark", "landscape"),
+    ("landscape-collection-staff-filter-dark",  1200, 630, "collection_staff_filter",  "dark", "landscape"),
+    ("landscape-staff-roles-dark",              1200, 630, "staff_roles",              "dark", "landscape"),
+    ("landscape-staff-owner-control-dark",      1200, 630, "staff_owner_control",      "dark", "landscape"),
+    ("landscape-staff-tracking-dark",           1200, 630, "staff_tracking",           "dark", "landscape"),
+    ("landscape-invoice-branded-dark",          1200, 630, "invoice_branded",          "dark", "landscape"),
+    ("landscape-invoice-instant-dark",          1200, 630, "invoice_instant",          "dark", "landscape"),
+    ("landscape-bulk-products-dark",            1200, 630, "bulk_products",            "dark", "landscape"),
+    ("landscape-bulk-orders-dark",              1200, 630, "bulk_orders",              "dark", "landscape"),
+    ("landscape-bulk-validation-dark",          1200, 630, "bulk_validation",          "dark", "landscape"),
+    ("landscape-onboarding-checklist-dark",     1200, 630, "onboarding_checklist",     "dark", "landscape"),
+    ("landscape-onboarding-demo-dark",          1200, 630, "onboarding_demo",          "dark", "landscape"),
+    ("landscape-onboarding-help-dark",          1200, 630, "onboarding_help",          "dark", "landscape"),
+    ("landscape-ai-diagnosis-dark",             1200, 630, "ai_diagnosis",             "dark", "landscape"),
+    ("landscape-ai-helpbutton-dark",            1200, 630, "ai_helpbutton",            "dark", "landscape"),
+    ("landscape-ai-escalation-dark",            1200, 630, "ai_escalation",            "dark", "landscape"),
+    ("landscape-woo-sync-dark",                 1200, 630, "woo_sync",                 "dark", "landscape"),
+    ("landscape-woo-courier-payment-dark",      1200, 630, "woo_courier_payment",      "dark", "landscape"),
+    ("landscape-woo-extra-dark",                1200, 630, "woo_extra",                "dark", "landscape"),
+    ("landscape-analytics-sales-dark",          1200, 630, "analytics_sales",          "dark", "landscape"),
+    ("landscape-analytics-customer-dark",       1200, 630, "analytics_customer",       "dark", "landscape"),
+    ("landscape-analytics-courier-dark",        1200, 630, "analytics_courier",        "dark", "landscape"),
+    ("landscape-security-totp-dark",            1200, 630, "security_totp",            "dark", "landscape"),
+    ("landscape-security-audit-dark",           1200, 630, "security_audit",           "dark", "landscape"),
+
     # Square 1080x1080 — Facebook/Instagram feed
     ("square-master-dark",  1080, 1080, "master",   "dark",  "stack"),
     ("square-master-light", 1080, 1080, "master",   "light", "stack"),
@@ -618,6 +1218,83 @@ MANIFEST = [
     ("square-woocommerce-dark",        1080, 1080, "woocommerce",        "dark", "stack"),
     ("square-analytics-dark",          1080, 1080, "analytics",          "dark", "stack"),
     ("square-security-dark",           1080, 1080, "security_2fa",       "dark", "stack"),
+
+    # Digital-product-only seller campaign (square)
+    ("square-digital-master-dark",       1080, 1080, "digital_master",       "dark", "stack"),
+    ("square-digital-instant-dark",      1080, 1080, "digital_instant",      "dark", "stack"),
+    ("square-digital-security-dark",     1080, 1080, "digital_security",     "dark", "stack"),
+    ("square-digital-no-inventory-dark", 1080, 1080, "digital_no_inventory", "dark", "stack"),
+    ("square-digital-creators-dark",     1080, 1080, "digital_creators",     "dark", "stack"),
+    ("square-digital-channels-dark",     1080, 1080, "digital_channels",     "dark", "stack"),
+    ("square-digital-payment-dark",      1080, 1080, "digital_payment",      "dark", "stack"),
+    ("square-digital-storefront-dark",   1080, 1080, "digital_storefront",   "dark", "stack"),
+    ("square-digital-cta-dark",          1080, 1080, "digital_cta",          "dark", "stack"),
+
+    # Landing-page-builder-only campaign (square)
+    ("square-lp-master-dark",          1080, 1080, "lp_master",          "dark", "stack"),
+    ("square-lp-builder-dark",         1080, 1080, "lp_builder",         "dark", "stack"),
+    ("square-lp-otp-checkout-dark",    1080, 1080, "lp_otp_checkout",    "dark", "stack"),
+    ("square-lp-abandoned-cart-dark",  1080, 1080, "lp_abandoned_cart",  "dark", "stack"),
+    ("square-lp-analytics-dark",       1080, 1080, "lp_analytics",       "dark", "stack"),
+    ("square-lp-subdomain-dark",       1080, 1080, "lp_subdomain",       "dark", "stack"),
+    ("square-lp-variants-dark",        1080, 1080, "lp_variants",        "dark", "stack"),
+    ("square-lp-customer-trust-dark",  1080, 1080, "lp_customer_trust",  "dark", "stack"),
+    ("square-lp-cta-dark",             1080, 1080, "lp_cta",             "dark", "stack"),
+
+    # Incomplete order / abandoned checkout recovery campaign (square)
+    ("square-incomplete-master-dark",          1080, 1080, "incomplete_master",          "dark", "stack"),
+    ("square-incomplete-capture-dark",         1080, 1080, "incomplete_capture",         "dark", "stack"),
+    ("square-incomplete-resume-link-dark",     1080, 1080, "incomplete_resume_link",     "dark", "stack"),
+    ("square-incomplete-customer-value-dark",  1080, 1080, "incomplete_customer_value",  "dark", "stack"),
+    ("square-incomplete-dashboard-dark",       1080, 1080, "incomplete_dashboard",       "dark", "stack"),
+    ("square-incomplete-manual-followup-dark", 1080, 1080, "incomplete_manual_followup", "dark", "stack"),
+    ("square-incomplete-convert-dark",         1080, 1080, "incomplete_convert",         "dark", "stack"),
+    ("square-incomplete-cta-dark",             1080, 1080, "incomplete_cta",             "dark", "stack"),
+
+    # Per-module deep-dive campaigns (square) — standard depth (2026-09-02)
+    ("square-courier-waybill-dark",          1080, 1080, "courier_waybill",          "dark", "stack"),
+    ("square-courier-realtime-dark",         1080, 1080, "courier_realtime",         "dark", "stack"),
+    ("square-courier-bulk-dark",             1080, 1080, "courier_bulk",             "dark", "stack"),
+    ("square-fraud-return-history-dark",     1080, 1080, "fraud_return_history",     "dark", "stack"),
+    ("square-fraud-blacklist-dark",          1080, 1080, "fraud_blacklist",          "dark", "stack"),
+    ("square-fraud-otp-dark",                1080, 1080, "fraud_otp",                "dark", "stack"),
+    ("square-payments-gateways-dark",        1080, 1080, "payments_gateways",        "dark", "stack"),
+    ("square-payments-wallet-dark",          1080, 1080, "payments_wallet",          "dark", "stack"),
+    ("square-payments-choice-dark",          1080, 1080, "payments_choice",          "dark", "stack"),
+    ("square-marketing-sms-dark",            1080, 1080, "marketing_sms",            "dark", "stack"),
+    ("square-marketing-notification-dark",   1080, 1080, "marketing_notification",   "dark", "stack"),
+    ("square-storefront-themes-dark",        1080, 1080, "storefront_themes",        "dark", "stack"),
+    ("square-storefront-reviews-dark",       1080, 1080, "storefront_reviews",       "dark", "stack"),
+    ("square-storefront-seo-dark",           1080, 1080, "storefront_seo",           "dark", "stack"),
+    ("square-hosting-speed-dark",            1080, 1080, "hosting_speed",            "dark", "stack"),
+    ("square-hosting-ssl-dark",              1080, 1080, "hosting_ssl",              "dark", "stack"),
+    ("square-accounting-ledger-dark",        1080, 1080, "accounting_ledger",        "dark", "stack"),
+    ("square-accounting-courier-charge-dark",1080, 1080, "accounting_courier_charge","dark", "stack"),
+    ("square-accounting-reports-dark",       1080, 1080, "accounting_reports",       "dark", "stack"),
+    ("square-collection-sources-dark",       1080, 1080, "collection_sources",       "dark", "stack"),
+    ("square-collection-staff-filter-dark",  1080, 1080, "collection_staff_filter",  "dark", "stack"),
+    ("square-staff-roles-dark",              1080, 1080, "staff_roles",              "dark", "stack"),
+    ("square-staff-owner-control-dark",      1080, 1080, "staff_owner_control",      "dark", "stack"),
+    ("square-staff-tracking-dark",           1080, 1080, "staff_tracking",           "dark", "stack"),
+    ("square-invoice-branded-dark",          1080, 1080, "invoice_branded",          "dark", "stack"),
+    ("square-invoice-instant-dark",          1080, 1080, "invoice_instant",          "dark", "stack"),
+    ("square-bulk-products-dark",            1080, 1080, "bulk_products",            "dark", "stack"),
+    ("square-bulk-orders-dark",              1080, 1080, "bulk_orders",              "dark", "stack"),
+    ("square-bulk-validation-dark",          1080, 1080, "bulk_validation",          "dark", "stack"),
+    ("square-onboarding-checklist-dark",     1080, 1080, "onboarding_checklist",     "dark", "stack"),
+    ("square-onboarding-demo-dark",          1080, 1080, "onboarding_demo",          "dark", "stack"),
+    ("square-onboarding-help-dark",          1080, 1080, "onboarding_help",          "dark", "stack"),
+    ("square-ai-diagnosis-dark",             1080, 1080, "ai_diagnosis",             "dark", "stack"),
+    ("square-ai-helpbutton-dark",            1080, 1080, "ai_helpbutton",            "dark", "stack"),
+    ("square-ai-escalation-dark",            1080, 1080, "ai_escalation",            "dark", "stack"),
+    ("square-woo-sync-dark",                 1080, 1080, "woo_sync",                 "dark", "stack"),
+    ("square-woo-courier-payment-dark",      1080, 1080, "woo_courier_payment",      "dark", "stack"),
+    ("square-woo-extra-dark",                1080, 1080, "woo_extra",                "dark", "stack"),
+    ("square-analytics-sales-dark",          1080, 1080, "analytics_sales",          "dark", "stack"),
+    ("square-analytics-customer-dark",       1080, 1080, "analytics_customer",       "dark", "stack"),
+    ("square-analytics-courier-dark",        1080, 1080, "analytics_courier",        "dark", "stack"),
+    ("square-security-totp-dark",            1080, 1080, "security_totp",            "dark", "stack"),
+    ("square-security-audit-dark",           1080, 1080, "security_audit",           "dark", "stack"),
 
     # Portrait 1080x1350 — Instagram feed portrait
     ("portrait-master-dark", 1080, 1350, "master", "dark", "stack"),
