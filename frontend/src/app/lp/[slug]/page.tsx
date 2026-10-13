@@ -54,9 +54,10 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
   const title = page.seo_meta?.meta_title || page.title;
   const description = page.seo_meta?.meta_description || page.content?.hero?.subheadline || page.title;
   // Facebook/Messenger link previews need og:image, and these pages are
-  // mostly shared and advertised there. Hero image first, else the first
-  // attached product's photo.
-  const image = page.content?.hero?.background_image_url
+  // mostly shared and advertised there. The seller's own share image first,
+  // then the hero image, then the first attached product's photo.
+  const image = page.seo_meta?.og_image
+    || page.content?.hero?.background_image_url
     || page.products?.map((item) => item.variant?.image_url || item.product?.thumbnail).find(Boolean)
     || undefined;
 

@@ -203,6 +203,29 @@ function LandingPagesContent() {
     }
   };
 
+  const duplicatePage = async (pageId: number) => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) return;
+    setBusyId(pageId);
+    setFlash(null);
+    setFlashError(null);
+    try {
+      const res = await fetch(`${LANDING_API_BASE}/landing/pages/${pageId}/duplicate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setFlash(locale === "bn" ? "পেজের কপি তৈরি হয়েছে (draft)।" : "Page duplicated as a draft.");
+        await loadPages();
+      } else {
+        setFlashError(data.message || (locale === "bn" ? "পেজ কপি করা যায়নি।" : "Could not duplicate the page."));
+      }
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const copyUrl = async (url?: string) => {
     if (!url) return;
     try {
@@ -314,6 +337,9 @@ function LandingPagesContent() {
                             {locale === "bn" ? "Unpublish" : "Unpublish"}
                           </button>
                         )}
+                        <button type="button" disabled={busyId === page.id} onClick={() => void duplicatePage(page.id)} className="font-medium text-[var(--accent)] hover:underline disabled:opacity-50">
+                          {locale === "bn" ? "কপি করুন" : "Duplicate"}
+                        </button>
                         <button type="button" disabled={busyId === page.id} onClick={() => void deletePage(page.id)} className="font-medium text-red-400 hover:underline disabled:opacity-50">
                           {locale === "bn" ? "Delete" : "Delete"}
                         </button>

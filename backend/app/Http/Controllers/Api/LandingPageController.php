@@ -642,6 +642,54 @@ class LandingPageController extends Controller
         ]);
     }
 
+    /**
+     * Copy a page (content, design, SEO, attached products) into a new
+     * draft so a seller can reuse a working page for another product.
+     * Never copies admin-lock state or the published status.
+     */
+    public function duplicate(int $id): JsonResponse
+    {
+        $actingUserId = auth()->id();
+        $shopUserIds = auth()->user()->shopUserIds();
+        $source = LandingPage::query()->whereIn('user_id', $shopUserIds)->with('products')->findOrFail($id);
+
+        if ($response = $this->landingPageLimitResponse($shopUserIds)) {
+            return $response;
+        }
+
+        $page = DB::transaction(function () use ($source, $actingUserId) {
+            $title = Str::limit($source->title, 170, '') . ' (copy)';
+
+            $page = LandingPage::create([
+                'user_id' => $actingUserId,
+                'template_id' => $source->template_id,
+                'title' => $title,
+                'slug' => $this->resolveSlug($source->slug . '-copy', $title),
+                'status' => 'draft',
+                'theme_settings' => $source->theme_settings,
+                'content' => $source->content,
+                'seo_meta' => $source->seo_meta,
+                'custom_css' => $source->custom_css,
+                'published_at' => null,
+            ]);
+
+            foreach ($source->products as $product) {
+                $copy = $product->replicate();
+                $copy->landing_page_id = $page->id;
+                $copy->save();
+            }
+
+            return $page;
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => array_merge($page->toArray(), [
+                'public_url' => $this->publicUrlFor($page),
+            ]),
+        ], 201);
+    }
+
     public function publish(int $id): JsonResponse
     {
         $page = LandingPage::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
