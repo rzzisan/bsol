@@ -256,6 +256,9 @@ export type LandingPageSettings = {
   // pixel id it resolves to lives on tracking_destinations, never here
   // (tracking_capi_context.md §8.8).
   tracking_enabled?: boolean | null;
+  // Mobile-only "order now" bar fixed to the bottom of the screen; on unless
+  // the seller turns it off.
+  sticky_cta_enabled?: boolean | null;
   // Which checkout payment channels THIS page offers — subset of
   // 'cod'/'bkash'/'nagad'/'rocket' (only the ones the seller has also
   // turned on shop-wide in Settings → Online Payment Channels). null/unset
@@ -425,6 +428,7 @@ export function mergeLandingContent(
       // Not part of DefaultSettingsShape — it isn't language-dependent like
       // the fields above, just an on/off toggle defaulting to on.
       tracking_enabled: pageContent.settings?.tracking_enabled ?? templateContent.settings?.tracking_enabled ?? true,
+      sticky_cta_enabled: pageContent.settings?.sticky_cta_enabled ?? templateContent.settings?.sticky_cta_enabled ?? true,
       // No default value here on purpose — null means "offer everything
       // the shop enabled", see the type comment above.
       payment_channels: pageContent.settings?.payment_channels ?? templateContent.settings?.payment_channels ?? null,

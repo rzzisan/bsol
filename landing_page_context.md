@@ -428,3 +428,12 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 **ফিক্স:** `route('landing-pages.show', ...)` বদলে একই ফাইলে already আগে থেকে থাকা `$this->publicUrlFor($page)` হেল্পার ব্যবহার করা হয়েছে (এই একই ফাইলে বাকি সব জায়গায় `public_url` এভাবেই বানানো হয় — `publicShow()`, `publicSubmitOrder()`, ইত্যাদি)। Rollback দরকার হয়নি, one-line ফিক্স। Tinker দিয়ে সরাসরি `index()` কল করে verify করা হয়েছে — 200 + real page data ফেরত আসছে।
 
 **শেখা:** dead-code cleanup-এর পর শুধু `route:list`/`php -l` না, actual runtime endpoint hit করে (বিশেষ করে `route()`/`view()`/named-reference ব্যবহার করা controller method-গুলো) smoke-test করা উচিত।
+
+## ২৩. এডিটর UX ও পাবলিক পেজ পারফরম্যান্স পাস (2026-10-13)
+
+- **Save করলে এডিটরেই থাকে।** edit মোডে redirect নেই; create মোডে save-এর পর `router.replace` দিয়ে `/dashboard/landing-pages/{id}/builder`-এ যায়। admin-template মোড আগের মতো।
+- **Unsaved changes:** `saveSnapshot` (save payload-এর সব state JSON) বনাম `savedSnapshot` তুলনা → `isDirty`; dirty থাকলে `beforeunload` সতর্কতা ও save বারে "সেভ করা হয়নি" লেবেল। নতুন state যোগ করলে `draftPage` বা `saveSnapshot`-এর তালিকায় রাখতে হবে, নাহলে dirty ধরা পড়বে না।
+- **প্রিভিউ iframe-এ:** `components/landing-builder/preview-frame.tsx` — `<PublicLandingPageView>` portal দিয়ে srcdoc iframe-এ রেন্ডার, ড্যাশবোর্ডের stylesheet কপি হয়, Mobile (390px) / Desktop (1280px, scale করা) টগল। তাই `PublicLandingPageView`-এ কখনো global `document.getElementById` ব্যবহার কোরো না, ref ব্যবহার করো (প্রিভিউতে `document` হলো ড্যাশবোর্ডের)।
+- **মোবাইল sticky অর্ডার বাটন:** `content.settings.sticky_cta_enabled` (ডিফল্ট true, `mergeLandingContent`-এ)। hero বা checkout ফর্ম দেখা গেলে লুকায় (IntersectionObserver)।
+- **OG/Twitter metadata:** `app/lp/[slug]/page.tsx` — ছবি = hero background → প্রথম প্রোডাক্টের variant/thumbnail।
+- সব `<img>`-এ `loading="lazy" decoding="async"`; `fonts.ts`-এ শুধু Hind Siliguri preload, বাকি ৫টা `preload: false`।
