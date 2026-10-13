@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Copy, Smartphone, Monitor, Image as ImageIcon, Type, Video, ShieldCheck, Timer, Star, HelpCircle, Images, Rows3, LayoutGrid, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Trash2, Copy, Smartphone, Monitor, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
 import { getStoredToken, type Locale } from "@/lib/dashboard-client";
 import { useLocale } from "@/lib/locale-context";
 import {
@@ -35,13 +35,11 @@ import BlockList from "@/components/landing-builder/block-list";
 import {
   TextField,
   TextAreaField,
-  IconPickerField,
-  RichTextEditorField,
   ImagePickerField,
   isAllowedVideoUrl,
 } from "@/components/landing-builder/block-fields";
-import type { JSONContent } from "@tiptap/react";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
+import { ADDABLE_BLOCK_TYPES, BLOCK_REGISTRY, blockLabel } from "@/components/landing-builder/blocks/registry";
 import PreviewFrame, { type PreviewDevice } from "@/components/landing-builder/preview-frame";
 import VariantPickerModal from "@/components/products/variant-picker-modal";
 import type { ProductVariant } from "@/types/variant";
@@ -113,65 +111,6 @@ function emptyContentState(): ContentState {
   return state;
 }
 
-const BLOCK_LABELS: Record<Locale, Record<BlockType, string>> = {
-  bn: {
-    html_sections: "টেক্সট সেকশন",
-    carousel_images: "ইমেজ ক্যারুসেল",
-    features: "ফিচার গ্রিড",
-    faq: "FAQ",
-    reviews: "রিভিউ",
-    rich_text_blocks: "রিচ টেক্সট",
-    image_text_blocks: "ছবি + টেক্সট",
-    video_embeds: "ভিডিও",
-    trust_badges: "ট্রাস্ট ব্যাজ",
-    countdown_blocks: "কাউন্টডাউন",
-    spacers: "স্পেসার",
-    products: "পণ্য ও চেকআউট",
-  },
-  en: {
-    html_sections: "Text Section",
-    carousel_images: "Image Carousel",
-    features: "Feature Grid",
-    faq: "FAQ",
-    reviews: "Reviews",
-    rich_text_blocks: "Rich Text",
-    image_text_blocks: "Image + Text",
-    video_embeds: "Video Embed",
-    trust_badges: "Trust Badges",
-    countdown_blocks: "Countdown Timer",
-    spacers: "Spacer",
-    products: "Products & Checkout",
-  },
-};
-
-const ADDABLE_TYPES: BlockType[] = [
-  "rich_text_blocks",
-  "image_text_blocks",
-  "features",
-  "trust_badges",
-  "carousel_images",
-  "video_embeds",
-  "countdown_blocks",
-  "reviews",
-  "faq",
-  "spacers",
-];
-
-const BLOCK_ICONS: Record<BlockType, React.ComponentType<{ size?: number }>> = {
-  html_sections: Type,
-  carousel_images: Images,
-  features: LayoutGrid,
-  faq: HelpCircle,
-  reviews: Star,
-  rich_text_blocks: Type,
-  image_text_blocks: ImageIcon,
-  video_embeds: Video,
-  trust_badges: ShieldCheck,
-  countdown_blocks: Timer,
-  spacers: Rows3,
-  products: LayoutGrid,
-};
-
 type TabKey = "content" | "design" | "blocks" | "products" | "settings";
 
 const TAB_ORDER: TabKey[] = ["content", "design", "blocks", "products", "settings"];
@@ -194,33 +133,6 @@ const GATEWAY_PROVIDER_LABELS: Record<string, string> = {
   bkash_merchant: "bKash (Merchant)",
   nagad_merchant: "Nagad (Merchant)",
 };
-
-function defaultItemFor(type: BlockType): Record<string, unknown> {
-  switch (type) {
-    case "rich_text_blocks":
-      return { title: "", body: { type: "doc", content: [{ type: "paragraph" }] } };
-    case "image_text_blocks":
-      return { image_url: "", image_position: "left", heading: "", body: "", cta_text: "", cta_url: "" };
-    case "features":
-      return { title: "", description: "", icon: "star" };
-    case "trust_badges":
-      return { icon: "shield-check", label: "", sublabel: "" };
-    case "carousel_images":
-      return { title: "", template: "style-1", images: [] };
-    case "video_embeds":
-      return { title: "", url: "" };
-    case "countdown_blocks":
-      return { message: "", end_datetime: "" };
-    case "reviews":
-      return { name: "", quote: "", rating: 5, avatar_url: "" };
-    case "faq":
-      return { q: "", a: "" };
-    case "spacers":
-      return { style: "space", size: "md" };
-    default:
-      return {};
-  }
-}
 
 const text = {
   bn: {
@@ -252,16 +164,6 @@ const text = {
     heroSubheadline: "Hero subheadline",
     heroCtaText: "CTA বাটন টেক্সট",
     heroImage: "Hero ব্যাকগ্রাউন্ড ছবি (ঐচ্ছিক)",
-    featuresTitle: "ফিচার গ্রিড সেকশনের টাইটেল",
-    featuresLayout: "ফিচার গ্রিডের লে-আউট",
-    featuresLayoutCards: "কার্ড গ্রিড",
-    featuresLayoutList: "লিস্ট",
-    featuresLayoutMinimal: "মিনিমাল (আইকন সেন্টার)",
-    trustBadgesLayout: "ট্রাস্ট ব্যাজের লে-আউট",
-    trustBadgesLayoutCards: "কার্ড গ্রিড",
-    trustBadgesLayoutRow: "কম্প্যাক্ট রো",
-    trustBadgesLayoutMinimal: "মিনিমাল (আইকন সেন্টার)",
-    sectionWideHint: "এই সেটিং পুরো সেকশনের সবগুলো আইটেমের জন্য প্রযোজ্য (শুধু প্রথম আইটেমে দেখানো হচ্ছে)।",
     productsTitle: "প্রোডাক্ট সেকশনের টাইটেল",
     productsSubtitle: "প্রোডাক্ট সেকশনের সাবটাইটেল",
     checkoutFields: "চেকআউট ফর্ম ফিল্ড",
@@ -358,8 +260,6 @@ const text = {
     defaultQty: "ডিফল্ট Qty",
     selectedByDefault: "ডিফল্ট সিলেক্টেড",
     dragHint: "ড্রাগ করে order বদলান",
-    pickImages: "Gallery থেকে ছবি সিলেক্ট করুন",
-    selectedCount: "Selected",
   },
   en: {
     loading: "Loading...",
@@ -390,16 +290,6 @@ const text = {
     heroSubheadline: "Hero subheadline",
     heroCtaText: "CTA button text",
     heroImage: "Hero background image (optional)",
-    featuresTitle: "Feature Grid section title",
-    featuresLayout: "Feature Grid layout",
-    featuresLayoutCards: "Card grid",
-    featuresLayoutList: "List",
-    featuresLayoutMinimal: "Minimal (centered icon)",
-    trustBadgesLayout: "Trust Badges layout",
-    trustBadgesLayoutCards: "Card grid",
-    trustBadgesLayoutRow: "Compact row",
-    trustBadgesLayoutMinimal: "Minimal (centered icon)",
-    sectionWideHint: "This setting applies to the whole section (shown here on the first item only).",
     productsTitle: "Products section title",
     productsSubtitle: "Products section subtitle",
     checkoutFields: "Checkout form fields",
@@ -496,8 +386,6 @@ const text = {
     defaultQty: "Default Qty",
     selectedByDefault: "Selected by default",
     dragHint: "Drag to reorder",
-    pickImages: "Pick images from gallery",
-    selectedCount: "Selected",
   },
 };
 
@@ -506,7 +394,6 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const contextLocale = useLocale();
   const locale = localeProp ?? contextLocale;
   const t = text[locale] ?? text.en;
-  const blockLabels = BLOCK_LABELS[locale] ?? BLOCK_LABELS.en;
   const tabLabels: Record<TabKey, string> = {
     content: t.tabContent,
     design: t.tabDesign,
@@ -925,7 +812,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
 
   function addBlock(type: BlockType, afterEntry?: LayoutEntry) {
     const id = `${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    const item: Item = { id, ...defaultItemFor(type) };
+    const item: Item = { id, ...BLOCK_REGISTRY[type].defaults() };
     setContentState((prev) => ({ ...prev, [type]: [...prev[type], item] }));
     setLayoutEntries((prev) => {
       if (!afterEntry) return [...prev, { type, id }];
@@ -1395,13 +1282,13 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   }
 
   function renderBlockItem(entry: LayoutEntry) {
-    const Icon = BLOCK_ICONS[entry.type];
+    const Icon = BLOCK_REGISTRY[entry.type].icon;
 
     if (SINGLETON_BLOCK_TYPES.includes(entry.type)) {
       return (
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            <Icon size={14} /> {blockLabels[entry.type]}
+            <Icon size={14} /> {blockLabel(entry.type, locale)}
           </span>
           <p className="mt-2 text-xs text-[var(--muted)]">
             {locale === "bn" ? "সবসময় পেজে যুক্ত থাকে — নিচে ম্যানেজ করুন।" : "Always present on the page — manage it below."}
@@ -1417,7 +1304,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            <Icon size={14} /> {blockLabels[entry.type]}
+            <Icon size={14} /> {blockLabel(entry.type, locale)}
           </span>
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -1430,11 +1317,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
               </button>
               {addAfterKey === `${entry.type}:${entry.id}` ? (
                 <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-lg">
-                  {ADDABLE_TYPES.map((addType) => {
-                    const AddIcon = BLOCK_ICONS[addType];
+                  {ADDABLE_BLOCK_TYPES.map((addType) => {
+                    const AddIcon = BLOCK_REGISTRY[addType].icon;
                     return (
                       <button key={addType} type="button" onClick={() => addBlock(addType, entry)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--surface-soft)]">
-                        <AddIcon size={14} /> {blockLabels[addType]}
+                        <AddIcon size={14} /> {blockLabel(addType, locale)}
                       </button>
                     );
                   })}
@@ -1455,202 +1342,23 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   }
 
   function renderBlockFields(type: BlockType, item: Item) {
-    const patch = (changes: Record<string, unknown>) => patchItem(type, item.id, changes);
-
-    switch (type) {
-      case "rich_text_blocks":
-        return (
-          <>
-            <TextField label={locale === "bn" ? "শিরোনাম (ঐচ্ছিক)" : "Title (optional)"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <RichTextEditorField value={item.body as JSONContent | undefined} onChange={(json) => patch({ body: json })} />
-          </>
-        );
-      case "image_text_blocks":
-        return (
-          <>
-            <ImagePickerField
-              label={locale === "bn" ? "ছবি" : "Image"}
-              value={String(item.image_url ?? "")}
-              locale={locale}
-              onPick={() => setMediaTarget({ type, id: item.id, field: "image_url" })}
-            />
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "ছবির অবস্থান" : "Image position"}</span>
-              <select value={String(item.image_position ?? "left")} onChange={(e) => patch({ image_position: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                <option value="left">{locale === "bn" ? "বামে" : "Left"}</option>
-                <option value="right">{locale === "bn" ? "ডানে" : "Right"}</option>
-              </select>
-            </label>
-            <TextField label={locale === "bn" ? "হেডিং" : "Heading"} value={String(item.heading ?? "")} onChange={(v) => patch({ heading: v })} />
-            <TextAreaField label={locale === "bn" ? "বর্ণনা" : "Body"} value={String(item.body ?? "")} onChange={(v) => patch({ body: v })} />
-            <TextField label={locale === "bn" ? "বাটন টেক্সট (ঐচ্ছিক)" : "Button text (optional)"} value={String(item.cta_text ?? "")} onChange={(v) => patch({ cta_text: v })} />
-            <TextField label={locale === "bn" ? "বাটন লিংক (ঐচ্ছিক)" : "Button link (optional)"} value={String(item.cta_url ?? "")} onChange={(v) => patch({ cta_url: v })} />
-          </>
-        );
-      case "features": {
-        const isFirst = contentState.features[0]?.id === item.id;
-        return (
-          <>
-            {isFirst ? (
-              <div className="mb-3 space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                <p className="text-xs text-[var(--muted)]">{t.sectionWideHint}</p>
-                <TextField label={t.featuresTitle} value={featuresTitle} onChange={setFeaturesTitle} />
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t.featuresLayout}</span>
-                  <select
-                    value={featuresLayout}
-                    onChange={(e) => setFeaturesLayout(e.target.value as "cards" | "list" | "minimal")}
-                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
-                  >
-                    <option value="cards">{t.featuresLayoutCards}</option>
-                    <option value="list">{t.featuresLayoutList}</option>
-                    <option value="minimal">{t.featuresLayoutMinimal}</option>
-                  </select>
-                </label>
-              </div>
-            ) : null}
-            <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "star")} onChange={(v) => patch({ icon: v })} locale={locale} />
-            <TextField label={locale === "bn" ? "শিরোনাম" : "Title"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <TextAreaField label={locale === "bn" ? "বর্ণনা" : "Description"} value={String(item.description ?? "")} onChange={(v) => patch({ description: v })} rows={2} />
-          </>
-        );
-      }
-      case "trust_badges": {
-        const isFirst = contentState.trust_badges[0]?.id === item.id;
-        return (
-          <>
-            {isFirst ? (
-              <div className="mb-3 space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                <p className="text-xs text-[var(--muted)]">{t.sectionWideHint}</p>
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t.trustBadgesLayout}</span>
-                  <select
-                    value={trustBadgesLayout}
-                    onChange={(e) => setTrustBadgesLayout(e.target.value as "cards" | "row" | "minimal")}
-                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
-                  >
-                    <option value="cards">{t.trustBadgesLayoutCards}</option>
-                    <option value="row">{t.trustBadgesLayoutRow}</option>
-                    <option value="minimal">{t.trustBadgesLayoutMinimal}</option>
-                  </select>
-                </label>
-              </div>
-            ) : null}
-            <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "shield-check")} onChange={(v) => patch({ icon: v })} locale={locale} />
-            <TextField label={locale === "bn" ? "লেবেল" : "Label"} value={String(item.label ?? "")} onChange={(v) => patch({ label: v })} />
-            <TextField label={locale === "bn" ? "সাব-লেবেল (ঐচ্ছিক)" : "Sublabel (optional)"} value={String(item.sublabel ?? "")} onChange={(v) => patch({ sublabel: v })} />
-          </>
-        );
-      }
-      case "video_embeds": {
-        const url = String(item.url ?? "");
-        const invalid = url.trim().length > 0 && !isAllowedVideoUrl(url);
-        return (
-          <>
-            <TextField label={locale === "bn" ? "শিরোনাম (ঐচ্ছিক)" : "Title (optional)"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <TextField label="YouTube / Facebook / Vimeo URL" value={url} onChange={(v) => patch({ url: v })} placeholder="https://youtube.com/watch?v=..." />
-            {invalid ? <p className="text-xs text-red-400">{t.invalidVideoUrl}</p> : null}
-          </>
-        );
-      }
-      case "countdown_blocks":
-        return (
-          <>
-            <TextField label={locale === "bn" ? "মেসেজ" : "Message"} value={String(item.message ?? "")} onChange={(v) => patch({ message: v })} />
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "শেষ সময়" : "End date/time"}</span>
-              <input type="datetime-local" value={String(item.end_datetime ?? "")} onChange={(e) => patch({ end_datetime: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]" />
-            </label>
-          </>
-        );
-      case "reviews":
-        return (
-          <>
-            <ImagePickerField
-              label={locale === "bn" ? "প্রোফাইল ছবি (ঐচ্ছিক)" : "Avatar (optional)"}
-              value={String(item.avatar_url ?? "")}
-              locale={locale}
-              onPick={() => setMediaTarget({ type, id: item.id, field: "avatar_url" })}
-            />
-            <TextField label={locale === "bn" ? "নাম" : "Name"} value={String(item.name ?? "")} onChange={(v) => patch({ name: v })} />
-            <TextAreaField label={locale === "bn" ? "রিভিউ" : "Quote"} value={String(item.quote ?? "")} onChange={(v) => patch({ quote: v })} rows={2} />
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "রেটিং" : "Rating"}</span>
-              <select value={String(item.rating ?? 5)} onChange={(e) => patch({ rating: Number(e.target.value) })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{"★".repeat(n)}</option>)}
-              </select>
-            </label>
-          </>
-        );
-      case "faq":
-        return (
-          <>
-            <TextField label={locale === "bn" ? "প্রশ্ন" : "Question"} value={String(item.q ?? "")} onChange={(v) => patch({ q: v })} />
-            <TextAreaField label={locale === "bn" ? "উত্তর" : "Answer"} value={String(item.a ?? "")} onChange={(v) => patch({ a: v })} rows={2} />
-          </>
-        );
-      case "spacers":
-        return (
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "স্টাইল" : "Style"}</span>
-              <select value={String(item.style ?? "space")} onChange={(e) => patch({ style: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                <option value="space">{locale === "bn" ? "ফাঁকা জায়গা" : "Blank space"}</option>
-                <option value="line">{locale === "bn" ? "লাইন" : "Line"}</option>
-                <option value="dots">{locale === "bn" ? "ডট" : "Dots"}</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "সাইজ" : "Size"}</span>
-              <select value={String(item.size ?? "md")} onChange={(e) => patch({ size: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                <option value="sm">{locale === "bn" ? "ছোট" : "Small"}</option>
-                <option value="md">{locale === "bn" ? "মাঝারি" : "Medium"}</option>
-                <option value="lg">{locale === "bn" ? "বড়" : "Large"}</option>
-              </select>
-            </label>
-          </div>
-        );
-      case "html_sections":
-        return (
-          <>
-            <TextField label={locale === "bn" ? "শিরোনাম" : "Title"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <p className="text-xs text-[var(--muted)]">{locale === "bn" ? "এই সেকশনটি পুরনো এডিটরে তৈরি — নতুন বিল্ডারে কোড এডিট করা যায় না।" : "Created in the old editor — code can't be edited from this builder."}</p>
-          </>
-        );
-      case "carousel_images": {
-        const images = (item.images as Array<{ id?: number | null; url?: string | null; alt?: string | null }> | undefined) ?? [];
-        return (
-          <>
-            <TextField label={locale === "bn" ? "শিরোনাম" : "Title"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "স্টাইল" : "Style"}</span>
-              <select value={String(item.template ?? "style-1")} onChange={(e) => patch({ template: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                <option value="style-1">Style 1</option>
-                <option value="style-2">Style 2</option>
-              </select>
-            </label>
-            <div className="flex items-center justify-between gap-2">
-              <button type="button" onClick={() => setMediaTarget({ type: "carousel_images", id: item.id, field: "images" })} className="rounded-xl border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]">
-                {t.pickImages}
-              </button>
-              <span className="text-xs text-[var(--muted)]">{t.selectedCount}: {images.length}</span>
-            </div>
-            {images.length > 0 ? (
-              <div className="grid grid-cols-4 gap-2">
-                {images.map((image, imageIndex) => (
-                  <div key={`${image.url}-${imageIndex}`} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image.url ?? ""} alt={image.alt ?? ""} className="aspect-square w-full object-cover" />
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </>
-        );
-      }
-      default:
-        return null;
-    }
+    const Editor = BLOCK_REGISTRY[type].Editor;
+    if (!Editor) return null;
+    return (
+      <Editor
+        item={item}
+        patch={(changes) => patchItem(type, item.id, changes)}
+        locale={locale}
+        openMedia={(field) => setMediaTarget({ type, id: item.id, field })}
+        isFirstOfType={contentState[type][0]?.id === item.id}
+        section={{ featuresTitle, featuresLayout, trustBadgesLayout }}
+        onSectionChange={(changes) => {
+          if (changes.featuresTitle !== undefined) setFeaturesTitle(changes.featuresTitle);
+          if (changes.featuresLayout !== undefined) setFeaturesLayout(changes.featuresLayout);
+          if (changes.trustBadgesLayout !== undefined) setTrustBadgesLayout(changes.trustBadgesLayout);
+        }}
+      />
+    );
   }
 
   return (
@@ -1837,11 +1545,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
                   </button>
                   {addMenuOpen ? (
                     <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-lg">
-                      {ADDABLE_TYPES.map((type) => {
-                        const Icon = BLOCK_ICONS[type];
+                      {ADDABLE_BLOCK_TYPES.map((type) => {
+                        const Icon = BLOCK_REGISTRY[type].icon;
                         return (
                           <button key={type} type="button" onClick={() => addBlock(type)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--surface-soft)]">
-                            <Icon size={14} /> {blockLabels[type]}
+                            <Icon size={14} /> {blockLabel(type, locale)}
                           </button>
                         );
                       })}
