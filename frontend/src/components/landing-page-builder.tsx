@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Copy, Smartphone, Monitor, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Trash2, Copy, Undo2, Redo2, Smartphone, Monitor, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
 import { getStoredToken, type Locale } from "@/lib/dashboard-client";
 import { useLocale } from "@/lib/locale-context";
 import {
@@ -40,6 +40,7 @@ import {
 } from "@/components/landing-builder/block-fields";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
 import { ADDABLE_BLOCK_TYPES, BLOCK_REGISTRY, blockLabel } from "@/components/landing-builder/blocks/registry";
+import { useUndoableState } from "@/components/landing-builder/use-undoable-state";
 import PreviewFrame, { type PreviewDevice } from "@/components/landing-builder/preview-frame";
 import VariantPickerModal from "@/components/products/variant-picker-modal";
 import type { ProductVariant } from "@/types/variant";
@@ -109,6 +110,115 @@ function emptyContentState(): ContentState {
   const state = {} as ContentState;
   for (const type of BLOCK_TYPES) state[type] = [];
   return state;
+}
+
+type BuilderDoc = {
+  title: string;
+  slug: string;
+  status: "draft" | "published";
+  metaTitle: string;
+  metaDescription: string;
+  heroHeadline: string;
+  heroSubheadline: string;
+  heroCtaText: string;
+  heroImage: string;
+  featuresTitle: string;
+  featuresLayout: "cards" | "list" | "minimal";
+  trustBadgesLayout: "cards" | "row" | "minimal";
+  productsTitle: string;
+  productsSubtitle: string;
+  pageLanguage: "bn" | "en";
+  checkoutFields: CheckoutFieldConfig[];
+  shippingInsideDhaka: string;
+  shippingOutsideDhaka: string;
+  contactPhone: string;
+  whatsappNumber: string;
+  floatingButtons: boolean;
+  ogImage: string;
+  customCss: string;
+  thankYouTitle: string;
+  thankYouMessage: string;
+  thankYouShowSummary: boolean;
+  thankYouShowAddress: boolean;
+  phoneValidationEnabled: boolean;
+  phoneValidationMessage: string;
+  otpVerificationEnabled: boolean;
+  otpVerifiedMessage: string;
+  otpSmsTemplate: string;
+  otpFormTitle: string;
+  otpFormDescription: string;
+  otpFormButtonText: string;
+  otpFormResendText: string;
+  trackingEnabled: boolean;
+  stickyCtaEnabled: boolean;
+  // null = no restriction, this page offers everything the shop enabled
+  // (backward-compatible default). A non-null array is an explicit subset.
+  // See online_payment_context.md.
+  paymentChannels: string[] | null;
+  theme: ThemeSettings;
+  templateNameBn: string;
+  templateNameEn: string;
+  templateDescription: string;
+  templatePreviewImage: string;
+  templateIsActive: boolean;
+  contentState: ContentState;
+  layoutEntries: LayoutEntry[];
+  selectedProducts: ProductDraft[];
+  selectedTemplateId: number | null;
+};
+
+function initialBuilderDoc(): BuilderDoc {
+  return {
+    title: "",
+    slug: "",
+    status: "draft",
+    metaTitle: "",
+    metaDescription: "",
+    heroHeadline: "",
+    heroSubheadline: "",
+    heroCtaText: "",
+    heroImage: "",
+    featuresTitle: "",
+    featuresLayout: "cards",
+    trustBadgesLayout: "cards",
+    productsTitle: "",
+    productsSubtitle: "",
+    pageLanguage: "bn",
+    checkoutFields: getDefaultCheckoutFields("bn"),
+    shippingInsideDhaka: "80",
+    shippingOutsideDhaka: "120",
+    contactPhone: "",
+    whatsappNumber: "",
+    floatingButtons: false,
+    ogImage: "",
+    customCss: "",
+    thankYouTitle: getDefaultThankYou("bn").title ?? "",
+    thankYouMessage: getDefaultThankYou("bn").message ?? "",
+    thankYouShowSummary: true,
+    thankYouShowAddress: true,
+    phoneValidationEnabled: getDefaultSettings("bn").phone_validation_enabled,
+    phoneValidationMessage: getDefaultSettings("bn").phone_validation_message,
+    otpVerificationEnabled: getDefaultSettings("bn").otp_verification_enabled,
+    otpVerifiedMessage: getDefaultSettings("bn").otp_verified_message,
+    otpSmsTemplate: getDefaultSettings("bn").otp_sms_template,
+    otpFormTitle: getDefaultSettings("bn").otp_form_title,
+    otpFormDescription: getDefaultSettings("bn").otp_form_description,
+    otpFormButtonText: getDefaultSettings("bn").otp_form_button_text,
+    otpFormResendText: getDefaultSettings("bn").otp_form_resend_text,
+    trackingEnabled: true,
+    stickyCtaEnabled: true,
+    paymentChannels: null,
+    theme: { ...DEFAULT_THEME },
+    templateNameBn: "",
+    templateNameEn: "",
+    templateDescription: "",
+    templatePreviewImage: "",
+    templateIsActive: true,
+    contentState: emptyContentState(),
+    layoutEntries: [],
+    selectedProducts: [],
+    selectedTemplateId: null,
+  };
 }
 
 type TabKey = "content" | "design" | "blocks" | "products" | "settings";
@@ -242,6 +352,7 @@ const text = {
     customCssHint: "শুধু এই পেজে প্রযোজ্য হবে। ভুল CSS পেজের ডিজাইন ভেঙে দিতে পারে।",
     blockRemoved: "ব্লক মুছে ফেলা হয়েছে।",
     undo: "ফেরত আনুন",
+    redo: "আবার করুন",
     addBlockHere: "ব্লক যোগ করুন",
     livePreview: "লাইভ প্রিভিউ",
     livePreviewHint: "মার্চেন্ট ঠিক এই ভিউ-টাই লাইভ পেজে দেখবে — একই কম্পোনেন্ট ব্যবহার করা হয়েছে।",
@@ -368,6 +479,7 @@ const text = {
     customCssHint: "Applies to this page only. Broken CSS can break the page's design.",
     blockRemoved: "Block removed.",
     undo: "Undo",
+    redo: "Redo",
     addBlockHere: "Add block",
     livePreview: "Live preview",
     livePreviewHint: "This is exactly what a merchant will see on the live page — same component.",
@@ -408,6 +520,110 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const token = getStoredToken();
 
   const [loading, setLoading] = useState(true);
+  // Everything a save sends lives in one undoable document; the
+  // destructured names and setters below keep the rest of this component
+  // reading like plain useState.
+  const docHistory = useUndoableState(initialBuilderDoc);
+  const {
+    title,
+    slug,
+    status,
+    metaTitle,
+    metaDescription,
+    heroHeadline,
+    heroSubheadline,
+    heroCtaText,
+    heroImage,
+    featuresTitle,
+    featuresLayout,
+    trustBadgesLayout,
+    productsTitle,
+    productsSubtitle,
+    pageLanguage,
+    checkoutFields,
+    shippingInsideDhaka,
+    shippingOutsideDhaka,
+    contactPhone,
+    whatsappNumber,
+    floatingButtons,
+    ogImage,
+    customCss,
+    thankYouTitle,
+    thankYouMessage,
+    thankYouShowSummary,
+    thankYouShowAddress,
+    phoneValidationEnabled,
+    phoneValidationMessage,
+    otpVerificationEnabled,
+    otpVerifiedMessage,
+    otpSmsTemplate,
+    otpFormTitle,
+    otpFormDescription,
+    otpFormButtonText,
+    otpFormResendText,
+    trackingEnabled,
+    stickyCtaEnabled,
+    paymentChannels,
+    theme,
+    templateNameBn,
+    templateNameEn,
+    templateDescription,
+    templatePreviewImage,
+    templateIsActive,
+    contentState,
+    layoutEntries,
+    selectedProducts,
+    selectedTemplateId,
+  } = docHistory.present;
+  const setTitle = docHistory.setField("title");
+  const setSlug = docHistory.setField("slug");
+  const setStatus = docHistory.setField("status");
+  const setMetaTitle = docHistory.setField("metaTitle");
+  const setMetaDescription = docHistory.setField("metaDescription");
+  const setHeroHeadline = docHistory.setField("heroHeadline");
+  const setHeroSubheadline = docHistory.setField("heroSubheadline");
+  const setHeroCtaText = docHistory.setField("heroCtaText");
+  const setHeroImage = docHistory.setField("heroImage");
+  const setFeaturesTitle = docHistory.setField("featuresTitle");
+  const setFeaturesLayout = docHistory.setField("featuresLayout");
+  const setTrustBadgesLayout = docHistory.setField("trustBadgesLayout");
+  const setProductsTitle = docHistory.setField("productsTitle");
+  const setProductsSubtitle = docHistory.setField("productsSubtitle");
+  const setPageLanguageState = docHistory.setField("pageLanguage");
+  const setCheckoutFields = docHistory.setField("checkoutFields");
+  const setShippingInsideDhaka = docHistory.setField("shippingInsideDhaka");
+  const setShippingOutsideDhaka = docHistory.setField("shippingOutsideDhaka");
+  const setContactPhone = docHistory.setField("contactPhone");
+  const setWhatsappNumber = docHistory.setField("whatsappNumber");
+  const setFloatingButtons = docHistory.setField("floatingButtons");
+  const setOgImage = docHistory.setField("ogImage");
+  const setCustomCss = docHistory.setField("customCss");
+  const setThankYouTitle = docHistory.setField("thankYouTitle");
+  const setThankYouMessage = docHistory.setField("thankYouMessage");
+  const setThankYouShowSummary = docHistory.setField("thankYouShowSummary");
+  const setThankYouShowAddress = docHistory.setField("thankYouShowAddress");
+  const setPhoneValidationEnabled = docHistory.setField("phoneValidationEnabled");
+  const setPhoneValidationMessage = docHistory.setField("phoneValidationMessage");
+  const setOtpVerificationEnabled = docHistory.setField("otpVerificationEnabled");
+  const setOtpVerifiedMessage = docHistory.setField("otpVerifiedMessage");
+  const setOtpSmsTemplate = docHistory.setField("otpSmsTemplate");
+  const setOtpFormTitle = docHistory.setField("otpFormTitle");
+  const setOtpFormDescription = docHistory.setField("otpFormDescription");
+  const setOtpFormButtonText = docHistory.setField("otpFormButtonText");
+  const setOtpFormResendText = docHistory.setField("otpFormResendText");
+  const setTrackingEnabled = docHistory.setField("trackingEnabled");
+  const setStickyCtaEnabled = docHistory.setField("stickyCtaEnabled");
+  const setPaymentChannels = docHistory.setField("paymentChannels");
+  const setTheme = docHistory.setField("theme");
+  const setTemplateNameBn = docHistory.setField("templateNameBn");
+  const setTemplateNameEn = docHistory.setField("templateNameEn");
+  const setTemplateDescription = docHistory.setField("templateDescription");
+  const setTemplatePreviewImage = docHistory.setField("templatePreviewImage");
+  const setTemplateIsActive = docHistory.setField("templateIsActive");
+  const setContentState = docHistory.setField("contentState");
+  const setLayoutEntries = docHistory.setField("layoutEntries");
+  const setSelectedProducts = docHistory.setField("selectedProducts");
+  const setSelectedTemplateId = docHistory.setField("selectedTemplateId");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -415,54 +631,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const [templates, setTemplates] = useState<LandingTemplate[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("content");
 
-  const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [status, setStatus] = useState<"draft" | "published">("draft");
-  const [metaTitle, setMetaTitle] = useState("");
-  const [metaDescription, setMetaDescription] = useState("");
-  const [heroHeadline, setHeroHeadline] = useState("");
-  const [heroSubheadline, setHeroSubheadline] = useState("");
-  const [heroCtaText, setHeroCtaText] = useState("");
-  const [heroImage, setHeroImage] = useState("");
-  const [featuresTitle, setFeaturesTitle] = useState("");
-  const [featuresLayout, setFeaturesLayout] = useState<"cards" | "list" | "minimal">("cards");
-  const [trustBadgesLayout, setTrustBadgesLayout] = useState<"cards" | "row" | "minimal">("cards");
-  const [productsTitle, setProductsTitle] = useState("");
-  const [productsSubtitle, setProductsSubtitle] = useState("");
-  const [pageLanguage, setPageLanguageState] = useState<"bn" | "en">("bn");
-  const [checkoutFields, setCheckoutFields] = useState<CheckoutFieldConfig[]>(getDefaultCheckoutFields("bn"));
   const [draggingFieldKey, setDraggingFieldKey] = useState<string | null>(null);
-  const [shippingInsideDhaka, setShippingInsideDhaka] = useState("80");
-  const [shippingOutsideDhaka, setShippingOutsideDhaka] = useState("120");
-  const [contactPhone, setContactPhone] = useState("");
-  const [whatsappNumber, setWhatsappNumber] = useState("");
-  const [floatingButtons, setFloatingButtons] = useState(false);
-  const [ogImage, setOgImage] = useState("");
-  const [customCss, setCustomCss] = useState("");
-  const [lastRemoved, setLastRemoved] = useState<{ type: BlockType; item: Item; itemIndex: number; layoutIndex: number } | null>(null);
-  const [thankYouTitle, setThankYouTitle] = useState(getDefaultThankYou("bn").title ?? "");
-  const [thankYouMessage, setThankYouMessage] = useState(getDefaultThankYou("bn").message ?? "");
-  const [thankYouShowSummary, setThankYouShowSummary] = useState(true);
-  const [thankYouShowAddress, setThankYouShowAddress] = useState(true);
-  const [phoneValidationEnabled, setPhoneValidationEnabled] = useState<boolean>(getDefaultSettings("bn").phone_validation_enabled);
-  const [phoneValidationMessage, setPhoneValidationMessage] = useState<string>(getDefaultSettings("bn").phone_validation_message);
-  const [otpVerificationEnabled, setOtpVerificationEnabled] = useState<boolean>(getDefaultSettings("bn").otp_verification_enabled);
-  const [otpVerifiedMessage, setOtpVerifiedMessage] = useState<string>(getDefaultSettings("bn").otp_verified_message);
-  const [otpSmsTemplate, setOtpSmsTemplate] = useState<string>(getDefaultSettings("bn").otp_sms_template);
-  const [otpFormTitle, setOtpFormTitle] = useState<string>(getDefaultSettings("bn").otp_form_title);
-  const [otpFormDescription, setOtpFormDescription] = useState<string>(getDefaultSettings("bn").otp_form_description);
-  const [otpFormButtonText, setOtpFormButtonText] = useState<string>(getDefaultSettings("bn").otp_form_button_text);
-  const [otpFormResendText, setOtpFormResendText] = useState<string>(getDefaultSettings("bn").otp_form_resend_text);
-  const [trackingEnabled, setTrackingEnabled] = useState<boolean>(true);
-  const [stickyCtaEnabled, setStickyCtaEnabled] = useState<boolean>(true);
+  const [blockRemovedNotice, setBlockRemovedNotice] = useState(0);
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("mobile");
-  // null = no restriction, this page offers everything the shop enabled
-  // (backward-compatible default). A non-null array is an explicit subset.
-  // See online_payment_context.md.
-  const [paymentChannels, setPaymentChannels] = useState<string[] | null>(null);
   const [shopWalletProviders, setShopWalletProviders] = useState<string[]>([]);
   const [shopGatewayProviders, setShopGatewayProviders] = useState<string[]>([]);
-  const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   // Which wallet channels this shop has turned on at all (Settings → Online
   // Payment Channels) — the per-page selector below can only narrow this
@@ -499,27 +672,18 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   }, [mode]);
 
   const isAdminTemplateMode = mode === "admin-template";
-  const [templateNameBn, setTemplateNameBn] = useState("");
-  const [templateNameEn, setTemplateNameEn] = useState("");
-  const [templateDescription, setTemplateDescription] = useState("");
-  const [templatePreviewImage, setTemplatePreviewImage] = useState("");
-  const [templateIsActive, setTemplateIsActive] = useState(true);
   const [templateScreenshotUploading, setTemplateScreenshotUploading] = useState(false);
 
-  const [contentState, setContentState] = useState<ContentState>(emptyContentState());
-  const [layoutEntries, setLayoutEntries] = useState<LayoutEntry[]>([]);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [addAfterKey, setAddAfterKey] = useState<string | null>(null);
 
   const [products, setProducts] = useState<ProductItem[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<ProductDraft[]>([]);
   const [productQuery, setProductQuery] = useState("");
   const [draggingProductId, setDraggingProductId] = useState<string | null>(null);
   // rowKey is set when re-picking a variant for an already-attached row
   // ("Change variant"); null means attaching a brand-new product.
   const [variantPicker, setVariantPicker] = useState<{ product: ProductItem; rowKey: string | null } | null>(null);
 
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
 
   const [mediaPolicy, setMediaPolicy] = useState<MediaPolicy | null>(null);
   const [mediaLibrary, setMediaLibrary] = useState<MediaLibraryItem[]>([]);
@@ -827,40 +991,38 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   }
 
   function removeBlock(type: BlockType, id: string) {
-    const item = contentState[type].find((candidate) => candidate.id === id);
-    if (item) {
-      setLastRemoved({
-        type,
-        item,
-        itemIndex: contentState[type].indexOf(item),
-        layoutIndex: layoutEntries.findIndex((entry) => entry.type === type && entry.id === id),
-      });
-    }
+    docHistory.checkpoint();
     setContentState((prev) => ({ ...prev, [type]: prev[type].filter((item) => item.id !== id) }));
     setLayoutEntries((prev) => prev.filter((entry) => !(entry.type === type && entry.id === id)));
-  }
-
-  function undoRemoveBlock() {
-    if (!lastRemoved) return;
-    const { type, item, itemIndex, layoutIndex } = lastRemoved;
-    setContentState((prev) => {
-      const next = [...prev[type]];
-      next.splice(Math.min(itemIndex, next.length), 0, item);
-      return { ...prev, [type]: next };
-    });
-    setLayoutEntries((prev) => {
-      const next = [...prev];
-      next.splice(layoutIndex < 0 ? next.length : Math.min(layoutIndex, next.length), 0, { type, id: item.id });
-      return next;
-    });
-    setLastRemoved(null);
+    setBlockRemovedNotice((n) => n + 1);
   }
 
   useEffect(() => {
-    if (!lastRemoved) return;
-    const timer = window.setTimeout(() => setLastRemoved(null), 10000);
+    if (!blockRemovedNotice) return;
+    const timer = window.setTimeout(() => setBlockRemovedNotice(0), 10000);
     return () => window.clearTimeout(timer);
-  }, [lastRemoved]);
+  }, [blockRemovedNotice]);
+
+  const { undo: undoDoc, redo: redoDoc } = docHistory;
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y) undo and redo builder
+  // changes. Inside a text field the browser's own text undo wins.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && !event.shiftKey) {
+        event.preventDefault();
+        undoDoc();
+      } else if ((key === "z" && event.shiftKey) || key === "y") {
+        event.preventDefault();
+        redoDoc();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [undoDoc, redoDoc]);
 
   function duplicateBlock(type: BlockType, id: string) {
     const source = contentState[type].find((item) => item.id === id);
@@ -1174,6 +1336,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   if (!loading && savedSnapshot === null) {
     setSavedSnapshot(saveSnapshot);
+    docHistory.clearHistory();
   }
   const isDirty = !loading && savedSnapshot !== null && savedSnapshot !== saveSnapshot;
 
@@ -1914,6 +2077,14 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           </div>
 
           <div className="sticky bottom-0 z-20 -mx-1 flex items-center justify-end gap-3 rounded-xl bg-[var(--surface)]/95 px-1 py-2 backdrop-blur">
+            <div className="mr-auto flex items-center gap-1">
+              <button type="button" onClick={docHistory.undo} disabled={!docHistory.canUndo} title={`${t.undo} (Ctrl+Z)`} aria-label={t.undo} className="rounded-lg border border-[var(--border)] p-2 text-[var(--foreground)] disabled:opacity-40">
+                <Undo2 size={16} />
+              </button>
+              <button type="button" onClick={docHistory.redo} disabled={!docHistory.canRedo} title={`${t.redo} (Ctrl+Shift+Z)`} aria-label={t.redo} className="rounded-lg border border-[var(--border)] p-2 text-[var(--foreground)] disabled:opacity-40">
+                <Redo2 size={16} />
+              </button>
+            </div>
             {!isAdminTemplateMode ? (
               <span className={`text-xs ${isDirty ? "font-semibold text-amber-500" : "text-[var(--muted)]"}`}>
                 {isDirty ? t.unsavedChanges : t.allSaved}
@@ -1999,10 +2170,10 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
         </div>
       ) : null}
 
-      {lastRemoved ? (
+      {blockRemovedNotice ? (
         <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--foreground)] shadow-lg">
           {t.blockRemoved}
-          <button type="button" onClick={undoRemoveBlock} className="font-semibold text-[var(--accent)] hover:underline">
+          <button type="button" onClick={() => { docHistory.undo(); setBlockRemovedNotice(0); }} className="font-semibold text-[var(--accent)] hover:underline">
             {t.undo}
           </button>
         </div>

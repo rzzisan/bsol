@@ -445,3 +445,11 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 - **ব্লক ডিলিটে Undo:** বিল্ডারে ১০ সেকেন্ডের টোস্ট, ব্লক আগের জায়গায় ফেরত আসে।
 - **শেয়ার ছবি:** `seo_meta.og_image`, `generateMetadata`-তে প্রথম অগ্রাধিকার।
 - **Custom CSS:** বিল্ডারের Settings ট্যাবে textarea (admin-template মোডে নেই); save payload-এ `custom_css` এখন পাঠানো হয়।
+
+## ২৫. ধাপ ৩: এডিটর রিফ্যাক্টর (2026-10-13)
+
+আচরণ বদলায়নি, শুধু কোড ভাগ করা হয়েছে, আর তার উপর Undo/Redo যোগ হয়েছে।
+- **ব্লক রেজিস্ট্রি:** `frontend/src/components/landing-builder/blocks/` — প্রতিটা ব্লক টাইপের এডিটর ফর্ম আলাদা ফাইলে (`faq.tsx`, `features.tsx` ...), `registry.ts`-এ `BLOCK_REGISTRY[type] = {label, icon, addable, defaults, Editor}`। আগের `BLOCK_LABELS`/`BLOCK_ICONS`/`ADDABLE_TYPES`/`defaultItemFor`/বিশাল `renderBlockFields` switch সরানো হয়েছে। নতুন ব্লক = একটা ফাইল + একটা রেজিস্ট্রি এন্ট্রি + `landing-blocks/block-views.tsx`-এ রেন্ডারার + `public-landing-page-view.tsx`-এর render-run-এ একটা কেস + `landing-layout.ts`-এর `BlockType`।
+- **ব্লক রেন্ডারার:** `frontend/src/components/landing-blocks/block-views.tsx` — `CarouselBlockView, RichTextBlockView, ImageTextBlockView, TrustBadgeRow, FeatureGrid, VideoEmbedView, CountdownView, SpacerView, sanitizeHtml` (আগে `public-landing-page-view.tsx`-এর ভেতরে ছিল)।
+- **একক undoable state:** save হয় এমন সব ফিল্ড এখন `BuilderDoc` টাইপের একটা অবজেক্টে (`initialBuilderDoc()`), `components/landing-builder/use-undoable-state.ts` হুক দিয়ে। কম্পোনেন্টে আগের নাম ও `setX` setter destructure করা আছে, তাই বাকি কোড আগের মতোই পড়া যায়। নতুন save-যোগ্য ফিল্ড যোগ করলে `BuilderDoc`, `initialBuilderDoc()` আর destructure/setter তালিকায় যোগ করতে হবে (useState নয়)।
+- **Undo/Redo:** save বারে বাটন, আর Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z বা Ctrl+Y (টেক্সট ফিল্ডের ভেতরে ব্রাউজারের নিজের undo চলে)। ৮০০ms-এর ভেতরের পরিবর্তনগুলো এক ধাপ ধরা হয়; ব্লক ডিলিট সবসময় আলাদা ধাপ (`checkpoint()`)। পেজ লোড হলে history মুছে যায়। ব্লক ডিলিটের টোস্টের "ফেরত আনুন" এখন একই undo ব্যবহার করে।
