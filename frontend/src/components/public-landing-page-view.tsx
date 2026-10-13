@@ -465,7 +465,7 @@ function CarouselBlockView({
                 >
                   <div className="overflow-hidden rounded-2xl bg-slate-50 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.18)] ring-1 ring-black/5">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={image.url ?? ""}
                       alt={image.alt || `Carousel image ${imageIndex + 1}`}
                       className="h-[12rem] w-full object-contain sm:h-[22rem] sm:object-cover"
@@ -528,7 +528,7 @@ function CarouselBlockView({
                   aria-hidden={!isActive}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={image.url ?? ""}
                     alt={image.alt || `Carousel image ${imageIndex + 1}`}
                     className="h-full w-full object-contain sm:object-cover"
@@ -621,7 +621,7 @@ function ImageTextBlockView({
         </div>
         {block.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={block.image_url} alt={block.heading || ""} className="w-full rounded-2xl object-cover" />
+          <img loading="lazy" decoding="async" src={block.image_url} alt={block.heading || ""} className="w-full rounded-2xl object-cover" />
         ) : null}
       </div>
     </div>
@@ -923,6 +923,32 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const initiateCheckoutFiredRef = useRef(false);
   const leadFiredRef = useRef(false);
 
+  // Refs, not getElementById: in the builder the page renders inside a
+  // preview iframe, where the global `document` is the dashboard's.
+  const heroRef = useRef<HTMLElement>(null);
+  const checkoutRef = useRef<HTMLFormElement>(null);
+  const [heroVisible, setHeroVisible] = useState(true);
+  const [checkoutVisible, setCheckoutVisible] = useState(false);
+
+  function scrollToCheckout() {
+    checkoutRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  useEffect(() => {
+    const hero = heroRef.current;
+    const checkoutForm = checkoutRef.current;
+    if (!hero || !checkoutForm || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === hero) setHeroVisible(entry.isIntersecting);
+        if (entry.target === checkoutForm) setCheckoutVisible(entry.isIntersecting);
+      }
+    });
+    observer.observe(hero);
+    observer.observe(checkoutForm);
+    return () => observer.disconnect();
+  }, []);
+
   const theme = useMemo(() => ({
     primary: page?.theme_settings?.primary_color ?? "#0f766e",
     accent: page?.theme_settings?.accent_color ?? "#f97316",
@@ -1115,6 +1141,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const t = PUBLIC_UI_TEXT[language] ?? PUBLIC_UI_TEXT.bn;
   const defaultSettings = getDefaultSettings(language);
   const checkoutFields = (content.checkout_fields && content.checkout_fields.length > 0 ? content.checkout_fields : getDefaultCheckoutFields(language)).filter((field) => field.enabled);
+  const stickyCtaEnabled = content.settings?.sticky_cta_enabled ?? true;
   const phoneValidationEnabled = content.settings?.phone_validation_enabled ?? defaultSettings.phone_validation_enabled;
   const phoneValidationMessage = content.settings?.phone_validation_message || defaultSettings.phone_validation_message;
   const shippingCharge = shippingZone === "inside"
@@ -1191,7 +1218,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     if (previewMode) {
       setSubmitError(null);
       setSubmitSuccess(t.previewNotice);
-      document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      scrollToCheckout();
       return;
     }
 
@@ -1200,7 +1227,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
 
     if (phoneValidationEnabled && !BD_PHONE_REGEX.test(customer.customer_phone.trim())) {
       setSubmitError(phoneValidationMessage);
-      document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      scrollToCheckout();
       return;
     }
 
@@ -1279,7 +1306,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       });
       setCustomFieldValues({});
       setCheckout((prev) => Object.fromEntries(Object.entries(prev).map(([productId, item]) => [productId, { ...item, quantity: 1 }])));
-      document.getElementById("checkout")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      scrollToCheckout();
     } catch (err) {
       // fetch() itself (no response at all — offline, DNS failure, dropped
       // mid-request on a slow mobile connection) always rejects with a
@@ -1377,6 +1404,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
       `}</style>
 
       <section
+        ref={heroRef}
         className="lp-shell px-4 py-16 text-white"
         style={{
           background: hero.background_image_url
@@ -1387,7 +1415,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         <div className="mx-auto max-w-5xl text-center">
           <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
           {hero.subheadline ? <p className="mx-auto mt-4 max-w-3xl text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
-          <a href="#checkout" className="mt-8 inline-flex rounded-2xl px-6 py-3 text-base font-semibold shadow-lg transition hover:translate-y-[-1px]" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
+          <a href="#checkout" onClick={(event) => { event.preventDefault(); scrollToCheckout(); }} className="mt-8 inline-flex rounded-2xl px-6 py-3 text-base font-semibold shadow-lg transition hover:translate-y-[-1px]" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
             {hero.cta_text || t.defaultCtaText}
           </a>
         </div>
@@ -1494,7 +1522,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                         <footer className="mt-3 flex items-center gap-2">
                           {review.avatar_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={review.avatar_url} alt={review.name ?? ""} className="h-8 w-8 rounded-full object-cover" />
+                            <img loading="lazy" decoding="async" src={review.avatar_url} alt={review.name ?? ""} className="h-8 w-8 rounded-full object-cover" />
                           ) : null}
                           {review.name ? <span className="text-sm font-semibold text-slate-900">— {review.name}</span> : null}
                         </footer>
@@ -1547,7 +1575,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                           />
                           {thumbnail ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-orange-100 object-cover" />
+                            <img loading="lazy" decoding="async" src={thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-orange-100 object-cover" />
                           ) : (
                             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">No image</div>
                           )}
@@ -1604,7 +1632,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             return null;
           })}
 
-          <form id="checkout" onSubmit={submitOrder} className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <form id="checkout" ref={checkoutRef} onSubmit={submitOrder} className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="lp-card rounded-3xl p-6 sm:p-8">
               <h2 className="text-2xl font-bold" style={{ color: theme.primary }}>Shipping Details</h2>
               <p className="mt-2 text-sm text-slate-500">{t.shippingDetailsHint}</p>
@@ -1702,7 +1730,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                         <div key={`summary-${item.product_id}`} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3">
                           {thumbnail ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-slate-100 object-cover" />
+                            <img loading="lazy" decoding="async" src={thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-slate-100 object-cover" />
                           ) : (
                             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">{t.noImage}</div>
                           )}
@@ -1833,6 +1861,27 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             </a>
           </p>
         </footer>
+      ) : null}
+
+      {stickyCtaEnabled ? (
+        <>
+          {/* Keeps the footer from sitting under the bar. */}
+          <div className="h-20 sm:hidden" aria-hidden="true" />
+          <div
+            className={`lp-shell fixed inset-x-0 bottom-0 z-40 p-3 transition-transform duration-300 sm:hidden ${heroVisible || checkoutVisible ? "translate-y-full" : "translate-y-0"}`}
+            style={{ background: "linear-gradient(to top, rgba(255,255,255,0.95) 60%, rgba(255,255,255,0))" }}
+          >
+            <button
+              type="button"
+              onClick={scrollToCheckout}
+              tabIndex={heroVisible || checkoutVisible ? -1 : 0}
+              className="w-full rounded-2xl px-6 py-3.5 text-base font-bold shadow-lg"
+              style={{ backgroundColor: theme.accent, color: theme.buttonText }}
+            >
+              {hero.cta_text || t.defaultCtaText}
+            </button>
+          </div>
+        </>
       ) : null}
     </main>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Copy, Image as ImageIcon, Type, Video, ShieldCheck, Timer, Star, HelpCircle, Images, Rows3, LayoutGrid, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Trash2, Copy, Smartphone, Monitor, Image as ImageIcon, Type, Video, ShieldCheck, Timer, Star, HelpCircle, Images, Rows3, LayoutGrid, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
 import { getStoredToken, type Locale } from "@/lib/dashboard-client";
 import { useLocale } from "@/lib/locale-context";
 import {
@@ -42,6 +42,7 @@ import {
 } from "@/components/landing-builder/block-fields";
 import type { JSONContent } from "@tiptap/react";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
+import PreviewFrame, { type PreviewDevice } from "@/components/landing-builder/preview-frame";
 import VariantPickerModal from "@/components/products/variant-picker-modal";
 import type { ProductVariant } from "@/types/variant";
 
@@ -295,6 +296,12 @@ const text = {
     otpFormButtonText: "কনফার্ম বাটনের টেক্সট",
     otpFormResendText: "পুনরায় পাঠান লিংকের টেক্সট",
     trackingEnabled: "মেটা (Facebook) ট্র্যাকিং",
+    stickyCtaEnabled: "মোবাইলে নিচে স্থির অর্ডার বাটন",
+    stickyCtaEnabledHint: "মোবাইলে স্ক্রল করার সময় স্ক্রিনের নিচে একটা অর্ডার বাটন থাকবে, চাপলে অর্ডার ফর্মে নিয়ে যাবে। উপরের বাটন বা অর্ডার ফর্ম দেখা গেলে লুকিয়ে যায়।",
+    unsavedChanges: "সেভ করা হয়নি এমন পরিবর্তন আছে",
+    allSaved: "সব পরিবর্তন সেভ হয়েছে",
+    previewMobile: "মোবাইল",
+    previewDesktop: "ডেস্কটপ",
     trackingEnabledHint: "চালু থাকলে এই পেজে Facebook Pixel/Conversions API ইভেন্ট পাঠানো হবে (আপনার ট্র্যাকিং কনফিগার করা থাকলে)। বন্ধ করলে এই নির্দিষ্ট পেজের জন্য ট্র্যাকিং সম্পূর্ণ বন্ধ হয়ে যাবে।",
     paymentChannelsTitle: "পেমেন্ট পদ্ধতি",
     paymentChannelsRestrict: "এই পেজের জন্য নির্দিষ্ট পেমেন্ট পদ্ধতি বেছে নিন",
@@ -419,6 +426,12 @@ const text = {
     otpFormButtonText: "Confirm button text",
     otpFormResendText: "Resend link text",
     trackingEnabled: "Meta (Facebook) tracking",
+    stickyCtaEnabled: "Sticky order button on mobile",
+    stickyCtaEnabledHint: "On mobile, an order button stays at the bottom of the screen while scrolling and jumps to the order form. It hides while the top button or the order form is in view.",
+    unsavedChanges: "You have unsaved changes",
+    allSaved: "All changes saved",
+    previewMobile: "Mobile",
+    previewDesktop: "Desktop",
     trackingEnabledHint: "When on, this page sends Facebook Pixel/Conversions API events (once you've configured tracking). Turning it off disables tracking for this specific page only.",
     paymentChannelsTitle: "Payment Methods",
     paymentChannelsRestrict: "Restrict payment methods for this page",
@@ -533,6 +546,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const [otpFormButtonText, setOtpFormButtonText] = useState<string>(getDefaultSettings("bn").otp_form_button_text);
   const [otpFormResendText, setOtpFormResendText] = useState<string>(getDefaultSettings("bn").otp_form_resend_text);
   const [trackingEnabled, setTrackingEnabled] = useState<boolean>(true);
+  const [stickyCtaEnabled, setStickyCtaEnabled] = useState<boolean>(true);
+  const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("mobile");
   // null = no restriction, this page offers everything the shop enabled
   // (backward-compatible default). A non-null array is an explicit subset.
   // See online_payment_context.md.
@@ -681,6 +696,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setOtpFormButtonText(merged.settings?.otp_form_button_text ?? loadedDefaults.otp_form_button_text);
       setOtpFormResendText(merged.settings?.otp_form_resend_text ?? loadedDefaults.otp_form_resend_text);
       setTrackingEnabled(merged.settings?.tracking_enabled ?? true);
+      setStickyCtaEnabled(merged.settings?.sticky_cta_enabled ?? true);
       setPaymentChannels(merged.settings?.payment_channels ?? null);
       if (sourceTheme) {
         setTheme({
@@ -845,6 +861,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setOtpFormButtonText(merged.settings?.otp_form_button_text ?? loadedDefaults.otp_form_button_text);
           setOtpFormResendText(merged.settings?.otp_form_resend_text ?? loadedDefaults.otp_form_resend_text);
       setTrackingEnabled(merged.settings?.tracking_enabled ?? true);
+      setStickyCtaEnabled(merged.settings?.sticky_cta_enabled ?? true);
           setPaymentChannels(merged.settings?.payment_channels ?? null);
           setTheme({
             primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
@@ -1174,6 +1191,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
         otp_form_button_text: otpFormButtonText || null,
         otp_form_resend_text: otpFormResendText || null,
         tracking_enabled: trackingEnabled,
+        sticky_cta_enabled: stickyCtaEnabled,
         payment_channels: paymentChannels,
       },
       layout_order: layoutEntries,
@@ -1196,7 +1214,29 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     custom_css: page?.custom_css ?? null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, stickyCtaEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
+
+  // Everything a save sends, as one string, so "unsaved changes" is a plain
+  // comparison against what was last loaded or saved.
+  const saveSnapshot = useMemo(
+    () => JSON.stringify([draftPage, status, selectedProducts, selectedTemplateId, templateNameBn, templateNameEn, templateDescription, templatePreviewImage, templateIsActive]),
+    [draftPage, status, selectedProducts, selectedTemplateId, templateNameBn, templateNameEn, templateDescription, templatePreviewImage, templateIsActive],
+  );
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
+  if (!loading && savedSnapshot === null) {
+    setSavedSnapshot(saveSnapshot);
+  }
+  const isDirty = !loading && savedSnapshot !== null && savedSnapshot !== saveSnapshot;
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -1278,8 +1318,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
 
       const nextId = json.data?.id ?? pageId;
       setSuccess(mode === "edit" ? t.updateSuccess : t.createSuccess);
-      if (nextId) {
-        setTimeout(() => router.push(`/dashboard/landing-pages/${nextId}`), 700);
+      setSavedSnapshot(saveSnapshot);
+      // Keep the seller in the editor. A new page moves to its edit route so
+      // the next save updates it instead of creating another one.
+      if (mode === "create" && nextId) {
+        router.replace(`/dashboard/landing-pages/${nextId}/builder`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.submitFailed);
@@ -1554,7 +1597,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       ) : (
         <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <form onSubmit={handleSubmit} className="space-y-5">
-          {(error || success) ? (
+          {(error || (success && !isDirty)) ? (
             <div className={`rounded-xl px-4 py-3 text-sm ${error ? "bg-red-500/10 text-red-400" : "bg-emerald-500/10 text-emerald-400"}`}>{error || success}</div>
           ) : null}
 
@@ -1995,6 +2038,14 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
             </div>
 
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+                <input type="checkbox" checked={stickyCtaEnabled} onChange={(e) => setStickyCtaEnabled(e.target.checked)} className="accent-[var(--accent)]" />
+                {t.stickyCtaEnabled}
+              </label>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t.stickyCtaEnabledHint}</p>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
               <h4 className="text-sm font-semibold text-[var(--foreground)]">{t.paymentChannelsTitle}</h4>
               <label className="mt-2 flex items-center gap-2 text-sm text-[var(--foreground)]">
                 <input
@@ -2063,7 +2114,12 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="sticky bottom-0 z-20 -mx-1 flex items-center justify-end gap-3 rounded-xl bg-[var(--surface)]/95 px-1 py-2 backdrop-blur">
+            {!isAdminTemplateMode ? (
+              <span className={`text-xs ${isDirty ? "font-semibold text-amber-500" : "text-[var(--muted)]"}`}>
+                {isDirty ? t.unsavedChanges : t.allSaved}
+              </span>
+            ) : null}
             <button type="submit" disabled={saving} className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
               {saving ? t.saving : t.save}
             </button>
@@ -2072,10 +2128,30 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
 
         <aside className="xl:sticky xl:top-4 xl:self-start">
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-            <h3 className="text-base font-semibold text-[var(--foreground)]">{t.livePreview}</h3>
-            <p className="mt-1 text-sm text-[var(--muted)]">{t.livePreviewHint}</p>
-            <div className="mt-4 max-h-[80vh] overflow-y-auto overflow-x-hidden rounded-2xl border border-[var(--border)]">
-              <PublicLandingPageView page={draftPage} previewMode />
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-[var(--foreground)]">{t.livePreview}</h3>
+                <p className="mt-1 text-sm text-[var(--muted)]">{t.livePreviewHint}</p>
+              </div>
+              <div className="flex shrink-0 rounded-xl border border-[var(--border)] p-0.5">
+                {([["mobile", Smartphone, t.previewMobile], ["desktop", Monitor, t.previewDesktop]] as const).map(([device, DeviceIcon, label]) => (
+                  <button
+                    key={device}
+                    type="button"
+                    onClick={() => setPreviewDevice(device)}
+                    aria-pressed={previewDevice === device}
+                    title={label}
+                    className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${previewDevice === device ? "bg-[var(--accent)] text-white" : "text-[var(--muted)]"}`}
+                  >
+                    <DeviceIcon size={14} /> {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+              <PreviewFrame device={previewDevice}>
+                <PublicLandingPageView page={draftPage} previewMode />
+              </PreviewFrame>
             </div>
           </div>
         </aside>
