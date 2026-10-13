@@ -51,9 +51,31 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
     };
   }
 
+  const title = page.seo_meta?.meta_title || page.title;
+  const description = page.seo_meta?.meta_description || page.content?.hero?.subheadline || page.title;
+  // Facebook/Messenger link previews need og:image, and these pages are
+  // mostly shared and advertised there. Hero image first, else the first
+  // attached product's photo.
+  const image = page.content?.hero?.background_image_url
+    || page.products?.map((item) => item.variant?.image_url || item.product?.thumbnail).find(Boolean)
+    || undefined;
+
   return {
-    title: page.seo_meta?.meta_title || page.title,
-    description: page.seo_meta?.meta_description || page.content?.hero?.subheadline || page.title,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      ...(page.public_url ? { url: page.public_url } : {}),
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
   };
 }
 
