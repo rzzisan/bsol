@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Copy, Smartphone, Monitor, Image as ImageIcon, Type, Video, ShieldCheck, Timer, Star, HelpCircle, Images, Rows3, LayoutGrid, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Trash2, Copy, Undo2, Redo2, Smartphone, Monitor, FileText, Palette, Layers, ShoppingBag, Settings as SettingsIcon } from "lucide-react";
 import { getStoredToken, type Locale } from "@/lib/dashboard-client";
 import { useLocale } from "@/lib/locale-context";
 import {
@@ -21,8 +21,10 @@ import {
   mergeLandingContent,
   toNumberOrNull,
 } from "@/lib/landing-pages";
-import { DEFAULT_THEME, type ThemeSettings } from "@/lib/theme-presets";
+import { DEFAULT_THEME, normalizeTheme, type ThemeSettings } from "@/lib/theme-presets";
 import LandingDesignPanel from "@/components/landing-design-panel";
+import { BlockStyleFields } from "@/components/landing-builder/block-style-fields";
+import { GROUPED_BLOCK_TYPES, hasBlockStyle, readBlockStyle } from "@/lib/landing-block-style";
 import {
   BLOCK_TYPES,
   SINGLETON_BLOCK_TYPES,
@@ -35,13 +37,13 @@ import BlockList from "@/components/landing-builder/block-list";
 import {
   TextField,
   TextAreaField,
-  IconPickerField,
-  RichTextEditorField,
   ImagePickerField,
   isAllowedVideoUrl,
 } from "@/components/landing-builder/block-fields";
-import type { JSONContent } from "@tiptap/react";
+import { FONT_VARIABLE_CLASSES } from "@/app/lp/[slug]/fonts";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
+import { ADDABLE_BLOCK_TYPES, BLOCK_REGISTRY, blockLabel } from "@/components/landing-builder/blocks/registry";
+import { useUndoableState } from "@/components/landing-builder/use-undoable-state";
 import PreviewFrame, { type PreviewDevice } from "@/components/landing-builder/preview-frame";
 import VariantPickerModal from "@/components/products/variant-picker-modal";
 import type { ProductVariant } from "@/types/variant";
@@ -113,64 +115,114 @@ function emptyContentState(): ContentState {
   return state;
 }
 
-const BLOCK_LABELS: Record<Locale, Record<BlockType, string>> = {
-  bn: {
-    html_sections: "টেক্সট সেকশন",
-    carousel_images: "ইমেজ ক্যারুসেল",
-    features: "ফিচার গ্রিড",
-    faq: "FAQ",
-    reviews: "রিভিউ",
-    rich_text_blocks: "রিচ টেক্সট",
-    image_text_blocks: "ছবি + টেক্সট",
-    video_embeds: "ভিডিও",
-    trust_badges: "ট্রাস্ট ব্যাজ",
-    countdown_blocks: "কাউন্টডাউন",
-    spacers: "স্পেসার",
-    products: "পণ্য ও চেকআউট",
-  },
-  en: {
-    html_sections: "Text Section",
-    carousel_images: "Image Carousel",
-    features: "Feature Grid",
-    faq: "FAQ",
-    reviews: "Reviews",
-    rich_text_blocks: "Rich Text",
-    image_text_blocks: "Image + Text",
-    video_embeds: "Video Embed",
-    trust_badges: "Trust Badges",
-    countdown_blocks: "Countdown Timer",
-    spacers: "Spacer",
-    products: "Products & Checkout",
-  },
+type BuilderDoc = {
+  title: string;
+  slug: string;
+  status: "draft" | "published";
+  metaTitle: string;
+  metaDescription: string;
+  heroHeadline: string;
+  heroSubheadline: string;
+  heroCtaText: string;
+  heroImage: string;
+  featuresTitle: string;
+  featuresLayout: "cards" | "list" | "minimal";
+  trustBadgesLayout: "cards" | "row" | "minimal";
+  productsTitle: string;
+  productsSubtitle: string;
+  pageLanguage: "bn" | "en";
+  checkoutFields: CheckoutFieldConfig[];
+  shippingInsideDhaka: string;
+  shippingOutsideDhaka: string;
+  contactPhone: string;
+  whatsappNumber: string;
+  floatingButtons: boolean;
+  ogImage: string;
+  customCss: string;
+  thankYouTitle: string;
+  thankYouMessage: string;
+  thankYouShowSummary: boolean;
+  thankYouShowAddress: boolean;
+  phoneValidationEnabled: boolean;
+  phoneValidationMessage: string;
+  otpVerificationEnabled: boolean;
+  otpVerifiedMessage: string;
+  otpSmsTemplate: string;
+  otpFormTitle: string;
+  otpFormDescription: string;
+  otpFormButtonText: string;
+  otpFormResendText: string;
+  trackingEnabled: boolean;
+  stickyCtaEnabled: boolean;
+  // null = no restriction, this page offers everything the shop enabled
+  // (backward-compatible default). A non-null array is an explicit subset.
+  // See online_payment_context.md.
+  paymentChannels: string[] | null;
+  theme: ThemeSettings;
+  templateNameBn: string;
+  templateNameEn: string;
+  templateDescription: string;
+  templatePreviewImage: string;
+  templateIsActive: boolean;
+  contentState: ContentState;
+  layoutEntries: LayoutEntry[];
+  selectedProducts: ProductDraft[];
+  selectedTemplateId: number | null;
 };
 
-const ADDABLE_TYPES: BlockType[] = [
-  "rich_text_blocks",
-  "image_text_blocks",
-  "features",
-  "trust_badges",
-  "carousel_images",
-  "video_embeds",
-  "countdown_blocks",
-  "reviews",
-  "faq",
-  "spacers",
-];
-
-const BLOCK_ICONS: Record<BlockType, React.ComponentType<{ size?: number }>> = {
-  html_sections: Type,
-  carousel_images: Images,
-  features: LayoutGrid,
-  faq: HelpCircle,
-  reviews: Star,
-  rich_text_blocks: Type,
-  image_text_blocks: ImageIcon,
-  video_embeds: Video,
-  trust_badges: ShieldCheck,
-  countdown_blocks: Timer,
-  spacers: Rows3,
-  products: LayoutGrid,
-};
+function initialBuilderDoc(): BuilderDoc {
+  return {
+    title: "",
+    slug: "",
+    status: "draft",
+    metaTitle: "",
+    metaDescription: "",
+    heroHeadline: "",
+    heroSubheadline: "",
+    heroCtaText: "",
+    heroImage: "",
+    featuresTitle: "",
+    featuresLayout: "cards",
+    trustBadgesLayout: "cards",
+    productsTitle: "",
+    productsSubtitle: "",
+    pageLanguage: "bn",
+    checkoutFields: getDefaultCheckoutFields("bn"),
+    shippingInsideDhaka: "80",
+    shippingOutsideDhaka: "120",
+    contactPhone: "",
+    whatsappNumber: "",
+    floatingButtons: false,
+    ogImage: "",
+    customCss: "",
+    thankYouTitle: getDefaultThankYou("bn").title ?? "",
+    thankYouMessage: getDefaultThankYou("bn").message ?? "",
+    thankYouShowSummary: true,
+    thankYouShowAddress: true,
+    phoneValidationEnabled: getDefaultSettings("bn").phone_validation_enabled,
+    phoneValidationMessage: getDefaultSettings("bn").phone_validation_message,
+    otpVerificationEnabled: getDefaultSettings("bn").otp_verification_enabled,
+    otpVerifiedMessage: getDefaultSettings("bn").otp_verified_message,
+    otpSmsTemplate: getDefaultSettings("bn").otp_sms_template,
+    otpFormTitle: getDefaultSettings("bn").otp_form_title,
+    otpFormDescription: getDefaultSettings("bn").otp_form_description,
+    otpFormButtonText: getDefaultSettings("bn").otp_form_button_text,
+    otpFormResendText: getDefaultSettings("bn").otp_form_resend_text,
+    trackingEnabled: true,
+    stickyCtaEnabled: true,
+    paymentChannels: null,
+    theme: { ...DEFAULT_THEME },
+    templateNameBn: "",
+    templateNameEn: "",
+    templateDescription: "",
+    templatePreviewImage: "",
+    templateIsActive: true,
+    contentState: emptyContentState(),
+    layoutEntries: [],
+    selectedProducts: [],
+    selectedTemplateId: null,
+  };
+}
 
 type TabKey = "content" | "design" | "blocks" | "products" | "settings";
 
@@ -194,33 +246,6 @@ const GATEWAY_PROVIDER_LABELS: Record<string, string> = {
   bkash_merchant: "bKash (Merchant)",
   nagad_merchant: "Nagad (Merchant)",
 };
-
-function defaultItemFor(type: BlockType): Record<string, unknown> {
-  switch (type) {
-    case "rich_text_blocks":
-      return { title: "", body: { type: "doc", content: [{ type: "paragraph" }] } };
-    case "image_text_blocks":
-      return { image_url: "", image_position: "left", heading: "", body: "", cta_text: "", cta_url: "" };
-    case "features":
-      return { title: "", description: "", icon: "star" };
-    case "trust_badges":
-      return { icon: "shield-check", label: "", sublabel: "" };
-    case "carousel_images":
-      return { title: "", template: "style-1", images: [] };
-    case "video_embeds":
-      return { title: "", url: "" };
-    case "countdown_blocks":
-      return { message: "", end_datetime: "" };
-    case "reviews":
-      return { name: "", quote: "", rating: 5, avatar_url: "" };
-    case "faq":
-      return { q: "", a: "" };
-    case "spacers":
-      return { style: "space", size: "md" };
-    default:
-      return {};
-  }
-}
 
 const text = {
   bn: {
@@ -252,16 +277,6 @@ const text = {
     heroSubheadline: "Hero subheadline",
     heroCtaText: "CTA বাটন টেক্সট",
     heroImage: "Hero ব্যাকগ্রাউন্ড ছবি (ঐচ্ছিক)",
-    featuresTitle: "ফিচার গ্রিড সেকশনের টাইটেল",
-    featuresLayout: "ফিচার গ্রিডের লে-আউট",
-    featuresLayoutCards: "কার্ড গ্রিড",
-    featuresLayoutList: "লিস্ট",
-    featuresLayoutMinimal: "মিনিমাল (আইকন সেন্টার)",
-    trustBadgesLayout: "ট্রাস্ট ব্যাজের লে-আউট",
-    trustBadgesLayoutCards: "কার্ড গ্রিড",
-    trustBadgesLayoutRow: "কম্প্যাক্ট রো",
-    trustBadgesLayoutMinimal: "মিনিমাল (আইকন সেন্টার)",
-    sectionWideHint: "এই সেটিং পুরো সেকশনের সবগুলো আইটেমের জন্য প্রযোজ্য (শুধু প্রথম আইটেমে দেখানো হচ্ছে)।",
     productsTitle: "প্রোডাক্ট সেকশনের টাইটেল",
     productsSubtitle: "প্রোডাক্ট সেকশনের সাবটাইটেল",
     checkoutFields: "চেকআউট ফর্ম ফিল্ড",
@@ -340,6 +355,7 @@ const text = {
     customCssHint: "শুধু এই পেজে প্রযোজ্য হবে। ভুল CSS পেজের ডিজাইন ভেঙে দিতে পারে।",
     blockRemoved: "ব্লক মুছে ফেলা হয়েছে।",
     undo: "ফেরত আনুন",
+    redo: "আবার করুন",
     addBlockHere: "ব্লক যোগ করুন",
     livePreview: "লাইভ প্রিভিউ",
     livePreviewHint: "মার্চেন্ট ঠিক এই ভিউ-টাই লাইভ পেজে দেখবে — একই কম্পোনেন্ট ব্যবহার করা হয়েছে।",
@@ -358,8 +374,6 @@ const text = {
     defaultQty: "ডিফল্ট Qty",
     selectedByDefault: "ডিফল্ট সিলেক্টেড",
     dragHint: "ড্রাগ করে order বদলান",
-    pickImages: "Gallery থেকে ছবি সিলেক্ট করুন",
-    selectedCount: "Selected",
   },
   en: {
     loading: "Loading...",
@@ -390,16 +404,6 @@ const text = {
     heroSubheadline: "Hero subheadline",
     heroCtaText: "CTA button text",
     heroImage: "Hero background image (optional)",
-    featuresTitle: "Feature Grid section title",
-    featuresLayout: "Feature Grid layout",
-    featuresLayoutCards: "Card grid",
-    featuresLayoutList: "List",
-    featuresLayoutMinimal: "Minimal (centered icon)",
-    trustBadgesLayout: "Trust Badges layout",
-    trustBadgesLayoutCards: "Card grid",
-    trustBadgesLayoutRow: "Compact row",
-    trustBadgesLayoutMinimal: "Minimal (centered icon)",
-    sectionWideHint: "This setting applies to the whole section (shown here on the first item only).",
     productsTitle: "Products section title",
     productsSubtitle: "Products section subtitle",
     checkoutFields: "Checkout form fields",
@@ -478,6 +482,7 @@ const text = {
     customCssHint: "Applies to this page only. Broken CSS can break the page's design.",
     blockRemoved: "Block removed.",
     undo: "Undo",
+    redo: "Redo",
     addBlockHere: "Add block",
     livePreview: "Live preview",
     livePreviewHint: "This is exactly what a merchant will see on the live page — same component.",
@@ -496,8 +501,6 @@ const text = {
     defaultQty: "Default Qty",
     selectedByDefault: "Selected by default",
     dragHint: "Drag to reorder",
-    pickImages: "Pick images from gallery",
-    selectedCount: "Selected",
   },
 };
 
@@ -506,7 +509,6 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const contextLocale = useLocale();
   const locale = localeProp ?? contextLocale;
   const t = text[locale] ?? text.en;
-  const blockLabels = BLOCK_LABELS[locale] ?? BLOCK_LABELS.en;
   const tabLabels: Record<TabKey, string> = {
     content: t.tabContent,
     design: t.tabDesign,
@@ -521,6 +523,110 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const token = getStoredToken();
 
   const [loading, setLoading] = useState(true);
+  // Everything a save sends lives in one undoable document; the
+  // destructured names and setters below keep the rest of this component
+  // reading like plain useState.
+  const docHistory = useUndoableState(initialBuilderDoc);
+  const {
+    title,
+    slug,
+    status,
+    metaTitle,
+    metaDescription,
+    heroHeadline,
+    heroSubheadline,
+    heroCtaText,
+    heroImage,
+    featuresTitle,
+    featuresLayout,
+    trustBadgesLayout,
+    productsTitle,
+    productsSubtitle,
+    pageLanguage,
+    checkoutFields,
+    shippingInsideDhaka,
+    shippingOutsideDhaka,
+    contactPhone,
+    whatsappNumber,
+    floatingButtons,
+    ogImage,
+    customCss,
+    thankYouTitle,
+    thankYouMessage,
+    thankYouShowSummary,
+    thankYouShowAddress,
+    phoneValidationEnabled,
+    phoneValidationMessage,
+    otpVerificationEnabled,
+    otpVerifiedMessage,
+    otpSmsTemplate,
+    otpFormTitle,
+    otpFormDescription,
+    otpFormButtonText,
+    otpFormResendText,
+    trackingEnabled,
+    stickyCtaEnabled,
+    paymentChannels,
+    theme,
+    templateNameBn,
+    templateNameEn,
+    templateDescription,
+    templatePreviewImage,
+    templateIsActive,
+    contentState,
+    layoutEntries,
+    selectedProducts,
+    selectedTemplateId,
+  } = docHistory.present;
+  const setTitle = docHistory.setField("title");
+  const setSlug = docHistory.setField("slug");
+  const setStatus = docHistory.setField("status");
+  const setMetaTitle = docHistory.setField("metaTitle");
+  const setMetaDescription = docHistory.setField("metaDescription");
+  const setHeroHeadline = docHistory.setField("heroHeadline");
+  const setHeroSubheadline = docHistory.setField("heroSubheadline");
+  const setHeroCtaText = docHistory.setField("heroCtaText");
+  const setHeroImage = docHistory.setField("heroImage");
+  const setFeaturesTitle = docHistory.setField("featuresTitle");
+  const setFeaturesLayout = docHistory.setField("featuresLayout");
+  const setTrustBadgesLayout = docHistory.setField("trustBadgesLayout");
+  const setProductsTitle = docHistory.setField("productsTitle");
+  const setProductsSubtitle = docHistory.setField("productsSubtitle");
+  const setPageLanguageState = docHistory.setField("pageLanguage");
+  const setCheckoutFields = docHistory.setField("checkoutFields");
+  const setShippingInsideDhaka = docHistory.setField("shippingInsideDhaka");
+  const setShippingOutsideDhaka = docHistory.setField("shippingOutsideDhaka");
+  const setContactPhone = docHistory.setField("contactPhone");
+  const setWhatsappNumber = docHistory.setField("whatsappNumber");
+  const setFloatingButtons = docHistory.setField("floatingButtons");
+  const setOgImage = docHistory.setField("ogImage");
+  const setCustomCss = docHistory.setField("customCss");
+  const setThankYouTitle = docHistory.setField("thankYouTitle");
+  const setThankYouMessage = docHistory.setField("thankYouMessage");
+  const setThankYouShowSummary = docHistory.setField("thankYouShowSummary");
+  const setThankYouShowAddress = docHistory.setField("thankYouShowAddress");
+  const setPhoneValidationEnabled = docHistory.setField("phoneValidationEnabled");
+  const setPhoneValidationMessage = docHistory.setField("phoneValidationMessage");
+  const setOtpVerificationEnabled = docHistory.setField("otpVerificationEnabled");
+  const setOtpVerifiedMessage = docHistory.setField("otpVerifiedMessage");
+  const setOtpSmsTemplate = docHistory.setField("otpSmsTemplate");
+  const setOtpFormTitle = docHistory.setField("otpFormTitle");
+  const setOtpFormDescription = docHistory.setField("otpFormDescription");
+  const setOtpFormButtonText = docHistory.setField("otpFormButtonText");
+  const setOtpFormResendText = docHistory.setField("otpFormResendText");
+  const setTrackingEnabled = docHistory.setField("trackingEnabled");
+  const setStickyCtaEnabled = docHistory.setField("stickyCtaEnabled");
+  const setPaymentChannels = docHistory.setField("paymentChannels");
+  const setTheme = docHistory.setField("theme");
+  const setTemplateNameBn = docHistory.setField("templateNameBn");
+  const setTemplateNameEn = docHistory.setField("templateNameEn");
+  const setTemplateDescription = docHistory.setField("templateDescription");
+  const setTemplatePreviewImage = docHistory.setField("templatePreviewImage");
+  const setTemplateIsActive = docHistory.setField("templateIsActive");
+  const setContentState = docHistory.setField("contentState");
+  const setLayoutEntries = docHistory.setField("layoutEntries");
+  const setSelectedProducts = docHistory.setField("selectedProducts");
+  const setSelectedTemplateId = docHistory.setField("selectedTemplateId");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -528,54 +634,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const [templates, setTemplates] = useState<LandingTemplate[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("content");
 
-  const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [status, setStatus] = useState<"draft" | "published">("draft");
-  const [metaTitle, setMetaTitle] = useState("");
-  const [metaDescription, setMetaDescription] = useState("");
-  const [heroHeadline, setHeroHeadline] = useState("");
-  const [heroSubheadline, setHeroSubheadline] = useState("");
-  const [heroCtaText, setHeroCtaText] = useState("");
-  const [heroImage, setHeroImage] = useState("");
-  const [featuresTitle, setFeaturesTitle] = useState("");
-  const [featuresLayout, setFeaturesLayout] = useState<"cards" | "list" | "minimal">("cards");
-  const [trustBadgesLayout, setTrustBadgesLayout] = useState<"cards" | "row" | "minimal">("cards");
-  const [productsTitle, setProductsTitle] = useState("");
-  const [productsSubtitle, setProductsSubtitle] = useState("");
-  const [pageLanguage, setPageLanguageState] = useState<"bn" | "en">("bn");
-  const [checkoutFields, setCheckoutFields] = useState<CheckoutFieldConfig[]>(getDefaultCheckoutFields("bn"));
   const [draggingFieldKey, setDraggingFieldKey] = useState<string | null>(null);
-  const [shippingInsideDhaka, setShippingInsideDhaka] = useState("80");
-  const [shippingOutsideDhaka, setShippingOutsideDhaka] = useState("120");
-  const [contactPhone, setContactPhone] = useState("");
-  const [whatsappNumber, setWhatsappNumber] = useState("");
-  const [floatingButtons, setFloatingButtons] = useState(false);
-  const [ogImage, setOgImage] = useState("");
-  const [customCss, setCustomCss] = useState("");
-  const [lastRemoved, setLastRemoved] = useState<{ type: BlockType; item: Item; itemIndex: number; layoutIndex: number } | null>(null);
-  const [thankYouTitle, setThankYouTitle] = useState(getDefaultThankYou("bn").title ?? "");
-  const [thankYouMessage, setThankYouMessage] = useState(getDefaultThankYou("bn").message ?? "");
-  const [thankYouShowSummary, setThankYouShowSummary] = useState(true);
-  const [thankYouShowAddress, setThankYouShowAddress] = useState(true);
-  const [phoneValidationEnabled, setPhoneValidationEnabled] = useState<boolean>(getDefaultSettings("bn").phone_validation_enabled);
-  const [phoneValidationMessage, setPhoneValidationMessage] = useState<string>(getDefaultSettings("bn").phone_validation_message);
-  const [otpVerificationEnabled, setOtpVerificationEnabled] = useState<boolean>(getDefaultSettings("bn").otp_verification_enabled);
-  const [otpVerifiedMessage, setOtpVerifiedMessage] = useState<string>(getDefaultSettings("bn").otp_verified_message);
-  const [otpSmsTemplate, setOtpSmsTemplate] = useState<string>(getDefaultSettings("bn").otp_sms_template);
-  const [otpFormTitle, setOtpFormTitle] = useState<string>(getDefaultSettings("bn").otp_form_title);
-  const [otpFormDescription, setOtpFormDescription] = useState<string>(getDefaultSettings("bn").otp_form_description);
-  const [otpFormButtonText, setOtpFormButtonText] = useState<string>(getDefaultSettings("bn").otp_form_button_text);
-  const [otpFormResendText, setOtpFormResendText] = useState<string>(getDefaultSettings("bn").otp_form_resend_text);
-  const [trackingEnabled, setTrackingEnabled] = useState<boolean>(true);
-  const [stickyCtaEnabled, setStickyCtaEnabled] = useState<boolean>(true);
+  const [blockRemovedNotice, setBlockRemovedNotice] = useState(0);
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("mobile");
-  // null = no restriction, this page offers everything the shop enabled
-  // (backward-compatible default). A non-null array is an explicit subset.
-  // See online_payment_context.md.
-  const [paymentChannels, setPaymentChannels] = useState<string[] | null>(null);
   const [shopWalletProviders, setShopWalletProviders] = useState<string[]>([]);
   const [shopGatewayProviders, setShopGatewayProviders] = useState<string[]>([]);
-  const [theme, setTheme] = useState<ThemeSettings>({ ...DEFAULT_THEME });
 
   // Which wallet channels this shop has turned on at all (Settings → Online
   // Payment Channels) — the per-page selector below can only narrow this
@@ -612,27 +675,18 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   }, [mode]);
 
   const isAdminTemplateMode = mode === "admin-template";
-  const [templateNameBn, setTemplateNameBn] = useState("");
-  const [templateNameEn, setTemplateNameEn] = useState("");
-  const [templateDescription, setTemplateDescription] = useState("");
-  const [templatePreviewImage, setTemplatePreviewImage] = useState("");
-  const [templateIsActive, setTemplateIsActive] = useState(true);
   const [templateScreenshotUploading, setTemplateScreenshotUploading] = useState(false);
 
-  const [contentState, setContentState] = useState<ContentState>(emptyContentState());
-  const [layoutEntries, setLayoutEntries] = useState<LayoutEntry[]>([]);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [addAfterKey, setAddAfterKey] = useState<string | null>(null);
 
   const [products, setProducts] = useState<ProductItem[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<ProductDraft[]>([]);
   const [productQuery, setProductQuery] = useState("");
   const [draggingProductId, setDraggingProductId] = useState<string | null>(null);
   // rowKey is set when re-picking a variant for an already-attached row
   // ("Change variant"); null means attaching a brand-new product.
   const [variantPicker, setVariantPicker] = useState<{ product: ProductItem; rowKey: string | null } | null>(null);
 
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
 
   const [mediaPolicy, setMediaPolicy] = useState<MediaPolicy | null>(null);
   const [mediaLibrary, setMediaLibrary] = useState<MediaLibraryItem[]>([]);
@@ -722,14 +776,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setStickyCtaEnabled(merged.settings?.sticky_cta_enabled ?? true);
       setPaymentChannels(merged.settings?.payment_channels ?? null);
       if (sourceTheme) {
-        setTheme({
-          primary_color: sourceTheme.primary_color ?? DEFAULT_THEME.primary_color,
-          accent_color: sourceTheme.accent_color ?? DEFAULT_THEME.accent_color,
-          background_color: sourceTheme.background_color ?? DEFAULT_THEME.background_color,
-          text_color: sourceTheme.text_color ?? DEFAULT_THEME.text_color,
-          button_text_color: sourceTheme.button_text_color ?? DEFAULT_THEME.button_text_color,
-          font_family: sourceTheme.font_family ?? DEFAULT_THEME.font_family,
-        });
+        setTheme(normalizeTheme(sourceTheme));
       }
     };
 
@@ -825,14 +872,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setFloatingButtons(merged.contact?.floating_buttons ?? false);
           const tplTheme = (initialTemplate.theme_settings ?? null) as ThemeSettings | null;
           if (tplTheme) {
-            setTheme({
-              primary_color: tplTheme.primary_color ?? DEFAULT_THEME.primary_color,
-              accent_color: tplTheme.accent_color ?? DEFAULT_THEME.accent_color,
-              background_color: tplTheme.background_color ?? DEFAULT_THEME.background_color,
-              text_color: tplTheme.text_color ?? DEFAULT_THEME.text_color,
-              button_text_color: tplTheme.button_text_color ?? DEFAULT_THEME.button_text_color,
-              font_family: tplTheme.font_family ?? DEFAULT_THEME.font_family,
-            });
+            setTheme(normalizeTheme(tplTheme));
           }
         } else if (pageRes) {
           const pageJson = await pageRes.json();
@@ -892,14 +932,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setTrackingEnabled(merged.settings?.tracking_enabled ?? true);
       setStickyCtaEnabled(merged.settings?.sticky_cta_enabled ?? true);
           setPaymentChannels(merged.settings?.payment_channels ?? null);
-          setTheme({
-            primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
-            accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
-            background_color: loadedPage.theme_settings?.background_color ?? DEFAULT_THEME.background_color,
-            text_color: loadedPage.theme_settings?.text_color ?? DEFAULT_THEME.text_color,
-            button_text_color: loadedPage.theme_settings?.button_text_color ?? DEFAULT_THEME.button_text_color,
-            font_family: loadedPage.theme_settings?.font_family ?? DEFAULT_THEME.font_family,
-          });
+          setTheme(normalizeTheme(loadedPage.theme_settings));
         } else {
           const nextContent = emptyContentState();
           setContentState(nextContent);
@@ -925,7 +958,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
 
   function addBlock(type: BlockType, afterEntry?: LayoutEntry) {
     const id = `${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    const item: Item = { id, ...defaultItemFor(type) };
+    const item: Item = { id, ...BLOCK_REGISTRY[type].defaults() };
     setContentState((prev) => ({ ...prev, [type]: [...prev[type], item] }));
     setLayoutEntries((prev) => {
       if (!afterEntry) return [...prev, { type, id }];
@@ -940,40 +973,38 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   }
 
   function removeBlock(type: BlockType, id: string) {
-    const item = contentState[type].find((candidate) => candidate.id === id);
-    if (item) {
-      setLastRemoved({
-        type,
-        item,
-        itemIndex: contentState[type].indexOf(item),
-        layoutIndex: layoutEntries.findIndex((entry) => entry.type === type && entry.id === id),
-      });
-    }
+    docHistory.checkpoint();
     setContentState((prev) => ({ ...prev, [type]: prev[type].filter((item) => item.id !== id) }));
     setLayoutEntries((prev) => prev.filter((entry) => !(entry.type === type && entry.id === id)));
-  }
-
-  function undoRemoveBlock() {
-    if (!lastRemoved) return;
-    const { type, item, itemIndex, layoutIndex } = lastRemoved;
-    setContentState((prev) => {
-      const next = [...prev[type]];
-      next.splice(Math.min(itemIndex, next.length), 0, item);
-      return { ...prev, [type]: next };
-    });
-    setLayoutEntries((prev) => {
-      const next = [...prev];
-      next.splice(layoutIndex < 0 ? next.length : Math.min(layoutIndex, next.length), 0, { type, id: item.id });
-      return next;
-    });
-    setLastRemoved(null);
+    setBlockRemovedNotice((n) => n + 1);
   }
 
   useEffect(() => {
-    if (!lastRemoved) return;
-    const timer = window.setTimeout(() => setLastRemoved(null), 10000);
+    if (!blockRemovedNotice) return;
+    const timer = window.setTimeout(() => setBlockRemovedNotice(0), 10000);
     return () => window.clearTimeout(timer);
-  }, [lastRemoved]);
+  }, [blockRemovedNotice]);
+
+  const { undo: undoDoc, redo: redoDoc } = docHistory;
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y) undo and redo builder
+  // changes. Inside a text field the browser's own text undo wins.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && !event.shiftKey) {
+        event.preventDefault();
+        undoDoc();
+      } else if ((key === "z" && event.shiftKey) || key === "y") {
+        event.preventDefault();
+        redoDoc();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [undoDoc, redoDoc]);
 
   function duplicateBlock(type: BlockType, id: string) {
     const source = contentState[type].find((item) => item.id === id);
@@ -1287,6 +1318,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   if (!loading && savedSnapshot === null) {
     setSavedSnapshot(saveSnapshot);
+    docHistory.clearHistory();
   }
   const isDirty = !loading && savedSnapshot !== null && savedSnapshot !== saveSnapshot;
 
@@ -1395,13 +1427,13 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   }
 
   function renderBlockItem(entry: LayoutEntry) {
-    const Icon = BLOCK_ICONS[entry.type];
+    const Icon = BLOCK_REGISTRY[entry.type].icon;
 
     if (SINGLETON_BLOCK_TYPES.includes(entry.type)) {
       return (
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            <Icon size={14} /> {blockLabels[entry.type]}
+            <Icon size={14} /> {blockLabel(entry.type, locale)}
           </span>
           <p className="mt-2 text-xs text-[var(--muted)]">
             {locale === "bn" ? "সবসময় পেজে যুক্ত থাকে — নিচে ম্যানেজ করুন।" : "Always present on the page — manage it below."}
@@ -1412,12 +1444,13 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
 
     const item = contentState[entry.type]?.find((candidate) => candidate.id === entry.id);
     if (!item) return null;
+    const previousEntry = layoutEntries[layoutEntries.findIndex((candidate) => candidate.type === entry.type && candidate.id === entry.id) - 1];
 
     return (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            <Icon size={14} /> {blockLabels[entry.type]}
+            <Icon size={14} /> {blockLabel(entry.type, locale)}
           </span>
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -1430,11 +1463,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
               </button>
               {addAfterKey === `${entry.type}:${entry.id}` ? (
                 <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-lg">
-                  {ADDABLE_TYPES.map((addType) => {
-                    const AddIcon = BLOCK_ICONS[addType];
+                  {ADDABLE_BLOCK_TYPES.map((addType) => {
+                    const AddIcon = BLOCK_REGISTRY[addType].icon;
                     return (
                       <button key={addType} type="button" onClick={() => addBlock(addType, entry)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--surface-soft)]">
-                        <AddIcon size={14} /> {blockLabels[addType]}
+                        <AddIcon size={14} /> {blockLabel(addType, locale)}
                       </button>
                     );
                   })}
@@ -1449,208 +1482,37 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
             </button>
           </div>
         </div>
-        <div className="space-y-2">{renderBlockFields(entry.type, item)}</div>
+        <div className="space-y-2">
+          {renderBlockFields(entry.type, item)}
+          <BlockStyleFields
+            style={readBlockStyle(item)}
+            onChange={(style) => patchItem(entry.type, item.id, { style: hasBlockStyle(style) ? style : undefined })}
+            locale={locale}
+            inheritsFromGroup={GROUPED_BLOCK_TYPES.includes(entry.type) && previousEntry?.type === entry.type}
+          />
+        </div>
       </div>
     );
   }
 
   function renderBlockFields(type: BlockType, item: Item) {
-    const patch = (changes: Record<string, unknown>) => patchItem(type, item.id, changes);
-
-    switch (type) {
-      case "rich_text_blocks":
-        return (
-          <>
-            <TextField label={locale === "bn" ? "শিরোনাম (ঐচ্ছিক)" : "Title (optional)"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <RichTextEditorField value={item.body as JSONContent | undefined} onChange={(json) => patch({ body: json })} />
-          </>
-        );
-      case "image_text_blocks":
-        return (
-          <>
-            <ImagePickerField
-              label={locale === "bn" ? "ছবি" : "Image"}
-              value={String(item.image_url ?? "")}
-              locale={locale}
-              onPick={() => setMediaTarget({ type, id: item.id, field: "image_url" })}
-            />
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "ছবির অবস্থান" : "Image position"}</span>
-              <select value={String(item.image_position ?? "left")} onChange={(e) => patch({ image_position: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                <option value="left">{locale === "bn" ? "বামে" : "Left"}</option>
-                <option value="right">{locale === "bn" ? "ডানে" : "Right"}</option>
-              </select>
-            </label>
-            <TextField label={locale === "bn" ? "হেডিং" : "Heading"} value={String(item.heading ?? "")} onChange={(v) => patch({ heading: v })} />
-            <TextAreaField label={locale === "bn" ? "বর্ণনা" : "Body"} value={String(item.body ?? "")} onChange={(v) => patch({ body: v })} />
-            <TextField label={locale === "bn" ? "বাটন টেক্সট (ঐচ্ছিক)" : "Button text (optional)"} value={String(item.cta_text ?? "")} onChange={(v) => patch({ cta_text: v })} />
-            <TextField label={locale === "bn" ? "বাটন লিংক (ঐচ্ছিক)" : "Button link (optional)"} value={String(item.cta_url ?? "")} onChange={(v) => patch({ cta_url: v })} />
-          </>
-        );
-      case "features": {
-        const isFirst = contentState.features[0]?.id === item.id;
-        return (
-          <>
-            {isFirst ? (
-              <div className="mb-3 space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                <p className="text-xs text-[var(--muted)]">{t.sectionWideHint}</p>
-                <TextField label={t.featuresTitle} value={featuresTitle} onChange={setFeaturesTitle} />
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t.featuresLayout}</span>
-                  <select
-                    value={featuresLayout}
-                    onChange={(e) => setFeaturesLayout(e.target.value as "cards" | "list" | "minimal")}
-                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
-                  >
-                    <option value="cards">{t.featuresLayoutCards}</option>
-                    <option value="list">{t.featuresLayoutList}</option>
-                    <option value="minimal">{t.featuresLayoutMinimal}</option>
-                  </select>
-                </label>
-              </div>
-            ) : null}
-            <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "star")} onChange={(v) => patch({ icon: v })} locale={locale} />
-            <TextField label={locale === "bn" ? "শিরোনাম" : "Title"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <TextAreaField label={locale === "bn" ? "বর্ণনা" : "Description"} value={String(item.description ?? "")} onChange={(v) => patch({ description: v })} rows={2} />
-          </>
-        );
-      }
-      case "trust_badges": {
-        const isFirst = contentState.trust_badges[0]?.id === item.id;
-        return (
-          <>
-            {isFirst ? (
-              <div className="mb-3 space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-                <p className="text-xs text-[var(--muted)]">{t.sectionWideHint}</p>
-                <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{t.trustBadgesLayout}</span>
-                  <select
-                    value={trustBadgesLayout}
-                    onChange={(e) => setTrustBadgesLayout(e.target.value as "cards" | "row" | "minimal")}
-                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm"
-                  >
-                    <option value="cards">{t.trustBadgesLayoutCards}</option>
-                    <option value="row">{t.trustBadgesLayoutRow}</option>
-                    <option value="minimal">{t.trustBadgesLayoutMinimal}</option>
-                  </select>
-                </label>
-              </div>
-            ) : null}
-            <IconPickerField label={locale === "bn" ? "আইকন" : "Icon"} value={String(item.icon ?? "shield-check")} onChange={(v) => patch({ icon: v })} locale={locale} />
-            <TextField label={locale === "bn" ? "লেবেল" : "Label"} value={String(item.label ?? "")} onChange={(v) => patch({ label: v })} />
-            <TextField label={locale === "bn" ? "সাব-লেবেল (ঐচ্ছিক)" : "Sublabel (optional)"} value={String(item.sublabel ?? "")} onChange={(v) => patch({ sublabel: v })} />
-          </>
-        );
-      }
-      case "video_embeds": {
-        const url = String(item.url ?? "");
-        const invalid = url.trim().length > 0 && !isAllowedVideoUrl(url);
-        return (
-          <>
-            <TextField label={locale === "bn" ? "শিরোনাম (ঐচ্ছিক)" : "Title (optional)"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <TextField label="YouTube / Facebook / Vimeo URL" value={url} onChange={(v) => patch({ url: v })} placeholder="https://youtube.com/watch?v=..." />
-            {invalid ? <p className="text-xs text-red-400">{t.invalidVideoUrl}</p> : null}
-          </>
-        );
-      }
-      case "countdown_blocks":
-        return (
-          <>
-            <TextField label={locale === "bn" ? "মেসেজ" : "Message"} value={String(item.message ?? "")} onChange={(v) => patch({ message: v })} />
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "শেষ সময়" : "End date/time"}</span>
-              <input type="datetime-local" value={String(item.end_datetime ?? "")} onChange={(e) => patch({ end_datetime: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]" />
-            </label>
-          </>
-        );
-      case "reviews":
-        return (
-          <>
-            <ImagePickerField
-              label={locale === "bn" ? "প্রোফাইল ছবি (ঐচ্ছিক)" : "Avatar (optional)"}
-              value={String(item.avatar_url ?? "")}
-              locale={locale}
-              onPick={() => setMediaTarget({ type, id: item.id, field: "avatar_url" })}
-            />
-            <TextField label={locale === "bn" ? "নাম" : "Name"} value={String(item.name ?? "")} onChange={(v) => patch({ name: v })} />
-            <TextAreaField label={locale === "bn" ? "রিভিউ" : "Quote"} value={String(item.quote ?? "")} onChange={(v) => patch({ quote: v })} rows={2} />
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "রেটিং" : "Rating"}</span>
-              <select value={String(item.rating ?? 5)} onChange={(e) => patch({ rating: Number(e.target.value) })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{"★".repeat(n)}</option>)}
-              </select>
-            </label>
-          </>
-        );
-      case "faq":
-        return (
-          <>
-            <TextField label={locale === "bn" ? "প্রশ্ন" : "Question"} value={String(item.q ?? "")} onChange={(v) => patch({ q: v })} />
-            <TextAreaField label={locale === "bn" ? "উত্তর" : "Answer"} value={String(item.a ?? "")} onChange={(v) => patch({ a: v })} rows={2} />
-          </>
-        );
-      case "spacers":
-        return (
-          <div className="grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "স্টাইল" : "Style"}</span>
-              <select value={String(item.style ?? "space")} onChange={(e) => patch({ style: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                <option value="space">{locale === "bn" ? "ফাঁকা জায়গা" : "Blank space"}</option>
-                <option value="line">{locale === "bn" ? "লাইন" : "Line"}</option>
-                <option value="dots">{locale === "bn" ? "ডট" : "Dots"}</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "সাইজ" : "Size"}</span>
-              <select value={String(item.size ?? "md")} onChange={(e) => patch({ size: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                <option value="sm">{locale === "bn" ? "ছোট" : "Small"}</option>
-                <option value="md">{locale === "bn" ? "মাঝারি" : "Medium"}</option>
-                <option value="lg">{locale === "bn" ? "বড়" : "Large"}</option>
-              </select>
-            </label>
-          </div>
-        );
-      case "html_sections":
-        return (
-          <>
-            <TextField label={locale === "bn" ? "শিরোনাম" : "Title"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <p className="text-xs text-[var(--muted)]">{locale === "bn" ? "এই সেকশনটি পুরনো এডিটরে তৈরি — নতুন বিল্ডারে কোড এডিট করা যায় না।" : "Created in the old editor — code can't be edited from this builder."}</p>
-          </>
-        );
-      case "carousel_images": {
-        const images = (item.images as Array<{ id?: number | null; url?: string | null; alt?: string | null }> | undefined) ?? [];
-        return (
-          <>
-            <TextField label={locale === "bn" ? "শিরোনাম" : "Title"} value={String(item.title ?? "")} onChange={(v) => patch({ title: v })} />
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">{locale === "bn" ? "স্টাইল" : "Style"}</span>
-              <select value={String(item.template ?? "style-1")} onChange={(e) => patch({ template: e.target.value })} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                <option value="style-1">Style 1</option>
-                <option value="style-2">Style 2</option>
-              </select>
-            </label>
-            <div className="flex items-center justify-between gap-2">
-              <button type="button" onClick={() => setMediaTarget({ type: "carousel_images", id: item.id, field: "images" })} className="rounded-xl border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]">
-                {t.pickImages}
-              </button>
-              <span className="text-xs text-[var(--muted)]">{t.selectedCount}: {images.length}</span>
-            </div>
-            {images.length > 0 ? (
-              <div className="grid grid-cols-4 gap-2">
-                {images.map((image, imageIndex) => (
-                  <div key={`${image.url}-${imageIndex}`} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={image.url ?? ""} alt={image.alt ?? ""} className="aspect-square w-full object-cover" />
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </>
-        );
-      }
-      default:
-        return null;
-    }
+    const Editor = BLOCK_REGISTRY[type].Editor;
+    if (!Editor) return null;
+    return (
+      <Editor
+        item={item}
+        patch={(changes) => patchItem(type, item.id, changes)}
+        locale={locale}
+        openMedia={(field) => setMediaTarget({ type, id: item.id, field })}
+        isFirstOfType={contentState[type][0]?.id === item.id}
+        section={{ featuresTitle, featuresLayout, trustBadgesLayout }}
+        onSectionChange={(changes) => {
+          if (changes.featuresTitle !== undefined) setFeaturesTitle(changes.featuresTitle);
+          if (changes.featuresLayout !== undefined) setFeaturesLayout(changes.featuresLayout);
+          if (changes.trustBadgesLayout !== undefined) setTrustBadgesLayout(changes.trustBadgesLayout);
+        }}
+      />
+    );
   }
 
   return (
@@ -1837,11 +1699,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
                   </button>
                   {addMenuOpen ? (
                     <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-lg">
-                      {ADDABLE_TYPES.map((type) => {
-                        const Icon = BLOCK_ICONS[type];
+                      {ADDABLE_BLOCK_TYPES.map((type) => {
+                        const Icon = BLOCK_REGISTRY[type].icon;
                         return (
                           <button key={type} type="button" onClick={() => addBlock(type)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--surface-soft)]">
-                            <Icon size={14} /> {blockLabels[type]}
+                            <Icon size={14} /> {blockLabel(type, locale)}
                           </button>
                         );
                       })}
@@ -2206,6 +2068,14 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           </div>
 
           <div className="sticky bottom-0 z-20 -mx-1 flex items-center justify-end gap-3 rounded-xl bg-[var(--surface)]/95 px-1 py-2 backdrop-blur">
+            <div className="mr-auto flex items-center gap-1">
+              <button type="button" onClick={docHistory.undo} disabled={!docHistory.canUndo} title={`${t.undo} (Ctrl+Z)`} aria-label={t.undo} className="rounded-lg border border-[var(--border)] p-2 text-[var(--foreground)] disabled:opacity-40">
+                <Undo2 size={16} />
+              </button>
+              <button type="button" onClick={docHistory.redo} disabled={!docHistory.canRedo} title={`${t.redo} (Ctrl+Shift+Z)`} aria-label={t.redo} className="rounded-lg border border-[var(--border)] p-2 text-[var(--foreground)] disabled:opacity-40">
+                <Redo2 size={16} />
+              </button>
+            </div>
             {!isAdminTemplateMode ? (
               <span className={`text-xs ${isDirty ? "font-semibold text-amber-500" : "text-[var(--muted)]"}`}>
                 {isDirty ? t.unsavedChanges : t.allSaved}
@@ -2241,7 +2111,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
             </div>
             <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
               <PreviewFrame device={previewDevice}>
-                <PublicLandingPageView page={draftPage} previewMode />
+                <div className={FONT_VARIABLE_CLASSES}>
+                  <PublicLandingPageView page={draftPage} previewMode />
+                </div>
               </PreviewFrame>
             </div>
           </div>
@@ -2291,10 +2163,10 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
         </div>
       ) : null}
 
-      {lastRemoved ? (
+      {blockRemovedNotice ? (
         <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--foreground)] shadow-lg">
           {t.blockRemoved}
-          <button type="button" onClick={undoRemoveBlock} className="font-semibold text-[var(--accent)] hover:underline">
+          <button type="button" onClick={() => { docHistory.undo(); setBlockRemovedNotice(0); }} className="font-semibold text-[var(--accent)] hover:underline">
             {t.undo}
           </button>
         </div>

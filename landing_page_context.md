@@ -445,3 +445,18 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 - **ব্লক ডিলিটে Undo:** বিল্ডারে ১০ সেকেন্ডের টোস্ট, ব্লক আগের জায়গায় ফেরত আসে।
 - **শেয়ার ছবি:** `seo_meta.og_image`, `generateMetadata`-তে প্রথম অগ্রাধিকার।
 - **Custom CSS:** বিল্ডারের Settings ট্যাবে textarea (admin-template মোডে নেই); save payload-এ `custom_css` এখন পাঠানো হয়।
+
+## ২৫. ধাপ ৩: এডিটর রিফ্যাক্টর (2026-10-13)
+
+আচরণ বদলায়নি, শুধু কোড ভাগ করা হয়েছে, আর তার উপর Undo/Redo যোগ হয়েছে।
+- **ব্লক রেজিস্ট্রি:** `frontend/src/components/landing-builder/blocks/` — প্রতিটা ব্লক টাইপের এডিটর ফর্ম আলাদা ফাইলে (`faq.tsx`, `features.tsx` ...), `registry.ts`-এ `BLOCK_REGISTRY[type] = {label, icon, addable, defaults, Editor}`। আগের `BLOCK_LABELS`/`BLOCK_ICONS`/`ADDABLE_TYPES`/`defaultItemFor`/বিশাল `renderBlockFields` switch সরানো হয়েছে। নতুন ব্লক = একটা ফাইল + একটা রেজিস্ট্রি এন্ট্রি + `landing-blocks/block-views.tsx`-এ রেন্ডারার + `public-landing-page-view.tsx`-এর render-run-এ একটা কেস + `landing-layout.ts`-এর `BlockType`।
+- **ব্লক রেন্ডারার:** `frontend/src/components/landing-blocks/block-views.tsx` — `CarouselBlockView, RichTextBlockView, ImageTextBlockView, TrustBadgeRow, FeatureGrid, VideoEmbedView, CountdownView, SpacerView, sanitizeHtml` (আগে `public-landing-page-view.tsx`-এর ভেতরে ছিল)।
+- **একক undoable state:** save হয় এমন সব ফিল্ড এখন `BuilderDoc` টাইপের একটা অবজেক্টে (`initialBuilderDoc()`), `components/landing-builder/use-undoable-state.ts` হুক দিয়ে। কম্পোনেন্টে আগের নাম ও `setX` setter destructure করা আছে, তাই বাকি কোড আগের মতোই পড়া যায়। নতুন save-যোগ্য ফিল্ড যোগ করলে `BuilderDoc`, `initialBuilderDoc()` আর destructure/setter তালিকায় যোগ করতে হবে (useState নয়)।
+- **Undo/Redo:** save বারে বাটন, আর Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z বা Ctrl+Y (টেক্সট ফিল্ডের ভেতরে ব্রাউজারের নিজের undo চলে)। ৮০০ms-এর ভেতরের পরিবর্তনগুলো এক ধাপ ধরা হয়; ব্লক ডিলিট সবসময় আলাদা ধাপ (`checkpoint()`)। পেজ লোড হলে history মুছে যায়। ব্লক ডিলিটের টোস্টের "ফেরত আনুন" এখন একই undo ব্যবহার করে।
+
+## ২৬. ধাপ ৪: ব্লক স্টাইল ও গ্লোবাল ডিজাইন (2026-10-14)
+- **প্রতি ব্লকের স্টাইল:** প্রতিটা ব্লক আইটেমে ঐচ্ছিক `style` = `{bg_color, text_color, padding: none|sm|lg, width: narrow|full, align: left|center|right, hide_mobile, hide_desktop}` (`frontend/src/lib/landing-block-style.ts`)। খালি হলে ফিল্ডটা save হয় না। পাবলিক পেজে `styled()` ব্লকটাকে `.lp-block` র‍্যাপারে মোড়ায়; `BLOCK_STYLE_CSS` র‍্যাপার থেকে ভেতরের `.lp-card`-এর ব্যাকগ্রাউন্ড/প্যাডিং বদলায়, তাই block view কম্পোনেন্টে কিছু বদলাতে হয়নি।
+- **গ্রুপ ব্লক** (`GROUPED_BLOCK_TYPES`: features, trust_badges, faq, reviews): পাশাপাশি একই টাইপের আইটেম এক বক্সে দেখায়, স্টাইল নেয় run-এর প্রথম আইটেম থেকে। বিল্ডারে পরেরগুলোতে স্টাইল প্যানেলের বদলে সেটা বলা থাকে।
+- **এডিটর:** `components/landing-builder/block-style-fields.tsx`, প্রতিটা ব্লক কার্ডের নিচে ভাঁজ করা "ব্লক স্টাইল" প্যানেল।
+- **থিম:** `theme_settings`-এ নতুন `heading_font` (null = মূল ফন্ট), `font_scale` (sm|md|lg, `html` font-size 93.75/100/112.5%), `button_shape` (rounded|pill|square, `.lp-btn` ক্লাসে)। `STYLE_KITS` রঙ+ফন্ট+বাটন একসাথে সেট করে। পুরনো থিম পড়তে `normalizeTheme()`। ব্যাকএন্ডে পরিবর্তন লাগেনি (`theme_settings` ও `content` array হিসেবে যায়)।
+- বিল্ডারের প্রিভিউ এখন `FONT_VARIABLE_CLASSES` দিয়ে মোড়ানো, তাই বাছাই করা ফন্ট প্রিভিউতেও দেখা যায় (আগে শুধু লাইভ পেজে দেখা যেত)।
