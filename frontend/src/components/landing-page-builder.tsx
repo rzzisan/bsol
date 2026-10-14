@@ -24,7 +24,7 @@ import {
 import { DEFAULT_THEME, normalizeTheme, type ThemeSettings } from "@/lib/theme-presets";
 import LandingDesignPanel from "@/components/landing-design-panel";
 import { BlockStyleFields } from "@/components/landing-builder/block-style-fields";
-import { GROUPED_BLOCK_TYPES, hasBlockStyle, readBlockStyle } from "@/lib/landing-block-style";
+import { BLOCK_STYLE_KEY, GROUPED_BLOCK_TYPES, hasBlockStyle, readBlockStyle } from "@/lib/landing-block-style";
 import {
   BLOCK_TYPES,
   SINGLETON_BLOCK_TYPES,
@@ -1486,7 +1486,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           {renderBlockFields(entry.type, item)}
           <BlockStyleFields
             style={readBlockStyle(item)}
-            onChange={(style) => patchItem(entry.type, item.id, { style: hasBlockStyle(style) ? style : undefined })}
+            onChange={(style) => patchItem(entry.type, item.id, {
+              [BLOCK_STYLE_KEY]: hasBlockStyle(style) ? style : undefined,
+              // Drop a block style saved under the old key; spacers keep their own `style`.
+              ...(typeof item.style === "object" && item.style !== null ? { style: undefined } : {}),
+            })}
             locale={locale}
             inheritsFromGroup={GROUPED_BLOCK_TYPES.includes(entry.type) && previousEntry?.type === entry.type}
           />
