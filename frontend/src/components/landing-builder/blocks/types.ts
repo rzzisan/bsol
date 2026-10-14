@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/dashboard-client";
+import type { FaqLayout, ReviewsLayout } from "@/lib/landing-pages";
 
 export type BlockItem = { id: string; [key: string]: unknown };
 
@@ -8,6 +9,10 @@ export type SectionSettings = {
   featuresTitle: string;
   featuresLayout: "cards" | "list" | "minimal";
   trustBadgesLayout: "cards" | "row" | "minimal";
+  reviewsTitle: string;
+  reviewsLayout: ReviewsLayout;
+  faqTitle: string;
+  faqLayout: FaqLayout;
 };
 
 export type BlockEditorProps = {
