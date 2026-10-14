@@ -28,6 +28,12 @@ export type BlockType =
   | "trust_badges"
   | "countdown_blocks"
   | "spacers"
+  | "button_blocks"
+  | "price_boxes"
+  | "checklists"
+  | "guarantees"
+  | "galleries"
+  | "before_after_blocks"
   | "products";
 
 export const BLOCK_TYPES: BlockType[] = [
@@ -42,6 +48,12 @@ export const BLOCK_TYPES: BlockType[] = [
   "reviews",
   "faq",
   "spacers",
+  "button_blocks",
+  "price_boxes",
+  "checklists",
+  "guarantees",
+  "galleries",
+  "before_after_blocks",
   "products",
 ];
 

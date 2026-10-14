@@ -3,9 +3,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { JSONContent } from "@tiptap/core";
-import { landingPathForSlug, mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
+import { landingPathForSlug, mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate, type ButtonBlock, type PriceBoxBlock, type ChecklistBlock, type GuaranteeBlock, type GalleryBlock, type BeforeAfterBlock, type NoticeBarConfig, type FooterConfig } from "@/lib/landing-pages";
 import { BUTTON_RADIUS, FONT_SCALE_PERCENT, resolveFontCssVar } from "@/lib/theme-presets";
-import { sanitizeHtml, CarouselBlockView, RichTextBlockView, ImageTextBlockView, TrustBadgeRow, FeatureGrid, VideoEmbedView, CountdownView, SpacerView } from "@/components/landing-blocks/block-views";
+import { sanitizeHtml, safeLinkUrl, CarouselBlockView, RichTextBlockView, ImageTextBlockView, TrustBadgeRow, FeatureGrid, VideoEmbedView, CountdownView, SpacerView, ButtonBlockView, PriceBoxView, ChecklistView, GuaranteeView, GalleryView, BeforeAfterView } from "@/components/landing-blocks/block-views";
 import type { LayoutEntry } from "@/lib/landing-layout";
 import { BLOCK_STYLE_CSS, blockStyleProps, hasBlockStyle, readBlockStyle } from "@/lib/landing-block-style";
 import { getOrCreateCheckoutSessionToken, setCheckoutSessionToken } from "@/lib/checkout-session";
@@ -250,6 +250,14 @@ export type PublicLandingPage = {
     countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
     video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
     spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
+    button_blocks?: ButtonBlock[];
+    price_boxes?: PriceBoxBlock[];
+    checklists?: ChecklistBlock[];
+    guarantees?: GuaranteeBlock[];
+    galleries?: GalleryBlock[];
+    before_after_blocks?: BeforeAfterBlock[];
+    notice_bar?: NoticeBarConfig | null;
+    footer?: FooterConfig | null;
     contact?: { phone?: string | null; whatsapp?: string | null; floating_buttons?: boolean | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
     settings?: { language?: "bn" | "en" | null; phone_validation_enabled?: boolean | null; phone_validation_message?: string | null } | null;
@@ -473,6 +481,14 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const countdownBlocks = content.countdown_blocks ?? [];
   const videoEmbeds = content.video_embeds ?? [];
   const spacers = content.spacers ?? [];
+  const buttonBlocks: ButtonBlock[] = content.button_blocks ?? [];
+  const priceBoxes: PriceBoxBlock[] = content.price_boxes ?? [];
+  const checklists: ChecklistBlock[] = content.checklists ?? [];
+  const guarantees: GuaranteeBlock[] = content.guarantees ?? [];
+  const galleries: GalleryBlock[] = content.galleries ?? [];
+  const beforeAfterBlocks: BeforeAfterBlock[] = content.before_after_blocks ?? [];
+  const noticeBar: NoticeBarConfig | null = content.notice_bar?.enabled && content.notice_bar.text ? content.notice_bar : null;
+  const footer: FooterConfig | null = content.footer?.enabled ? content.footer : null;
   const products = (page.products ?? []).filter((item) => item.product);
 
   const [sessionToken, setSessionToken] = useState("");
@@ -920,6 +936,17 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         ${sanitizeCustomCss(page.custom_css ?? "")}
       `}</style>
 
+      {noticeBar ? (() => {
+        const noticeUrl = safeLinkUrl(noticeBar.url);
+        const noticeStyle = { backgroundColor: noticeBar.bg_color || theme.accent, color: noticeBar.text_color || theme.buttonText };
+        const noticeClass = "lp-shell block px-4 py-2 text-center text-sm font-semibold";
+        return noticeUrl ? (
+          <a href={noticeUrl} className={`${noticeClass} hover:underline`} style={noticeStyle}>{noticeBar.text}</a>
+        ) : (
+          <div className={noticeClass} style={noticeStyle}>{noticeBar.text}</div>
+        );
+      })() : null}
+
       <section
         ref={heroRef}
         className="lp-shell px-4 py-16 text-white"
@@ -1005,6 +1032,42 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             if (sectionKey === "spacers") {
               return pickRun(spacers, run).map((block, index) => styled(`spacer-${block.id ?? index}`, block, (
                 <SpacerView block={block} />
+              )));
+            }
+
+            if (sectionKey === "button_blocks") {
+              return pickRun(buttonBlocks, run).map((block, index) => styled(`button-${block.id ?? index}`, block, (
+                <ButtonBlockView block={block} theme={theme} onCheckout={scrollToCheckout} fallbackText={hero.cta_text || t.defaultCtaText} />
+              )));
+            }
+
+            if (sectionKey === "price_boxes") {
+              return pickRun(priceBoxes, run).map((block, index) => styled(`price-${block.id ?? index}`, block, (
+                <PriceBoxView block={block} theme={theme} onCheckout={scrollToCheckout} />
+              )));
+            }
+
+            if (sectionKey === "checklists") {
+              return pickRun(checklists, run).map((block, index) => styled(`checklist-${block.id ?? index}`, block, (
+                <ChecklistView block={block} theme={theme} />
+              )));
+            }
+
+            if (sectionKey === "guarantees") {
+              return pickRun(guarantees, run).map((block, index) => styled(`guarantee-${block.id ?? index}`, block, (
+                <GuaranteeView block={block} theme={theme} />
+              )));
+            }
+
+            if (sectionKey === "galleries") {
+              return pickRun(galleries, run).map((block, index) => styled(`gallery-${block.id ?? index}`, block, (
+                <GalleryView block={block} theme={theme} />
+              )));
+            }
+
+            if (sectionKey === "before_after_blocks") {
+              return pickRun(beforeAfterBlocks, run).map((block, index) => styled(`beforeafter-${block.id ?? index}`, block, (
+                <BeforeAfterView block={block} theme={theme} />
               )));
             }
 
@@ -1364,6 +1427,18 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
           </div>
         </div>
       </section>
+
+      {footer ? (
+        <footer className="lp-shell mt-4 px-4 py-8 text-center" style={{ backgroundColor: theme.primary, color: theme.buttonText }}>
+          {footer.text ? <p className="mx-auto max-w-3xl whitespace-pre-line text-sm leading-6">{footer.text}</p> : null}
+          {footer.show_contact && floatingPhone ? (
+            <p className="mt-2 text-sm">
+              {t.contactLabel}: <a href={`tel:${floatingPhone}`} className="font-semibold underline">{floatingPhone}</a>
+            </p>
+          ) : null}
+          <p className="mt-3 text-xs opacity-75">© {new Date().getFullYear()} {page.title}</p>
+        </footer>
+      ) : null}
 
       {platformSettings ? (
         <footer className="mx-auto max-w-4xl px-4 pb-8 pt-2 text-center text-xs leading-5 text-slate-400">

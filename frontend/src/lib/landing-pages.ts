@@ -235,6 +235,14 @@ export type LandingPageContent = {
   countdown_blocks?: Array<{ id?: string; message?: string | null; end_datetime?: string | null }>;
   video_embeds?: Array<{ id?: string; title?: string | null; url?: string | null }>;
   spacers?: Array<{ id?: string; style?: "space" | "line" | "dots" | null; size?: "sm" | "md" | "lg" | null }>;
+  button_blocks?: ButtonBlock[];
+  price_boxes?: PriceBoxBlock[];
+  checklists?: ChecklistBlock[];
+  guarantees?: GuaranteeBlock[];
+  galleries?: GalleryBlock[];
+  before_after_blocks?: BeforeAfterBlock[];
+  notice_bar?: NoticeBarConfig | null;
+  footer?: FooterConfig | null;
   contact?: { phone?: string | null; whatsapp?: string | null; floating_buttons?: boolean | null };
   shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
   thank_you?: ThankYouConfig | null;
@@ -242,6 +250,16 @@ export type LandingPageContent = {
   layout_order?: Array<string | { type: string; id: string }>;
   [key: string]: unknown;
 };
+
+export type ButtonBlock = { id?: string; text?: string | null; url?: string | null; size?: "md" | "lg" | null; full_width?: boolean | null };
+export type PriceBoxBlock = { id?: string; title?: string | null; regular_price?: string | null; offer_price?: string | null; note?: string | null; cta_text?: string | null };
+export type ChecklistBlock = { id?: string; title?: string | null; items?: string | null; icon?: "check" | "cross" | "star" | null };
+export type GuaranteeBlock = { id?: string; icon?: string | null; title?: string | null; body?: string | null };
+export type GalleryBlock = { id?: string; title?: string | null; columns?: "2" | "3" | "4" | null; images?: Array<{ url?: string | null; alt?: string | null }> };
+export type BeforeAfterBlock = { id?: string; title?: string | null; before_url?: string | null; after_url?: string | null; before_label?: string | null; after_label?: string | null };
+// Thin bar above the hero, e.g. "Free delivery today only".
+export type NoticeBarConfig = { enabled?: boolean | null; text?: string | null; url?: string | null; bg_color?: string | null; text_color?: string | null };
+export type FooterConfig = { enabled?: boolean | null; text?: string | null; show_contact?: boolean | null };
 
 // Per-page toggles for optional landing-page behavior. Starts with phone
 // validation; future toggles become sibling fields here.
@@ -404,6 +422,14 @@ export function mergeLandingContent(
     countdown_blocks: pickArray(pageContent.countdown_blocks, templateContent.countdown_blocks),
     video_embeds: pickArray(pageContent.video_embeds, templateContent.video_embeds),
     spacers: pickArray(pageContent.spacers, templateContent.spacers),
+    button_blocks: pickArray(pageContent.button_blocks, templateContent.button_blocks),
+    price_boxes: pickArray(pageContent.price_boxes, templateContent.price_boxes),
+    checklists: pickArray(pageContent.checklists, templateContent.checklists),
+    guarantees: pickArray(pageContent.guarantees, templateContent.guarantees),
+    galleries: pickArray(pageContent.galleries, templateContent.galleries),
+    before_after_blocks: pickArray(pageContent.before_after_blocks, templateContent.before_after_blocks),
+    notice_bar: pageContent.notice_bar ?? templateContent.notice_bar ?? null,
+    footer: pageContent.footer ?? templateContent.footer ?? null,
     contact: {
       ...(templateContent.contact ?? {}),
       ...(pageContent.contact ?? {}),

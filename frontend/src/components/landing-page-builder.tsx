@@ -14,6 +14,8 @@ import {
   type LandingTemplate,
   type ProductItem,
   type AttachedVariant,
+  type FooterConfig,
+  type NoticeBarConfig,
   getDefaultCheckoutFields,
   getDefaultThankYou,
   getDefaultSettings,
@@ -24,6 +26,7 @@ import {
 import { DEFAULT_THEME, normalizeTheme, type ThemeSettings } from "@/lib/theme-presets";
 import LandingDesignPanel from "@/components/landing-design-panel";
 import { BlockStyleFields } from "@/components/landing-builder/block-style-fields";
+import { PageChromeFields } from "@/components/landing-builder/page-chrome-fields";
 import { BLOCK_STYLE_KEY, GROUPED_BLOCK_TYPES, hasBlockStyle, readBlockStyle } from "@/lib/landing-block-style";
 import {
   BLOCK_TYPES,
@@ -137,6 +140,8 @@ type BuilderDoc = {
   contactPhone: string;
   whatsappNumber: string;
   floatingButtons: boolean;
+  noticeBar: NoticeBarConfig;
+  footer: FooterConfig;
   ogImage: string;
   customCss: string;
   thankYouTitle: string;
@@ -193,6 +198,8 @@ function initialBuilderDoc(): BuilderDoc {
     contactPhone: "",
     whatsappNumber: "",
     floatingButtons: false,
+    noticeBar: {},
+    footer: {},
     ogImage: "",
     customCss: "",
     thankYouTitle: getDefaultThankYou("bn").title ?? "",
@@ -549,6 +556,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     contactPhone,
     whatsappNumber,
     floatingButtons,
+    noticeBar,
+    footer,
     ogImage,
     customCss,
     thankYouTitle,
@@ -599,6 +608,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const setContactPhone = docHistory.setField("contactPhone");
   const setWhatsappNumber = docHistory.setField("whatsappNumber");
   const setFloatingButtons = docHistory.setField("floatingButtons");
+  const setNoticeBar = docHistory.setField("noticeBar");
+  const setFooter = docHistory.setField("footer");
   const setOgImage = docHistory.setField("ogImage");
   const setCustomCss = docHistory.setField("customCss");
   const setThankYouTitle = docHistory.setField("thankYouTitle");
@@ -759,6 +770,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setContactPhone(merged.contact?.phone ?? "");
       setWhatsappNumber(merged.contact?.whatsapp ?? "");
       setFloatingButtons(merged.contact?.floating_buttons ?? false);
+      setNoticeBar(merged.notice_bar ?? {});
+      setFooter(merged.footer ?? {});
       setThankYouTitle(merged.thank_you?.title ?? "");
       setThankYouMessage(merged.thank_you?.message ?? "");
       setThankYouShowSummary(merged.thank_you?.show_order_summary ?? true);
@@ -870,6 +883,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setContactPhone(merged.contact?.phone ?? "");
       setWhatsappNumber(merged.contact?.whatsapp ?? "");
       setFloatingButtons(merged.contact?.floating_buttons ?? false);
+      setNoticeBar(merged.notice_bar ?? {});
+      setFooter(merged.footer ?? {});
           const tplTheme = (initialTemplate.theme_settings ?? null) as ThemeSettings | null;
           if (tplTheme) {
             setTheme(normalizeTheme(tplTheme));
@@ -916,6 +931,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setContactPhone(merged.contact?.phone ?? "");
       setWhatsappNumber(merged.contact?.whatsapp ?? "");
       setFloatingButtons(merged.contact?.floating_buttons ?? false);
+      setNoticeBar(merged.notice_bar ?? {});
+      setFooter(merged.footer ?? {});
           setThankYouTitle(merged.thank_you?.title ?? loadedThankYou.title ?? "");
           setThankYouMessage(merged.thank_you?.message ?? loadedThankYou.message ?? "");
           setThankYouShowSummary(merged.thank_you?.show_order_summary ?? true);
@@ -1203,10 +1220,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     setMediaTarget(null);
   }
 
-  function toggleCarouselImage(blockId: string, image: MediaLibraryItem) {
+  // Blocks with an `images` list (carousel, gallery) pick several images.
+  function toggleBlockImage(type: BlockType, blockId: string, image: MediaLibraryItem) {
     setContentState((prev) => ({
       ...prev,
-      carousel_images: prev.carousel_images.map((block) => {
+      [type]: prev[type].map((block) => {
         if (block.id !== blockId) return block;
         const images = (block.images as Array<{ id?: number | null; url?: string | null; alt?: string | null }> | undefined) ?? [];
         const exists = images.some((img) => img.url === image.url);
@@ -1262,6 +1280,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       products_section_subtitle: productsSubtitle || null,
       checkout_fields: checkoutFields,
       contact: { phone: contactPhone || null, whatsapp: whatsappNumber || null, floating_buttons: floatingButtons },
+      notice_bar: noticeBar.enabled ? noticeBar : null,
+      footer: footer.enabled ? footer : null,
       shipping: {
         inside_dhaka: toNumberOrNull(shippingInsideDhaka) ?? 80,
         outside_dhaka: toNumberOrNull(shippingOutsideDhaka) ?? 120,
@@ -1307,7 +1327,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     custom_css: customCss || null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, whatsappNumber, floatingButtons, ogImage, customCss, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, stickyCtaEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, whatsappNumber, floatingButtons, noticeBar, footer, ogImage, customCss, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, stickyCtaEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   // Everything a save sends, as one string, so "unsaved changes" is a plain
   // comparison against what was last loaded or saved.
@@ -1694,6 +1714,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           </div>
 
           <div className={activeTab === "blocks" ? "space-y-5" : "hidden"}>
+            <PageChromeFields locale={locale} noticeBar={noticeBar} onNoticeBarChange={setNoticeBar} footer={footer} onFooterChange={setFooter} />
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-base font-semibold text-[var(--foreground)]">{t.blocksTitle}</h3>
@@ -2142,16 +2163,16 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
             </div>
             <div className="grid grid-cols-4 gap-2">
               {mediaLibrary.map((item) => {
-                const isCarousel = mediaTarget?.type === "carousel_images";
-                const carouselImages = isCarousel
-                  ? ((contentState.carousel_images.find((block) => block.id === mediaTarget?.id)?.images as Array<{ url?: string | null }> | undefined) ?? [])
+                const multiTarget = mediaTarget && mediaTarget.type !== "hero" && mediaTarget.field === "images" ? mediaTarget.type : null;
+                const pickedImages = multiTarget
+                  ? ((contentState[multiTarget].find((block) => block.id === mediaTarget?.id)?.images as Array<{ url?: string | null }> | undefined) ?? [])
                   : [];
-                const selected = isCarousel && carouselImages.some((img) => img.url === item.url);
+                const selected = pickedImages.some((img) => img.url === item.url);
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => (isCarousel ? toggleCarouselImage(mediaTarget!.id, item) : applyMediaPick(item.url))}
+                    onClick={() => (multiTarget ? toggleBlockImage(multiTarget, mediaTarget!.id, item) : applyMediaPick(item.url))}
                     className={`relative overflow-hidden rounded-lg border ${selected ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : "border-[var(--border)]"}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -460,3 +460,15 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 - **এডিটর:** `components/landing-builder/block-style-fields.tsx`, প্রতিটা ব্লক কার্ডের নিচে ভাঁজ করা "ব্লক স্টাইল" প্যানেল।
 - **থিম:** `theme_settings`-এ নতুন `heading_font` (null = মূল ফন্ট), `font_scale` (sm|md|lg, `html` font-size 93.75/100/112.5%), `button_shape` (rounded|pill|square, `.lp-btn` ক্লাসে)। `STYLE_KITS` রঙ+ফন্ট+বাটন একসাথে সেট করে। পুরনো থিম পড়তে `normalizeTheme()`। ব্যাকএন্ডে পরিবর্তন লাগেনি (`theme_settings` ও `content` array হিসেবে যায়)।
 - বিল্ডারের প্রিভিউ এখন `FONT_VARIABLE_CLASSES` দিয়ে মোড়ানো, তাই বাছাই করা ফন্ট প্রিভিউতেও দেখা যায় (আগে শুধু লাইভ পেজে দেখা যেত)।
+
+## ২৭. ধাপ ৫ক: নতুন ব্লক, নোটিশ বার ও ফুটার (2026-10-14)
+- **নতুন ব্লক টাইপ** (`landing-layout.ts` `BlockType`, এডিটর `landing-builder/blocks/*.tsx`, রেন্ডারার `landing-blocks/block-views.tsx`):
+  - `button_blocks` `{text, url, size: md|lg, full_width}` — url খালি বা `#checkout` হলে অর্ডার ফর্মে স্ক্রল করে।
+  - `price_boxes` `{title, regular_price, offer_price, note, cta_text}` — দুটো দাম থাকলে ছাড়ের % নিজে হিসাব করে দেখায়।
+  - `checklists` `{title, items (প্রতি লাইনে একটা), icon: check|cross|star}`
+  - `guarantees` `{icon, title, body}`
+  - `galleries` `{title, columns: "2"|"3"|"4", images: [{url, alt}]}` — ক্যারুসেলের মতো একাধিক ছবি বাছাই (`field === "images"` হলে মিডিয়া পিকার multi-select)।
+  - `before_after_blocks` `{title, before_url, after_url, before_label, after_label}` — টেনে দেখার স্লাইডার।
+- **নোটিশ বার** `content.notice_bar` `{enabled, text, url, bg_color, text_color}` হিরোর উপরে; **ফুটার** `content.footer` `{enabled, text, show_contact}` প্ল্যাটফর্ম ক্রেডিটের উপরে। বিল্ডারের Blocks ট্যাবের উপরে (`landing-builder/page-chrome-fields.tsx`)। বন্ধ থাকলে save-এ `null`।
+- সেলারের দেওয়া লিংক (`button`, `notice_bar`, image-text CTA) `safeLinkUrl()` দিয়ে যায়: শুধু http(s), tel:, mailto:, `#…`, `/…`। বাকিগুলো বাদ।
+- **ফিক্স:** ব্লক স্টাইল এখন `block_style` key-তে (আগে `style`, যেটা স্পেসারের নিজের ফিল্ডের সাথে মিলে যেত)।

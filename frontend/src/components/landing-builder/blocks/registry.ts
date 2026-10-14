@@ -2,7 +2,7 @@
 // the editor form. Adding a block type means adding a file here and one
 // registry entry (plus its renderer in public-landing-page-view.tsx).
 import type { ComponentType } from "react";
-import { HelpCircle, Image as ImageIcon, Images, LayoutGrid, Rows3, ShieldCheck, Star, Timer, Type, Video } from "lucide-react";
+import { BadgeCheck, Columns2, Grid3x3, HelpCircle, Image as ImageIcon, Images, LayoutGrid, ListChecks, MousePointerClick, Rows3, ShieldCheck, Star, Tag, Timer, Type, Video } from "lucide-react";
 import type { Locale } from "@/lib/dashboard-client";
 import type { BlockType } from "@/lib/landing-layout";
 import type { BlockEditorProps } from "./types";
@@ -17,6 +17,12 @@ import { RichTextEditor, richTextDefaults } from "./rich-text";
 import { SpacerEditor, spacerDefaults } from "./spacer";
 import { TrustBadgesEditor, trustBadgesDefaults } from "./trust-badges";
 import { VideoEditor, videoDefaults } from "./video";
+import { BeforeAfterEditor, beforeAfterDefaults } from "./before-after";
+import { ButtonEditor, buttonDefaults } from "./button";
+import { ChecklistEditor, checklistDefaults } from "./checklist";
+import { GalleryEditor, galleryDefaults } from "./gallery";
+import { GuaranteeEditor, guaranteeDefaults } from "./guarantee";
+import { PriceBoxEditor, priceBoxDefaults } from "./price-box";
 
 export type BlockDefinition = {
   label: Record<Locale, string>;
@@ -37,6 +43,12 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
   countdown_blocks: { label: { bn: "কাউন্টডাউন", en: "Countdown Timer" }, icon: Timer, addable: true, defaults: countdownDefaults, Editor: CountdownEditor },
   reviews: { label: { bn: "রিভিউ", en: "Reviews" }, icon: Star, addable: true, defaults: reviewsDefaults, Editor: ReviewsEditor },
   faq: { label: { bn: "FAQ", en: "FAQ" }, icon: HelpCircle, addable: true, defaults: faqDefaults, Editor: FaqEditor },
+  button_blocks: { label: { bn: "বাটন", en: "Button" }, icon: MousePointerClick, addable: true, defaults: buttonDefaults, Editor: ButtonEditor },
+  price_boxes: { label: { bn: "প্রাইস বক্স", en: "Price Box" }, icon: Tag, addable: true, defaults: priceBoxDefaults, Editor: PriceBoxEditor },
+  checklists: { label: { bn: "চেকলিস্ট", en: "Checklist" }, icon: ListChecks, addable: true, defaults: checklistDefaults, Editor: ChecklistEditor },
+  guarantees: { label: { bn: "গ্যারান্টি", en: "Guarantee" }, icon: BadgeCheck, addable: true, defaults: guaranteeDefaults, Editor: GuaranteeEditor },
+  galleries: { label: { bn: "ছবির গ্যালারি", en: "Image Gallery" }, icon: Grid3x3, addable: true, defaults: galleryDefaults, Editor: GalleryEditor },
+  before_after_blocks: { label: { bn: "আগে / পরে", en: "Before / After" }, icon: Columns2, addable: true, defaults: beforeAfterDefaults, Editor: BeforeAfterEditor },
   spacers: { label: { bn: "স্পেসার", en: "Spacer" }, icon: Rows3, addable: true, defaults: spacerDefaults, Editor: SpacerEditor },
   html_sections: { label: { bn: "টেক্সট সেকশন", en: "Text Section" }, icon: Type, addable: false, defaults: () => ({}), Editor: HtmlSectionEditor },
   products: { label: { bn: "পণ্য ও চেকআউট", en: "Products & Checkout" }, icon: LayoutGrid, addable: false, defaults: () => ({}), Editor: null },
