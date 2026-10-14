@@ -268,7 +268,7 @@ export function ImageTextBlockView({
           {block.heading ? <h2 className="text-2xl font-bold" style={{ color: theme.primary }}>{block.heading}</h2> : null}
           {block.body ? <p className="mt-3 text-sm leading-7 text-slate-600">{block.body}</p> : null}
           {block.cta_text ? (
-            <a href={block.cta_url || "#checkout"} className="mt-5 inline-flex rounded-2xl px-5 py-2.5 text-sm font-semibold shadow" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
+            <a href={block.cta_url || "#checkout"} className="lp-btn mt-5 inline-flex rounded-2xl px-5 py-2.5 text-sm font-semibold shadow" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
               {block.cta_text}
             </a>
           ) : null}

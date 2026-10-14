@@ -21,8 +21,10 @@ import {
   mergeLandingContent,
   toNumberOrNull,
 } from "@/lib/landing-pages";
-import { DEFAULT_THEME, type ThemeSettings } from "@/lib/theme-presets";
+import { DEFAULT_THEME, normalizeTheme, type ThemeSettings } from "@/lib/theme-presets";
 import LandingDesignPanel from "@/components/landing-design-panel";
+import { BlockStyleFields } from "@/components/landing-builder/block-style-fields";
+import { GROUPED_BLOCK_TYPES, hasBlockStyle, readBlockStyle } from "@/lib/landing-block-style";
 import {
   BLOCK_TYPES,
   SINGLETON_BLOCK_TYPES,
@@ -38,6 +40,7 @@ import {
   ImagePickerField,
   isAllowedVideoUrl,
 } from "@/components/landing-builder/block-fields";
+import { FONT_VARIABLE_CLASSES } from "@/app/lp/[slug]/fonts";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
 import { ADDABLE_BLOCK_TYPES, BLOCK_REGISTRY, blockLabel } from "@/components/landing-builder/blocks/registry";
 import { useUndoableState } from "@/components/landing-builder/use-undoable-state";
@@ -773,14 +776,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setStickyCtaEnabled(merged.settings?.sticky_cta_enabled ?? true);
       setPaymentChannels(merged.settings?.payment_channels ?? null);
       if (sourceTheme) {
-        setTheme({
-          primary_color: sourceTheme.primary_color ?? DEFAULT_THEME.primary_color,
-          accent_color: sourceTheme.accent_color ?? DEFAULT_THEME.accent_color,
-          background_color: sourceTheme.background_color ?? DEFAULT_THEME.background_color,
-          text_color: sourceTheme.text_color ?? DEFAULT_THEME.text_color,
-          button_text_color: sourceTheme.button_text_color ?? DEFAULT_THEME.button_text_color,
-          font_family: sourceTheme.font_family ?? DEFAULT_THEME.font_family,
-        });
+        setTheme(normalizeTheme(sourceTheme));
       }
     };
 
@@ -876,14 +872,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setFloatingButtons(merged.contact?.floating_buttons ?? false);
           const tplTheme = (initialTemplate.theme_settings ?? null) as ThemeSettings | null;
           if (tplTheme) {
-            setTheme({
-              primary_color: tplTheme.primary_color ?? DEFAULT_THEME.primary_color,
-              accent_color: tplTheme.accent_color ?? DEFAULT_THEME.accent_color,
-              background_color: tplTheme.background_color ?? DEFAULT_THEME.background_color,
-              text_color: tplTheme.text_color ?? DEFAULT_THEME.text_color,
-              button_text_color: tplTheme.button_text_color ?? DEFAULT_THEME.button_text_color,
-              font_family: tplTheme.font_family ?? DEFAULT_THEME.font_family,
-            });
+            setTheme(normalizeTheme(tplTheme));
           }
         } else if (pageRes) {
           const pageJson = await pageRes.json();
@@ -943,14 +932,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setTrackingEnabled(merged.settings?.tracking_enabled ?? true);
       setStickyCtaEnabled(merged.settings?.sticky_cta_enabled ?? true);
           setPaymentChannels(merged.settings?.payment_channels ?? null);
-          setTheme({
-            primary_color: loadedPage.theme_settings?.primary_color ?? DEFAULT_THEME.primary_color,
-            accent_color: loadedPage.theme_settings?.accent_color ?? DEFAULT_THEME.accent_color,
-            background_color: loadedPage.theme_settings?.background_color ?? DEFAULT_THEME.background_color,
-            text_color: loadedPage.theme_settings?.text_color ?? DEFAULT_THEME.text_color,
-            button_text_color: loadedPage.theme_settings?.button_text_color ?? DEFAULT_THEME.button_text_color,
-            font_family: loadedPage.theme_settings?.font_family ?? DEFAULT_THEME.font_family,
-          });
+          setTheme(normalizeTheme(loadedPage.theme_settings));
         } else {
           const nextContent = emptyContentState();
           setContentState(nextContent);
@@ -1462,6 +1444,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
 
     const item = contentState[entry.type]?.find((candidate) => candidate.id === entry.id);
     if (!item) return null;
+    const previousEntry = layoutEntries[layoutEntries.findIndex((candidate) => candidate.type === entry.type && candidate.id === entry.id) - 1];
 
     return (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
@@ -1499,7 +1482,15 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
             </button>
           </div>
         </div>
-        <div className="space-y-2">{renderBlockFields(entry.type, item)}</div>
+        <div className="space-y-2">
+          {renderBlockFields(entry.type, item)}
+          <BlockStyleFields
+            style={readBlockStyle(item)}
+            onChange={(style) => patchItem(entry.type, item.id, { style: hasBlockStyle(style) ? style : undefined })}
+            locale={locale}
+            inheritsFromGroup={GROUPED_BLOCK_TYPES.includes(entry.type) && previousEntry?.type === entry.type}
+          />
+        </div>
       </div>
     );
   }
@@ -2120,7 +2111,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
             </div>
             <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
               <PreviewFrame device={previewDevice}>
-                <PublicLandingPageView page={draftPage} previewMode />
+                <div className={FONT_VARIABLE_CLASSES}>
+                  <PublicLandingPageView page={draftPage} previewMode />
+                </div>
               </PreviewFrame>
             </div>
           </div>

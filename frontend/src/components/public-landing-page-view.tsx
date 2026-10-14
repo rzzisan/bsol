@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { JSONContent } from "@tiptap/core";
 import { landingPathForSlug, mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate } from "@/lib/landing-pages";
-import { resolveFontCssVar } from "@/lib/theme-presets";
+import { BUTTON_RADIUS, FONT_SCALE_PERCENT, resolveFontCssVar } from "@/lib/theme-presets";
 import { sanitizeHtml, CarouselBlockView, RichTextBlockView, ImageTextBlockView, TrustBadgeRow, FeatureGrid, VideoEmbedView, CountdownView, SpacerView } from "@/components/landing-blocks/block-views";
 import type { LayoutEntry } from "@/lib/landing-layout";
+import { BLOCK_STYLE_CSS, blockStyleProps, hasBlockStyle, readBlockStyle } from "@/lib/landing-block-style";
 import { getOrCreateCheckoutSessionToken, setCheckoutSessionToken } from "@/lib/checkout-session";
 import { useBsolTracking } from "@/lib/tracking";
 import type { ProductOption } from "@/types/variant";
@@ -208,6 +209,9 @@ export type PublicLandingPage = {
     text_color?: string | null;
     button_text_color?: string | null;
     font_family?: string | null;
+    heading_font?: string | null;
+    font_scale?: "sm" | "md" | "lg" | null;
+    button_shape?: "rounded" | "pill" | "square" | null;
   } | null;
   content?: {
     hero?: {
@@ -451,6 +455,9 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     text: page?.theme_settings?.text_color ?? "#0f172a",
     buttonText: page?.theme_settings?.button_text_color ?? "#ffffff",
     fontFamily: page?.theme_settings?.font_family ?? "Hind Siliguri",
+    headingFont: page?.theme_settings?.heading_font ?? null,
+    fontScale: page?.theme_settings?.font_scale ?? "md",
+    buttonShape: page?.theme_settings?.button_shape ?? "rounded",
   }), [page]);
 
   const content = mergeLandingContent(page.content, page.template);
@@ -710,6 +717,14 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     return run.ids.map((id) => byId.get(id)).filter((item): item is T => Boolean(item));
   }
 
+  // Wraps a rendered block in its optional per-block style.
+  function styled(key: string, item: unknown, node: ReactNode) {
+    const style = readBlockStyle(item);
+    if (!hasBlockStyle(style)) return <Fragment key={key}>{node}</Fragment>;
+    const props = blockStyleProps(style);
+    return <div key={key} className={props.className} style={props.style}>{node}</div>;
+  }
+
   async function submitOrder(event: React.FormEvent) {
     event.preventDefault();
 
@@ -887,9 +902,12 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   }
 
   return (
-    <main className="min-h-screen" style={{ backgroundColor: theme.background, color: theme.text }}>
+    <main className="min-h-screen overflow-x-clip" style={{ backgroundColor: theme.background, color: theme.text }}>
       <style>{`
         .lp-shell { font-family: var(${resolveFontCssVar(theme.fontFamily)}), system-ui, -apple-system, sans-serif; }
+        ${theme.headingFont ? `.lp-shell h1, .lp-shell h2, .lp-shell h3 { font-family: var(${resolveFontCssVar(theme.headingFont)}), system-ui, sans-serif; }` : ""}
+        ${theme.fontScale !== "md" ? `html { font-size: ${FONT_SCALE_PERCENT[theme.fontScale]}%; }` : ""}
+        .lp-btn { border-radius: ${BUTTON_RADIUS[theme.buttonShape]} !important; }
         .lp-card { background: rgba(255,255,255,0.92); border: 1px solid rgba(148,163,184,0.18); box-shadow: 0 20px 50px rgba(15,23,42,0.08); }
         .lp-html ul { padding-left: 1.25rem; list-style: disc; }
         .lp-html ol { padding-left: 1.25rem; list-style: decimal; }
@@ -898,6 +916,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         .lp-rich-text h2 { font-size: 1.25rem; font-weight: 700; color: #0f172a; margin-bottom: .5rem; }
         .lp-rich-text a { color: ${theme.primary}; text-decoration: underline; }
         .lp-rich-text strong { font-weight: 700; }
+        ${BLOCK_STYLE_CSS}
         ${sanitizeCustomCss(page.custom_css ?? "")}
       `}</style>
 
@@ -913,7 +932,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         <div className="mx-auto max-w-5xl text-center">
           <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
           {hero.subheadline ? <p className="mx-auto mt-4 max-w-3xl text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
-          <a href="#checkout" onClick={(event) => { event.preventDefault(); scrollToCheckout(); }} className="mt-8 inline-flex rounded-2xl px-6 py-3 text-base font-semibold shadow-lg transition hover:translate-y-[-1px]" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
+          <a href="#checkout" onClick={(event) => { event.preventDefault(); scrollToCheckout(); }} className="lp-btn mt-8 inline-flex rounded-2xl px-6 py-3 text-base font-semibold shadow-lg transition hover:translate-y-[-1px]" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
             {hero.cta_text || t.defaultCtaText}
           </a>
         </div>
@@ -925,74 +944,75 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             const sectionKey = run.blockType;
 
             if (sectionKey === "html_sections") {
-              return pickRun(htmlSections, run).map((section, index) => (
-                <div key={`${section.id ?? section.title ?? "section"}-${index}`} className="lp-card rounded-3xl p-6 sm:p-8">
+              return pickRun(htmlSections, run).map((section, index) => styled(`html-${section.id ?? index}`, section, (
+                <div className="lp-card rounded-3xl p-6 sm:p-8">
                   {section.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{section.title}</h2> : null}
                   <div className="lp-html max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: sanitizeHtml(section.html ?? "") }} />
                 </div>
-              ));
+              )));
             }
 
             if (sectionKey === "carousel_images") {
               const blocks = pickRun(carouselBlocks, run);
               if (blocks.length === 0) return null;
-              return blocks.map((block, blockIndex) => (
-                <CarouselBlockView key={`carousel-${block.id ?? blockIndex}`} block={block} theme={theme} />
-              ));
+              return blocks.map((block, blockIndex) => styled(`carousel-${block.id ?? blockIndex}`, block, (
+                <CarouselBlockView block={block} theme={theme} />
+              )));
             }
 
             if (sectionKey === "features") {
-              return (
+              const items = pickRun(features, run);
+              return styled(`features-${runIndex}`, items[0], (
                 <FeatureGrid
-                  key={`features-${runIndex}`}
-                  features={pickRun(features, run)}
+                  features={items}
                   title={content.features_title}
                   fallbackTitle={t.whyChoose}
                   layout={content.features_layout}
                   theme={theme}
                 />
-              );
+              ));
             }
 
             if (sectionKey === "trust_badges") {
-              return <TrustBadgeRow key={`trust-${runIndex}`} badges={pickRun(trustBadges, run)} layout={content.trust_badges_layout} theme={theme} />;
+              const items = pickRun(trustBadges, run);
+              return styled(`trust-${runIndex}`, items[0], <TrustBadgeRow badges={items} layout={content.trust_badges_layout} theme={theme} />);
             }
 
             if (sectionKey === "rich_text_blocks") {
-              return pickRun(richTextBlocks, run).map((block, index) => (
-                <RichTextBlockView key={`richtext-${block.id ?? index}`} block={block} theme={theme} />
-              ));
+              return pickRun(richTextBlocks, run).map((block, index) => styled(`richtext-${block.id ?? index}`, block, (
+                <RichTextBlockView block={block} theme={theme} />
+              )));
             }
 
             if (sectionKey === "image_text_blocks") {
-              return pickRun(imageTextBlocks, run).map((block, index) => (
-                <ImageTextBlockView key={`imagetext-${block.id ?? index}`} block={block} theme={theme} />
-              ));
+              return pickRun(imageTextBlocks, run).map((block, index) => styled(`imagetext-${block.id ?? index}`, block, (
+                <ImageTextBlockView block={block} theme={theme} />
+              )));
             }
 
             if (sectionKey === "video_embeds") {
-              return pickRun(videoEmbeds, run).map((block, index) => (
-                <VideoEmbedView key={`video-${block.id ?? index}`} block={block} theme={theme} />
-              ));
+              return pickRun(videoEmbeds, run).map((block, index) => styled(`video-${block.id ?? index}`, block, (
+                <VideoEmbedView block={block} theme={theme} />
+              )));
             }
 
             if (sectionKey === "countdown_blocks") {
-              return pickRun(countdownBlocks, run).map((block, index) => (
-                <CountdownView key={`countdown-${block.id ?? index}`} block={block} theme={theme} />
-              ));
+              return pickRun(countdownBlocks, run).map((block, index) => styled(`countdown-${block.id ?? index}`, block, (
+                <CountdownView block={block} theme={theme} />
+              )));
             }
 
             if (sectionKey === "spacers") {
-              return pickRun(spacers, run).map((block, index) => (
-                <SpacerView key={`spacer-${block.id ?? index}`} block={block} />
-              ));
+              return pickRun(spacers, run).map((block, index) => styled(`spacer-${block.id ?? index}`, block, (
+                <SpacerView block={block} />
+              )));
             }
 
             if (sectionKey === "faq") {
               const items = pickRun(faq, run);
               if (items.length === 0) return null;
-              return (
-                <div key={`faq-${runIndex}`} className="lp-card rounded-3xl p-6 sm:p-8">
+              return styled(`faq-${runIndex}`, items[0], (
+                <div className="lp-card rounded-3xl p-6 sm:p-8">
                   <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{t.faqTitle}</h2>
                   <div className="space-y-3">
                     {items.map((item, index) => (
@@ -1003,14 +1023,14 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                     ))}
                   </div>
                 </div>
-              );
+              ));
             }
 
             if (sectionKey === "reviews") {
               const items = pickRun(reviews, run);
               if (items.length === 0) return null;
-              return (
-                <div key={`reviews-${runIndex}`} className="lp-card rounded-3xl p-6 sm:p-8">
+              return styled(`reviews-${runIndex}`, items[0], (
+                <div className="lp-card rounded-3xl p-6 sm:p-8">
                   <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>Customer Reviews</h2>
                   <div className="grid gap-4 md:grid-cols-2">
                     {items.map((review, index) => (
@@ -1028,7 +1048,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
                     ))}
                   </div>
                 </div>
-              );
+              ));
             }
 
             if (sectionKey === "products") {
@@ -1327,7 +1347,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
 
                 <p className="mt-4 text-xs leading-6 text-slate-500">{t.privacyNotice}</p>
 
-                <button type="submit" disabled={submitting || selectedProducts.length === 0} className="mt-6 inline-flex w-full items-center justify-center rounded-2xl px-6 py-3.5 text-base font-semibold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
+                <button type="submit" disabled={submitting || selectedProducts.length === 0} className="lp-btn mt-6 inline-flex w-full items-center justify-center rounded-2xl px-6 py-3.5 text-base font-semibold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
                   {submitting ? t.sendingOrder : selectedProducts.length === 0 ? t.selectProductToOrder : t.placeOrder(money(total))}
                 </button>
               </div>
@@ -1388,7 +1408,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               type="button"
               onClick={scrollToCheckout}
               tabIndex={heroVisible || checkoutVisible ? -1 : 0}
-              className="w-full rounded-2xl px-6 py-3.5 text-base font-bold shadow-lg"
+              className="lp-btn w-full rounded-2xl px-6 py-3.5 text-base font-bold shadow-lg"
               style={{ backgroundColor: theme.accent, color: theme.buttonText }}
             >
               {hero.cta_text || t.defaultCtaText}

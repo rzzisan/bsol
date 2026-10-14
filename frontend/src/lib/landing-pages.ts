@@ -90,6 +90,9 @@ export type LandingPageRecord = {
     text_color?: string | null;
     button_text_color?: string | null;
     font_family?: string | null;
+    heading_font?: string | null;
+    font_scale?: "sm" | "md" | "lg" | null;
+    button_shape?: "rounded" | "pill" | "square" | null;
   } | null;
   content?: {
     hero?: {
