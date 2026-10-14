@@ -2,11 +2,12 @@
 
 // Renderers for the individual landing page block types. Shared by the
 // public page and the builder's live preview (through PublicLandingPageView).
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import DOMPurify from "isomorphic-dompurify";
 import type { JSONContent } from "@tiptap/core";
 import { resolveBlockIcon } from "@/lib/block-icons";
 import { renderTiptapJSON } from "@/lib/rich-text-render";
+import type { BeforeAfterBlock, ButtonBlock, ChecklistBlock, GalleryBlock, GuaranteeBlock, PriceBoxBlock } from "@/lib/landing-pages";
 
 // Seller-authored content (rich-text blocks, raw HTML sections) is rendered
 // via dangerouslySetInnerHTML on this public, unauthenticated checkout page —
@@ -268,7 +269,7 @@ export function ImageTextBlockView({
           {block.heading ? <h2 className="text-2xl font-bold" style={{ color: theme.primary }}>{block.heading}</h2> : null}
           {block.body ? <p className="mt-3 text-sm leading-7 text-slate-600">{block.body}</p> : null}
           {block.cta_text ? (
-            <a href={block.cta_url || "#checkout"} className="lp-btn mt-5 inline-flex rounded-2xl px-5 py-2.5 text-sm font-semibold shadow" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
+            <a href={safeLinkUrl(block.cta_url) ?? "#checkout"} className="lp-btn mt-5 inline-flex rounded-2xl px-5 py-2.5 text-sm font-semibold shadow" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
               {block.cta_text}
             </a>
           ) : null}
@@ -519,4 +520,160 @@ export function SpacerView({ block }: { block: { style?: string | null; size?: s
     );
   }
   return <div className={sizeClass} />;
+}
+
+type ButtonTheme = { primary: string; accent: string; buttonText: string };
+
+// Seller-entered links: only web, phone, mail and same-page links, so a
+// `javascript:` URL can't run on the public page.
+export function safeLinkUrl(url: string | null | undefined): string | null {
+  const value = (url ?? "").trim();
+  if (!value) return null;
+  if (/^(https?:|tel:|mailto:)/i.test(value) || value.startsWith("#") || (value.startsWith("/") && !value.startsWith("//"))) return value;
+  return null;
+}
+
+// An empty or "#checkout" link scrolls to the order form instead of navigating.
+function CtaLink({ text, url, onCheckout, theme, className }: { text: string; url?: string | null; onCheckout: () => void; theme: ButtonTheme; className: string }) {
+  const safeUrl = safeLinkUrl(url);
+  const toCheckout = !safeUrl || safeUrl === "#checkout";
+  return (
+    <a
+      href={toCheckout ? "#checkout" : safeUrl}
+      onClick={toCheckout ? (event) => { event.preventDefault(); onCheckout(); } : undefined}
+      className={`lp-btn ${className}`}
+      style={{ backgroundColor: theme.accent, color: theme.buttonText }}
+    >
+      {text}
+    </a>
+  );
+}
+
+export function ButtonBlockView({ block, theme, onCheckout, fallbackText }: { block: ButtonBlock; theme: ButtonTheme; onCheckout: () => void; fallbackText: string }) {
+  const large = block.size === "lg";
+  return (
+    <div className="text-center">
+      <CtaLink
+        text={block.text || fallbackText}
+        url={block.url}
+        onCheckout={onCheckout}
+        theme={theme}
+        className={`inline-flex justify-center rounded-2xl font-semibold shadow-lg transition hover:translate-y-[-1px] ${large ? "px-8 py-4 text-lg" : "px-6 py-3 text-base"} ${block.full_width ? "w-full" : ""}`}
+      />
+    </div>
+  );
+}
+
+export function PriceBoxView({ block, theme, onCheckout }: { block: PriceBoxBlock; theme: ButtonTheme; onCheckout: () => void }) {
+  if (!block.offer_price && !block.regular_price && !block.title) return null;
+  const regular = Number(block.regular_price);
+  const offer = Number(block.offer_price);
+  const discount = regular > 0 && offer > 0 && offer < regular ? Math.round(((regular - offer) / regular) * 100) : 0;
+  return (
+    <div className="lp-card relative mx-auto max-w-md overflow-hidden rounded-3xl p-6 text-center sm:p-8" style={{ borderColor: theme.accent, borderWidth: 2 }}>
+      {discount > 0 ? (
+        <span className="absolute right-4 top-4 rounded-full px-2.5 py-1 text-xs font-bold" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>-{discount}%</span>
+      ) : null}
+      {block.title ? <h2 className="text-xl font-bold" style={{ color: theme.primary }}>{block.title}</h2> : null}
+      <div className="mt-3 flex items-baseline justify-center gap-3">
+        {block.regular_price ? <span className="text-lg text-slate-400 line-through">৳{block.regular_price}</span> : null}
+        {block.offer_price ? <span className="text-4xl font-extrabold" style={{ color: theme.primary }}>৳{block.offer_price}</span> : null}
+      </div>
+      {block.note ? <p className="mt-2 text-sm text-slate-600">{block.note}</p> : null}
+      {block.cta_text ? (
+        <CtaLink text={block.cta_text} onCheckout={onCheckout} theme={theme} className="mt-5 inline-flex w-full justify-center rounded-2xl px-6 py-3 text-base font-semibold shadow-lg" />
+      ) : null}
+    </div>
+  );
+}
+
+const CHECKLIST_MARKS: Record<string, { mark: string; color: string }> = {
+  check: { mark: "✓", color: "#16a34a" },
+  cross: { mark: "✕", color: "#dc2626" },
+  star: { mark: "★", color: "#f59e0b" },
+};
+
+export function ChecklistView({ block, theme }: { block: ChecklistBlock; theme: { primary: string } }) {
+  const items = (block.items ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
+  if (items.length === 0) return null;
+  const { mark, color } = CHECKLIST_MARKS[block.icon ?? "check"] ?? CHECKLIST_MARKS.check;
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      {block.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{block.title}</h2> : null}
+      <ul className="space-y-3">
+        {items.map((text, index) => (
+          <li key={index} className="flex items-start gap-3 text-base leading-7 text-slate-700">
+            <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: color }}>{mark}</span>
+            <span>{text}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function GuaranteeView({ block, theme }: { block: GuaranteeBlock; theme: { primary: string } }) {
+  if (!block.title && !block.body) return null;
+  return (
+    <div className="lp-card flex flex-col items-center gap-4 rounded-3xl p-6 text-center sm:flex-row sm:p-8 sm:text-left" style={{ border: `2px dashed ${theme.primary}` }}>
+      <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${theme.primary}1a`, color: theme.primary }}>
+        {createElement(resolveBlockIcon(block.icon || "shield-check"), { size: 32 })}
+      </span>
+      <div>
+        {block.title ? <h2 className="text-xl font-bold" style={{ color: theme.primary }}>{block.title}</h2> : null}
+        {block.body ? <p className="mt-1 text-sm leading-7 text-slate-600">{block.body}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+const GALLERY_COLUMNS: Record<string, string> = { "2": "grid-cols-2", "3": "grid-cols-2 sm:grid-cols-3", "4": "grid-cols-2 sm:grid-cols-4" };
+
+export function GalleryView({ block, theme }: { block: GalleryBlock; theme: { primary: string } }) {
+  const images = (block.images ?? []).filter((image) => image.url);
+  if (images.length === 0) return null;
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      {block.title ? <h2 className="mb-4 text-center text-2xl font-bold" style={{ color: theme.primary }}>{block.title}</h2> : null}
+      <div className={`grid gap-3 ${GALLERY_COLUMNS[block.columns ?? "3"] ?? GALLERY_COLUMNS["3"]}`}>
+        {images.map((image, index) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={`${image.url}-${index}`} loading="lazy" decoding="async" src={image.url ?? ""} alt={image.alt ?? ""} className="aspect-square w-full rounded-2xl object-cover" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Drag the handle (or use the range input underneath) to reveal before/after.
+export function BeforeAfterView({ block, theme }: { block: BeforeAfterBlock; theme: { primary: string } }) {
+  const [position, setPosition] = useState(50);
+  if (!block.before_url || !block.after_url) return null;
+  return (
+    <div className="lp-card rounded-3xl p-6 sm:p-8">
+      {block.title ? <h2 className="mb-4 text-center text-2xl font-bold" style={{ color: theme.primary }}>{block.title}</h2> : null}
+      <div className="relative mx-auto max-w-2xl select-none overflow-hidden rounded-2xl">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img loading="lazy" decoding="async" src={block.after_url} alt={block.after_label || "After"} className="block w-full" />
+        <div className="absolute inset-0 overflow-hidden" style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img loading="lazy" decoding="async" src={block.before_url} alt={block.before_label || "Before"} className="block h-full w-full object-cover" />
+        </div>
+        <div className="pointer-events-none absolute inset-y-0 w-0.5 bg-white shadow" style={{ left: `${position}%` }}>
+          <span className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-sm font-bold text-slate-700 shadow-lg">⇆</span>
+        </div>
+        <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white">{block.before_label || "Before"}</span>
+        <span className="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white">{block.after_label || "After"}</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={position}
+          onChange={(event) => setPosition(Number(event.target.value))}
+          aria-label={`${block.before_label || "Before"} / ${block.after_label || "After"}`}
+          className="absolute inset-0 h-full w-full cursor-ew-resize opacity-0"
+        />
+      </div>
+    </div>
+  );
 }

@@ -1,4 +1,4 @@
-// Optional per-block design overrides, stored on each block item as `style`.
+// Optional per-block design overrides, stored on each block item as `block_style`.
 // Unset fields keep the block's normal look.
 import type { CSSProperties } from "react";
 import type { BlockType } from "@/lib/landing-layout";
@@ -17,8 +17,13 @@ export type BlockStyle = {
 // takes its style from the first item of the run.
 export const GROUPED_BLOCK_TYPES: BlockType[] = ["features", "trust_badges", "faq", "reviews"];
 
+// Stored under `block_style` because spacers already use `style` for their
+// own look. Pages saved right after the first release kept it in `style`.
+export const BLOCK_STYLE_KEY = "block_style";
+
 export function readBlockStyle(item: unknown): BlockStyle {
-  const style = (item as { style?: unknown } | null)?.style;
+  const record = item as { block_style?: unknown; style?: unknown } | null;
+  const style = record?.block_style ?? record?.style;
   return style && typeof style === "object" ? (style as BlockStyle) : {};
 }
 

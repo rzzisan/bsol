@@ -455,8 +455,20 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 - **Undo/Redo:** save বারে বাটন, আর Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z বা Ctrl+Y (টেক্সট ফিল্ডের ভেতরে ব্রাউজারের নিজের undo চলে)। ৮০০ms-এর ভেতরের পরিবর্তনগুলো এক ধাপ ধরা হয়; ব্লক ডিলিট সবসময় আলাদা ধাপ (`checkpoint()`)। পেজ লোড হলে history মুছে যায়। ব্লক ডিলিটের টোস্টের "ফেরত আনুন" এখন একই undo ব্যবহার করে।
 
 ## ২৬. ধাপ ৪: ব্লক স্টাইল ও গ্লোবাল ডিজাইন (2026-10-14)
-- **প্রতি ব্লকের স্টাইল:** প্রতিটা ব্লক আইটেমে ঐচ্ছিক `style` = `{bg_color, text_color, padding: none|sm|lg, width: narrow|full, align: left|center|right, hide_mobile, hide_desktop}` (`frontend/src/lib/landing-block-style.ts`)। খালি হলে ফিল্ডটা save হয় না। পাবলিক পেজে `styled()` ব্লকটাকে `.lp-block` র‍্যাপারে মোড়ায়; `BLOCK_STYLE_CSS` র‍্যাপার থেকে ভেতরের `.lp-card`-এর ব্যাকগ্রাউন্ড/প্যাডিং বদলায়, তাই block view কম্পোনেন্টে কিছু বদলাতে হয়নি।
+- **প্রতি ব্লকের স্টাইল:** প্রতিটা ব্লক আইটেমে ঐচ্ছিক `block_style` (স্পেসারের নিজের `style` ফিল্ড থাকায় এই নাম; পুরনো object `style`-ও পড়া হয়) = `{bg_color, text_color, padding: none|sm|lg, width: narrow|full, align: left|center|right, hide_mobile, hide_desktop}` (`frontend/src/lib/landing-block-style.ts`)। খালি হলে ফিল্ডটা save হয় না। পাবলিক পেজে `styled()` ব্লকটাকে `.lp-block` র‍্যাপারে মোড়ায়; `BLOCK_STYLE_CSS` র‍্যাপার থেকে ভেতরের `.lp-card`-এর ব্যাকগ্রাউন্ড/প্যাডিং বদলায়, তাই block view কম্পোনেন্টে কিছু বদলাতে হয়নি।
 - **গ্রুপ ব্লক** (`GROUPED_BLOCK_TYPES`: features, trust_badges, faq, reviews): পাশাপাশি একই টাইপের আইটেম এক বক্সে দেখায়, স্টাইল নেয় run-এর প্রথম আইটেম থেকে। বিল্ডারে পরেরগুলোতে স্টাইল প্যানেলের বদলে সেটা বলা থাকে।
 - **এডিটর:** `components/landing-builder/block-style-fields.tsx`, প্রতিটা ব্লক কার্ডের নিচে ভাঁজ করা "ব্লক স্টাইল" প্যানেল।
 - **থিম:** `theme_settings`-এ নতুন `heading_font` (null = মূল ফন্ট), `font_scale` (sm|md|lg, `html` font-size 93.75/100/112.5%), `button_shape` (rounded|pill|square, `.lp-btn` ক্লাসে)। `STYLE_KITS` রঙ+ফন্ট+বাটন একসাথে সেট করে। পুরনো থিম পড়তে `normalizeTheme()`। ব্যাকএন্ডে পরিবর্তন লাগেনি (`theme_settings` ও `content` array হিসেবে যায়)।
 - বিল্ডারের প্রিভিউ এখন `FONT_VARIABLE_CLASSES` দিয়ে মোড়ানো, তাই বাছাই করা ফন্ট প্রিভিউতেও দেখা যায় (আগে শুধু লাইভ পেজে দেখা যেত)।
+
+## ২৭. ধাপ ৫ক: নতুন ব্লক, নোটিশ বার ও ফুটার (2026-10-14)
+- **নতুন ব্লক টাইপ** (`landing-layout.ts` `BlockType`, এডিটর `landing-builder/blocks/*.tsx`, রেন্ডারার `landing-blocks/block-views.tsx`):
+  - `button_blocks` `{text, url, size: md|lg, full_width}` — url খালি বা `#checkout` হলে অর্ডার ফর্মে স্ক্রল করে।
+  - `price_boxes` `{title, regular_price, offer_price, note, cta_text}` — দুটো দাম থাকলে ছাড়ের % নিজে হিসাব করে দেখায়।
+  - `checklists` `{title, items (প্রতি লাইনে একটা), icon: check|cross|star}`
+  - `guarantees` `{icon, title, body}`
+  - `galleries` `{title, columns: "2"|"3"|"4", images: [{url, alt}]}` — ক্যারুসেলের মতো একাধিক ছবি বাছাই (`field === "images"` হলে মিডিয়া পিকার multi-select)।
+  - `before_after_blocks` `{title, before_url, after_url, before_label, after_label}` — টেনে দেখার স্লাইডার।
+- **নোটিশ বার** `content.notice_bar` `{enabled, text, url, bg_color, text_color}` হিরোর উপরে; **ফুটার** `content.footer` `{enabled, text, show_contact}` প্ল্যাটফর্ম ক্রেডিটের উপরে। বিল্ডারের Blocks ট্যাবের উপরে (`landing-builder/page-chrome-fields.tsx`)। বন্ধ থাকলে save-এ `null`।
+- সেলারের দেওয়া লিংক (`button`, `notice_bar`, image-text CTA) `safeLinkUrl()` দিয়ে যায়: শুধু http(s), tel:, mailto:, `#…`, `/…`। বাকিগুলো বাদ।
+- **ফিক্স:** ব্লক স্টাইল এখন `block_style` key-তে (আগে `style`, যেটা স্পেসারের নিজের ফিল্ডের সাথে মিলে যেত)।
