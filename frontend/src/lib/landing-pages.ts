@@ -100,7 +100,7 @@ export type LandingPageRecord = {
       subheadline?: string | null;
       cta_text?: string | null;
       background_image_url?: string | null;
-      layout?: "center" | "image-right" | null;
+      layout?: HeroLayout | null;
     };
     html_sections?: Array<{ id?: string; title?: string | null; html?: string | null }>;
     carousel_images?: Array<{
@@ -203,7 +203,7 @@ export type LandingPageContent = {
     subheadline?: string | null;
     cta_text?: string | null;
     background_image_url?: string | null;
-    layout?: "center" | "image-right" | null;
+    layout?: HeroLayout | null;
   };
   html_sections?: Array<{ id?: string; title?: string | null; html?: string | null }>;
   carousel_images?: Array<{
@@ -243,6 +243,10 @@ export type LandingPageContent = {
   before_after_blocks?: BeforeAfterBlock[];
   notice_bar?: NoticeBarConfig | null;
   footer?: FooterConfig | null;
+  reviews_title?: string | null;
+  reviews_layout?: ReviewsLayout | null;
+  faq_title?: string | null;
+  faq_layout?: FaqLayout | null;
   contact?: { phone?: string | null; whatsapp?: string | null; floating_buttons?: boolean | null };
   shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
   thank_you?: ThankYouConfig | null;
@@ -251,6 +255,9 @@ export type LandingPageContent = {
   [key: string]: unknown;
 };
 
+export type HeroLayout = "center" | "image-right" | "minimal";
+export type ReviewsLayout = "grid" | "list" | "highlight";
+export type FaqLayout = "accordion" | "open" | "two-column";
 export type ButtonBlock = { id?: string; text?: string | null; url?: string | null; size?: "md" | "lg" | null; full_width?: boolean | null };
 export type PriceBoxBlock = { id?: string; title?: string | null; regular_price?: string | null; offer_price?: string | null; note?: string | null; cta_text?: string | null };
 export type ChecklistBlock = { id?: string; title?: string | null; items?: string | null; icon?: "check" | "cross" | "star" | null };
@@ -430,6 +437,10 @@ export function mergeLandingContent(
     before_after_blocks: pickArray(pageContent.before_after_blocks, templateContent.before_after_blocks),
     notice_bar: pageContent.notice_bar ?? templateContent.notice_bar ?? null,
     footer: pageContent.footer ?? templateContent.footer ?? null,
+    reviews_title: pageContent.reviews_title ?? templateContent.reviews_title ?? null,
+    reviews_layout: pageContent.reviews_layout ?? templateContent.reviews_layout ?? "grid",
+    faq_title: pageContent.faq_title ?? templateContent.faq_title ?? null,
+    faq_layout: pageContent.faq_layout ?? templateContent.faq_layout ?? "accordion",
     contact: {
       ...(templateContent.contact ?? {}),
       ...(pageContent.contact ?? {}),

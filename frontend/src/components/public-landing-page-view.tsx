@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { JSONContent } from "@tiptap/core";
-import { landingPathForSlug, mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate, type ButtonBlock, type PriceBoxBlock, type ChecklistBlock, type GuaranteeBlock, type GalleryBlock, type BeforeAfterBlock, type NoticeBarConfig, type FooterConfig } from "@/lib/landing-pages";
+import { landingPathForSlug, mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate, type ButtonBlock, type PriceBoxBlock, type ChecklistBlock, type GuaranteeBlock, type GalleryBlock, type BeforeAfterBlock, type NoticeBarConfig, type FooterConfig, type HeroLayout, type ReviewsLayout, type FaqLayout } from "@/lib/landing-pages";
 import { BUTTON_RADIUS, FONT_SCALE_PERCENT, resolveFontCssVar } from "@/lib/theme-presets";
 import { sanitizeHtml, safeLinkUrl, CarouselBlockView, RichTextBlockView, ImageTextBlockView, TrustBadgeRow, FeatureGrid, VideoEmbedView, CountdownView, SpacerView, ButtonBlockView, PriceBoxView, ChecklistView, GuaranteeView, GalleryView, BeforeAfterView } from "@/components/landing-blocks/block-views";
 import type { LayoutEntry } from "@/lib/landing-layout";
@@ -219,6 +219,7 @@ export type PublicLandingPage = {
       subheadline?: string | null;
       cta_text?: string | null;
       background_image_url?: string | null;
+      layout?: HeroLayout | null;
     };
     html_sections?: Array<{ id?: string; title?: string | null; html?: string | null }>;
     carousel_images?: Array<{
@@ -258,6 +259,10 @@ export type PublicLandingPage = {
     before_after_blocks?: BeforeAfterBlock[];
     notice_bar?: NoticeBarConfig | null;
     footer?: FooterConfig | null;
+    reviews_title?: string | null;
+    reviews_layout?: ReviewsLayout | null;
+    faq_title?: string | null;
+    faq_layout?: FaqLayout | null;
     contact?: { phone?: string | null; whatsapp?: string | null; floating_buttons?: boolean | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
     settings?: { language?: "bn" | "en" | null; phone_validation_enabled?: boolean | null; phone_validation_message?: string | null } | null;
@@ -305,6 +310,7 @@ const PUBLIC_UI_TEXT = {
   bn: {
     whyChoose: "কেন এই পেজটি বেছে নেবেন?",
     faqTitle: "সাধারণ প্রশ্ন",
+    reviewsTitle: "কাস্টমারদের মতামত",
     selectOption: "নির্বাচন করুন",
     previewNotice: "এটি একটি প্রিভিউ — অর্ডার সাবমিট হয়নি। আসল অর্ডারে কাস্টমার Thank You পেজে যাবে।",
     orderSubmitFailed: "অর্ডার সাবমিট করা যায়নি।",
@@ -340,6 +346,7 @@ const PUBLIC_UI_TEXT = {
   en: {
     whyChoose: "Why choose this page?",
     faqTitle: "Frequently Asked Questions",
+    reviewsTitle: "Customer Reviews",
     selectOption: "Select an option",
     previewNotice: "This is a preview — no order was submitted. On the live page, customers land on the Thank You page.",
     orderSubmitFailed: "Order could not be submitted.",
@@ -454,7 +461,8 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     observer.observe(hero);
     observer.observe(checkoutForm);
     return () => observer.disconnect();
-  }, []);
+    // The hero element changes when its layout does (builder preview).
+  }, [page?.content?.hero?.layout]);
 
   const theme = useMemo(() => ({
     primary: page?.theme_settings?.primary_color ?? "#0f766e",
@@ -470,6 +478,7 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
 
   const content = mergeLandingContent(page.content, page.template);
   const hero = content.hero ?? {};
+  const heroLayout: HeroLayout = hero.layout ?? "center";
   const htmlSections = content.html_sections ?? [];
   const carouselBlocks = content.carousel_images ?? [];
   const features = content.features ?? [];
@@ -947,23 +956,65 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         );
       })() : null}
 
-      <section
-        ref={heroRef}
-        className="lp-shell px-4 py-16 text-white"
-        style={{
-          background: hero.background_image_url
-            ? `linear-gradient(135deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.75) 100%), url(${hero.background_image_url}) center/cover no-repeat`
-            : `linear-gradient(135deg, ${theme.primary} 0%, #0b3b36 100%)`,
-        }}
-      >
-        <div className="mx-auto max-w-5xl text-center">
-          <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
-          {hero.subheadline ? <p className="mx-auto mt-4 max-w-3xl text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
+      {(() => {
+        const ctaButton = (
           <a href="#checkout" onClick={(event) => { event.preventDefault(); scrollToCheckout(); }} className="lp-btn mt-8 inline-flex rounded-2xl px-6 py-3 text-base font-semibold shadow-lg transition hover:translate-y-[-1px]" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
             {hero.cta_text || t.defaultCtaText}
           </a>
-        </div>
-      </section>
+        );
+
+        if (heroLayout === "minimal") {
+          return (
+            <section ref={heroRef} className="lp-shell px-4 pb-6 pt-14 text-center">
+              <div className="mx-auto max-w-3xl">
+                <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl" style={{ color: theme.primary }}>{hero.headline || page.title}</h1>
+                {hero.subheadline ? <p className="mx-auto mt-4 max-w-2xl text-base opacity-80 sm:text-xl">{hero.subheadline}</p> : null}
+                {ctaButton}
+                {hero.background_image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={hero.background_image_url} alt="" className="mx-auto mt-10 w-full max-w-3xl rounded-3xl object-cover shadow-xl" />
+                ) : null}
+              </div>
+            </section>
+          );
+        }
+
+        if (heroLayout === "image-right") {
+          return (
+            <section ref={heroRef} className="lp-shell px-4 py-12 text-white sm:py-16" style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, #0b3b36 100%)` }}>
+              <div className={`mx-auto grid max-w-5xl items-center gap-8 ${hero.background_image_url ? "md:grid-cols-2" : ""}`}>
+                <div className="text-center md:text-left">
+                  <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
+                  {hero.subheadline ? <p className="mt-4 text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
+                  {ctaButton}
+                </div>
+                {hero.background_image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={hero.background_image_url} alt="" className="w-full rounded-3xl object-cover shadow-2xl" />
+                ) : null}
+              </div>
+            </section>
+          );
+        }
+
+        return (
+          <section
+            ref={heroRef}
+            className="lp-shell px-4 py-16 text-white"
+            style={{
+              background: hero.background_image_url
+                ? `linear-gradient(135deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.75) 100%), url(${hero.background_image_url}) center/cover no-repeat`
+                : `linear-gradient(135deg, ${theme.primary} 0%, #0b3b36 100%)`,
+            }}
+          >
+            <div className="mx-auto max-w-5xl text-center">
+              <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
+              {hero.subheadline ? <p className="mx-auto mt-4 max-w-3xl text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
+              {ctaButton}
+            </div>
+          </section>
+        );
+      })()}
 
       <section className="lp-shell mx-auto max-w-5xl px-4 py-10">
         <div className="space-y-6">
@@ -1076,13 +1127,18 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               if (items.length === 0) return null;
               return styled(`faq-${runIndex}`, items[0], (
                 <div className="lp-card rounded-3xl p-6 sm:p-8">
-                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{t.faqTitle}</h2>
-                  <div className="space-y-3">
-                    {items.map((item, index) => (
+                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.faq_title || t.faqTitle}</h2>
+                  <div className={content.faq_layout === "two-column" ? "grid gap-3 md:grid-cols-2" : "space-y-3"}>
+                    {items.map((item, index) => content.faq_layout === "accordion" || !content.faq_layout ? (
                       <details key={`${item.id ?? item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
                         <summary className="cursor-pointer text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</summary>
                         {item.a ? <p className="mt-3 text-sm leading-7 text-slate-600">{item.a}</p> : null}
                       </details>
+                    ) : (
+                      <div key={`${item.id ?? item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <h3 className="text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</h3>
+                        {item.a ? <p className="mt-2 text-sm leading-7 text-slate-600">{item.a}</p> : null}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1094,21 +1150,29 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
               if (items.length === 0) return null;
               return styled(`reviews-${runIndex}`, items[0], (
                 <div className="lp-card rounded-3xl p-6 sm:p-8">
-                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>Customer Reviews</h2>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {items.map((review, index) => (
-                      <blockquote key={`${review.id ?? review.name ?? "review"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5">
-                        {review.rating ? <div className="mb-2 text-amber-400">{"★".repeat(Math.max(0, Math.min(5, review.rating)))}<span className="text-slate-200">{"★".repeat(5 - Math.max(0, Math.min(5, review.rating)))}</span></div> : null}
-                        <p className="text-sm leading-7 text-slate-700">“{review.quote || ""}”</p>
-                        <footer className="mt-3 flex items-center gap-2">
-                          {review.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img loading="lazy" decoding="async" src={review.avatar_url} alt={review.name ?? ""} className="h-8 w-8 rounded-full object-cover" />
-                          ) : null}
-                          {review.name ? <span className="text-sm font-semibold text-slate-900">— {review.name}</span> : null}
-                        </footer>
-                      </blockquote>
-                    ))}
+                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.reviews_title || t.reviewsTitle}</h2>
+                  <div className={content.reviews_layout === "list" ? "mx-auto max-w-2xl space-y-4" : "grid gap-4 md:grid-cols-2"}>
+                    {items.map((review, index) => {
+                      const rating = Math.max(0, Math.min(5, review.rating ?? 0));
+                      const highlight = content.reviews_layout === "highlight";
+                      return (
+                        <blockquote
+                          key={`${review.id ?? review.name ?? "review"}-${index}`}
+                          className={highlight ? "rounded-3xl p-6 shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-5"}
+                          style={highlight ? { backgroundColor: `${theme.primary}12`, borderLeft: `4px solid ${theme.accent}` } : undefined}
+                        >
+                          {rating ? <div className="mb-2 text-amber-400">{"★".repeat(rating)}<span className="text-slate-200">{"★".repeat(5 - rating)}</span></div> : null}
+                          <p className={highlight ? "text-base font-medium leading-8 text-slate-800" : "text-sm leading-7 text-slate-700"}>“{review.quote || ""}”</p>
+                          <footer className="mt-3 flex items-center gap-2">
+                            {review.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img loading="lazy" decoding="async" src={review.avatar_url} alt={review.name ?? ""} className={highlight ? "h-10 w-10 rounded-full object-cover" : "h-8 w-8 rounded-full object-cover"} />
+                            ) : null}
+                            {review.name ? <span className="text-sm font-semibold text-slate-900">— {review.name}</span> : null}
+                          </footer>
+                        </blockquote>
+                      );
+                    })}
                   </div>
                 </div>
               ));

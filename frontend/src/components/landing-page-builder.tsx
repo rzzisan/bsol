@@ -14,8 +14,11 @@ import {
   type LandingTemplate,
   type ProductItem,
   type AttachedVariant,
+  type FaqLayout,
   type FooterConfig,
+  type HeroLayout,
   type NoticeBarConfig,
+  type ReviewsLayout,
   getDefaultCheckoutFields,
   getDefaultThankYou,
   getDefaultSettings,
@@ -27,6 +30,7 @@ import { DEFAULT_THEME, normalizeTheme, type ThemeSettings } from "@/lib/theme-p
 import LandingDesignPanel from "@/components/landing-design-panel";
 import { BlockStyleFields } from "@/components/landing-builder/block-style-fields";
 import { PageChromeFields } from "@/components/landing-builder/page-chrome-fields";
+import { SelectField } from "@/components/landing-builder/blocks/select-field";
 import { BLOCK_STYLE_KEY, GROUPED_BLOCK_TYPES, hasBlockStyle, readBlockStyle } from "@/lib/landing-block-style";
 import {
   BLOCK_TYPES,
@@ -130,6 +134,11 @@ type BuilderDoc = {
   heroImage: string;
   featuresTitle: string;
   featuresLayout: "cards" | "list" | "minimal";
+  heroLayout: HeroLayout;
+  reviewsTitle: string;
+  reviewsLayout: ReviewsLayout;
+  faqTitle: string;
+  faqLayout: FaqLayout;
   trustBadgesLayout: "cards" | "row" | "minimal";
   productsTitle: string;
   productsSubtitle: string;
@@ -188,6 +197,11 @@ function initialBuilderDoc(): BuilderDoc {
     heroImage: "",
     featuresTitle: "",
     featuresLayout: "cards",
+    heroLayout: "center",
+    reviewsTitle: "",
+    reviewsLayout: "grid",
+    faqTitle: "",
+    faqLayout: "accordion",
     trustBadgesLayout: "cards",
     productsTitle: "",
     productsSubtitle: "",
@@ -284,6 +298,11 @@ const text = {
     heroSubheadline: "Hero subheadline",
     heroCtaText: "CTA বাটন টেক্সট",
     heroImage: "Hero ব্যাকগ্রাউন্ড ছবি (ঐচ্ছিক)",
+    heroSideImage: "Hero-র পাশের ছবি",
+    heroLayout: "Hero ডিজাইন",
+    heroLayoutCenter: "মাঝখানে লেখা, রঙিন ব্যাকগ্রাউন্ড",
+    heroLayoutSplit: "বামে লেখা, ডানে ছবি",
+    heroLayoutMinimal: "হালকা ও সাধারণ",
     productsTitle: "প্রোডাক্ট সেকশনের টাইটেল",
     productsSubtitle: "প্রোডাক্ট সেকশনের সাবটাইটেল",
     checkoutFields: "চেকআউট ফর্ম ফিল্ড",
@@ -411,6 +430,11 @@ const text = {
     heroSubheadline: "Hero subheadline",
     heroCtaText: "CTA button text",
     heroImage: "Hero background image (optional)",
+    heroSideImage: "Hero side image",
+    heroLayout: "Hero design",
+    heroLayoutCenter: "Centered text, colored background",
+    heroLayoutSplit: "Text left, image right",
+    heroLayoutMinimal: "Light and minimal",
     productsTitle: "Products section title",
     productsSubtitle: "Products section subtitle",
     checkoutFields: "Checkout form fields",
@@ -546,6 +570,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     heroImage,
     featuresTitle,
     featuresLayout,
+    heroLayout,
+    reviewsTitle,
+    reviewsLayout,
+    faqTitle,
+    faqLayout,
     trustBadgesLayout,
     productsTitle,
     productsSubtitle,
@@ -598,6 +627,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const setHeroImage = docHistory.setField("heroImage");
   const setFeaturesTitle = docHistory.setField("featuresTitle");
   const setFeaturesLayout = docHistory.setField("featuresLayout");
+  const setHeroLayout = docHistory.setField("heroLayout");
+  const setReviewsTitle = docHistory.setField("reviewsTitle");
+  const setReviewsLayout = docHistory.setField("reviewsLayout");
+  const setFaqTitle = docHistory.setField("faqTitle");
+  const setFaqLayout = docHistory.setField("faqLayout");
   const setTrustBadgesLayout = docHistory.setField("trustBadgesLayout");
   const setProductsTitle = docHistory.setField("productsTitle");
   const setProductsSubtitle = docHistory.setField("productsSubtitle");
@@ -761,6 +795,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setHeroImage(merged.hero?.background_image_url ?? "");
       setFeaturesTitle(merged.features_title ?? "");
       setFeaturesLayout(merged.features_layout ?? "cards");
+      setHeroLayout(merged.hero?.layout ?? "center");
+      setReviewsTitle(merged.reviews_title ?? "");
+      setReviewsLayout(merged.reviews_layout ?? "grid");
+      setFaqTitle(merged.faq_title ?? "");
+      setFaqLayout(merged.faq_layout ?? "accordion");
       setTrustBadgesLayout(merged.trust_badges_layout ?? "cards");
       setProductsTitle(merged.products_section_title ?? "");
       setProductsSubtitle(merged.products_section_subtitle ?? "");
@@ -874,6 +913,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setHeroImage(merged.hero?.background_image_url ?? "");
           setFeaturesTitle(merged.features_title ?? "");
           setFeaturesLayout(merged.features_layout ?? "cards");
+      setHeroLayout(merged.hero?.layout ?? "center");
+      setReviewsTitle(merged.reviews_title ?? "");
+      setReviewsLayout(merged.reviews_layout ?? "grid");
+      setFaqTitle(merged.faq_title ?? "");
+      setFaqLayout(merged.faq_layout ?? "accordion");
           setTrustBadgesLayout(merged.trust_badges_layout ?? "cards");
           setProductsTitle(merged.products_section_title ?? "");
           setProductsSubtitle(merged.products_section_subtitle ?? "");
@@ -922,6 +966,11 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
           setHeroImage(merged.hero?.background_image_url ?? "");
           setFeaturesTitle(merged.features_title ?? "");
           setFeaturesLayout(merged.features_layout ?? "cards");
+      setHeroLayout(merged.hero?.layout ?? "center");
+      setReviewsTitle(merged.reviews_title ?? "");
+      setReviewsLayout(merged.reviews_layout ?? "grid");
+      setFaqTitle(merged.faq_title ?? "");
+      setFaqLayout(merged.faq_layout ?? "accordion");
           setTrustBadgesLayout(merged.trust_badges_layout ?? "cards");
           setProductsTitle(merged.products_section_title ?? "");
           setProductsSubtitle(merged.products_section_subtitle ?? "");
@@ -1272,7 +1321,12 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
         subheadline: heroSubheadline || null,
         cta_text: heroCtaText || null,
         background_image_url: heroImage || null,
+        layout: heroLayout,
       },
+      reviews_title: reviewsTitle || null,
+      reviews_layout: reviewsLayout,
+      faq_title: faqTitle || null,
+      faq_layout: faqLayout,
       features_title: featuresTitle || null,
       features_layout: featuresLayout,
       trust_badges_layout: trustBadgesLayout,
@@ -1327,7 +1381,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     custom_css: customCss || null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, whatsappNumber, floatingButtons, noticeBar, footer, ogImage, customCss, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, stickyCtaEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, heroLayout, reviewsTitle, reviewsLayout, faqTitle, faqLayout, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, whatsappNumber, floatingButtons, noticeBar, footer, ogImage, customCss, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, stickyCtaEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   // Everything a save sends, as one string, so "unsaved changes" is a plain
   // comparison against what was last loaded or saved.
@@ -1529,10 +1583,14 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
         locale={locale}
         openMedia={(field) => setMediaTarget({ type, id: item.id, field })}
         isFirstOfType={contentState[type][0]?.id === item.id}
-        section={{ featuresTitle, featuresLayout, trustBadgesLayout }}
+        section={{ featuresTitle, featuresLayout, trustBadgesLayout, reviewsTitle, reviewsLayout, faqTitle, faqLayout }}
         onSectionChange={(changes) => {
           if (changes.featuresTitle !== undefined) setFeaturesTitle(changes.featuresTitle);
           if (changes.featuresLayout !== undefined) setFeaturesLayout(changes.featuresLayout);
+          if (changes.reviewsTitle !== undefined) setReviewsTitle(changes.reviewsTitle);
+          if (changes.reviewsLayout !== undefined) setReviewsLayout(changes.reviewsLayout);
+          if (changes.faqTitle !== undefined) setFaqTitle(changes.faqTitle);
+          if (changes.faqLayout !== undefined) setFaqLayout(changes.faqLayout);
           if (changes.trustBadgesLayout !== undefined) setTrustBadgesLayout(changes.trustBadgesLayout);
         }}
       />
@@ -1648,7 +1706,19 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
                   <TextAreaField label={t.heroSubheadline} value={heroSubheadline} onChange={setHeroSubheadline} />
                   <TextField label={t.heroCtaText} value={heroCtaText} onChange={setHeroCtaText} />
                 </div>
-                <ImagePickerField label={t.heroImage} value={heroImage} locale={locale} onPick={() => setMediaTarget({ type: "hero", id: "hero", field: "background_image_url" })} />
+                <div className="space-y-3">
+                  <SelectField
+                    label={t.heroLayout}
+                    value={heroLayout}
+                    onChange={(v) => setHeroLayout(v as HeroLayout)}
+                    options={[
+                      { value: "center", label: t.heroLayoutCenter },
+                      { value: "image-right", label: t.heroLayoutSplit },
+                      { value: "minimal", label: t.heroLayoutMinimal },
+                    ]}
+                  />
+                  <ImagePickerField label={heroLayout === "image-right" ? t.heroSideImage : t.heroImage} value={heroImage} locale={locale} onPick={() => setMediaTarget({ type: "hero", id: "hero", field: "background_image_url" })} />
+                </div>
               </div>
             </div>
 
