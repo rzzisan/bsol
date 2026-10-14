@@ -472,3 +472,10 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 - **নোটিশ বার** `content.notice_bar` `{enabled, text, url, bg_color, text_color}` হিরোর উপরে; **ফুটার** `content.footer` `{enabled, text, show_contact}` প্ল্যাটফর্ম ক্রেডিটের উপরে। বিল্ডারের Blocks ট্যাবের উপরে (`landing-builder/page-chrome-fields.tsx`)। বন্ধ থাকলে save-এ `null`।
 - সেলারের দেওয়া লিংক (`button`, `notice_bar`, image-text CTA) `safeLinkUrl()` দিয়ে যায়: শুধু http(s), tel:, mailto:, `#…`, `/…`। বাকিগুলো বাদ।
 - **ফিক্স:** ব্লক স্টাইল এখন `block_style` key-তে (আগে `style`, যেটা স্পেসারের নিজের ফিল্ডের সাথে মিলে যেত)।
+
+## ২৮. ধাপ ৫খ: সেকশনের ডিজাইন অপশন (2026-10-14)
+- **Hero:** `content.hero.layout` = `center` (ডিফল্ট, আগের মতো) | `image-right` (বামে লেখা, ডানে `background_image_url`-এর ছবি) | `minimal` (পেজের ব্যাকগ্রাউন্ডে প্রধান রঙের হেডিং, ছবি নিচে)। বিল্ডারের Content ট্যাবে Hero-র পাশে। Hero এখনও সবসময় পেজের শুরুতে থাকে, layout_order-এ নেই।
+- **রিভিউ:** `reviews_title` (খালি হলে ভাষা অনুযায়ী ডিফল্ট; আগে ইংরেজিতে হার্ডকোড ছিল), `reviews_layout` = `grid` | `list` | `highlight`।
+- **FAQ:** `faq_title`, `faq_layout` = `accordion` (ডিফল্ট) | `open` (সব উত্তর খোলা) | `two-column`।
+- রিভিউ ও FAQ সেটিং দুটো প্রথম রিভিউ/FAQ ব্লকের এডিটরে (ফিচার গ্রিডের মতো `SectionSettings`)।
+- প্রোডাক্ট/চেকআউট সেকশনের ভ্যারিয়েন্ট করা হয়নি (ভ্যারিয়েন্ট পিকার ও কার্ট লজিক জড়িত)।
