@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // scripts/deploy-safe.sh builds into a separate folder so a failed build
+  // never touches the live one, then swaps it in.
+  distDir: process.env.NEXT_BUILD_DIR || ".next",
   images: {
     // Allow Next.js <Image> to optimize images from our own domain
     remotePatterns: [
