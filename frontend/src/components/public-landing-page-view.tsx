@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { JSONContent } from "@tiptap/core";
-import { landingPathForSlug, mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate, type ButtonBlock, type PriceBoxBlock, type ChecklistBlock, type GuaranteeBlock, type GalleryBlock, type BeforeAfterBlock, type NoticeBarConfig, type FooterConfig, type HeroLayout, type ReviewsLayout, type FaqLayout } from "@/lib/landing-pages";
+import { landingPathForSlug, mergeLandingContent, getDefaultCheckoutFields, getDefaultSettings, BD_PHONE_REGEX, type CheckoutFieldConfig, type LandingTemplate, type ButtonBlock, type PriceBoxBlock, type ChecklistBlock, type GuaranteeBlock, type GalleryBlock, type BeforeAfterBlock, type NoticeBarConfig, type FooterConfig, type HeroLayout, type ReviewsLayout, type FaqLayout, type ProductsLayout, type CheckoutLayout } from "@/lib/landing-pages";
 import { BUTTON_RADIUS, FONT_SCALE_PERCENT, resolveFontCssVar } from "@/lib/theme-presets";
 import { sanitizeHtml, safeLinkUrl, CarouselBlockView, RichTextBlockView, ImageTextBlockView, TrustBadgeRow, FeatureGrid, VideoEmbedView, CountdownView, SpacerView, ButtonBlockView, PriceBoxView, ChecklistView, GuaranteeView, GalleryView, BeforeAfterView } from "@/components/landing-blocks/block-views";
 import type { LayoutEntry } from "@/lib/landing-layout";
@@ -263,6 +263,9 @@ export type PublicLandingPage = {
     reviews_layout?: ReviewsLayout | null;
     faq_title?: string | null;
     faq_layout?: FaqLayout | null;
+    products_layout?: ProductsLayout | null;
+    checkout_layout?: CheckoutLayout | null;
+    show_delivery_info?: boolean | null;
     contact?: { phone?: string | null; whatsapp?: string | null; floating_buttons?: boolean | null };
     shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
     settings?: { language?: "bn" | "en" | null; phone_validation_enabled?: boolean | null; phone_validation_message?: string | null } | null;
@@ -479,6 +482,8 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
   const content = mergeLandingContent(page.content, page.template);
   const hero = content.hero ?? {};
   const heroLayout: HeroLayout = hero.layout ?? "center";
+  const productsLayout: ProductsLayout = content.products_layout ?? "list";
+  const checkoutLayout: CheckoutLayout = content.checkout_layout ?? "split";
   const htmlSections = content.html_sections ?? [];
   const carouselBlocks = content.carousel_images ?? [];
   const features = content.features ?? [];
@@ -750,6 +755,385 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     return <div key={key} className={props.className} style={props.style}>{node}</div>;
   }
 
+  function renderHero() {
+      const ctaButton = (
+        <a href="#checkout" onClick={(event) => { event.preventDefault(); scrollToCheckout(); }} className="lp-btn mt-8 inline-flex rounded-2xl px-6 py-3 text-base font-semibold shadow-lg transition hover:translate-y-[-1px]" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
+          {hero.cta_text || t.defaultCtaText}
+        </a>
+      );
+
+      if (heroLayout === "minimal") {
+        return (
+          <section ref={heroRef} className="lp-shell px-4 pb-6 pt-14 text-center">
+            <div className="mx-auto max-w-3xl">
+              <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl" style={{ color: theme.primary }}>{hero.headline || page.title}</h1>
+              {hero.subheadline ? <p className="mx-auto mt-4 max-w-2xl text-base opacity-80 sm:text-xl">{hero.subheadline}</p> : null}
+              {ctaButton}
+              {hero.background_image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={hero.background_image_url} alt="" className="mx-auto mt-10 w-full max-w-3xl rounded-3xl object-cover shadow-xl" />
+              ) : null}
+            </div>
+          </section>
+        );
+      }
+
+      if (heroLayout === "image-right") {
+        return (
+          <section ref={heroRef} className="lp-shell px-4 py-12 text-white sm:py-16" style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, #0b3b36 100%)` }}>
+            <div className={`mx-auto grid max-w-5xl items-center gap-8 ${hero.background_image_url ? "md:grid-cols-2" : ""}`}>
+              <div className="text-center md:text-left">
+                <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
+                {hero.subheadline ? <p className="mt-4 text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
+                {ctaButton}
+              </div>
+              {hero.background_image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={hero.background_image_url} alt="" className="w-full rounded-3xl object-cover shadow-2xl" />
+              ) : null}
+            </div>
+          </section>
+        );
+      }
+
+      return (
+        <section
+          ref={heroRef}
+          className="lp-shell px-4 py-16 text-white"
+          style={{
+            background: hero.background_image_url
+              ? `linear-gradient(135deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.75) 100%), url(${hero.background_image_url}) center/cover no-repeat`
+              : `linear-gradient(135deg, ${theme.primary} 0%, #0b3b36 100%)`,
+          }}
+        >
+          <div className="mx-auto max-w-5xl text-center">
+            <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
+            {hero.subheadline ? <p className="mx-auto mt-4 max-w-3xl text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
+            {ctaButton}
+          </div>
+        </section>
+      );
+  }
+
+  function renderRun(run: RenderRun, runIndex: number): ReactNode {
+    const sectionKey = run.blockType;
+
+    if (sectionKey === "html_sections") {
+      return pickRun(htmlSections, run).map((section, index) => styled(`html-${section.id ?? index}`, section, (
+        <div className="lp-card rounded-3xl p-6 sm:p-8">
+          {section.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{section.title}</h2> : null}
+          <div className="lp-html max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: sanitizeHtml(section.html ?? "") }} />
+        </div>
+      )));
+    }
+
+    if (sectionKey === "carousel_images") {
+      const blocks = pickRun(carouselBlocks, run);
+      if (blocks.length === 0) return null;
+      return blocks.map((block, blockIndex) => styled(`carousel-${block.id ?? blockIndex}`, block, (
+        <CarouselBlockView block={block} theme={theme} />
+      )));
+    }
+
+    if (sectionKey === "features") {
+      const items = pickRun(features, run);
+      return styled(`features-${runIndex}`, items[0], (
+        <FeatureGrid
+          features={items}
+          title={content.features_title}
+          fallbackTitle={t.whyChoose}
+          layout={content.features_layout}
+          theme={theme}
+        />
+      ));
+    }
+
+    if (sectionKey === "trust_badges") {
+      const items = pickRun(trustBadges, run);
+      return styled(`trust-${runIndex}`, items[0], <TrustBadgeRow badges={items} layout={content.trust_badges_layout} theme={theme} />);
+    }
+
+    if (sectionKey === "rich_text_blocks") {
+      return pickRun(richTextBlocks, run).map((block, index) => styled(`richtext-${block.id ?? index}`, block, (
+        <RichTextBlockView block={block} theme={theme} />
+      )));
+    }
+
+    if (sectionKey === "image_text_blocks") {
+      return pickRun(imageTextBlocks, run).map((block, index) => styled(`imagetext-${block.id ?? index}`, block, (
+        <ImageTextBlockView block={block} theme={theme} />
+      )));
+    }
+
+    if (sectionKey === "video_embeds") {
+      return pickRun(videoEmbeds, run).map((block, index) => styled(`video-${block.id ?? index}`, block, (
+        <VideoEmbedView block={block} theme={theme} />
+      )));
+    }
+
+    if (sectionKey === "countdown_blocks") {
+      return pickRun(countdownBlocks, run).map((block, index) => styled(`countdown-${block.id ?? index}`, block, (
+        <CountdownView block={block} theme={theme} />
+      )));
+    }
+
+    if (sectionKey === "spacers") {
+      return pickRun(spacers, run).map((block, index) => styled(`spacer-${block.id ?? index}`, block, (
+        <SpacerView block={block} />
+      )));
+    }
+
+    if (sectionKey === "button_blocks") {
+      return pickRun(buttonBlocks, run).map((block, index) => styled(`button-${block.id ?? index}`, block, (
+        <ButtonBlockView block={block} theme={theme} onCheckout={scrollToCheckout} fallbackText={hero.cta_text || t.defaultCtaText} />
+      )));
+    }
+
+    if (sectionKey === "price_boxes") {
+      return pickRun(priceBoxes, run).map((block, index) => styled(`price-${block.id ?? index}`, block, (
+        <PriceBoxView block={block} theme={theme} onCheckout={scrollToCheckout} />
+      )));
+    }
+
+    if (sectionKey === "checklists") {
+      return pickRun(checklists, run).map((block, index) => styled(`checklist-${block.id ?? index}`, block, (
+        <ChecklistView block={block} theme={theme} />
+      )));
+    }
+
+    if (sectionKey === "guarantees") {
+      return pickRun(guarantees, run).map((block, index) => styled(`guarantee-${block.id ?? index}`, block, (
+        <GuaranteeView block={block} theme={theme} />
+      )));
+    }
+
+    if (sectionKey === "galleries") {
+      return pickRun(galleries, run).map((block, index) => styled(`gallery-${block.id ?? index}`, block, (
+        <GalleryView block={block} theme={theme} />
+      )));
+    }
+
+    if (sectionKey === "before_after_blocks") {
+      return pickRun(beforeAfterBlocks, run).map((block, index) => styled(`beforeafter-${block.id ?? index}`, block, (
+        <BeforeAfterView block={block} theme={theme} />
+      )));
+    }
+
+    if (sectionKey === "faq") {
+      const items = pickRun(faq, run);
+      if (items.length === 0) return null;
+      return styled(`faq-${runIndex}`, items[0], (
+        <div className="lp-card rounded-3xl p-6 sm:p-8">
+          <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.faq_title || t.faqTitle}</h2>
+          <div className={content.faq_layout === "two-column" ? "grid gap-3 md:grid-cols-2" : "space-y-3"}>
+            {items.map((item, index) => content.faq_layout === "accordion" || !content.faq_layout ? (
+              <details key={`${item.id ?? item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</summary>
+                {item.a ? <p className="mt-3 text-sm leading-7 text-slate-600">{item.a}</p> : null}
+              </details>
+            ) : (
+              <div key={`${item.id ?? item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</h3>
+                {item.a ? <p className="mt-2 text-sm leading-7 text-slate-600">{item.a}</p> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ));
+    }
+
+    if (sectionKey === "reviews") {
+      const items = pickRun(reviews, run);
+      if (items.length === 0) return null;
+      return styled(`reviews-${runIndex}`, items[0], (
+        <div className="lp-card rounded-3xl p-6 sm:p-8">
+          <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.reviews_title || t.reviewsTitle}</h2>
+          <div className={content.reviews_layout === "list" ? "mx-auto max-w-2xl space-y-4" : "grid gap-4 md:grid-cols-2"}>
+            {items.map((review, index) => {
+              const rating = Math.max(0, Math.min(5, review.rating ?? 0));
+              const highlight = content.reviews_layout === "highlight";
+              return (
+                <blockquote
+                  key={`${review.id ?? review.name ?? "review"}-${index}`}
+                  className={highlight ? "rounded-3xl p-6 shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-5"}
+                  style={highlight ? { backgroundColor: `${theme.primary}12`, borderLeft: `4px solid ${theme.accent}` } : undefined}
+                >
+                  {rating ? <div className="mb-2 text-amber-400">{"★".repeat(rating)}<span className="text-slate-200">{"★".repeat(5 - rating)}</span></div> : null}
+                  <p className={highlight ? "text-base font-medium leading-8 text-slate-800" : "text-sm leading-7 text-slate-700"}>“{review.quote || ""}”</p>
+                  <footer className="mt-3 flex items-center gap-2">
+                    {review.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img loading="lazy" decoding="async" src={review.avatar_url} alt={review.name ?? ""} className={highlight ? "h-10 w-10 rounded-full object-cover" : "h-8 w-8 rounded-full object-cover"} />
+                    ) : null}
+                    {review.name ? <span className="text-sm font-semibold text-slate-900">— {review.name}</span> : null}
+                  </footer>
+                </blockquote>
+              );
+            })}
+          </div>
+        </div>
+      ));
+    }
+
+    if (sectionKey === "products") {
+      return (
+        <div key="products" id="products" className="lp-card rounded-3xl p-6 sm:p-8">
+    <h2 className="mb-2 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.products_section_title || t.defaultProductsTitle}</h2>
+    <p className="mb-6 text-center text-sm text-slate-500">{content.products_section_subtitle || t.defaultProductsSubtitle}</p>
+    {products.length === 0 ? (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">{t.noProductsAttached}</div>
+    ) : (
+      <div className={productsLayout === "cards" ? "grid gap-4 sm:grid-cols-2" : productsLayout === "compact" ? "space-y-2" : "space-y-4"}>
+        {products.map((item) => {
+          const product = item.product!;
+          const draft = checkout[item.product_id] ?? {
+            enabled: Boolean(item.selected_by_default ?? true),
+            quantity: Math.max(1, Number(item.default_qty ?? 1)),
+            resolvedVariant: null,
+          };
+          const { originalPrice, currentPrice } = getProductPrices(item, draft.resolvedVariant);
+          const needsPick = needsCustomerVariantPick(item);
+          const activeVariant = item.variant ?? draft.resolvedVariant ?? null;
+          const thumbnail = activeVariant?.image_url || product.thumbnail;
+          // Mixed physical+digital cart is rejected server-side
+          // (digital_product_context.md §5) — block it at the
+          // checkbox too, rather than letting the customer build an
+          // invalid cart and only find out at submit.
+          const cartType = selectedProducts.find((sel) => sel.product_id !== item.product_id)?.product?.product_type;
+          const crossTypeConflict = !draft.enabled && cartType !== undefined && cartType !== product.product_type;
+          const canEnable = (!needsPick || Boolean(draft.resolvedVariant)) && !crossTypeConflict;
+          const name = item.title_override || product.name;
+
+          const checkbox = (
+            <input
+              type="checkbox"
+              checked={draft.enabled}
+              disabled={!canEnable}
+              aria-label={name}
+              title={crossTypeConflict ? (language === "bn" ? "ডিজিটাল ও ফিজিকাল প্রোডাক্ট একসাথে অর্ডার করা যাবে না" : "Digital and physical products can't be ordered together") : undefined}
+              onChange={(e) => patchCheckout(item.product_id, { enabled: e.target.checked })}
+              className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[var(--accent)] disabled:opacity-40"
+            />
+          );
+          const badge = item.badge_text ? <span className="mb-2 inline-flex rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-orange-600">{item.badge_text}</span> : null;
+          const picker = needsPick ? (
+            <InlineVariantPicker
+              slug={page.slug}
+              productId={item.product_id}
+              onResolved={(variant) => patchCheckout(item.product_id, { resolvedVariant: variant, enabled: variant ? draft.enabled : false })}
+            />
+          ) : null;
+          const stepper = (
+            <div className="inline-flex items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+              <button
+                type="button"
+                onClick={() => patchCheckout(item.product_id, { quantity: Math.max(1, draft.quantity - 1) })}
+                className="px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+              >
+                −
+              </button>
+              <div className="min-w-10 border-x border-slate-200 px-3 py-2 text-center text-sm font-semibold text-slate-900">{draft.quantity}</div>
+              <button
+                type="button"
+                onClick={() => patchCheckout(item.product_id, { quantity: Math.min(100, draft.quantity + 1) })}
+                className="px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+              >
+                +
+              </button>
+            </div>
+          );
+          const price = (
+            <div className="text-right">
+              {originalPrice > currentPrice ? (
+                <div className="text-xs text-slate-400 line-through">{money(originalPrice)}</div>
+              ) : null}
+              <div className="text-xl font-extrabold text-orange-500">{money(currentPrice)}</div>
+            </div>
+          );
+          const articleClass = `rounded-3xl border bg-white shadow-sm transition ${draft.enabled ? "border-orange-300 ring-1 ring-orange-200" : "border-orange-200"}`;
+          const key = `${item.product_id}-${item.sort_order ?? 0}`;
+
+          if (productsLayout === "cards") {
+            return (
+              <article key={key} className={`${articleClass} flex flex-col overflow-hidden`}>
+                {thumbnail ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img loading="lazy" decoding="async" src={thumbnail} alt={name} className="aspect-[4/3] w-full object-cover" />
+                ) : (
+                  <div className="flex aspect-[4/3] w-full items-center justify-center bg-slate-100 text-slate-400">{t.noImage}</div>
+                )}
+                <div className="flex flex-1 flex-col p-4">
+                  {badge ? <div>{badge}</div> : null}
+                  <label className="flex items-start gap-2">
+                    <span className="mt-1">{checkbox}</span>
+                    <h3 className="text-base font-bold text-slate-900">{name}</h3>
+                  </label>
+                  {item.subtitle ? <p className="mt-1 text-xs text-slate-500">{item.subtitle}</p> : null}
+                  {picker}
+                  <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+                    {stepper}
+                    {price}
+                  </div>
+                </div>
+              </article>
+            );
+          }
+
+          if (productsLayout === "compact") {
+            return (
+              <article key={key} className={`${articleClass} px-4 py-3`}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex min-w-0 flex-1 items-center gap-3">
+                    {checkbox}
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-slate-900 sm:text-base">{name}</span>
+                      {item.badge_text ? <span className="text-[11px] font-semibold text-orange-600">{item.badge_text}</span> : null}
+                    </span>
+                  </label>
+                  {stepper}
+                  {price}
+                </div>
+                {picker}
+              </article>
+            );
+          }
+
+          return (
+            <article key={key} className={`${articleClass} p-4`}>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex min-w-0 items-center gap-4">
+                  {checkbox}
+                  {thumbnail ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img loading="lazy" decoding="async" src={thumbnail} alt={name} className="h-16 w-16 rounded-2xl border border-orange-100 object-cover" />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">No image</div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    {badge}
+                    <h3 className="truncate text-sm font-bold text-slate-900 sm:text-base">{name}</h3>
+                    <p className="mt-1 text-xs text-slate-500">{item.subtitle || activeVariant?.sku || product.sku || "Selected product"}</p>
+                    {picker}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 md:justify-end">
+                  {stepper}
+                  {price}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    )}
+        </div>
+      );
+    }
+
+    return null;
+  }
+
   async function submitOrder(event: React.FormEvent) {
     event.preventDefault();
 
@@ -926,6 +1310,11 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
     }));
   }
 
+  // The hero sits in layout_order like any block; pages saved before it
+  // could be moved have no hero entry and show it first.
+  const heroIndex = renderRuns.findIndex((run) => run.blockType === "hero");
+  const heroNode = renderHero();
+
   return (
     <main className="min-h-screen overflow-x-clip" style={{ backgroundColor: theme.background, color: theme.text }}>
       <style>{`
@@ -956,328 +1345,22 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
         );
       })() : null}
 
-      {(() => {
-        const ctaButton = (
-          <a href="#checkout" onClick={(event) => { event.preventDefault(); scrollToCheckout(); }} className="lp-btn mt-8 inline-flex rounded-2xl px-6 py-3 text-base font-semibold shadow-lg transition hover:translate-y-[-1px]" style={{ backgroundColor: theme.accent, color: theme.buttonText }}>
-            {hero.cta_text || t.defaultCtaText}
-          </a>
-        );
+      {heroIndex < 0 ? heroNode : null}
 
-        if (heroLayout === "minimal") {
-          return (
-            <section ref={heroRef} className="lp-shell px-4 pb-6 pt-14 text-center">
-              <div className="mx-auto max-w-3xl">
-                <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl" style={{ color: theme.primary }}>{hero.headline || page.title}</h1>
-                {hero.subheadline ? <p className="mx-auto mt-4 max-w-2xl text-base opacity-80 sm:text-xl">{hero.subheadline}</p> : null}
-                {ctaButton}
-                {hero.background_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={hero.background_image_url} alt="" className="mx-auto mt-10 w-full max-w-3xl rounded-3xl object-cover shadow-xl" />
-                ) : null}
-              </div>
-            </section>
-          );
-        }
-
-        if (heroLayout === "image-right") {
-          return (
-            <section ref={heroRef} className="lp-shell px-4 py-12 text-white sm:py-16" style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, #0b3b36 100%)` }}>
-              <div className={`mx-auto grid max-w-5xl items-center gap-8 ${hero.background_image_url ? "md:grid-cols-2" : ""}`}>
-                <div className="text-center md:text-left">
-                  <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
-                  {hero.subheadline ? <p className="mt-4 text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
-                  {ctaButton}
-                </div>
-                {hero.background_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={hero.background_image_url} alt="" className="w-full rounded-3xl object-cover shadow-2xl" />
-                ) : null}
-              </div>
-            </section>
-          );
-        }
-
-        return (
-          <section
-            ref={heroRef}
-            className="lp-shell px-4 py-16 text-white"
-            style={{
-              background: hero.background_image_url
-                ? `linear-gradient(135deg, rgba(15,23,42,0.55) 0%, rgba(15,23,42,0.75) 100%), url(${hero.background_image_url}) center/cover no-repeat`
-                : `linear-gradient(135deg, ${theme.primary} 0%, #0b3b36 100%)`,
-            }}
-          >
-            <div className="mx-auto max-w-5xl text-center">
-              <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">{hero.headline || page.title}</h1>
-              {hero.subheadline ? <p className="mx-auto mt-4 max-w-3xl text-base text-white/90 sm:text-xl">{hero.subheadline}</p> : null}
-              {ctaButton}
-            </div>
-          </section>
-        );
-      })()}
+      {heroIndex > 0 ? (
+        <section className="lp-shell mx-auto max-w-5xl px-4 py-10">
+          <div className="space-y-6">
+            {renderRuns.map((run, runIndex) => (runIndex < heroIndex ? renderRun(run, runIndex) : null))}
+          </div>
+        </section>
+      ) : null}
+      {heroIndex >= 0 ? heroNode : null}
 
       <section className="lp-shell mx-auto max-w-5xl px-4 py-10">
         <div className="space-y-6">
-          {renderRuns.map((run, runIndex) => {
-            const sectionKey = run.blockType;
+          {renderRuns.map((run, runIndex) => (runIndex > heroIndex ? renderRun(run, runIndex) : null))}
 
-            if (sectionKey === "html_sections") {
-              return pickRun(htmlSections, run).map((section, index) => styled(`html-${section.id ?? index}`, section, (
-                <div className="lp-card rounded-3xl p-6 sm:p-8">
-                  {section.title ? <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{section.title}</h2> : null}
-                  <div className="lp-html max-w-none text-sm leading-7 text-slate-700" dangerouslySetInnerHTML={{ __html: sanitizeHtml(section.html ?? "") }} />
-                </div>
-              )));
-            }
-
-            if (sectionKey === "carousel_images") {
-              const blocks = pickRun(carouselBlocks, run);
-              if (blocks.length === 0) return null;
-              return blocks.map((block, blockIndex) => styled(`carousel-${block.id ?? blockIndex}`, block, (
-                <CarouselBlockView block={block} theme={theme} />
-              )));
-            }
-
-            if (sectionKey === "features") {
-              const items = pickRun(features, run);
-              return styled(`features-${runIndex}`, items[0], (
-                <FeatureGrid
-                  features={items}
-                  title={content.features_title}
-                  fallbackTitle={t.whyChoose}
-                  layout={content.features_layout}
-                  theme={theme}
-                />
-              ));
-            }
-
-            if (sectionKey === "trust_badges") {
-              const items = pickRun(trustBadges, run);
-              return styled(`trust-${runIndex}`, items[0], <TrustBadgeRow badges={items} layout={content.trust_badges_layout} theme={theme} />);
-            }
-
-            if (sectionKey === "rich_text_blocks") {
-              return pickRun(richTextBlocks, run).map((block, index) => styled(`richtext-${block.id ?? index}`, block, (
-                <RichTextBlockView block={block} theme={theme} />
-              )));
-            }
-
-            if (sectionKey === "image_text_blocks") {
-              return pickRun(imageTextBlocks, run).map((block, index) => styled(`imagetext-${block.id ?? index}`, block, (
-                <ImageTextBlockView block={block} theme={theme} />
-              )));
-            }
-
-            if (sectionKey === "video_embeds") {
-              return pickRun(videoEmbeds, run).map((block, index) => styled(`video-${block.id ?? index}`, block, (
-                <VideoEmbedView block={block} theme={theme} />
-              )));
-            }
-
-            if (sectionKey === "countdown_blocks") {
-              return pickRun(countdownBlocks, run).map((block, index) => styled(`countdown-${block.id ?? index}`, block, (
-                <CountdownView block={block} theme={theme} />
-              )));
-            }
-
-            if (sectionKey === "spacers") {
-              return pickRun(spacers, run).map((block, index) => styled(`spacer-${block.id ?? index}`, block, (
-                <SpacerView block={block} />
-              )));
-            }
-
-            if (sectionKey === "button_blocks") {
-              return pickRun(buttonBlocks, run).map((block, index) => styled(`button-${block.id ?? index}`, block, (
-                <ButtonBlockView block={block} theme={theme} onCheckout={scrollToCheckout} fallbackText={hero.cta_text || t.defaultCtaText} />
-              )));
-            }
-
-            if (sectionKey === "price_boxes") {
-              return pickRun(priceBoxes, run).map((block, index) => styled(`price-${block.id ?? index}`, block, (
-                <PriceBoxView block={block} theme={theme} onCheckout={scrollToCheckout} />
-              )));
-            }
-
-            if (sectionKey === "checklists") {
-              return pickRun(checklists, run).map((block, index) => styled(`checklist-${block.id ?? index}`, block, (
-                <ChecklistView block={block} theme={theme} />
-              )));
-            }
-
-            if (sectionKey === "guarantees") {
-              return pickRun(guarantees, run).map((block, index) => styled(`guarantee-${block.id ?? index}`, block, (
-                <GuaranteeView block={block} theme={theme} />
-              )));
-            }
-
-            if (sectionKey === "galleries") {
-              return pickRun(galleries, run).map((block, index) => styled(`gallery-${block.id ?? index}`, block, (
-                <GalleryView block={block} theme={theme} />
-              )));
-            }
-
-            if (sectionKey === "before_after_blocks") {
-              return pickRun(beforeAfterBlocks, run).map((block, index) => styled(`beforeafter-${block.id ?? index}`, block, (
-                <BeforeAfterView block={block} theme={theme} />
-              )));
-            }
-
-            if (sectionKey === "faq") {
-              const items = pickRun(faq, run);
-              if (items.length === 0) return null;
-              return styled(`faq-${runIndex}`, items[0], (
-                <div className="lp-card rounded-3xl p-6 sm:p-8">
-                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.faq_title || t.faqTitle}</h2>
-                  <div className={content.faq_layout === "two-column" ? "grid gap-3 md:grid-cols-2" : "space-y-3"}>
-                    {items.map((item, index) => content.faq_layout === "accordion" || !content.faq_layout ? (
-                      <details key={`${item.id ?? item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <summary className="cursor-pointer text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</summary>
-                        {item.a ? <p className="mt-3 text-sm leading-7 text-slate-600">{item.a}</p> : null}
-                      </details>
-                    ) : (
-                      <div key={`${item.id ?? item.q ?? "faq"}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <h3 className="text-sm font-semibold text-slate-900">{item.q || `Question ${index + 1}`}</h3>
-                        {item.a ? <p className="mt-2 text-sm leading-7 text-slate-600">{item.a}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ));
-            }
-
-            if (sectionKey === "reviews") {
-              const items = pickRun(reviews, run);
-              if (items.length === 0) return null;
-              return styled(`reviews-${runIndex}`, items[0], (
-                <div className="lp-card rounded-3xl p-6 sm:p-8">
-                  <h2 className="mb-6 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.reviews_title || t.reviewsTitle}</h2>
-                  <div className={content.reviews_layout === "list" ? "mx-auto max-w-2xl space-y-4" : "grid gap-4 md:grid-cols-2"}>
-                    {items.map((review, index) => {
-                      const rating = Math.max(0, Math.min(5, review.rating ?? 0));
-                      const highlight = content.reviews_layout === "highlight";
-                      return (
-                        <blockquote
-                          key={`${review.id ?? review.name ?? "review"}-${index}`}
-                          className={highlight ? "rounded-3xl p-6 shadow-sm" : "rounded-2xl border border-slate-200 bg-white p-5"}
-                          style={highlight ? { backgroundColor: `${theme.primary}12`, borderLeft: `4px solid ${theme.accent}` } : undefined}
-                        >
-                          {rating ? <div className="mb-2 text-amber-400">{"★".repeat(rating)}<span className="text-slate-200">{"★".repeat(5 - rating)}</span></div> : null}
-                          <p className={highlight ? "text-base font-medium leading-8 text-slate-800" : "text-sm leading-7 text-slate-700"}>“{review.quote || ""}”</p>
-                          <footer className="mt-3 flex items-center gap-2">
-                            {review.avatar_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img loading="lazy" decoding="async" src={review.avatar_url} alt={review.name ?? ""} className={highlight ? "h-10 w-10 rounded-full object-cover" : "h-8 w-8 rounded-full object-cover"} />
-                            ) : null}
-                            {review.name ? <span className="text-sm font-semibold text-slate-900">— {review.name}</span> : null}
-                          </footer>
-                        </blockquote>
-                      );
-                    })}
-                  </div>
-                </div>
-              ));
-            }
-
-            if (sectionKey === "products") {
-              return (
-                <div key="products" id="products" className="lp-card rounded-3xl p-6 sm:p-8">
-            <h2 className="mb-2 text-center text-2xl font-bold" style={{ color: theme.primary }}>{content.products_section_title || t.defaultProductsTitle}</h2>
-            <p className="mb-6 text-center text-sm text-slate-500">{content.products_section_subtitle || t.defaultProductsSubtitle}</p>
-            {products.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">{t.noProductsAttached}</div>
-            ) : (
-              <div className="space-y-4">
-                {products.map((item) => {
-                  const product = item.product!;
-                  const draft = checkout[item.product_id] ?? {
-                    enabled: Boolean(item.selected_by_default ?? true),
-                    quantity: Math.max(1, Number(item.default_qty ?? 1)),
-                    resolvedVariant: null,
-                  };
-                  const { originalPrice, currentPrice } = getProductPrices(item, draft.resolvedVariant);
-                  const needsPick = needsCustomerVariantPick(item);
-                  const activeVariant = item.variant ?? draft.resolvedVariant ?? null;
-                  const thumbnail = activeVariant?.image_url || product.thumbnail;
-                  // Mixed physical+digital cart is rejected server-side
-                  // (digital_product_context.md §5) — block it at the
-                  // checkbox too, rather than letting the customer build an
-                  // invalid cart and only find out at submit.
-                  const cartType = selectedProducts.find((sel) => sel.product_id !== item.product_id)?.product?.product_type;
-                  const crossTypeConflict = !draft.enabled && cartType !== undefined && cartType !== product.product_type;
-                  const canEnable = (!needsPick || Boolean(draft.resolvedVariant)) && !crossTypeConflict;
-
-                  return (
-                    <article key={`${item.product_id}-${item.sort_order ?? 0}`} className={`rounded-3xl border bg-white p-4 shadow-sm transition ${draft.enabled ? "border-orange-300 ring-1 ring-orange-200" : "border-orange-200"}`}>
-                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div className="flex min-w-0 items-center gap-4">
-                          <input
-                            type="checkbox"
-                            checked={draft.enabled}
-                            disabled={!canEnable}
-                            title={crossTypeConflict ? (language === "bn" ? "ডিজিটাল ও ফিজিকাল প্রোডাক্ট একসাথে অর্ডার করা যাবে না" : "Digital and physical products can't be ordered together") : undefined}
-                            onChange={(e) => patchCheckout(item.product_id, { enabled: e.target.checked })}
-                            className="h-4 w-4 rounded border-slate-300 accent-[var(--accent)] disabled:opacity-40"
-                          />
-                          {thumbnail ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img loading="lazy" decoding="async" src={thumbnail} alt={item.title_override || product.name} className="h-16 w-16 rounded-2xl border border-orange-100 object-cover" />
-                          ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">No image</div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            {item.badge_text ? <span className="mb-2 inline-flex rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-orange-600">{item.badge_text}</span> : null}
-                            <h3 className="truncate text-sm font-bold text-slate-900 sm:text-base">{item.title_override || product.name}</h3>
-                            <p className="mt-1 text-xs text-slate-500">{item.subtitle || activeVariant?.sku || product.sku || "Selected product"}</p>
-                            {needsPick ? (
-                              <InlineVariantPicker
-                                slug={page.slug}
-                                productId={item.product_id}
-                                onResolved={(variant) => patchCheckout(item.product_id, { resolvedVariant: variant, enabled: variant ? draft.enabled : false })}
-                              />
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-3 md:justify-end">
-                          <div className="inline-flex items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-                            <button
-                              type="button"
-                              onClick={() => patchCheckout(item.product_id, { quantity: Math.max(1, draft.quantity - 1) })}
-                              className="px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-                            >
-                              −
-                            </button>
-                            <div className="min-w-10 border-x border-slate-200 px-3 py-2 text-center text-sm font-semibold text-slate-900">{draft.quantity}</div>
-                            <button
-                              type="button"
-                              onClick={() => patchCheckout(item.product_id, { quantity: Math.min(100, draft.quantity + 1) })}
-                              className="px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-                            >
-                              +
-                            </button>
-                          </div>
-
-                          <div className="text-right">
-                            {originalPrice > currentPrice ? (
-                              <div className="text-xs text-slate-400 line-through">{money(originalPrice)}</div>
-                            ) : null}
-                            <div className="text-xl font-extrabold text-orange-500">{money(currentPrice)}</div>
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-                </div>
-              );
-            }
-
-            return null;
-          })}
-
-          <form id="checkout" ref={checkoutRef} onSubmit={submitOrder} className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <form id="checkout" ref={checkoutRef} onSubmit={submitOrder} className={checkoutLayout === "stacked" ? "mx-auto grid w-full max-w-2xl gap-6" : "grid gap-6 xl:grid-cols-[1.1fr_0.9fr]"}>
             <div className="lp-card rounded-3xl p-6 sm:p-8">
               <h2 className="text-2xl font-bold" style={{ color: theme.primary }}>Shipping Details</h2>
               <p className="mt-2 text-sm text-slate-500">{t.shippingDetailsHint}</p>
@@ -1481,14 +1564,16 @@ export default function PublicLandingPageView({ page, previewMode = false }: { p
             </div>
           </form>
 
-          <div className="lp-card rounded-3xl p-6 sm:p-8">
-            <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{t.deliveryContact}</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="text-sm text-slate-500">Inside Dhaka</div><div className="mt-2 text-2xl font-bold text-slate-900">{money(shipping.inside_dhaka)}</div></div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="text-sm text-slate-500">Outside Dhaka</div><div className="mt-2 text-2xl font-bold text-slate-900">{money(shipping.outside_dhaka)}</div></div>
+          {content.show_delivery_info !== false ? (
+            <div className="lp-card rounded-3xl p-6 sm:p-8">
+              <h2 className="mb-4 text-2xl font-bold" style={{ color: theme.primary }}>{t.deliveryContact}</h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="text-sm text-slate-500">Inside Dhaka</div><div className="mt-2 text-2xl font-bold text-slate-900">{money(shipping.inside_dhaka)}</div></div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="text-sm text-slate-500">Outside Dhaka</div><div className="mt-2 text-2xl font-bold text-slate-900">{money(shipping.outside_dhaka)}</div></div>
+              </div>
+              {content.contact?.phone ? <p className="mt-5 text-sm text-slate-600">{t.contactLabel}: <a className="font-semibold" href={`tel:${content.contact.phone}`}>{content.contact.phone}</a></p> : null}
             </div>
-            {content.contact?.phone ? <p className="mt-5 text-sm text-slate-600">{t.contactLabel}: <a className="font-semibold" href={`tel:${content.contact.phone}`}>{content.contact.phone}</a></p> : null}
-          </div>
+          ) : null}
         </div>
       </section>
 

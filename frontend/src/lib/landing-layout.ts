@@ -17,6 +17,7 @@
 // expandLegacyLayoutOrder() only needs to run once, on first load.
 
 export type BlockType =
+  | "hero"
   | "html_sections"
   | "carousel_images"
   | "features"
@@ -37,6 +38,7 @@ export type BlockType =
   | "products";
 
 export const BLOCK_TYPES: BlockType[] = [
+  "hero",
   "html_sections",
   "image_text_blocks",
   "rich_text_blocks",
@@ -57,10 +59,11 @@ export const BLOCK_TYPES: BlockType[] = [
   "products",
 ];
 
-// "products" is the always-present structured checkout section — it has no
-// backing content array of its own (it's landing_page_products) and is not
-// addable/removable, only positionable.
-export const SINGLETON_BLOCK_TYPES: BlockType[] = ["products"];
+// "hero" and "products" are always present and have no backing content array
+// (hero lives in content.hero, products in landing_page_products). They are
+// not addable/removable, only positionable. A page without a hero entry
+// shows the hero first.
+export const SINGLETON_BLOCK_TYPES: BlockType[] = ["hero", "products"];
 
 export type LayoutEntry = { type: BlockType; id: string };
 
@@ -137,7 +140,9 @@ export function expandLegacyLayoutOrder(
   const seen = new Set(entries.map((e) => `${e.type}:${e.id}`));
   for (const type of BLOCK_TYPES) {
     if (SINGLETON_BLOCK_TYPES.includes(type)) {
-      if (!seen.has(`${type}:${type}`)) entries.push({ type, id: type });
+      if (seen.has(`${type}:${type}`)) continue;
+      if (type === "hero") entries.unshift({ type, id: type });
+      else entries.push({ type, id: type });
       continue;
     }
     for (const item of contentWithIds[type] ?? []) {

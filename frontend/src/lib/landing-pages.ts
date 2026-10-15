@@ -247,6 +247,9 @@ export type LandingPageContent = {
   reviews_layout?: ReviewsLayout | null;
   faq_title?: string | null;
   faq_layout?: FaqLayout | null;
+  products_layout?: ProductsLayout | null;
+  checkout_layout?: CheckoutLayout | null;
+  show_delivery_info?: boolean | null;
   contact?: { phone?: string | null; whatsapp?: string | null; floating_buttons?: boolean | null };
   shipping?: { inside_dhaka?: number | null; outside_dhaka?: number | null };
   thank_you?: ThankYouConfig | null;
@@ -258,6 +261,8 @@ export type LandingPageContent = {
 export type HeroLayout = "center" | "image-right" | "minimal";
 export type ReviewsLayout = "grid" | "list" | "highlight";
 export type FaqLayout = "accordion" | "open" | "two-column";
+export type ProductsLayout = "list" | "cards" | "compact";
+export type CheckoutLayout = "split" | "stacked";
 export type ButtonBlock = { id?: string; text?: string | null; url?: string | null; size?: "md" | "lg" | null; full_width?: boolean | null };
 export type PriceBoxBlock = { id?: string; title?: string | null; regular_price?: string | null; offer_price?: string | null; note?: string | null; cta_text?: string | null };
 export type ChecklistBlock = { id?: string; title?: string | null; items?: string | null; icon?: "check" | "cross" | "star" | null };
@@ -441,6 +446,9 @@ export function mergeLandingContent(
     reviews_layout: pageContent.reviews_layout ?? templateContent.reviews_layout ?? "grid",
     faq_title: pageContent.faq_title ?? templateContent.faq_title ?? null,
     faq_layout: pageContent.faq_layout ?? templateContent.faq_layout ?? "accordion",
+    products_layout: pageContent.products_layout ?? templateContent.products_layout ?? "list",
+    checkout_layout: pageContent.checkout_layout ?? templateContent.checkout_layout ?? "split",
+    show_delivery_info: pageContent.show_delivery_info ?? templateContent.show_delivery_info ?? true,
     contact: {
       ...(templateContent.contact ?? {}),
       ...(pageContent.contact ?? {}),

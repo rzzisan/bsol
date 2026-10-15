@@ -2,7 +2,7 @@
 // the editor form. Adding a block type means adding a file here and one
 // registry entry (plus its renderer in public-landing-page-view.tsx).
 import type { ComponentType } from "react";
-import { BadgeCheck, Columns2, Grid3x3, HelpCircle, Image as ImageIcon, Images, LayoutGrid, ListChecks, MousePointerClick, Rows3, ShieldCheck, Star, Tag, Timer, Type, Video } from "lucide-react";
+import { BadgeCheck, Columns2, Grid3x3, HelpCircle, Image as ImageIcon, Images, LayoutGrid, ListChecks, MousePointerClick, PanelTop, Rows3, ShieldCheck, Star, Tag, Timer, Type, Video } from "lucide-react";
 import type { Locale } from "@/lib/dashboard-client";
 import type { BlockType } from "@/lib/landing-layout";
 import type { BlockEditorProps } from "./types";
@@ -51,6 +51,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
   before_after_blocks: { label: { bn: "আগে / পরে", en: "Before / After" }, icon: Columns2, addable: true, defaults: beforeAfterDefaults, Editor: BeforeAfterEditor },
   spacers: { label: { bn: "স্পেসার", en: "Spacer" }, icon: Rows3, addable: true, defaults: spacerDefaults, Editor: SpacerEditor },
   html_sections: { label: { bn: "টেক্সট সেকশন", en: "Text Section" }, icon: Type, addable: false, defaults: () => ({}), Editor: HtmlSectionEditor },
+  hero: { label: { bn: "হেডার (Hero)", en: "Hero" }, icon: PanelTop, addable: false, defaults: () => ({}), Editor: null },
   products: { label: { bn: "পণ্য ও চেকআউট", en: "Products & Checkout" }, icon: LayoutGrid, addable: false, defaults: () => ({}), Editor: null },
 };
 
