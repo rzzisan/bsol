@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node -e \"const fs=require('fs'); fs.rmSync('.next',{recursive:true,force:true}); fs.mkdirSync('.next',{recursive:true});\"",
+    "prebuild": "node -e \"const fs=require('fs'); const dir=process.env.NEXT_BUILD_DIR||'.next'; fs.rmSync(dir,{recursive:true,force:true}); fs.mkdirSync(dir,{recursive:true});\"",
     "build": "next build",
     "start": "next start",
     "deploy:prod:safe": "bash ./scripts/deploy-safe.sh",
