@@ -15,6 +15,8 @@ import {
   type ProductItem,
   type AttachedVariant,
   type FaqLayout,
+  type CheckoutLayout,
+  type ProductsLayout,
   type FooterConfig,
   type HeroLayout,
   type NoticeBarConfig,
@@ -139,6 +141,9 @@ type BuilderDoc = {
   reviewsLayout: ReviewsLayout;
   faqTitle: string;
   faqLayout: FaqLayout;
+  productsLayout: ProductsLayout;
+  checkoutLayout: CheckoutLayout;
+  showDeliveryInfo: boolean;
   trustBadgesLayout: "cards" | "row" | "minimal";
   productsTitle: string;
   productsSubtitle: string;
@@ -202,6 +207,9 @@ function initialBuilderDoc(): BuilderDoc {
     reviewsLayout: "grid",
     faqTitle: "",
     faqLayout: "accordion",
+    productsLayout: "list",
+    checkoutLayout: "split",
+    showDeliveryInfo: true,
     trustBadgesLayout: "cards",
     productsTitle: "",
     productsSubtitle: "",
@@ -383,6 +391,17 @@ const text = {
     undo: "ফেরত আনুন",
     redo: "আবার করুন",
     addBlockHere: "ব্লক যোগ করুন",
+    singletonHint: "সবসময় পেজে থাকে, টেনে জায়গা বদলাতে পারেন।",
+    editInContentTab: "কনটেন্ট ট্যাবে এডিট করুন",
+    editInProductsTab: "প্রোডাক্ট ট্যাবে এডিট করুন",
+    productsLayout: "প্রোডাক্ট ডিজাইন",
+    productsLayoutList: "লিস্ট (ছোট ছবি, পাশে দাম)",
+    productsLayoutCards: "কার্ড (বড় ছবি)",
+    productsLayoutCompact: "কমপ্যাক্ট (ছবি ছাড়া)",
+    checkoutLayout: "চেকআউট ডিজাইন",
+    checkoutLayoutSplit: "দুই কলাম (ফর্ম ও অর্ডার পাশাপাশি)",
+    checkoutLayoutStacked: "এক কলাম (ফর্ম, তারপর অর্ডার ও পেমেন্ট)",
+    showDeliveryInfo: "ডেলিভারি চার্জ ও যোগাযোগ বক্স দেখান",
     livePreview: "লাইভ প্রিভিউ",
     livePreviewHint: "মার্চেন্ট ঠিক এই ভিউ-টাই লাইভ পেজে দেখবে — একই কম্পোনেন্ট ব্যবহার করা হয়েছে।",
     duplicate: "কপি করুন",
@@ -515,6 +534,17 @@ const text = {
     undo: "Undo",
     redo: "Redo",
     addBlockHere: "Add block",
+    singletonHint: "Always on the page. Drag to move it.",
+    editInContentTab: "Edit in the Content tab",
+    editInProductsTab: "Edit in the Products tab",
+    productsLayout: "Product design",
+    productsLayoutList: "List (small image, price beside)",
+    productsLayoutCards: "Cards (large image)",
+    productsLayoutCompact: "Compact (no images)",
+    checkoutLayout: "Checkout design",
+    checkoutLayoutSplit: "Two columns (form and order side by side)",
+    checkoutLayoutStacked: "One column (form, then order and payment)",
+    showDeliveryInfo: "Show the delivery charge and contact box",
     livePreview: "Live preview",
     livePreviewHint: "This is exactly what a merchant will see on the live page — same component.",
     duplicate: "Duplicate",
@@ -575,6 +605,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     reviewsLayout,
     faqTitle,
     faqLayout,
+    productsLayout,
+    checkoutLayout,
+    showDeliveryInfo,
     trustBadgesLayout,
     productsTitle,
     productsSubtitle,
@@ -632,6 +665,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const setReviewsLayout = docHistory.setField("reviewsLayout");
   const setFaqTitle = docHistory.setField("faqTitle");
   const setFaqLayout = docHistory.setField("faqLayout");
+  const setProductsLayout = docHistory.setField("productsLayout");
+  const setCheckoutLayout = docHistory.setField("checkoutLayout");
+  const setShowDeliveryInfo = docHistory.setField("showDeliveryInfo");
   const setTrustBadgesLayout = docHistory.setField("trustBadgesLayout");
   const setProductsTitle = docHistory.setField("productsTitle");
   const setProductsSubtitle = docHistory.setField("productsSubtitle");
@@ -800,6 +836,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setReviewsLayout(merged.reviews_layout ?? "grid");
       setFaqTitle(merged.faq_title ?? "");
       setFaqLayout(merged.faq_layout ?? "accordion");
+      setProductsLayout(merged.products_layout ?? "list");
+      setCheckoutLayout(merged.checkout_layout ?? "split");
+      setShowDeliveryInfo(merged.show_delivery_info !== false);
       setTrustBadgesLayout(merged.trust_badges_layout ?? "cards");
       setProductsTitle(merged.products_section_title ?? "");
       setProductsSubtitle(merged.products_section_subtitle ?? "");
@@ -918,6 +957,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setReviewsLayout(merged.reviews_layout ?? "grid");
       setFaqTitle(merged.faq_title ?? "");
       setFaqLayout(merged.faq_layout ?? "accordion");
+      setProductsLayout(merged.products_layout ?? "list");
+      setCheckoutLayout(merged.checkout_layout ?? "split");
+      setShowDeliveryInfo(merged.show_delivery_info !== false);
           setTrustBadgesLayout(merged.trust_badges_layout ?? "cards");
           setProductsTitle(merged.products_section_title ?? "");
           setProductsSubtitle(merged.products_section_subtitle ?? "");
@@ -971,6 +1013,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       setReviewsLayout(merged.reviews_layout ?? "grid");
       setFaqTitle(merged.faq_title ?? "");
       setFaqLayout(merged.faq_layout ?? "accordion");
+      setProductsLayout(merged.products_layout ?? "list");
+      setCheckoutLayout(merged.checkout_layout ?? "split");
+      setShowDeliveryInfo(merged.show_delivery_info !== false);
           setTrustBadgesLayout(merged.trust_badges_layout ?? "cards");
           setProductsTitle(merged.products_section_title ?? "");
           setProductsSubtitle(merged.products_section_subtitle ?? "");
@@ -1327,6 +1372,9 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
       reviews_layout: reviewsLayout,
       faq_title: faqTitle || null,
       faq_layout: faqLayout,
+      products_layout: productsLayout,
+      checkout_layout: checkoutLayout,
+      show_delivery_info: showDeliveryInfo,
       features_title: featuresTitle || null,
       features_layout: featuresLayout,
       trust_badges_layout: trustBadgesLayout,
@@ -1381,7 +1429,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     custom_css: customCss || null,
     products: selectedProductDetails as unknown as PublicLandingPage["products"],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, heroLayout, reviewsTitle, reviewsLayout, faqTitle, faqLayout, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, whatsappNumber, floatingButtons, noticeBar, footer, ogImage, customCss, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, stickyCtaEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
+  }), [page, title, slug, theme, contentState, layoutEntries, heroHeadline, heroSubheadline, heroCtaText, heroImage, heroLayout, reviewsTitle, reviewsLayout, faqTitle, faqLayout, productsLayout, checkoutLayout, showDeliveryInfo, featuresTitle, featuresLayout, trustBadgesLayout, productsTitle, productsSubtitle, checkoutFields, contactPhone, whatsappNumber, floatingButtons, noticeBar, footer, ogImage, customCss, shippingInsideDhaka, shippingOutsideDhaka, thankYouTitle, thankYouMessage, thankYouShowSummary, thankYouShowAddress, pageLanguage, phoneValidationEnabled, phoneValidationMessage, otpVerificationEnabled, otpVerifiedMessage, otpSmsTemplate, otpFormTitle, otpFormDescription, otpFormButtonText, otpFormResendText, trackingEnabled, stickyCtaEnabled, paymentChannels, metaTitle, metaDescription, locale, selectedProductDetails]);
 
   // Everything a save sends, as one string, so "unsaved changes" is a plain
   // comparison against what was last loaded or saved.
@@ -1500,17 +1548,51 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
     }
   }
 
+  function renderAddHere(entry: LayoutEntry) {
+    const key = `${entry.type}:${entry.id}`;
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setAddAfterKey((prev) => (prev === key ? null : key))}
+          className="flex items-center gap-1 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-2 py-1 text-xs font-semibold text-[var(--accent)]"
+        >
+          <Plus size={12} /> {t.addBlockHere}
+        </button>
+        {addAfterKey === key ? (
+          <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-lg">
+            {ADDABLE_BLOCK_TYPES.map((addType) => {
+              const AddIcon = BLOCK_REGISTRY[addType].icon;
+              return (
+                <button key={addType} type="button" onClick={() => addBlock(addType, entry)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--surface-soft)]">
+                  <AddIcon size={14} /> {blockLabel(addType, locale)}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   function renderBlockItem(entry: LayoutEntry) {
     const Icon = BLOCK_REGISTRY[entry.type].icon;
 
     if (SINGLETON_BLOCK_TYPES.includes(entry.type)) {
+      const editTab: TabKey = entry.type === "hero" ? "content" : "products";
       return (
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
-          <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            <Icon size={14} /> {blockLabel(entry.type, locale)}
-          </span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <Icon size={14} /> {blockLabel(entry.type, locale)}
+            </span>
+            {renderAddHere(entry)}
+          </div>
           <p className="mt-2 text-xs text-[var(--muted)]">
-            {locale === "bn" ? "সবসময় পেজে যুক্ত থাকে — নিচে ম্যানেজ করুন।" : "Always present on the page — manage it below."}
+            {t.singletonHint}{" "}
+            {visibleTabs.includes(editTab) ? <button type="button" onClick={() => setActiveTab(editTab)} className="font-semibold text-[var(--accent)] underline">
+              {editTab === "content" ? t.editInContentTab : t.editInProductsTab}
+            </button> : null}
           </p>
         </div>
       );
@@ -1527,27 +1609,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
             <Icon size={14} /> {blockLabel(entry.type, locale)}
           </span>
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setAddAfterKey((prev) => (prev === `${entry.type}:${entry.id}` ? null : `${entry.type}:${entry.id}`))}
-                className="flex items-center gap-1 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-2 py-1 text-xs font-semibold text-[var(--accent)]"
-              >
-                <Plus size={12} /> {t.addBlockHere}
-              </button>
-              {addAfterKey === `${entry.type}:${entry.id}` ? (
-                <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-lg">
-                  {ADDABLE_BLOCK_TYPES.map((addType) => {
-                    const AddIcon = BLOCK_REGISTRY[addType].icon;
-                    return (
-                      <button key={addType} type="button" onClick={() => addBlock(addType, entry)} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-[var(--foreground)] hover:bg-[var(--surface-soft)]">
-                        <AddIcon size={14} /> {blockLabel(addType, locale)}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
+            {renderAddHere(entry)}
             <button type="button" onClick={() => duplicateBlock(entry.type, entry.id)} className="flex items-center gap-1 rounded-lg border border-[var(--border)] px-2 py-1 text-xs font-semibold text-[var(--foreground)]">
               <Copy size={12} /> {t.duplicate}
             </button>
@@ -1824,6 +1886,31 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
                 <TextField label={t.productsTitle} value={productsTitle} onChange={setProductsTitle} />
                 <TextField label={t.productsSubtitle} value={productsSubtitle} onChange={setProductsSubtitle} />
               </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <SelectField
+                  label={t.productsLayout}
+                  value={productsLayout}
+                  onChange={(v) => setProductsLayout(v as ProductsLayout)}
+                  options={[
+                    { value: "list", label: t.productsLayoutList },
+                    { value: "cards", label: t.productsLayoutCards },
+                    { value: "compact", label: t.productsLayoutCompact },
+                  ]}
+                />
+                <SelectField
+                  label={t.checkoutLayout}
+                  value={checkoutLayout}
+                  onChange={(v) => setCheckoutLayout(v as CheckoutLayout)}
+                  options={[
+                    { value: "split", label: t.checkoutLayoutSplit },
+                    { value: "stacked", label: t.checkoutLayoutStacked },
+                  ]}
+                />
+              </div>
+              <label className="mt-3 flex items-center gap-2 text-sm text-[var(--foreground)]">
+                <input type="checkbox" checked={showDeliveryInfo} onChange={(e) => setShowDeliveryInfo(e.target.checked)} />
+                {t.showDeliveryInfo}
+              </label>
               {selectedProductDetails.length === 0 ? (
                 <div className="mt-3 rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">{t.emptyProducts}</div>
               ) : (
