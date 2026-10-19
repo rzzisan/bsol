@@ -495,3 +495,11 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 - Duplicate ও admin-এর এডিট snapshot নেয় না।
 - বিল্ডারের নিচের বারে undo/redo-র পাশে "ভার্সন হিস্টোরি" (`revision-history.tsx`, শুধু edit মোডে)। Restore-এর পর `reloadKey` বাড়িয়ে পেজ আবার লোড হয়।
 - **Deploy-এ লাগবে:** `php artisan migrate --force` (নতুন টেবিল)।
+
+## ৩১. ধাপ ৬খ: সার্ভারে content যাচাই (2026-10-19)
+- `App\Support\LandingContentValidator`, `LandingPageController::validatePayload()` থেকে ডাকা হয় (store ও update দুটোতেই)। ভুল পেলে 422, আর মেসেজে কোন ব্লক তা লেখা থাকে (যেমন "Button 2: link must start with ...")। বিল্ডার সেই মেসেজটাই দেখায়।
+- নিয়ম: পুরো `content` JSON ৫১২ KB-এর মধ্যে; প্রতিটা ব্লক অ্যারে আসলেই list আর এক ধরনের ব্লক সর্বোচ্চ ১০০টা; `layout_order` হয় string নয়তো `{type, id}`।
+- লিংক (`button_blocks.url`, `image_text_blocks.cta_url`, `notice_bar.url`): শুধু http(s), tel:, mailto:, `#…` আর `/…` (`//` না), ফ্রন্টএন্ডের `safeLinkUrl`-এর মতো।
+- ছবি (hero ব্যাকগ্রাউন্ড, image+text, রিভিউ avatar, before/after, ক্যারুসেল ও গ্যালারির ছবি): http(s) বা `/…`, ফাঁকা জায়গা, quote আর বন্ধনী ছাড়া (কারণ এগুলো CSS `url()`-এর ভেতরে যায়)।
+- রঙ (`theme_settings`-এর সব `*_color`, ব্লকের `block_style` রঙ, নোটিশ বারের রঙ): শুধু hex (কারণ এগুলো `<style>`-এর ভেতরে যায়)।
+- Admin template এডিটরে এই যাচাই নেই।

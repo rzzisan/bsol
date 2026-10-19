@@ -9,6 +9,7 @@ use App\Services\CheckoutOtpService;
 use App\Services\LandingPageOrderService;
 use App\Support\CheckoutFieldResolver;
 use App\Support\FrontendUrl;
+use App\Support\LandingContentValidator;
 use App\Support\LandingPageResolver;
 use App\Models\LandingPage;
 use App\Models\LandingPageProduct;
@@ -819,6 +820,7 @@ class LandingPageController extends Controller
         ]);
 
         $this->assertVideoEmbedUrlsAllowed($validated['content']['video_embeds'] ?? []);
+        LandingContentValidator::validate($validated['content'] ?? null, $validated['theme_settings'] ?? null);
 
         return $validated;
     }
