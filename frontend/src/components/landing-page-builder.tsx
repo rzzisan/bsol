@@ -53,6 +53,7 @@ import { FONT_VARIABLE_CLASSES } from "@/app/lp/[slug]/fonts";
 import PublicLandingPageView, { type PublicLandingPage } from "@/components/public-landing-page-view";
 import { ADDABLE_BLOCK_TYPES, BLOCK_REGISTRY, blockLabel } from "@/components/landing-builder/blocks/registry";
 import { useUndoableState } from "@/components/landing-builder/use-undoable-state";
+import { RevisionHistory } from "@/components/landing-builder/revision-history";
 import PreviewFrame, { type PreviewDevice } from "@/components/landing-builder/preview-frame";
 import VariantPickerModal from "@/components/products/variant-picker-modal";
 import type { ProductVariant } from "@/types/variant";
@@ -584,6 +585,8 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
   const token = getStoredToken();
 
   const [loading, setLoading] = useState(true);
+  // Bumped after a version restore to load the page again.
+  const [reloadKey, setReloadKey] = useState(0);
   // Everything a save sends lives in one undoable document; the
   // destructured names and setters below keep the rest of this component
   // reading like plain useState.
@@ -1058,7 +1061,7 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
 
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, mode, pageId, initialTemplateId, sourcePageId, templateId]);
+  }, [token, mode, pageId, initialTemplateId, sourcePageId, templateId, reloadKey]);
 
   function patchItem(type: BlockType, id: string, changes: Record<string, unknown>) {
     setContentState((prev) => ({
@@ -2257,6 +2260,19 @@ export default function LandingPageBuilder({ locale: localeProp, mode, pageId, i
               <button type="button" onClick={docHistory.redo} disabled={!docHistory.canRedo} title={`${t.redo} (Ctrl+Shift+Z)`} aria-label={t.redo} className="rounded-lg border border-[var(--border)] p-2 text-[var(--foreground)] disabled:opacity-40">
                 <Redo2 size={16} />
               </button>
+              {mode === "edit" && pageId && token ? (
+                <RevisionHistory
+                  pageId={pageId}
+                  token={token}
+                  locale={locale}
+                  isDirty={isDirty}
+                  onRestored={() => {
+                    setSavedSnapshot(null);
+                    setLoading(true);
+                    setReloadKey((key) => key + 1);
+                  }}
+                />
+              ) : null}
             </div>
             {!isAdminTemplateMode ? (
               <span className={`text-xs ${isDirty ? "font-semibold text-amber-500" : "text-[var(--muted)]"}`}>
