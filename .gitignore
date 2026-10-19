@@ -7,3 +7,7 @@ Flash Cards – Goofi World_files/
 gha-creds-*.json
 asr920_router_context.md
 router-logs/
+
+# Server-only folders, never committed
+/logserver/
+node_modules/
