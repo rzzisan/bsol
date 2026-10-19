@@ -12,6 +12,7 @@ use App\Support\FrontendUrl;
 use App\Support\LandingPageResolver;
 use App\Models\LandingPage;
 use App\Models\LandingPageProduct;
+use App\Models\LandingPageRevision;
 use App\Models\Order;
 use App\Models\ShopProfile;
 use App\Models\LandingTemplate;
@@ -602,6 +603,8 @@ class LandingPageController extends Controller
         }
 
         $page = DB::transaction(function () use ($page, $data, $shopUserIds) {
+            LandingPageRevision::snapshot($page, auth()->id());
+
             $status = $data['status'] ?? $page->status;
             $slug = $this->resolveSlug(
                 $data['slug'] ?? $page->slug,
@@ -629,6 +632,62 @@ class LandingPageController extends Controller
         });
 
         return response()->json(['success' => true, 'data' => $page]);
+    }
+
+    /**
+     * Earlier saved states of a page, newest first, without their bodies.
+     */
+    public function revisions(int $id): JsonResponse
+    {
+        $page = LandingPage::query()->whereIn('user_id', auth()->user()->shopUserIds())->findOrFail($id);
+
+        $revisions = $page->revisions()
+            ->with('user:id,name')
+            ->orderByDesc('id')
+            ->get(['id', 'landing_page_id', 'user_id', 'title', 'created_at'])
+            ->map(fn (LandingPageRevision $revision) => [
+                'id' => $revision->id,
+                'title' => $revision->title,
+                'created_at' => $revision->created_at,
+                'user_name' => $revision->user?->name,
+            ]);
+
+        return response()->json(['success' => true, 'data' => $revisions]);
+    }
+
+    /**
+     * Puts a page back to an earlier revision. The current state is stored
+     * first, so a restore can itself be undone. Status and slug stay as they
+     * are: going back in content never unpublishes or moves a page.
+     */
+    public function restoreRevision(int $id, int $revisionId): JsonResponse
+    {
+        $shopUserIds = auth()->user()->shopUserIds();
+        $page = LandingPage::query()->whereIn('user_id', $shopUserIds)->findOrFail($id);
+        $revision = $page->revisions()->findOrFail($revisionId);
+
+        $page = DB::transaction(function () use ($page, $revision, $shopUserIds) {
+            LandingPageRevision::snapshot($page, auth()->id(), force: true);
+
+            $page->update([
+                'title' => $revision->title,
+                'theme_settings' => $revision->theme_settings,
+                'content' => $revision->content,
+                'seo_meta' => $revision->seo_meta,
+                'custom_css' => $revision->custom_css,
+            ]);
+            // Products deleted or moved to another shop since are dropped here.
+            $this->syncProducts($page, $revision->products ?? [], $shopUserIds);
+
+            return $page->load(['template', 'products.product.images', 'products.variant.optionValues.option']);
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => array_merge($page->toArray(), [
+                'public_url' => $this->publicUrlFor($page),
+            ]),
+        ]);
     }
 
     public function destroy(int $id): JsonResponse

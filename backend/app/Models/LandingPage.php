@@ -109,6 +109,11 @@ class LandingPage extends Model
         return $this->belongsTo(LandingTemplate::class, 'template_id');
     }
 
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(LandingPageRevision::class);
+    }
+
     public function products(): HasMany
     {
         return $this->hasMany(LandingPageProduct::class)->orderBy('sort_order');

@@ -486,3 +486,12 @@ SAAS_MODULE_CONTEXT.md §17.4-এর review থেকে পাওয়া এ�
 - **প্রোডাক্ট:** `products_layout` = `list` (ডিফল্ট, আগের মতো) | `cards` (২ কলাম, বড় ছবি) | `compact` (ছবি ছাড়া এক লাইন)। চেকবক্স, ভ্যারিয়েন্ট পিকার, quantity ও কার্ট লজিক তিনটাতেই একই।
 - **চেকআউট:** `checkout_layout` = `split` (ডিফল্ট, দুই কলাম) | `stacked` (এক কলাম, `max-w-2xl`)। `show_delivery_info` (ডিফল্ট true) false হলে নিচের "ডেলিভারি ও যোগাযোগ" বক্স লুকায়।
 - তিনটা সেটিং বিল্ডারের Products ট্যাবে (admin template মোডে এই ট্যাব নেই, তাই টেমপ্লেটে ডিফল্টই থাকে)।
+
+## ৩০. ধাপ ৬ক: ভার্সন হিস্টোরি (2026-10-19)
+- নতুন টেবিল `landing_page_revisions` (`landing_page_id`, `user_id`, `title`, `theme_settings`, `content`, `seo_meta`, `custom_css`, `products` JSON, `created_at`)। মডেল `LandingPageRevision`।
+- `LandingPageController::update()` save-এর আগে পেজের অবস্থা snapshot করে। শেষ snapshot ২ মিনিটের কম পুরনো হলে, অথবা অবস্থা শেষ snapshot-এর সমান হলে, নতুন snapshot নেয় না। প্রতি পেজে শেষ ৩০টা রাখে (`KEEP`), বাকিগুলো মুছে যায়।
+- `GET /landing/pages/{id}/revisions`: তালিকা (id, title, created_at, user_name), বডি ছাড়া।
+- `POST /landing/pages/{id}/revisions/{revisionId}/restore`: আগে এখনকার অবস্থা জোর করে snapshot করে (তাই restore-ও undo করা যায়), তারপর title, theme, content, SEO, CSS আর প্রোডাক্ট ফিরিয়ে আনে। প্রোডাক্ট `syncProducts` দিয়ে আসে, তাই মুছে যাওয়া বা অন্য শপের প্রোডাক্ট বাদ পড়ে। Status আর slug বদলায় না।
+- Duplicate ও admin-এর এডিট snapshot নেয় না।
+- বিল্ডারের নিচের বারে undo/redo-র পাশে "ভার্সন হিস্টোরি" (`revision-history.tsx`, শুধু edit মোডে)। Restore-এর পর `reloadKey` বাড়িয়ে পেজ আবার লোড হয়।
+- **Deploy-এ লাগবে:** `php artisan migrate --force` (নতুন টেবিল)।
